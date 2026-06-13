@@ -11,6 +11,8 @@ let currentCategory = 'all';
 let searchQuery = '';
 let currentPage = 1;
 const itemsPerPage = 24;
+let filterSupplier = 'all';
+let filterOnlyStock = false;
 
 // Supplier display names mapping
 const supplierNames = {
@@ -37,6 +39,9 @@ const cartTotalEl = document.getElementById('b2b-cart-total');
 const cartCountEl = document.getElementById('b2b-cart-count');
 const checkoutForm = document.getElementById('b2b-checkout-form');
 const toastEl = document.getElementById('b2b-toast');
+const filterSupplierSelect = document.getElementById('b2b-filter-supplier');
+const filterStockCheckbox = document.getElementById('b2b-filter-stock');
+const printPdfBtn = document.getElementById('b2b-print-pdf-btn');
 const toastMessageEl = document.getElementById('b2b-toast-message');
 
 // --- INITIALIZE PORTAL ---
@@ -94,6 +99,27 @@ function setupEventListeners() {
 
   // Checkout submit
   checkoutForm.addEventListener('submit', handleCheckout);
+
+  // Supplier filter
+  if (filterSupplierSelect) {
+    filterSupplierSelect.addEventListener('change', (e) => {
+      filterSupplier = e.target.value;
+      fetchB2BProducts(true);
+    });
+  }
+
+  // Stock filter
+  if (filterStockCheckbox) {
+    filterStockCheckbox.addEventListener('change', (e) => {
+      filterOnlyStock = e.target.checked;
+      fetchB2BProducts(true);
+    });
+  }
+
+  // PDF button
+  if (printPdfBtn) {
+    printPdfBtn.addEventListener('click', generateComparativePDF);
+  }
 }
 
 // --- DATA FETCHING ---
@@ -140,6 +166,7 @@ async function fetchB2BProducts(clearGrid = true) {
       query = query.ilike('name', `%${searchQuery}%`);
     }
 
+
     // Sort products by name alphabetically
     query = query.order('name', { ascending: true })
                  .range(from, to);
@@ -148,7 +175,7 @@ async function fetchB2BProducts(clearGrid = true) {
 
     if (error) throw error;
 
-    const fetchedProducts = data || [];
+    let fetchedProducts = data || [];
     
     // Sort supplier products for each product from cheapest to most expensive
     fetchedProducts.forEach(product => {
@@ -157,12 +184,28 @@ async function fetchB2BProducts(clearGrid = true) {
       }
     });
 
+    // Client-side filter: by supplier
+    if (filterSupplier !== 'all') {
+      fetchedProducts = fetchedProducts.filter(p =>
+        p.supplier_products && p.supplier_products.some(sp => sp.supplier_id === filterSupplier)
+      );
+    }
+
+    // Client-side filter: only items with stock
+    if (filterOnlyStock) {
+      fetchedProducts = fetchedProducts.filter(p =>
+        p.supplier_products && p.supplier_products.some(sp =>
+          sp.available && (sp.stock === null || sp.stock > 0)
+        )
+      );
+    }
+
     baseProducts = baseProducts.concat(fetchedProducts);
 
     renderProductsList(fetchedProducts, clearGrid);
 
     // Show/hide Load More button
-    if (fetchedProducts.length === itemsPerPage) {
+    if ((data || []).length === itemsPerPage) {
       loadMoreContainer.style.display = 'block';
     } else {
       loadMoreContainer.style.display = 'none';
@@ -227,50 +270,55 @@ function renderProductsList(productsToRender, clearGrid) {
     const suppliers = product.supplier_products || [];
     
     if (suppliers.length > 0) {
-      // Find cheapest with stock
       selectedSupplier = suppliers.find(s => s.available && (s.stock === null || s.stock > 0));
-      // Fallback to first (cheapest) if none have stock
       if (!selectedSupplier) {
         selectedSupplier = suppliers[0];
       }
     }
 
-    // Build suppliers list HTML
-    let suppliersHtml = '';
+    // Build supplier dropdown + price display
+    let supplierSelectHtml = '';
+    let priceDisplayHtml = '';
+    const defaultSupplierId = selectedSupplier ? selectedSupplier.supplier_id : '';
+    const defaultPrice = selectedSupplier ? selectedSupplier.price : 0;
+
     if (suppliers.length === 0) {
-      suppliersHtml = `<div style="padding: 10px; text-align: center; font-size: 0.8rem; color: #888;">Sin proveedores cargados</div>`;
+      supplierSelectHtml = `<div style="padding: 10px; text-align: center; font-size: 0.8rem; color: #888;">Sin proveedores cargados</div>`;
+      priceDisplayHtml = '';
     } else {
+      // Build select options
+      let optionsHtml = '';
       suppliers.forEach((s, idx) => {
-        const isSelected = selectedSupplier && selectedSupplier.supplier_id === s.supplier_id;
-        const isCheapest = idx === 0;
         const displayName = supplierNames[s.supplier_id] || s.supplier_id;
-        
-        let stockText = 'Sin stock';
-        let stockClass = 'out-of-stock';
-        if (s.available) {
-          if (s.stock === null) {
-            stockText = 'Stock disp.';
-            stockClass = '';
-          } else if (s.stock > 0) {
-            stockText = `${s.stock} disp.`;
-            stockClass = '';
-          }
+        const isCheapest = idx === 0;
+        const isSelected = selectedSupplier && selectedSupplier.supplier_id === s.supplier_id;
+
+        let stockLabel = '';
+        if (!s.available || (s.stock !== null && s.stock <= 0)) {
+          stockLabel = ' — SIN STOCK';
+        } else if (s.stock === null) {
+          stockLabel = ' — Disponible';
+        } else {
+          stockLabel = ` — ${s.stock} disp.`;
         }
 
-        suppliersHtml += `
-          <div class="b2b-supplier-row ${isSelected ? 'selected' : ''}" 
-               data-supplier-id="${s.supplier_id}" 
-               onclick="selectSupplierRow(this, '${product.id}', '${s.supplier_id}')">
-            <input type="radio" name="radio-${product.id}" class="b2b-supplier-radio" ${isSelected ? 'checked' : ''}>
-            <span class="b2b-supplier-name">
-              ${displayName}
-              ${isCheapest ? '<span class="b2b-best-price-badge">Cheapest</span>' : ''}
-            </span>
-            <span class="b2b-supplier-stock ${stockClass}">${stockText}</span>
-            <span class="b2b-supplier-price">$${formatPrice(s.price)}</span>
-          </div>
-        `;
+        optionsHtml += `<option value="${s.supplier_id}" ${isSelected ? 'selected' : ''} data-price="${s.price}" data-stock="${s.stock}" data-available="${s.available}">${displayName} — $${formatPrice(s.price)}${stockLabel}${isCheapest ? ' ★' : ''}</option>`;
       });
+
+      supplierSelectHtml = `
+        <div class="b2b-supplier-select-wrapper">
+          <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #666; margin-bottom: 4px; display: block;">Proveedor</label>
+          <select class="b2b-card-supplier-select" id="supplier-select-${product.id}" onchange="handleSupplierChange(this, '${product.id}')">
+            ${optionsHtml}
+          </select>
+        </div>
+      `;
+
+      priceDisplayHtml = `
+        <div class="b2b-card-price-display" id="price-display-${product.id}">
+          <span class="b2b-card-price-value">$${formatPrice(defaultPrice)}</span>
+        </div>
+      `;
     }
 
     // Image fallback
@@ -284,9 +332,8 @@ function renderProductsList(productsToRender, clearGrid) {
         <span class="b2b-card-category">${product.category}</span>
         <h3 class="b2b-card-title" title="${product.name}">${product.name}</h3>
         
-        <div class="b2b-supplier-list">
-          ${suppliersHtml}
-        </div>
+        ${supplierSelectHtml}
+        ${priceDisplayHtml}
 
         <div class="b2b-card-footer">
           <div class="b2b-qty-selector">
@@ -310,18 +357,13 @@ function renderProductsList(productsToRender, clearGrid) {
 }
 
 // --- INTERACTION HELPERS ---
-window.selectSupplierRow = function(rowEl, productId, supplierId) {
-  const card = rowEl.closest('.b2b-card');
-  
-  // Unselect all rows in this card
-  card.querySelectorAll('.b2b-supplier-row').forEach(row => {
-    row.classList.remove('selected');
-    row.querySelector('.b2b-supplier-radio').checked = false;
-  });
-
-  // Select this row
-  rowEl.classList.add('selected');
-  rowEl.querySelector('.b2b-supplier-radio').checked = true;
+window.handleSupplierChange = function(selectEl, productId) {
+  const selectedOption = selectEl.options[selectEl.selectedIndex];
+  const price = parseFloat(selectedOption.dataset.price) || 0;
+  const priceDisplay = document.getElementById(`price-display-${productId}`);
+  if (priceDisplay) {
+    priceDisplay.querySelector('.b2b-card-price-value').textContent = `$${formatPrice(price)}`;
+  }
 };
 
 window.adjustQty = function(btnEl, amount) {
@@ -340,13 +382,13 @@ window.handleAddClick = function(productId) {
   const card = document.querySelector(`.b2b-card[data-id="${productId}"]`);
   if (!card) return;
 
-  const selectedRow = card.querySelector('.b2b-supplier-row.selected');
-  if (!selectedRow) {
-    showToast('Por favor, selecciona un proveedor', true);
+  const supplierSelect = card.querySelector('.b2b-card-supplier-select');
+  if (!supplierSelect) {
+    showToast('No hay proveedores disponibles', true);
     return;
   }
 
-  const supplierId = selectedRow.dataset.supplierId;
+  const supplierId = supplierSelect.value;
   const qty = parseInt(card.querySelector('.b2b-qty-value').value) || 1;
 
   addToCart(productId, supplierId, qty);
@@ -608,6 +650,175 @@ function handleCheckout(e) {
 
   // Redirect to WhatsApp
   window.open(waUrl, '_blank');
+}
+
+// --- PDF COMPARATIVO ---
+function generateComparativePDF() {
+  if (cart.length === 0) {
+    showToast('El pedido está vacío. Agregá productos primero.', true);
+    return;
+  }
+
+  const vendedorName = document.getElementById('b2b-vendedor-name').value.trim() || 'Vendedor';
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('es-AR', { year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+
+  // All known supplier IDs from cart data
+  const allSupplierIds = new Set();
+  cart.forEach(item => {
+    (item.suppliers || []).forEach(s => allSupplierIds.add(s.supplier_id));
+  });
+  const supplierIdList = [...allSupplierIds].sort();
+
+  // Build rows - one per cart item, flat (not grouped)
+  let rowsHtml = '';
+  let overallTotal = 0;
+
+  cart.forEach((item, idx) => {
+    const lineTotal = item.price * item.quantity;
+    overallTotal += lineTotal;
+    const allSuppliers = item.suppliers || [];
+
+    // Find cheapest available
+    const availableSuppliers = allSuppliers.filter(s => s.available && (s.stock === null || s.stock > 0));
+    const cheapestPrice = availableSuppliers.length > 0 ? Math.min(...availableSuppliers.map(s => s.price)) : null;
+
+    // Build one cell per known supplier
+    let supplierCells = '';
+    supplierIdList.forEach(sid => {
+      const sp = allSuppliers.find(s => s.supplier_id === sid);
+      const isChosen = sid === item.supplier_id;
+
+      if (!sp || (!sp.available && (sp.stock !== null && sp.stock <= 0)) || !sp.available) {
+        // No tiene este producto o sin stock
+        const label = sp ? 'SIN STOCK' : '—';
+        supplierCells += `<td style="padding:6px 8px; border:1px solid #ddd; text-align:center; color:#c62828; font-size:11px; font-weight:600; background:#fff5f5;">${label}</td>`;
+      } else {
+        const isCheapest = cheapestPrice !== null && sp.price === cheapestPrice;
+        let cellBg = '';
+        let extra = '';
+        if (isChosen) {
+          cellBg = 'background:#e3f2fd;';
+          extra = '<div style="font-size:8px; color:#1565c0; font-weight:700; margin-top:2px;">✔ ELEGIDO</div>';
+        }
+        if (isCheapest) {
+          cellBg = isChosen ? 'background:#c8e6c9;' : 'background:#e8f5e9;';
+          extra += '<div style="font-size:8px; color:#2e7d32; font-weight:700;">★ MÁS BARATO</div>';
+        }
+        supplierCells += `<td style="padding:6px 8px; border:1px solid #ddd; text-align:center; ${cellBg}">
+          <div style="font-weight:700; font-size:12px;">$${formatPrice(sp.price)}</div>
+          ${sp.stock !== null ? '<div style="font-size:9px; color:#666;">' + sp.stock + ' u.</div>' : ''}
+          ${extra}
+        </td>`;
+      }
+    });
+
+    rowsHtml += `
+      <tr style="${idx % 2 !== 0 ? 'background:#fafaf8;' : ''}">
+        <td style="padding:8px; border:1px solid #ddd; text-align:center; width:55px; vertical-align:middle;">
+          <img src="${item.image || 'assets/logo.jpg'}" style="width:45px; height:45px; object-fit:contain; border-radius:3px;" onerror="this.style.display='none'">
+        </td>
+        <td style="padding:8px; border:1px solid #ddd; vertical-align:middle;">
+          <div style="font-weight:600; font-size:11px;">${item.name}</div>
+          <div style="font-size:10px; color:#888;">${item.category || ''}</div>
+        </td>
+        <td style="padding:8px; border:1px solid #ddd; text-align:center; font-weight:600; vertical-align:middle;">${item.quantity}</td>
+        <td style="padding:8px; border:1px solid #ddd; text-align:right; font-weight:600; vertical-align:middle; white-space:nowrap;">$${formatPrice(item.price)}</td>
+        <td style="padding:8px; border:1px solid #ddd; text-align:right; font-weight:700; vertical-align:middle; white-space:nowrap; color:#152d24;">$${formatPrice(lineTotal)}</td>
+        ${supplierCells}
+      </tr>
+    `;
+  });
+
+  // Build supplier header columns
+  let supplierHeaders = '';
+  supplierIdList.forEach(sid => {
+    const name = supplierNames[sid] || sid;
+    supplierHeaders += `<th style="padding:6px 8px; border:1px solid #ddd; text-align:center; font-size:10px; min-width:90px; background:#f0ece2; writing-mode:horizontal-tb;">${name}</th>`;
+  });
+
+  const tableHtml = `
+    <table style="width:100%; border-collapse:collapse; font-size:12px; font-family:'Segoe UI',Arial,sans-serif; margin-bottom:20px;">
+      <thead>
+        <tr>
+          <th style="padding:8px; border:1px solid #ddd; width:55px; background:#152d24; color:white;">Img</th>
+          <th style="padding:8px; border:1px solid #ddd; text-align:left; background:#152d24; color:white;">Producto</th>
+          <th style="padding:8px; border:1px solid #ddd; text-align:center; width:45px; background:#152d24; color:white;">Cant.</th>
+          <th style="padding:8px; border:1px solid #ddd; text-align:right; width:80px; background:#152d24; color:white;">P.Unit</th>
+          <th style="padding:8px; border:1px solid #ddd; text-align:right; width:80px; background:#152d24; color:white;">Subtotal</th>
+          ${supplierHeaders}
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+    </table>
+  `;
+
+  // Full HTML document for print
+  const printHtml = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <title>Comprobante de Compra - BO growclub</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; color: #333; padding: 25px; background: #fff; }
+        @media print {
+          body { padding: 10px; font-size: 11px; }
+          .no-print { display: none !important; }
+          @page { margin: 8mm; size: landscape; }
+          table { font-size: 10px !important; }
+        }
+      </style>
+    </head>
+    <body>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; border-bottom:3px solid #152d24; padding-bottom:12px;">
+        <div>
+          <h1 style="font-size:20px; color:#152d24; margin-bottom:3px;">🌿 BO growclub</h1>
+          <p style="font-size:12px; color:#c39b4b; text-transform:uppercase; letter-spacing:2px; font-weight:600;">Comprobante de Orden de Compra B2B</p>
+        </div>
+        <div style="text-align:right; font-size:11px; color:#666;">
+          <p><strong>Vendedor:</strong> ${vendedorName}</p>
+          <p><strong>Fecha:</strong> ${dateStr} — ${timeStr}</p>
+          <p style="margin-top:4px; padding:3px 8px; background:#e8f5e9; border-radius:4px; display:inline-block; font-weight:600; color:#2e7d32;">Ítems: ${cart.length} | Unidades: ${cart.reduce((s,i) => s + i.quantity, 0)}</p>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px; padding:8px 12px; background:#fffde7; border:1px solid #fff9c4; border-radius:4px; font-size:10px; color:#555;">
+        <strong style="color:#f57f17;">📋 LEYENDA:</strong>
+        Las columnas de la derecha muestran el <strong>precio de cada proveedor</strong> para ese producto.
+        <span style="color:#c62828; font-weight:700;">SIN STOCK</span> = no disponible.
+        <span style="color:#2e7d32; font-weight:700;">★ MÁS BARATO</span> = menor precio.
+        <span style="color:#1565c0; font-weight:700;">✔ ELEGIDO</span> = proveedor seleccionado en este pedido.
+        <strong>—</strong> = el proveedor no vende este producto.
+      </div>
+
+      ${tableHtml}
+
+      <div style="background:#152d24; color:white; padding:12px 18px; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:15px; font-weight:700;">💰 TOTAL ESTIMADO DE COMPRA</span>
+        <span style="font-size:20px; font-weight:700; color:#c39b4b;">$${formatPrice(overallTotal)}</span>
+      </div>
+
+      <div class="no-print" style="margin-top:20px; text-align:center;">
+        <button onclick="window.print()" style="background:#152d24; color:white; border:none; padding:12px 30px; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; margin-right:10px;">🖨️ Imprimir / Guardar como PDF</button>
+        <button onclick="window.close()" style="background:#e0e0e0; color:#333; border:none; padding:12px 30px; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer;">Cerrar</button>
+      </div>
+    </body>
+    </html>
+  `;
+
+  // Open in new window for print
+  const printWindow = window.open('', '_blank', 'width=1200,height=800');
+  if (printWindow) {
+    printWindow.document.write(printHtml);
+    printWindow.document.close();
+  } else {
+    showToast('El navegador bloqueó la ventana emergente. Habilitá los popups.', true);
+  }
 }
 
 // --- UI HELPERS ---

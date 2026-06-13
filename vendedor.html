@@ -268,85 +268,53 @@
       font-family: var(--font-sans);
     }
 
-    /* Suppliers List inside Card */
-    .b2b-supplier-list {
+    /* Supplier Select Dropdown inside Card */
+    .b2b-supplier-select-wrapper {
       margin-top: auto;
+      margin-bottom: 10px;
+    }
+
+    .b2b-card-supplier-select {
+      width: 100%;
+      padding: 9px 12px;
       border: 1px solid var(--color-b2b-border);
       border-radius: var(--border-radius-sm);
-      overflow: hidden;
-      margin-bottom: 15px;
-    }
-
-    .b2b-supplier-row {
-      display: grid;
-      grid-template-columns: 20px 1fr auto auto;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 10px;
-      border-bottom: 1px solid var(--color-b2b-border);
-      cursor: pointer;
-      font-size: 0.85rem;
-      transition: var(--transition-fast);
-      position: relative;
-    }
-
-    .b2b-supplier-row:last-child {
-      border-bottom: none;
-    }
-
-    .b2b-supplier-row:hover {
       background: var(--color-neutral-light);
-    }
-
-    .b2b-supplier-row.selected {
-      background: rgba(195, 155, 75, 0.08);
-      font-weight: 600;
-    }
-
-    .b2b-supplier-row.selected::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 3px;
-      background: var(--color-accent-gold);
-    }
-
-    .b2b-supplier-radio {
-      accent-color: var(--color-accent-gold);
-    }
-
-    .b2b-supplier-name {
+      font-size: 0.82rem;
+      font-family: var(--font-sans);
       color: var(--color-neutral-dark);
+      cursor: pointer;
+      outline: none;
+      transition: var(--transition-fast);
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 30px;
     }
 
-    .b2b-supplier-stock {
-      color: #666;
-      font-size: 0.75rem;
+    .b2b-card-supplier-select:hover {
+      border-color: var(--color-accent-gold);
     }
 
-    .b2b-supplier-stock.out-of-stock {
-      color: #d9534f;
-      font-weight: 600;
+    .b2b-card-supplier-select:focus {
+      border-color: var(--color-accent-gold);
+      box-shadow: 0 0 0 2px rgba(195, 155, 75, 0.2);
     }
 
-    .b2b-supplier-price {
-      color: var(--color-primary);
-      font-weight: 600;
+    /* Price Display */
+    .b2b-card-price-display {
+      text-align: center;
+      margin-bottom: 15px;
+      padding: 8px 0;
     }
 
-    .b2b-best-price-badge {
-      background: var(--color-badge-cheapest);
-      color: var(--color-badge-cheapest-text);
-      font-size: 0.65rem;
+    .b2b-card-price-value {
+      font-size: 1.5rem;
       font-weight: 700;
-      padding: 2px 6px;
-      border-radius: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-left: 5px;
-      display: inline-block;
+      color: var(--color-primary);
+      font-family: var(--font-sans);
     }
 
     .b2b-card-footer {
@@ -787,6 +755,26 @@
         <li><button class="b2b-category-btn" data-category="Parafernalia">🍁 Parafernalia <span class="category-count" id="count-Parafernalia"></span></button></li>
         <li><button class="b2b-category-btn" data-category="Otros">✨ Otros <span class="category-count" id="count-Otros"></span></button></li>
       </ul>
+
+      <!-- B2B Advanced Filters -->
+      <div style="margin-top: 25px; border-top: 2px solid var(--color-neutral-stone); padding-top: 20px;">
+        <h2 class="b2b-sidebar-title" style="margin-bottom: 10px; font-size: 0.95rem;">Filtrar por Proveedor</h2>
+        <div class="b2b-form-group" style="margin-bottom: 15px;">
+          <select id="b2b-filter-supplier" class="b2b-form-input" style="font-size: 0.85rem; padding: 6px 10px; height: auto;">
+            <option value="all">Todos los Proveedores</option>
+            <option value="astrogrow">AstroGrow</option>
+            <option value="santaplanta">Santa Planta</option>
+            <option value="candyclub">Candy Club</option>
+            <option value="rosse">Distribuidora Rosse</option>
+          </select>
+        </div>
+        
+        <h2 class="b2b-sidebar-title" style="margin-bottom: 10px; font-size: 0.95rem;">Disponibilidad</h2>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; color: var(--color-neutral-dark); user-select: none;">
+          <input type="checkbox" id="b2b-filter-stock" style="accent-color: var(--color-accent-gold); width: 16px; height: 16px; margin: 0;">
+          Solo artículos con Stock
+        </label>
+      </div>
     </aside>
 
     <!-- Products Content Area -->
@@ -842,6 +830,13 @@
           <label for="b2b-order-notes" class="b2b-form-label">Notas Adicionales</label>
           <textarea id="b2b-order-notes" class="b2b-form-input" style="height: 60px; resize: none;" placeholder="Ej. Envío urgente, cambios de última hora..."></textarea>
         </div>
+        <button type="button" class="b2b-checkout-btn" id="b2b-print-pdf-btn" style="background: var(--color-neutral-stone); color: var(--color-primary); margin-bottom: 12px; border: 1px solid var(--color-b2b-border);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+            <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          Generar Comprobante PDF
+        </button>
         <button type="submit" class="b2b-checkout-btn" id="b2b-send-order-btn">
           <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;">
             <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.003 5.385 5.39.002 12.007 0c3.201.001 6.212 1.244 8.477 3.513 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.618-5.39 11.999-12.007 12.001-2.005-.002-3.97-.502-5.73-1.45L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436-.002 9.858-4.427 9.86-9.868.002-2.635-1.02-5.11-2.88-6.973-1.859-1.863-4.336-2.888-6.974-2.89-5.441 0-9.863 4.423-9.865 9.864-.001 1.704.453 3.37 1.314 4.821L1.895 21.05l4.752-1.896zm12.333-5.32c-.328-.164-1.942-.958-2.242-1.069-.301-.11-.52-.164-.738.164-.219.328-.848 1.069-1.039 1.288-.19.22-.382.246-.71.082-.328-.164-1.386-.51-2.64-1.627-.975-.87-1.633-1.946-1.824-2.274-.19-.328-.02-.505.143-.668.147-.146.328-.382.493-.574.164-.192.219-.328.328-.547.11-.219.055-.41-.027-.574-.082-.164-.738-1.777-1.011-2.434-.266-.64-.539-.553-.738-.563-.19-.01-.41-.011-.629-.011-.219 0-.574.082-.875.41-.301.328-1.148 1.121-1.148 2.733 0 1.612 1.175 3.17 1.339 3.389.164.22 2.313 3.532 5.6 4.95 1.387.6 2.054.74 2.808.648.775-.095 2.242-.917 2.553-1.807.31-.89.31-1.656.219-1.807-.092-.165-.32-.256-.649-.42z"/>
