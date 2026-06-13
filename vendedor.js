@@ -2,8 +2,7 @@
 const supabaseUrl = 'https://sxbhrgvizqylnfcqzhin.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4YmhyZ3ZpenF5bG5mY3F6aGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMjM1MzEsImV4cCI6MjA5Njg5OTUzMX0.UUOwXsHXKNCjlJKdxMUlAuCtNAnNWgAroBwMlWAdTag';
 
-const { createClient } = window.supabase;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+let supabase;
 
 // --- STATE MANAGEMENT ---
 let baseProducts = []; // Stores products rendered in the grid
@@ -42,6 +41,14 @@ const toastMessageEl = document.getElementById('b2b-toast-message');
 
 // --- INITIALIZE PORTAL ---
 document.addEventListener('DOMContentLoaded', () => {
+  if (window.supabase) {
+    supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+  } else {
+    console.error('Supabase CDN failed to load.');
+    alert('Error: No se pudo cargar la librería de Supabase. Por favor, recarga la página o comprueba tu conexión.');
+    return;
+  }
+
   setupEventListeners();
   fetchB2BProducts(true); // Initial fetch (clearing grid)
   updateCartBadge();
