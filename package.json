@@ -1,0 +1,25 @@
+{
+  "name": "boeweb",
+  "version": "1.0.0",
+  "description": "Sitio web autogestionable y premium para **BO growclub**, un espacio zen para cultivo premium. Combina catálogo de e-commerce, una Rueda Zen de descuentos interactiva y una sección completa de Guías de Cultivo (Blog).",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nodira2025/boeweb.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Nodira2025/boeweb/issues"
+  },
+  "homepage": "https://github.com/Nodira2025/boeweb#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.1",
+    "dotenv": "^17.4.2"
+  }
+}
