@@ -2,7 +2,7 @@
 const supabaseUrl = 'https://sxbhrgvizqylnfcqzhin.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4YmhyZ3ZpenF5bG5mY3F6aGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMjM1MzEsImV4cCI6MjA5Njg5OTUzMX0.UUOwXsHXKNCjlJKdxMUlAuCtNAnNWgAroBwMlWAdTag';
 
-let supabase;
+let supabaseClient;
 
 // --- STATE MANAGEMENT ---
 let baseProducts = []; // Stores products rendered in the grid
@@ -42,7 +42,7 @@ const toastMessageEl = document.getElementById('b2b-toast-message');
 // --- INITIALIZE PORTAL ---
 document.addEventListener('DOMContentLoaded', () => {
   if (window.supabase) {
-    supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+    supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
   } else {
     console.error('Supabase CDN failed to load.');
     alert('Error: No se pudo cargar la librería de Supabase. Por favor, recarga la página o comprueba tu conexión.');
@@ -113,7 +113,7 @@ async function fetchB2BProducts(clearGrid = true) {
 
   try {
     // We select products and their mapped supplier relations
-    let query = supabase
+    let query = supabaseClient
       .from('products')
       .select(`
         id,
@@ -183,7 +183,7 @@ async function fetchB2BProducts(clearGrid = true) {
 async function updateCategoryCounts() {
   try {
     // Fetch count of all products
-    const { count: allCount, error: errAll } = await supabase
+    const { count: allCount, error: errAll } = await supabaseClient
       .from('products')
       .select('*', { count: 'exact', head: true });
     
@@ -199,7 +199,7 @@ async function updateCategoryCounts() {
       const countEl = document.getElementById(elementId);
       if (!countEl) continue;
 
-      const { count, error } = await supabase
+      const { count, error } = await supabaseClient
         .from('products')
         .select('*', { count: 'exact', head: true })
         .eq('category', cat);
