@@ -190,25 +190,36 @@ async function fetchB2BProducts(clearGrid = true) {
   const to = currentPage * itemsPerPage - 1;
 
   try {
-    // We select products and their mapped supplier relations
+    // Build the select query dynamically.
+    // If filtering by supplier or stock is active, we append a renamed inner join relation.
+    // This allows database-side filtering of parent rows while still retrieving ALL supplier_products for matching products.
+    let selectQuery = `
+      id,
+      name,
+      image,
+      category,
+      description,
+      supplier_products (
+        id,
+        supplier_id,
+        name,
+        price,
+        stock,
+        available,
+        link
+      )
+    `;
+
+    const isSupplierFilterActive = filterSupplier !== 'all';
+    const isStockFilterActive = filterOnlyStock;
+
+    if (isSupplierFilterActive || isStockFilterActive) {
+      selectQuery += `, filtered_query:supplier_products!inner(supplier_id, available, stock)`;
+    }
+
     let query = supabaseClient
       .from('products')
-      .select(`
-        id,
-        name,
-        image,
-        category,
-        description,
-        supplier_products (
-          id,
-          supplier_id,
-          name,
-          price,
-          stock,
-          available,
-          link
-        )
-      `);
+      .select(selectQuery);
 
     if (currentCategory !== 'all') {
       query = query.eq('category', currentCategory);
@@ -218,6 +229,15 @@ async function fetchB2BProducts(clearGrid = true) {
       query = query.ilike('name', `%${searchQuery}%`);
     }
 
+    // Apply database filters on the renamed inner relation
+    if (isSupplierFilterActive) {
+      query = query.eq('filtered_query.supplier_id', filterSupplier);
+    }
+
+    if (isStockFilterActive) {
+      query = query.eq('filtered_query.available', true)
+                   .or('stock.is.null,stock.gt.0', { foreignTable: 'filtered_query' });
+    }
 
     // Sort products by name alphabetically
     query = query.order('name', { ascending: true })
@@ -232,25 +252,11 @@ async function fetchB2BProducts(clearGrid = true) {
     // Sort supplier products for each product from cheapest to most expensive
     fetchedProducts.forEach(product => {
       if (product.supplier_products) {
+        // Clean up the extra filtered_query key returned by Supabase
+        delete product.filtered_query;
         product.supplier_products.sort((a, b) => a.price - b.price);
       }
     });
-
-    // Client-side filter: by supplier
-    if (filterSupplier !== 'all') {
-      fetchedProducts = fetchedProducts.filter(p =>
-        p.supplier_products && p.supplier_products.some(sp => sp.supplier_id === filterSupplier)
-      );
-    }
-
-    // Client-side filter: only items with stock
-    if (filterOnlyStock) {
-      fetchedProducts = fetchedProducts.filter(p =>
-        p.supplier_products && p.supplier_products.some(sp =>
-          sp.available && (sp.stock === null || sp.stock > 0)
-        )
-      );
-    }
 
     baseProducts = baseProducts.concat(fetchedProducts);
 
@@ -719,12 +725,8 @@ function generateComparativePDF() {
   const dateStr = now.toLocaleDateString('es-AR', { year: 'numeric', month: 'long', day: 'numeric' });
   const timeStr = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 
-  // All known supplier IDs from cart data
-  const allSupplierIds = new Set();
-  cart.forEach(item => {
-    (item.suppliers || []).forEach(s => allSupplierIds.add(s.supplier_id));
-  });
-  const supplierIdList = [...allSupplierIds].sort();
+  // Show comparison for ALL defined B2B suppliers in the system
+  const supplierIdList = ['astrogrow', 'santaplanta', 'rosse', 'candyclub'];
 
   // Build rows - one per cart item, flat (not grouped)
   let rowsHtml = '';
