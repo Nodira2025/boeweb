@@ -7,6 +7,12 @@ let supabaseClient;
 // --- STATE MANAGEMENT ---
 let baseProducts = []; // Stores products rendered in the grid
 let cart = JSON.parse(localStorage.getItem('boeweb_b2b_cart')) || [];
+// Clear legacy carts once to prevent price mismatch with the new 30% discount system
+if (localStorage.getItem('boeweb_b2b_cart_version') !== '1.1') {
+  cart = [];
+  localStorage.setItem('boeweb_b2b_cart', JSON.stringify(cart));
+  localStorage.setItem('boeweb_b2b_cart_version', '1.1');
+}
 let currentCategory = 'all';
 let searchQuery = '';
 let currentPage = 1;
@@ -249,11 +255,14 @@ async function fetchB2BProducts(clearGrid = true) {
 
     let fetchedProducts = data || [];
     
-    // Sort supplier products for each product from cheapest to most expensive
+    // Sort supplier products for each product from cheapest to most expensive and apply 30% B2B discount
     fetchedProducts.forEach(product => {
       if (product.supplier_products) {
         // Clean up the extra filtered_query key returned by Supabase
         delete product.filtered_query;
+        product.supplier_products.forEach(sp => {
+          sp.price = sp.price * 0.70; // Apply 30% wholesale discount (precios reales con proveedor)
+        });
         product.supplier_products.sort((a, b) => a.price - b.price);
       }
     });
