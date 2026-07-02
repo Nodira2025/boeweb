@@ -386,6 +386,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateCartBadge() {
     const totalQty = cart.reduce((acc, item) => acc + item.quantity, 0);
     cartCountEl.textContent = totalQty;
+    const mobileCartCountEl = document.getElementById('mobile-cart-count');
+    if (mobileCartCountEl) {
+      mobileCartCountEl.textContent = totalQty;
+    }
   }
 
   function toggleCart() {
@@ -1031,17 +1035,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Switch between Catalog view and Blog view
   function showView(view) {
+    const mobileShopBtn = document.getElementById('mobile-shop-btn');
+    const mobileBlogBtn = document.getElementById('mobile-blog-btn');
+
     if (view === 'shop') {
       catalogSection.style.display = 'block';
-      if (heroSection) heroSection.style.display = 'flex'; // Hero section style is display: flex in desktop
+      if (heroSection) heroSection.style.display = ''; // Clear inline flex
       blogSection.style.display = 'none';
       if (blogTrigger) blogTrigger.classList.remove('active');
+      
+      // Update mobile bottom nav active classes
+      if (mobileShopBtn) mobileShopBtn.classList.add('active');
+      if (mobileBlogBtn) mobileBlogBtn.classList.remove('active');
+      
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (view === 'blog') {
       catalogSection.style.display = 'none';
       if (heroSection) heroSection.style.display = 'none';
       blogSection.style.display = 'block';
       if (blogTrigger) blogTrigger.classList.add('active');
+      
+      // Update mobile bottom nav active classes
+      if (mobileShopBtn) mobileShopBtn.classList.remove('active');
+      if (mobileBlogBtn) mobileBlogBtn.classList.add('active');
+      
       renderBlogGrid();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -1205,4 +1222,30 @@ document.addEventListener('DOMContentLoaded', () => {
       applyFiltersAndRender(true);
     });
   });
+
+  // --- MOBILE BOTTOM NAVIGATION LISTENERS ---
+  const mobileShopBtn = document.getElementById('mobile-shop-btn');
+  const mobileBlogBtn = document.getElementById('mobile-blog-btn');
+  const mobileCartBtn = document.getElementById('mobile-cart-btn');
+
+  if (mobileShopBtn) {
+    mobileShopBtn.addEventListener('click', () => {
+      showView('shop');
+      // If we are already on shop, scroll to catalog
+      const catalogEl = document.getElementById('catalog-section');
+      if (catalogEl) {
+        catalogEl.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  }
+
+  if (mobileBlogBtn) {
+    mobileBlogBtn.addEventListener('click', () => {
+      showView('blog');
+    });
+  }
+
+  if (mobileCartBtn) {
+    mobileCartBtn.addEventListener('click', toggleCart);
+  }
 });

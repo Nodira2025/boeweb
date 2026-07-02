@@ -52,7 +52,7 @@
 
       <!-- Navigation & Cart Area -->
       <div class="header-cart-area" style="display: flex; gap: 15px; align-items: center;">
-        <button class="btn btn-secondary nav-blog-btn" id="blog-trigger" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px;" aria-label="Ver guías de cultivo">
+        <button class="btn btn-secondary nav-blog-btn no-mobile" id="blog-trigger" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px;" aria-label="Ver guías de cultivo">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
             <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
@@ -60,7 +60,7 @@
           Guías de Cultivo
         </button>
 
-        <a href="vendedor.html" class="btn btn-secondary" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px; background: rgba(195, 155, 75, 0.1); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold-dark);" aria-label="Acceso Vendedores">
+        <a href="vendedor.html" class="btn btn-secondary no-mobile" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px; background: rgba(195, 155, 75, 0.1); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold-dark);" aria-label="Acceso Vendedores">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
             <circle cx="9" cy="7" r="4"></circle>
@@ -633,6 +633,48 @@
       <p>&copy; 2026 BO growclub. Todos los derechos reservados. Cultivando con amor y conciencia.</p>
     </div>
   </footer>
+
+  <!-- Mobile Bottom Navigation -->
+  <div class="mobile-nav">
+    <button type="button" class="mobile-nav-btn active" id="mobile-shop-btn">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <path d="M16 10a4 4 0 0 1-8 0"></path>
+      </svg>
+      <span>Tienda</span>
+    </button>
+    
+    <button type="button" class="mobile-nav-btn" id="mobile-blog-btn">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+      </svg>
+      <span>Guías</span>
+    </button>
+    
+    <a href="vendedor.html" class="mobile-nav-btn">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+        <circle cx="9" cy="7" r="4"></circle>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+      </svg>
+      <span>Vendedores</span>
+    </a>
+    
+    <button type="button" class="mobile-nav-btn" id="mobile-cart-btn">
+      <div style="position: relative; display: inline-flex; align-items: center; justify-content: center;">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+          <circle cx="9" cy="21" r="1"></circle>
+          <circle cx="20" cy="21" r="1"></circle>
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+        </svg>
+        <span class="mobile-cart-badge" id="mobile-cart-count">0</span>
+      </div>
+      <span>Carrito</span>
+    </button>
+  </div>
 
   <!-- Main JavaScript File -->
   <script src="index.js?v=1.3"></script>

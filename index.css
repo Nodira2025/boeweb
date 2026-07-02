@@ -2686,6 +2686,190 @@ textarea.form-control {
   }
 }
 
+/* Hide mobile navigation by default on desktop */
+.mobile-nav {
+  display: none;
+}
+
+/* ==========================================================================
+   Mobile Optimization Overrides & Navigation (Zen & Premium Theme)
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  /* Helper to hide desktop navigation in mobile */
+  .no-mobile {
+    display: none !important;
+  }
+
+  /* Bottom Navigation Bar */
+  .mobile-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 65px;
+    background: rgba(21, 45, 36, 0.96); /* Zen dark green */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--color-accent-gold);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 999; /* Float above content, but under detail modal */
+    box-shadow: 0 -4px 16px rgba(21, 45, 36, 0.2);
+    padding: 0 10px;
+  }
+
+  .mobile-nav-btn {
+    background: none;
+    border: none;
+    color: rgba(253, 252, 249, 0.65); /* var(--color-neutral-light) with opacity */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 500;
+    cursor: pointer;
+    gap: 4px;
+    flex: 1;
+    height: 100%;
+    transition: var(--transition-fast);
+    text-decoration: none;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-nav-btn svg {
+    stroke: currentColor;
+    transition: transform 0.2s ease;
+  }
+
+  .mobile-nav-btn:active svg {
+    transform: scale(0.9);
+  }
+
+  .mobile-nav-btn.active {
+    color: var(--color-accent-gold);
+    font-weight: 600;
+  }
+
+  .mobile-cart-badge {
+    position: absolute;
+    top: -6px;
+    right: -10px;
+    background-color: var(--color-accent-gold);
+    color: #152d24;
+    font-size: 0.62rem;
+    font-weight: 700;
+    border-radius: 10px;
+    padding: 1px 6px;
+    line-height: 1.2;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
+    min-width: 14px;
+    text-align: center;
+  }
+
+  /* Elevate floating wheel of discounts above bottom nav */
+  .floating-wheel-trigger {
+    bottom: 85px !important;
+    right: 16px !important;
+    width: 52px !important;
+    height: 52px !important;
+  }
+  
+  .floating-lotus-icon {
+    width: 24px !important;
+    height: 24px !important;
+  }
+
+  /* Space out main containers so the bottom nav doesn't cover anything */
+  body {
+    padding-bottom: 75px !important;
+  }
+
+  /* Compress hero section to save space on mobile */
+  .hero-section {
+    padding: 40px 16px !important;
+  }
+  
+  .hero-container {
+    gap: 24px !important;
+  }
+
+  .hero-description {
+    margin-bottom: 24px !important;
+  }
+
+  /* Compact header styling for mobile */
+  .brand-title {
+    font-size: 1.25rem;
+  }
+
+  .brand-logo {
+    width: 38px;
+    height: 38px;
+  }
+
+  .header-container {
+    padding: 10px 16px;
+  }
+  
+  .cart-trigger-btn {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* Category pills styling for mobile and tablet */
+@media (max-width: 992px) {
+  .catalog-sidebar {
+    margin: 0 -16px;
+    padding: 0 16px;
+    width: auto;
+  }
+
+  .category-list {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 8px;
+    padding: 8px 16px 12px 16px;
+    margin: 0;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .category-list li {
+    flex: 0 0 auto;
+  }
+
+  .category-btn {
+    width: auto !important;
+    text-align: center !important;
+    background-color: var(--color-neutral-stone) !important;
+    border: 1px solid rgba(195, 155, 75, 0.15) !important;
+    border-radius: 24px !important;
+    padding: 8px 16px !important;
+    font-size: 0.88rem !important;
+    color: var(--color-neutral-dark) !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02) !important;
+  }
+
+  .category-btn:hover {
+    background-color: var(--color-neutral-light) !important;
+    padding-left: 16px !important; /* Prevent sliding effect on mobile */
+  }
+
+  .category-btn.active {
+    background-color: var(--color-primary) !important;
+    color: #fff !important;
+    border-color: var(--color-primary) !important;
+    box-shadow: var(--shadow-sm), var(--shadow-gold) !important;
+  }
+}
+
 
 
 
