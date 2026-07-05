@@ -1755,7 +1755,7 @@ textarea.form-control {
 }
 
 /* Mobile Devices (Narrow width) */
-@media (max-width: 576px) {
+@media (max-width: 768px) {
   .header-container {
     padding: 8px 16px;
     flex-wrap: wrap;
