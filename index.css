@@ -39,6 +39,11 @@
   padding: 0;
 }
 
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
 html {
   scroll-behavior: smooth;
   font-size: 16px;
@@ -51,7 +56,6 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow-x: hidden;
   line-height: 1.6;
 }
 
@@ -687,19 +691,19 @@ button, input, select, textarea {
 
 .product-card-img-container {
   position: relative;
-  display: inline-flex;
+  display: flex;
   justify-content: center;
   align-items: center;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
 }
 
 .product-card-img {
   position: relative;
+  width: 100%;
+  height: 100%;
   max-width: 100%;
   max-height: 100%;
-  width: auto;
-  height: auto;
   object-fit: contain;
   padding: 10px;
   transition: var(--transition-smooth);
@@ -2801,6 +2805,23 @@ textarea.form-control {
     margin-bottom: 24px !important;
   }
 
+  .hero-visual {
+    width: 180px !important;
+    height: 180px !important;
+    margin: 0 auto !important;
+    position: relative !important;
+  }
+
+  .mandala-decoration {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .hero-center-logo {
+    width: 100px !important;
+    height: 100px !important;
+  }
+
   /* Compact header styling for mobile */
   .brand-title {
     font-size: 1.25rem;
@@ -2867,6 +2888,17 @@ textarea.form-control {
     color: #fff !important;
     border-color: var(--color-primary) !important;
     box-shadow: var(--shadow-sm), var(--shadow-gold) !important;
+  }
+}
+
+/* Compact cards for extra small screens to prevent price/button overflow */
+@media (max-width: 360px) {
+  .product-card-price {
+    font-size: 0.8rem !important;
+  }
+  .add-to-cart-btn {
+    width: 28px !important;
+    height: 28px !important;
   }
 }
 
