@@ -1248,4 +1248,48 @@ document.addEventListener('DOMContentLoaded', () => {
   if (mobileCartBtn) {
     mobileCartBtn.addEventListener('click', toggleCart);
   }
+
+  // Initialize Zen 420 Floating Leaves
+  initZenLeaves();
 });
+
+// --- ZEN 420 FLOATING LEAVES EFFECT ---
+function initZenLeaves() {
+  const container = document.getElementById('zen-leaves-container');
+  if (!container) return;
+
+  const colors = [
+    'rgba(195, 155, 75, 0.25)', // Gold
+    'rgba(21, 45, 36, 0.15)',   // Zen Green Dark
+    'rgba(46, 125, 50, 0.2)',   // Leaf Green Light
+    'rgba(139, 195, 74, 0.15)'  // Lime Green
+  ];
+
+  for (let i = 0; i < 15; i++) {
+    const leaf = document.createElement('div');
+    leaf.className = 'zen-leaf';
+    
+    // Random properties
+    const size = Math.random() * 20 + 12; // 12px to 32px
+    const left = Math.random() * 100; // 0% to 100%
+    const delay = Math.random() * 10; // 0s to 10s
+    const duration = Math.random() * 8 + 8; // 8s to 16s
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const rotation = Math.random() * 360;
+
+    leaf.style.width = `${size}px`;
+    leaf.style.height = `${size}px`;
+    leaf.style.left = `${left}%`;
+    leaf.style.animationDelay = `${delay}s`;
+    leaf.style.animationDuration = `${duration}s`;
+    leaf.style.color = color;
+    leaf.style.transform = `rotate(${rotation}deg)`;
+
+    leaf.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="currentColor" style="width: 100%; height: 100%;">
+        <path d="M12 2c-4 5.3-6 9.8-6 13.5C6 18.8 8.7 21 12 21s6-2.2 6-5.5c0-3.7-2-8.2-6-13.5z"/>
+      </svg>
+    `;
+    container.appendChild(leaf);
+  }
+}

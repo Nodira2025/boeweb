@@ -326,11 +326,12 @@ button, input, select, textarea {
    Hero Section
    ========================================================================== */
 .hero-section {
-  padding: 80px 24px;
+  padding: 100px 24px;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(180deg, var(--color-neutral-light) 0%, var(--color-bg) 100%);
-  border-bottom: 1px solid var(--color-neutral-stone);
+  background: radial-gradient(circle at 80% 20%, #1c3d31 0%, #0d1d17 100%);
+  border-bottom: 2px solid var(--color-accent-gold);
+  color: #fdfcf9;
 }
 
 .hero-container {
@@ -349,13 +350,14 @@ button, input, select, textarea {
 .hero-title {
   font-size: 3.2rem;
   margin-bottom: 24px;
+  color: #fdfcf9 !important;
 }
 
 .hero-description {
   font-size: 1.15rem;
   line-height: 1.7;
-  color: var(--color-neutral-dark);
-  opacity: 0.85;
+  color: #eceae4;
+  opacity: 0.9;
   margin-bottom: 36px;
   max-width: 550px;
 }
@@ -402,11 +404,104 @@ button, input, select, textarea {
   position: relative;
   z-index: 2;
   transition: var(--transition-smooth);
+  animation: logo-gentle-pulse 6s ease-in-out infinite;
 }
 
 .hero-center-logo:hover {
   transform: scale(1.03);
-  box-shadow: var(--shadow-gold);
+  box-shadow: var(--shadow-gold), 0 0 35px rgba(229, 193, 123, 0.5);
+}
+
+/* Zen 420 Particles & Floating Leaves */
+.zen-leaves-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.zen-leaf {
+  position: absolute;
+  bottom: -40px;
+  display: block;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  animation: floatUp linear infinite;
+}
+
+/* Premium glows and custom button modifications for hero actions */
+.hero-actions .btn-primary {
+  background-color: var(--color-accent-gold) !important;
+  color: #0d1d17 !important;
+  font-weight: 600 !important;
+  border: 1px solid var(--color-accent-gold) !important;
+  box-shadow: 0 4px 15px rgba(195, 155, 75, 0.4) !important;
+}
+
+.hero-actions .btn-primary:hover {
+  background-color: #e5c17b !important;
+  border-color: #e5c17b !important;
+  box-shadow: 0 6px 20px rgba(195, 155, 75, 0.6), 0 0 10px rgba(195, 155, 75, 0.3) !important;
+  transform: translateY(-2px) !important;
+}
+
+.hero-actions .btn-secondary {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: #fdfcf9 !important;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.hero-actions .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Bright gold text highlights in Hero */
+.highlight-gold {
+  color: #e5c17b !important;
+  text-shadow: 0 0 10px rgba(229, 193, 123, 0.2);
+}
+
+@keyframes floatUp {
+  0% {
+    bottom: -40px;
+    transform: translateX(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    bottom: 105%;
+    transform: translateX(60px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+@keyframes logo-gentle-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: var(--shadow-lg);
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow: var(--shadow-gold), 0 0 35px rgba(229, 193, 123, 0.5);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: var(--shadow-lg);
+  }
 }
 
 .animate-spin-slow {
