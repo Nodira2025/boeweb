@@ -277,6 +277,12 @@ document.addEventListener('DOMContentLoaded', () => {
       // Fallback image if empty
       const imageUrl = product.image && product.image !== '' ? product.image : 'assets/logo.jpg';
 
+      // Weight badge if present
+      let weightTag = '';
+      if (product.weight) {
+        weightTag = `<span class="product-card-weight-badge">${product.weight}</span>`;
+      }
+
       card.innerHTML = `
         ${stockTag}
         <div class="product-card-img-wrapper">
@@ -289,7 +295,10 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
         <div class="product-card-content">
-          <div class="product-card-category">${product.category}</div>
+          <div class="product-card-category-row">
+            <div class="product-card-category" style="margin-bottom: 0;">${product.category}</div>
+            ${weightTag}
+          </div>
           <h3 class="product-card-title" title="${product.name}">${product.name}</h3>
           <div class="product-card-footer">
             <div class="product-card-price">$${formatPrice(product.price)}</div>
