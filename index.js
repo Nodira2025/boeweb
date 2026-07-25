@@ -742,8 +742,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Submit form and redirect to WhatsApp
-  checkoutForm.addEventListener('submit', (e) => {
+  // Submit form and handle payment gateway / WhatsApp
+  checkoutForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const name = document.getElementById('checkout-name').value.trim();
@@ -753,29 +753,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const address = checkoutAddressInput.value.trim();
     const notes = document.getElementById('checkout-notes').value.trim();
 
-    // Build the Message
-    let msg = `✨ *Nuevo Pedido - BO growclub* ✨\n\n`;
-    msg += `👤 *Cliente:* ${name}\n`;
-    msg += `📞 *Teléfono:* ${phone}\n`;
-    msg += `🚚 *Entrega:* ${deliveryType === 'shipping' ? 'Envío a domicilio' : 'Retiro por el local'}\n`;
-    
-    if (deliveryType === 'shipping') {
-      msg += `📍 *Dirección:* ${address}\n`;
-    }
-    
-    msg += `💳 *Pago sugerido:* ${payment}\n`;
-
-    if (appliedCoupon) {
-      msg += `🎫 *Cupón:* ${appliedCoupon.code} (${appliedCoupon.desc})\n`;
-    }
-
-    msg += `\n🛒 *Detalle del Pedido:*\n`;
-
     let subtotal = 0;
     cart.forEach(item => {
-      const itemSubtotal = item.price * item.quantity;
-      subtotal += itemSubtotal;
-      msg += `- ${item.quantity}x ${item.name} ($${formatPrice(item.price)} c/u)\n`;
+      subtotal += item.price * item.quantity;
     });
 
     let discount = 0;
@@ -793,58 +773,149 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     const total = Math.max(0, subtotal - discount);
+    const orderId = 'BO-' + Math.floor(100000 + Math.random() * 900000);
 
-    msg += `\n💰 *Subtotal:* $${formatPrice(subtotal)}\n`;
-    if (discount > 0) {
-      msg += `📉 *${discountLabel}:* -$${formatPrice(discount)}\n`;
-    }
-    if (appliedCoupon && appliedCoupon.type === 'shipping') {
-      msg += `🚚 *Envío:* Bonificado (Gratis)\n`;
-    }
-    msg += `✨ *Total final:* $${formatPrice(total)}\n`;
-
-    if (notes !== '') {
-      msg += `\n💬 *Notas:* ${notes}\n`;
-    }
-    
-    msg += `\n¡Muchas gracias! 🙏`;
-
-    // Log Order to Order History for Member Portal
+    // Save order history locally
     const orderHistory = JSON.parse(localStorage.getItem('boeweb_order_history')) || [];
     const currentMember = JSON.parse(localStorage.getItem('boeweb_member'));
     const newOrder = {
-      id: Math.floor(10000 + Math.random() * 90000).toString(),
+      id: orderId,
       date: new Date().toISOString(),
       email: currentMember ? currentMember.email : '',
       phone: phone,
       name: name,
-      items: cart.map(i => ({ name: i.name, quantity: i.quantity, price: i.price })),
+      items: cart.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, price: i.price })),
       subtotal: subtotal,
       discount: discount,
       total: total,
-      status: 'Enviado a WhatsApp'
+      paymentMethod: payment,
+      status: payment.includes('Mercado') ? 'Pendiente Mercado Pago' : 'Confirmado'
     };
     orderHistory.unshift(newOrder);
     localStorage.setItem('boeweb_order_history', JSON.stringify(orderHistory));
 
-    // WhatsApp redirection URL
-    // Target Phone: +54 9 381 302-3185 (Formatted as 5493813023185)
+    // Save to Supabase orders table if client available
+    if (window.supabase) {
+      try {
+        const client = window.supabase.createClient('https://sxbhrgvizqylnfcqzhin.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4YmhyZ3ZpenF5bG5mY3F6aGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMjM1MzEsImV4cCI6MjA5Njg5OTUzMX0.UUOwXsHXKNCjlJKdxMUlAuCtNAnNWgAroBwMlWAdTag');
+        await client.from('orders').insert([{
+          order_id: orderId,
+          customer_name: name,
+          customer_phone: phone,
+          delivery_type: deliveryType,
+          payment_method: payment,
+          total_amount: total,
+          items_json: newOrder.items,
+          status: newOrder.status,
+          created_at: new Date().toISOString()
+        }]);
+      } catch (sbErr) {
+        console.warn('Could not record order in Supabase orders table:', sbErr);
+      }
+    }
+
+    // Load admin payment gateway config
+    const config = JSON.parse(localStorage.getItem('boeweb_payment_config')) || {};
+
+    // 1. MERCADO PAGO AUTOMATED CHECKOUT
+    if (payment.includes('Mercado Pago')) {
+      const mpToken = config.mpAccessToken || '';
+      if (!mpToken) {
+        alert('⚠️ El Administrador aún no configuró el Access Token de Mercado Pago. Podés ingresar a admin-config.html para configurarlo o seleccionar otro método de pago.');
+        return;
+      }
+
+      try {
+        const submitBtn = checkoutForm.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.textContent = '⏳ Conectando con Mercado Pago...';
+
+        const pref = await window.createMercadoPagoPreference({
+          orderId: orderId,
+          customerName: name,
+          customerPhone: phone,
+          items: cart.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, price: i.price }))
+        }, mpToken);
+
+        // Clear cart
+        cart = [];
+        localStorage.removeItem('boeweb_cart');
+        updateCartBadge();
+        appliedCoupon = null;
+        localStorage.removeItem('boeweb_applied_coupon');
+        closeCheckout();
+
+        // Redirect customer to Mercado Pago Payment URL
+        window.location.href = pref.init_point || pref.sandbox_init_point;
+        return;
+      } catch (mpErr) {
+        alert('Error al conectar con Mercado Pago: ' + mpErr.message);
+        const submitBtn = checkoutForm.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.textContent = 'Confirmar Pedido';
+        return;
+      }
+    }
+
+    // 2. BANK TRANSFER AUTOMATED DISPLAY
+    if (payment.includes('Transferencia')) {
+      const bankName = config.bankName || 'Banco Galicia';
+      const bankHolder = config.bankHolder || 'BÔ GROWCLUB S.A.';
+      const bankCbu = config.bankCbu || '0000003100012345678901';
+      const bankAlias = config.bankAlias || 'BO.GROWCLUB.MP';
+
+      let bankMsg = `✨ *BO growclub - Datos de Transferencia* ✨\n\n`;
+      bankMsg += `📦 *Pedido N°:* ${orderId}\n`;
+      bankMsg += `💰 *Monto a transferir:* $${formatPrice(total)}\n\n`;
+      bankMsg += `🏦 *Banco:* ${bankName}\n`;
+      bankMsg += `👤 *Titular:* ${bankHolder}\n`;
+      bankMsg += `🔢 *CBU/CVU:* ${bankCbu}\n`;
+      bankMsg += `🏷️ *Alias:* ${bankAlias}\n\n`;
+      bankMsg += `Al realizar la transferencia, envianos el comprobante por WhatsApp.`;
+
+      alert(`🏦 DATOS PARA TRANSFERENCIA BANCARIA\n\nPedido N°: ${orderId}\nTotal a transferir: $${formatPrice(total)}\n\nBanco: ${bankName}\nTitular: ${bankHolder}\nCBU/CVU: ${bankCbu}\nAlias: ${bankAlias}\n\n¡Al presionar Aceptar se abrirá WhatsApp para enviar tu comprobante!`);
+
+      const waPhone = "5493813023185";
+      const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(bankMsg)}`;
+      
+      cart = [];
+      localStorage.removeItem('boeweb_cart');
+      updateCartBadge();
+      appliedCoupon = null;
+      localStorage.removeItem('boeweb_applied_coupon');
+      closeCheckout();
+      window.open(waUrl, '_blank');
+      return;
+    }
+
+    // 3. WHATSAPP DIRECT CHECKOUT
+    let msg = `✨ *Nuevo Pedido - BO growclub* ✨\n\n`;
+    msg += `📦 *Pedido N°:* ${orderId}\n`;
+    msg += `👤 *Cliente:* ${name}\n`;
+    msg += `📞 *Teléfono:* ${phone}\n`;
+    msg += `🚚 *Entrega:* ${deliveryType === 'shipping' ? 'Envío a domicilio' : 'Retiro por el local'}\n`;
+    if (deliveryType === 'shipping') msg += `📍 *Dirección:* ${address}\n`;
+    msg += `💳 *Método de pago:* ${payment}\n`;
+    if (appliedCoupon) msg += `🎫 *Cupón:* ${appliedCoupon.code} (${appliedCoupon.desc})\n`;
+
+    msg += `\n🛒 *Detalle del Pedido:*\n`;
+    cart.forEach(item => {
+      msg += `- ${item.quantity}x ${item.name} ($${formatPrice(item.price)} c/u)\n`;
+    });
+
+    msg += `\n💰 *Subtotal:* $${formatPrice(subtotal)}\n`;
+    if (discount > 0) msg += `📉 *${discountLabel}:* -$${formatPrice(discount)}\n`;
+    msg += `✨ *Total final:* $${formatPrice(total)}\n`;
+    if (notes !== '') msg += `\n💬 *Notas:* ${notes}\n`;
+    msg += `\n¡Muchas gracias! 🙏`;
+
     const waPhone = "5493813023185";
     const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
 
-    // Clear cart and state
     cart = [];
     localStorage.removeItem('boeweb_cart');
     updateCartBadge();
-    
-    // Optional: Keep coupon so they don't spin again, but clear from active session once purchase is sent
     appliedCoupon = null;
     localStorage.removeItem('boeweb_applied_coupon');
-
-    // Close Modal
     closeCheckout();
-
-    // Redirect to WhatsApp in a new tab
     window.open(waUrl, '_blank');
   });
 

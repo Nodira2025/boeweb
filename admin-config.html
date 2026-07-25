@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BÔ growclub - Panel de Configuración de Pasarelas & Pagos</title>
+  <meta name="robots" content="noindex, nofollow">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  
+  <!-- Supabase JS SDK CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="index.css?v=2.5">
+  
+  <style>
+    body {
+      background-color: #0f1e18;
+      color: #f7f6f2;
+      font-family: var(--font-sans);
+      min-height: 100vh;
+    }
+
+    .admin-login-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 30, 24, 0.95);
+      backdrop-filter: blur(15px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-card {
+      background: rgba(21, 45, 36, 0.9);
+      border: 1px solid rgba(195, 155, 75, 0.4);
+      border-radius: 20px;
+      padding: 40px 32px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .admin-container {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 24px;
+    }
+
+    .admin-card {
+      background: rgba(21, 45, 36, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(195, 155, 75, 0.3);
+      border-radius: 20px;
+      padding: 36px;
+      margin-bottom: 30px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+    }
+
+    .admin-card-title {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      color: var(--color-accent-gold);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .admin-card-subtitle {
+      font-size: 0.88rem;
+      color: rgba(247, 246, 242, 0.7);
+      margin-bottom: 24px;
+    }
+
+    .admin-label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--color-accent-gold);
+      margin-bottom: 8px;
+    }
+
+    .admin-input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: var(--border-radius-md);
+      border: 1px solid rgba(195, 155, 75, 0.3);
+      background: rgba(15, 30, 24, 0.8);
+      color: #ffffff;
+      font-family: monospace;
+      font-size: 0.95rem;
+      transition: all 0.25s ease;
+    }
+
+    .admin-input:focus {
+      outline: none;
+      border-color: var(--color-accent-gold);
+      box-shadow: 0 0 0 3px rgba(195, 155, 75, 0.2);
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      background: rgba(15, 30, 24, 0.5);
+      border-radius: 12px;
+      border: 1px solid rgba(195, 155, 75, 0.15);
+      margin-bottom: 16px;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 52px;
+      height: 28px;
+    }
+
+    .switch input { opacity: 0; width: 0; height: 0; }
+
+    .slider {
+      position: absolute; cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(255, 255, 255, 0.2);
+      transition: .4s;
+      border-radius: 34px;
+    }
+
+    .slider:before {
+      position: absolute; content: "";
+      height: 20px; width: 20px;
+      left: 4px; bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider { background-color: var(--color-accent-gold); }
+    input:checked + .slider:before { transform: translateX(24px); }
+
+    .btn-admin-save {
+      background: linear-gradient(135deg, var(--color-accent-gold) 0%, #b88e28 100%);
+      color: #0f1e18;
+      border: none;
+      padding: 16px 36px;
+      border-radius: var(--border-radius-full);
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      width: 100%;
+      box-shadow: 0 8px 25px rgba(195, 155, 75, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    .btn-admin-save:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(195, 155, 75, 0.45);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ADMIN AUTH LOGIN MODAL -->
+  <div class="admin-login-overlay" id="admin-login-modal">
+    <div class="login-card">
+      <div style="font-size: 2.5rem; margin-bottom: 12px;">🔐</div>
+      <h2 style="font-family: var(--font-display); color: var(--color-accent-gold); margin-bottom: 8px;">Panel Administrador</h2>
+      <p style="font-size: 0.85rem; color: rgba(247,246,242,0.7); margin-bottom: 24px;">Ingresá la clave de administrador para gestionar credenciales y pagos.</p>
+      
+      <div style="margin-bottom: 20px;">
+        <input type="password" id="admin-passcode-input" class="admin-input" placeholder="Clave de Administrador" style="text-align: center;">
+      </div>
+      <button onclick="checkAdminPasscode()" class="btn-admin-save">Ingresar al Panel</button>
+      <p id="admin-login-error" style="color: #ff6b6b; font-size: 0.85rem; margin-top: 12px; display: none;">Clave incorrecta. Reintentá.</p>
+    </div>
+  </div>
+
+  <!-- MAIN ADMIN DASHBOARD (Hidden until auth) -->
+  <div id="admin-dashboard-content" style="display: none;">
+    <!-- Header -->
+    <header class="main-header" style="background: rgba(15, 30, 24, 0.98);">
+      <div class="header-container">
+        <a href="index.html" class="header-logo-area" style="text-decoration: none;">
+          <img src="assets/logo.jpg" alt="BO growclub Logo" class="brand-logo">
+          <div class="brand-text">
+            <span class="brand-title">BO</span>
+            <span class="brand-subtitle">growclub ADMIN</span>
+          </div>
+        </a>
+        <a href="index.html" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem; text-decoration: none;">
+          ← Volver a la Tienda
+        </a>
+      </div>
+    </header>
+
+    <div class="admin-container">
+      
+      <!-- Mercado Pago Credentials Card -->
+      <div class="admin-card">
+        <div class="admin-card-title">
+          <svg style="width: 24px; height: 24px;" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
+          <span>Mercado Pago API (Checkout Automatizado)</span>
+        </div>
+        <p class="admin-card-subtitle">
+          Ingresá tus credenciales de Mercado Pago. Podés usar tu Access Token de Producción (`APP_USR-...`) o tu Token de Pruebas (`TEST-...`).
+        </p>
+
+        <div class="toggle-row">
+          <div>
+            <strong style="color: #fff; font-size: 0.95rem; display: block;">Habilitar Checkout por Mercado Pago</strong>
+            <span style="font-size: 0.8rem; color: rgba(247,246,242,0.6);">Los clientes podrán pagar directo con tarjetas o billetera virtual.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="mp-active-toggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <label class="admin-label" for="mp-access-token">Mercado Pago Access Token *</label>
+          <input type="text" id="mp-access-token" class="admin-input" placeholder="Ej: APP_USR-1234567890123456-abcdef..." autocomplete="off">
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <label class="admin-label" for="mp-public-key">Mercado Pago Public Key (Opcional)</label>
+          <input type="text" id="mp-public-key" class="admin-input" placeholder="Ej: APP_USR-78901234-5678-..." autocomplete="off">
+        </div>
+      </div>
+
+      <!-- Bank Transfer Config Card -->
+      <div class="admin-card">
+        <div class="admin-card-title">
+          <svg style="width: 24px; height: 24px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"/></svg>
+          <span>Datos para Transferencia Bancaria</span>
+        </div>
+        <p class="admin-card-subtitle">
+          Configurá los datos bancarios para que los clientes puedan transferir directamente a tu cuenta.
+        </p>
+
+        <div class="toggle-row">
+          <div>
+            <strong style="color: #fff; font-size: 0.95rem; display: block;">Habilitar Transferencia Bancaria Directa</strong>
+            <span style="font-size: 0.8rem; color: rgba(247,246,242,0.6);">Se mostrarán los datos bancarios al confirmar el pedido.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="bank-active-toggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px;">
+          <div>
+            <label class="admin-label" for="bank-name">Banco / Entidad</label>
+            <input type="text" id="bank-name" class="admin-input" placeholder="Ej: Banco Galicia / Mercado Pago">
+          </div>
+          <div>
+            <label class="admin-label" for="bank-holder">Titular de la Cuenta</label>
+            <input type="text" id="bank-holder" class="admin-input" placeholder="Ej: BÔ GROWCLUB S.A.">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;">
+          <div>
+            <label class="admin-label" for="bank-cbu">CBU / CVU</label>
+            <input type="text" id="bank-cbu" class="admin-input" placeholder="Ej: 0000003100012345678901">
+          </div>
+          <div>
+            <label class="admin-label" for="bank-alias">Alias de Pago</label>
+            <input type="text" id="bank-alias" class="admin-input" placeholder="Ej: BO.GROWCLUB.MP">
+          </div>
+        </div>
+      </div>
+
+      <!-- Security Settings Card -->
+      <div class="admin-card">
+        <div class="admin-card-title">
+          <svg style="width: 24px; height: 24px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <span>Seguridad del Panel</span>
+        </div>
+        <div style="margin-bottom: 20px;">
+          <label class="admin-label" for="admin-new-passcode">Cambiar Clave de Acceso del Administrador</label>
+          <input type="password" id="admin-new-passcode" class="admin-input" placeholder="Dejar en blanco para mantener clave actual (boeweb2026)">
+        </div>
+      </div>
+
+      <!-- Submit Action -->
+      <div style="margin-bottom: 60px;">
+        <button onclick="saveAdminConfig()" class="btn-admin-save">💾 Guardar Configuración de Pagos</button>
+        <p id="admin-save-msg" style="text-align: center; color: #25D366; font-weight: 600; margin-top: 12px; display: none;">
+          ✓ ¡Configuración guardada con éxito!
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="admin-config.js?v=1.0"></script>
+</body>
+</html>
