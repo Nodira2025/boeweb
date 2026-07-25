@@ -1,10 +1,23 @@
 /**
  * BO growclub - Member & VIP Portal Logic (v2.4)
  * Implements Multi-account Login/Registration, Order History, Monthly Raffle Surveys,
- * and Seeds Redemption Store (Canjes por Cupones y Productos $0).
+ * Seeds Redemption Store, and Supabase Cloud Synchronization with localStorage Fallback.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  // --- SUPABASE CLIENT SETUP (HYBRID SYNC) ---
+  const SUPABASE_URL = "https://sxbhrgvizqylnfcqzhin.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4YmhyZ3ZpenF5bG5mY3F6aGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMjM1MzEsImV4cCI6MjA5Njg5OTUzMX0.UUOwXsHXKNCjlJKdxMUlAuCtNAnNWgAroBwMlWAdTag";
+
+  let supabaseClient = null;
+  if (window.supabase) {
+    try {
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (err) {
+      console.warn("Supabase initialization fallback to localStorage:", err.message);
+    }
+  }
+
   // --- STATE & DATA ---
   let currentMember = JSON.parse(localStorage.getItem('boeweb_member')) || null;
   let registeredUsers = JSON.parse(localStorage.getItem('boeweb_registered_users')) || [];
@@ -16,13 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
     PLANTA: { name: 'Miembro Planta', discount: 0.10, minSeeds: 500, nextMin: 1500, label: 'Planta (10% OFF)' },
     ARBOL: { name: 'Árbol Zen VIP', discount: 0.15, minSeeds: 1500, nextMin: null, label: 'Árbol Zen (15% OFF)' }
   };
-
-  // Coupons available per tier
-  const VIP_COUPONS = [
-    { code: 'VIPBROTE5', desc: '5% OFF Fijo de Bienvenida', tier: 'BROTE', value: 0.05, type: 'percent' },
-    { code: 'VIPPLANTA10', desc: '10% OFF Fijo en toda la Tienda', tier: 'PLANTA', value: 0.10, type: 'percent' },
-    { code: 'VIPZEN15', desc: '15% OFF + Envíos Prioritarios', tier: 'ARBOL', value: 0.15, type: 'percent' }
-  ];
 
   // Redeemable Physical Products ($0 cost in cart)
   const REDEEMABLE_PRODUCTS = [
@@ -139,6 +145,53 @@ document.addEventListener('DOMContentLoaded', () => {
     if (viewCertBtn) viewCertBtn.addEventListener('click', openCertificateModal);
   }
 
+  // --- CLOUD SYNC HELPERS ---
+  async function syncMemberToCloud(member) {
+    if (!supabaseClient || !member) return;
+    try {
+      const payload = {
+        name: member.name,
+        email: member.email,
+        phone: member.phone,
+        grow_type: member.growType,
+        seeds: member.seeds || 100,
+        raffle_ticket: member.raffleTicket || null,
+        survey_completed: member.surveyCompleted || false,
+        updated_at: new Date().toISOString()
+      };
+      await supabaseClient.from('boeweb_members').upsert(payload, { onConflict: 'email' });
+    } catch (err) {
+      console.warn("Cloud sync fallback:", err.message);
+    }
+  }
+
+  async function fetchMemberFromCloud(credential) {
+    if (!supabaseClient || !credential) return null;
+    try {
+      const { data, error } = await supabaseClient
+        .from('boeweb_members')
+        .select('*')
+        .or(`email.eq.${credential},phone.eq.${credential}`)
+        .maybeSingle();
+
+      if (data && !error) {
+        return {
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          growType: data.grow_type,
+          seeds: data.seeds,
+          raffleTicket: data.raffle_ticket,
+          surveyCompleted: data.survey_completed,
+          joinedAt: data.created_at || new Date().toISOString()
+        };
+      }
+    } catch (err) {
+      console.warn("Cloud fetch fallback:", err.message);
+    }
+    return null;
+  }
+
   // --- FUNCTIONS ---
 
   function toggleModal(modal, show) {
@@ -191,7 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- REGISTRATION & LOGIN ---
 
-  function handleRegistration(e) {
+  async function handleRegistration(e) {
     e.preventDefault();
     const name = document.getElementById('member-name').value.trim();
     const email = document.getElementById('member-email').value.trim().toLowerCase();
@@ -200,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!name || !email || !phone) return;
 
-    // Check if user already exists
+    // Check if user already exists in local list
     const existing = registeredUsers.find(u => u.email === email || u.phone === phone);
     if (existing) {
       currentMember = existing;
@@ -220,23 +273,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     saveCurrentMemberState();
-    updateClubButtons();
+    syncMemberToCloud(currentMember); // Cloud Sync
 
+    updateClubButtons();
     toggleModal(authModal, false);
     setTimeout(() => openMemberPortal(), 300);
 
     if (window.updateCartDisplay) window.updateCartDisplay();
   }
 
-  function handleLogin(e) {
+  async function handleLogin(e) {
     e.preventDefault();
     const inputVal = document.getElementById('login-credential').value.trim().toLowerCase();
     loginFeedback.style.display = 'none';
 
     if (!inputVal) return;
 
-    // Search by email or phone
-    const foundUser = registeredUsers.find(u => u.email === inputVal || u.phone.includes(inputVal));
+    // 1. Try local list search
+    let foundUser = registeredUsers.find(u => u.email === inputVal || u.phone.includes(inputVal));
+
+    // 2. Fallback / Priority: Try Supabase Cloud Fetch
+    if (!foundUser && supabaseClient) {
+      const cloudUser = await fetchMemberFromCloud(inputVal);
+      if (cloudUser) {
+        foundUser = cloudUser;
+        registeredUsers.push(foundUser);
+        localStorage.setItem('boeweb_registered_users', JSON.stringify(registeredUsers));
+      }
+    }
 
     if (foundUser) {
       currentMember = foundUser;
@@ -280,6 +344,9 @@ document.addEventListener('DOMContentLoaded', () => {
       registeredUsers.push(currentMember);
     }
     localStorage.setItem('boeweb_registered_users', JSON.stringify(registeredUsers));
+    
+    // Sync to Supabase in background
+    syncMemberToCloud(currentMember);
   }
 
   function updateClubButtons() {
