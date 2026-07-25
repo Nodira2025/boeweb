@@ -1245,7 +1245,7 @@ button, input, select, textarea {
   height: 100vh;
   background-color: rgba(21, 45, 36, 0.5);
   backdrop-filter: blur(5px);
-  z-index: 300;
+  z-index: 2000; /* Float above mobile bottom-nav (999) */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1432,6 +1432,7 @@ textarea.form-control {
   text-align: center;
   background-color: var(--color-primary);
   color: var(--color-neutral-light);
+  overflow-y: auto;
 }
 
 .lotus-badge {
