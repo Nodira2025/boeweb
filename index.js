@@ -749,6 +749,24 @@ document.addEventListener('DOMContentLoaded', () => {
     
     msg += `\n¡Muchas gracias! 🙏`;
 
+    // Log Order to Order History for Member Portal
+    const orderHistory = JSON.parse(localStorage.getItem('boeweb_order_history')) || [];
+    const currentMember = JSON.parse(localStorage.getItem('boeweb_member'));
+    const newOrder = {
+      id: Math.floor(10000 + Math.random() * 90000).toString(),
+      date: new Date().toISOString(),
+      email: currentMember ? currentMember.email : '',
+      phone: phone,
+      name: name,
+      items: cart.map(i => ({ name: i.name, quantity: i.quantity, price: i.price })),
+      subtotal: subtotal,
+      discount: discount,
+      total: total,
+      status: 'Enviado a WhatsApp'
+    };
+    orderHistory.unshift(newOrder);
+    localStorage.setItem('boeweb_order_history', JSON.stringify(orderHistory));
+
     // WhatsApp redirection URL
     // Target Phone: +54 9 381 302-3185 (Formatted as 5493813023185)
     const waPhone = "5493813023185";
@@ -769,6 +787,37 @@ document.addEventListener('DOMContentLoaded', () => {
     // Redirect to WhatsApp in a new tab
     window.open(waUrl, '_blank');
   });
+
+  // Global Helper: Add Gift Item to Cart ($0)
+  window.addGiftToCart = function(giftProduct) {
+    const existing = cart.find(i => i.id === giftProduct.id);
+    if (existing) {
+      existing.quantity += 1;
+    } else {
+      cart.push({
+        id: giftProduct.id,
+        name: giftProduct.name,
+        price: 0,
+        image: giftProduct.image,
+        quantity: 1,
+        available: true
+      });
+    }
+    saveCart();
+    updateCartBadge();
+    renderCart();
+  };
+
+  // Global Helper: Reorder Items from History
+  window.reorderItems = function(itemsList) {
+    itemsList.forEach(histItem => {
+      const matchProd = products.find(p => p.name === histItem.name);
+      if (matchProd) {
+        addToCart(matchProd, histItem.quantity);
+      }
+    });
+    openCart();
+  };
 
 
   // --- ZEN DISCOUNT WHEEL GAME ENGINE ---

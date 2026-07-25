@@ -800,40 +800,62 @@
   <div class="modal-backdrop" id="club-auth-modal">
     <div class="modal-card auth-modal-card">
       <button class="close-modal-btn" id="close-club-auth-btn">&times;</button>
-      <div class="auth-modal-header" style="text-align: center; margin-bottom: 20px;">
-        <div class="auth-logo" style="margin-bottom: 12px;">
+      <div class="auth-modal-header" style="text-align: center; margin-bottom: 15px;">
+        <div class="auth-logo" style="margin-bottom: 8px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 40px; height: 40px; color: var(--color-accent-gold); display: inline-block;">
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
           </svg>
         </div>
-        <h3 style="font-family: var(--font-display); font-size: 1.6rem; color: var(--color-primary); margin-bottom: 8px;">Unite al Club BÔ</h3>
-        <p style="font-size: 0.9rem; color: var(--color-neutral-stone-dark); line-height: 1.4;">Registrate gratis para acumular semillas de lealtad, acceder al portal VIP y obtener descuentos exclusivos de cultivo.</p>
+        <h3 style="font-family: var(--font-display); font-size: 1.5rem; color: var(--color-primary); margin-bottom: 4px;">Acceso Club BÔ</h3>
+        <p style="font-size: 0.85rem; color: var(--color-neutral-stone-dark); margin: 0;">Ingresá a tu cuenta o registrate para ganar semillas y descuentos.</p>
       </div>
+
+      <!-- Auth Tabs Switcher -->
+      <div class="auth-tabs-nav">
+        <button class="auth-tab-btn" id="auth-tab-login">Iniciar Sesión</button>
+        <button class="auth-tab-btn active" id="auth-tab-register">Registrarse</button>
+      </div>
+
       <div class="modal-body" style="padding: 0;">
-        <form id="club-register-form">
-          <div class="form-group" style="margin-bottom: 15px;">
-            <label for="member-name" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Nombre Completo</label>
-            <input type="text" id="member-name" class="form-control" placeholder="Ej: Juan Pérez" required style="width: 100%; box-sizing: border-box;">
-          </div>
-          <div class="form-group" style="margin-bottom: 15px;">
-            <label for="member-email" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Correo Electrónico</label>
-            <input type="email" id="member-email" class="form-control" placeholder="Ej: juan@example.com" required style="width: 100%; box-sizing: border-box;">
-          </div>
-          <div class="form-group" style="margin-bottom: 15px;">
-            <label for="member-phone" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">WhatsApp (Celular)</label>
-            <input type="tel" id="member-phone" class="form-control" placeholder="Ej: +54 9 381 555-5555" required style="width: 100%; box-sizing: border-box;">
-          </div>
-          <div class="form-group" style="margin-bottom: 20px;">
-            <label for="member-growtype" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Tu Tipo de Cultivo Preferido</label>
-            <select id="member-growtype" class="form-control" style="width: 100%; box-sizing: border-box;">
-              <option value="Indoor">Indoor (Luces & Carpa)</option>
-              <option value="Exterior">Exterior (Sol & Tierra)</option>
-              <option value="Mixto">Mixto (Invernadero / Balcón)</option>
-              <option value="Ninguno">No cultivo (Solo accesorios)</option>
-            </select>
-          </div>
-          <button type="submit" class="btn btn-primary btn-full-width" style="margin-top: 10px; width: 100%;">Registrarse & Recibir +100 Semillas</button>
-        </form>
+        <!-- Login Form Container -->
+        <div id="auth-login-container" style="display: none;">
+          <form id="club-login-form">
+            <div class="form-group" style="margin-bottom: 15px;">
+              <label for="login-credential" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Email o Celular (WhatsApp)</label>
+              <input type="text" id="login-credential" class="form-control" placeholder="Ej: juan@example.com o +54381..." required style="width: 100%; box-sizing: border-box;">
+            </div>
+            <div class="quiz-result-msg error" id="login-feedback" style="display: none; margin-bottom: 15px;"></div>
+            <button type="submit" class="btn btn-primary btn-full-width" style="width: 100%;">Ingresar al Portal VIP</button>
+          </form>
+        </div>
+
+        <!-- Register Form Container -->
+        <div id="auth-register-container">
+          <form id="club-register-form">
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label for="member-name" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">Nombre Completo</label>
+              <input type="text" id="member-name" class="form-control" placeholder="Ej: Juan Pérez" required style="width: 100%; box-sizing: border-box;">
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label for="member-email" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">Correo Electrónico</label>
+              <input type="email" id="member-email" class="form-control" placeholder="Ej: juan@example.com" required style="width: 100%; box-sizing: border-box;">
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label for="member-phone" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">WhatsApp (Celular)</label>
+              <input type="tel" id="member-phone" class="form-control" placeholder="Ej: +54 9 381 555-5555" required style="width: 100%; box-sizing: border-box;">
+            </div>
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label for="member-growtype" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">Tu Tipo de Cultivo Preferido</label>
+              <select id="member-growtype" class="form-control" style="width: 100%; box-sizing: border-box;">
+                <option value="Indoor">Indoor (Luces & Carpa)</option>
+                <option value="Exterior">Exterior (Sol & Tierra)</option>
+                <option value="Mixto">Mixto (Invernadero / Balcón)</option>
+                <option value="Ninguno">No cultivo (Solo accesorios)</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full-width" style="width: 100%;">Registrarse & Recibir +100 Semillas</button>
+          </form>
+        </div>
       </div>
     </div>
   </div>
@@ -856,49 +878,125 @@
           <span class="seeds-label">Semillas</span>
         </div>
       </div>
+
+      <!-- Portal Dashboard Navigation Bar -->
+      <nav class="portal-tabs-nav">
+        <button class="portal-nav-item active" data-tab="profile">🏆 Mi Perfil</button>
+        <button class="portal-nav-item" data-tab="history">🛒 Mis Compras</button>
+        <button class="portal-nav-item" data-tab="raffle">🎟️ Sorteo Mensual</button>
+        <button class="portal-nav-item" data-tab="store">🎁 Canje de Semillas</button>
+      </nav>
       
       <div class="modal-body portal-body-layout" style="padding: 20px 24px;">
-        <!-- Progress Bar Section -->
-        <div class="portal-progress-section">
-          <div class="progress-labels">
-            <span id="current-tier-label">Brote (5% OFF)</span>
-            <span id="next-tier-label">Planta (10% OFF)</span>
+        
+        <!-- Tab 1: Profile & Progress -->
+        <div class="portal-tab-content active" id="tab-profile">
+          <!-- Progress Bar Section -->
+          <div class="portal-progress-section">
+            <div class="progress-labels">
+              <span id="current-tier-label">Brote (5% OFF)</span>
+              <span id="next-tier-label">Planta (10% OFF)</span>
+            </div>
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill" id="vip-progress-fill" style="width: 20%;"></div>
+            </div>
+            <p class="progress-info-text" id="vip-progress-text">Te faltan 400 semillas para subir de nivel.</p>
           </div>
-          <div class="progress-bar-container">
-            <div class="progress-bar-fill" id="vip-progress-fill" style="width: 20%;"></div>
-          </div>
-          <p class="progress-info-text" id="vip-progress-text">Te faltan 400 semillas para subir de nivel.</p>
-        </div>
 
-        <!-- Dashboard Subsections Grid -->
-        <div class="portal-dashboard-grid">
-          <!-- Column 1: Lunar Calendar -->
-          <div class="portal-dashboard-col">
-            <div class="dashboard-box lunar-widget">
-              <h4 class="box-title">🌙 Calendario Lunar de Cultivo</h4>
-              <div class="lunar-status">
-                <span class="lunar-icon" id="lunar-phase-icon">🌑</span>
-                <div>
-                  <h5 id="lunar-phase-name" style="margin: 0; font-size: 0.95rem; font-weight: 600;">Luna Nueva</h5>
-                  <span id="lunar-phase-age" style="font-size: 0.75rem; color: var(--color-neutral-stone-dark);">Edad: 0.0 días</span>
+          <!-- Academy Cert Action Banner -->
+          <div id="dashboard-cert-banner" style="margin-bottom: 20px;">
+            <button class="btn btn-secondary" id="dashboard-view-cert-btn" style="width: 100%; border-color: var(--color-accent-gold); color: var(--color-accent-gold-dark); display: none; align-items: center; justify-content: center; gap: 8px;">
+              🏆 Ver Mi Certificado de Cultivador Experto BÔ
+            </button>
+          </div>
+
+          <!-- Dashboard Subsections Grid -->
+          <div class="portal-dashboard-grid">
+            <!-- Column 1: Lunar Calendar -->
+            <div class="portal-dashboard-col">
+              <div class="dashboard-box lunar-widget">
+                <h4 class="box-title">🌙 Calendario Lunar de Cultivo</h4>
+                <div class="lunar-status">
+                  <span class="lunar-icon" id="lunar-phase-icon">🌑</span>
+                  <div>
+                    <h5 id="lunar-phase-name" style="margin: 0; font-size: 0.95rem; font-weight: 600;">Luna Nueva</h5>
+                    <span id="lunar-phase-age" style="font-size: 0.75rem; color: var(--color-neutral-stone-dark);">Edad: 0.0 días</span>
+                  </div>
+                </div>
+                <p class="lunar-tip" id="lunar-phase-tip">Cargando consejos de cultivo...</p>
+              </div>
+            </div>
+
+            <!-- Column 2: VIP Coupons -->
+            <div class="portal-dashboard-col">
+              <div class="dashboard-box coupons-widget">
+                <h4 class="box-title">🎫 Cupones Activos</h4>
+                <div id="vip-coupons-container">
+                  <!-- Filled dynamically by memberPortal.js -->
                 </div>
               </div>
-              <p class="lunar-tip" id="lunar-phase-tip">Cargando consejos de cultivo...</p>
-            </div>
-          </div>
-
-          <!-- Column 2: VIP Coupons -->
-          <div class="portal-dashboard-col">
-            <div class="dashboard-box coupons-widget">
-              <h4 class="box-title">🎫 Cupones Activos</h4>
-              <div id="vip-coupons-container">
-                <!-- Filled dynamically by memberPortal.js -->
-              </div>
             </div>
           </div>
         </div>
 
-        <div class="portal-footer-actions" style="margin-top: 24px; display: flex; justify-content: space-between; align-items: center;">
+        <!-- Tab 2: Order History -->
+        <div class="portal-tab-content" id="tab-history">
+          <h4 style="margin-top: 0; color: var(--color-primary);">📦 Historial de Compras en WhatsApp</h4>
+          <div id="history-orders-container">
+            <!-- Filled dynamically by memberPortal.js -->
+          </div>
+        </div>
+
+        <!-- Tab 3: Monthly Survey & Raffle -->
+        <div class="portal-tab-content" id="tab-raffle">
+          <h4 style="margin-top: 0; color: var(--color-primary);">🎟️ Sorteo Mensual del Club BÔ</h4>
+          
+          <div id="survey-active-container">
+            <p style="font-size: 0.9rem; color: var(--color-neutral-stone-dark);">Completá esta breve encuesta de 3 preguntas para ganar <strong>+150 Semillas</strong> y obtener tu número de ticket para el sorteo mensual de productos.</p>
+            <form id="survey-form">
+              <div class="form-group" style="margin-bottom: 12px;">
+                <label class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">1. ¿Qué producto te gustaría que sumemos al catálogo?</label>
+                <input type="text" class="form-control" placeholder="Ej: Carpas 80x80, Iluminación Samsung..." required style="width: 100%; box-sizing: border-box;">
+              </div>
+              <div class="form-group" style="margin-bottom: 12px;">
+                <label class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">2. ¿Cómo calificás la atención del local?</label>
+                <select class="form-control" style="width: 100%; box-sizing: border-box;">
+                  <option value="5">⭐⭐⭐⭐⭐ Excelente</option>
+                  <option value="4">⭐⭐⭐⭐ Muy Buena</option>
+                  <option value="3">⭐⭐⭐ Buena</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">3. ¿Qué contenido te sirvió más de la Academia?</label>
+                <input type="text" class="form-control" placeholder="Ej: La calculadora de VPD..." required style="width: 100%; box-sizing: border-box;">
+              </div>
+              <button type="submit" class="btn btn-primary" style="width: 100%;">Enviar Encuesta & Obtener Número de Rifa</button>
+            </form>
+          </div>
+
+          <div id="raffle-ticket-box" class="golden-ticket-card" style="display: none;">
+            <div class="ticket-header">
+              <span>🎟️ TICKET DE SORTEO MENSUAL</span>
+              <strong>BO GROWCLUB VIP</strong>
+            </div>
+            <div class="ticket-number" id="ticket-number-display">#BO-0000</div>
+            <p class="ticket-status">¡Ya estás participando en el sorteo de este mes! El ganador se anuncia en nuestro Instagram @bo.growclub.</p>
+          </div>
+        </div>
+
+        <!-- Tab 4: Seed Redemption Store -->
+        <div class="portal-tab-content" id="tab-store">
+          <h4 style="margin-top: 0; color: var(--color-primary);">🎁 Tienda de Canje de Semillas</h4>
+          <p style="font-size: 0.88rem; color: var(--color-neutral-stone-dark);">Usá tus semillas acumuladas para canjear cupones o agregar productos físicos de regalo por $0 a tu carrito.</p>
+
+          <h5 style="color: var(--color-accent-gold-dark); margin-bottom: 10px;">🎫 Cupones de Descuento Extra:</h5>
+          <div id="redeem-coupons-container" class="store-grid"></div>
+
+          <h5 style="color: var(--color-accent-gold-dark); margin-top: 20px; margin-bottom: 10px;">🌱 Productos Físicos de Regalo ($0):</h5>
+          <div id="redeem-products-container" class="store-grid"></div>
+        </div>
+
+        <div class="portal-footer-actions" style="margin-top: 24px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--color-neutral-stone); padding-top: 16px;">
           <button class="btn btn-secondary" id="club-logout-btn" style="padding: 8px 16px; font-size: 0.85rem; border-radius: var(--border-radius-sm);">Cerrar Sesión</button>
         </div>
       </div>
@@ -954,8 +1052,8 @@
   </div>
 
   <!-- Main JavaScript Files -->
-  <script src="index.js?v=2.3"></script>
-  <script src="memberPortal.js?v=2.3"></script>
-  <script src="academy.js?v=2.3"></script>
+  <script src="index.js?v=2.4"></script>
+  <script src="memberPortal.js?v=2.4"></script>
+  <script src="academy.js?v=2.4"></script>
 </body>
 </html>

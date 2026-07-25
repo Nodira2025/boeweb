@@ -1,11 +1,14 @@
 /**
- * BO growclub - Member & VIP Portal Logic
- * Implements registration, tiers, loyalty points ("Semillas"), and Lunar calendar recommendations.
+ * BO growclub - Member & VIP Portal Logic (v2.4)
+ * Implements Multi-account Login/Registration, Order History, Monthly Raffle Surveys,
+ * and Seeds Redemption Store (Canjes por Cupones y Productos $0).
  */
 
 document.addEventListener('DOMContentLoaded', () => {
   // --- STATE & DATA ---
   let currentMember = JSON.parse(localStorage.getItem('boeweb_member')) || null;
+  let registeredUsers = JSON.parse(localStorage.getItem('boeweb_registered_users')) || [];
+  let orderHistory = JSON.parse(localStorage.getItem('boeweb_order_history')) || [];
 
   // Tiers definition
   const TIERS = {
@@ -21,6 +24,21 @@ document.addEventListener('DOMContentLoaded', () => {
     { code: 'VIPZEN15', desc: '15% OFF + Envíos Prioritarios', tier: 'ARBOL', value: 0.15, type: 'percent' }
   ];
 
+  // Redeemable Physical Products ($0 cost in cart)
+  const REDEEMABLE_PRODUCTS = [
+    { id: 'gift-sedas', name: 'Sedas BÔ Premium (Papel de Armar)', seedsCost: 200, img: 'assets/logo.jpg' },
+    { id: 'gift-clipper', name: 'Encendedor Clipper Edición Zen', seedsCost: 450, img: 'assets/logo.jpg' },
+    { id: 'gift-grinder', name: 'Picador / Grinder BÔ 2 Piezas', seedsCost: 800, img: 'assets/logo.jpg' },
+    { id: 'gift-nutrientes', name: 'Kit de Nutrientes Orgánicos 250ml', seedsCost: 1500, img: 'assets/logo.jpg' }
+  ];
+
+  // Redeemable Coupon Packs
+  const REDEEMABLE_COUPONS = [
+    { code: 'CANJE5', desc: '5% OFF Extra para tu compra', seedsCost: 100, value: 0.05 },
+    { code: 'CANJE10', desc: '10% OFF Extra para tu compra', seedsCost: 300, value: 0.10 },
+    { code: 'CANJE15', desc: '15% OFF Extra para tu compra', seedsCost: 500, value: 0.15 }
+  ];
+
   // --- DOM ELEMENTS ---
   const clubTrigger = document.getElementById('club-trigger');
   const mobileClubBtn = document.getElementById('mobile-club-btn');
@@ -32,9 +50,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeAuthBtn = document.getElementById('close-club-auth-btn');
   const closePortalBtn = document.getElementById('close-club-portal-btn');
 
+  // Auth Tabs
+  const authTabRegister = document.getElementById('auth-tab-register');
+  const authTabLogin = document.getElementById('auth-tab-login');
+  const registerFormContainer = document.getElementById('auth-register-container');
+  const loginFormContainer = document.getElementById('auth-login-container');
+
   // Forms & Actions
   const registerForm = document.getElementById('club-register-form');
+  const loginForm = document.getElementById('club-login-form');
+  const loginFeedback = document.getElementById('login-feedback');
   const logoutBtn = document.getElementById('club-logout-btn');
+
+  // VIP Dashboard Tabs
+  const portalNavItems = document.querySelectorAll('.portal-nav-item');
+  const portalTabContents = document.querySelectorAll('.portal-tab-content');
 
   // VIP Dashboard Elements
   const vipName = document.getElementById('vip-member-name');
@@ -44,109 +74,182 @@ document.addEventListener('DOMContentLoaded', () => {
   const nextTierLabel = document.getElementById('next-tier-label');
   const progressFill = document.getElementById('vip-progress-fill');
   const progressText = document.getElementById('vip-progress-text');
-  const couponsContainer = document.getElementById('vip-coupons-container');
 
-  // Lunar Elements
-  const lunarIcon = document.getElementById('lunar-phase-icon');
-  const lunarName = document.getElementById('lunar-phase-name');
-  const lunarAge = document.getElementById('lunar-phase-age');
-  const lunarTip = document.getElementById('lunar-phase-tip');
+  // Certificate Link in Dashboard
+  const viewCertBtn = document.getElementById('dashboard-view-cert-btn');
+
+  // History Tab Elements
+  const historyContainer = document.getElementById('history-orders-container');
+
+  // Survey & Raffle Elements
+  const surveyForm = document.getElementById('survey-form');
+  const surveyContainer = document.getElementById('survey-active-container');
+  const raffleTicketBox = document.getElementById('raffle-ticket-box');
+  const ticketNumberEl = document.getElementById('ticket-number-display');
+
+  // Store Tab Elements
+  const redeemCouponsContainer = document.getElementById('redeem-coupons-container');
+  const redeemProductsContainer = document.getElementById('redeem-products-container');
 
   // --- INITIALIZATION ---
   updateClubButtons();
+  bindEvents();
 
-  // --- EVENT LISTENERS ---
-  if (clubTrigger) {
-    clubTrigger.addEventListener('click', openMemberPortal);
-  }
-  if (mobileClubBtn) {
-    mobileClubBtn.addEventListener('click', () => {
-      openMemberPortal();
-      // Remove active class from other mobile buttons and add here
-      document.querySelectorAll('.mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
-      mobileClubBtn.classList.add('active');
-    });
-  }
-
-  // Modal Closures
-  if (closeAuthBtn) {
-    closeAuthBtn.addEventListener('click', () => toggleModal(authModal, false));
-  }
-  if (closePortalBtn) {
-    closePortalBtn.addEventListener('click', () => toggleModal(portalModal, false));
-  }
-
-  // Handle outside clicks
-  [authModal, portalModal].forEach(modal => {
-    if (modal) {
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-          toggleModal(modal, false);
-        }
+  function bindEvents() {
+    if (clubTrigger) clubTrigger.addEventListener('click', openMemberPortal);
+    if (mobileClubBtn) {
+      mobileClubBtn.addEventListener('click', () => {
+        openMemberPortal();
+        document.querySelectorAll('.mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
+        mobileClubBtn.classList.add('active');
       });
     }
-  });
 
-  // Forms
-  if (registerForm) {
-    registerForm.addEventListener('submit', handleRegistration);
-  }
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', handleLogout);
+    if (closeAuthBtn) closeAuthBtn.addEventListener('click', () => toggleModal(authModal, false));
+    if (closePortalBtn) closePortalBtn.addEventListener('click', () => toggleModal(portalModal, false));
+
+    // Auth Tabs Switcher
+    if (authTabRegister && authTabLogin) {
+      authTabRegister.addEventListener('click', () => switchAuthTab('register'));
+      authTabLogin.addEventListener('click', () => switchAuthTab('login'));
+    }
+
+    // Portal Navigation Tabs Switcher
+    portalNavItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const targetTab = item.getAttribute('data-tab');
+        switchPortalTab(targetTab);
+      });
+    });
+
+    // Handle outside clicks
+    [authModal, portalModal].forEach(modal => {
+      if (modal) {
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) toggleModal(modal, false);
+        });
+      }
+    });
+
+    // Forms
+    if (registerForm) registerForm.addEventListener('submit', handleRegistration);
+    if (loginForm) loginForm.addEventListener('submit', handleLogin);
+    if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+    if (surveyForm) surveyForm.addEventListener('submit', handleSurveySubmit);
+    if (viewCertBtn) viewCertBtn.addEventListener('click', openCertificateModal);
   }
 
   // --- FUNCTIONS ---
 
   function toggleModal(modal, show) {
     if (!modal) return;
-    if (show) {
-      modal.classList.add('active');
+    if (show) modal.classList.add('active');
+    else modal.classList.remove('active');
+  }
+
+  function switchAuthTab(tab) {
+    if (tab === 'register') {
+      authTabRegister.classList.add('active');
+      authTabLogin.classList.remove('active');
+      registerFormContainer.style.display = 'block';
+      loginFormContainer.style.display = 'none';
     } else {
-      modal.classList.remove('active');
+      authTabLogin.classList.add('active');
+      authTabRegister.classList.remove('active');
+      loginFormContainer.style.display = 'block';
+      registerFormContainer.style.display = 'none';
     }
+  }
+
+  function switchPortalTab(tabId) {
+    portalNavItems.forEach(item => {
+      if (item.getAttribute('data-tab') === tabId) item.classList.add('active');
+      else item.classList.remove('active');
+    });
+
+    portalTabContents.forEach(content => {
+      if (content.id === `tab-${tabId}`) content.classList.add('active');
+      else content.classList.remove('active');
+    });
+
+    // Render contents dynamically per tab
+    if (tabId === 'history') renderOrderHistory();
+    else if (tabId === 'raffle') renderRaffleSection();
+    else if (tabId === 'store') renderRedemptionStore();
   }
 
   function openMemberPortal() {
     if (currentMember) {
       updatePortalUI();
+      switchPortalTab('profile');
       toggleModal(portalModal, true);
     } else {
+      switchAuthTab('login');
       toggleModal(authModal, true);
     }
   }
 
+  // --- REGISTRATION & LOGIN ---
+
   function handleRegistration(e) {
     e.preventDefault();
     const name = document.getElementById('member-name').value.trim();
-    const email = document.getElementById('member-email').value.trim();
+    const email = document.getElementById('member-email').value.trim().toLowerCase();
     const phone = document.getElementById('member-phone').value.trim();
     const growType = document.getElementById('member-growtype').value;
 
     if (!name || !email || !phone) return;
 
-    currentMember = {
-      name,
-      email,
-      phone,
-      growType,
-      seeds: 100, // 100 seeds welcome bonus!
-      joinedAt: new Date().toISOString()
-    };
+    // Check if user already exists
+    const existing = registeredUsers.find(u => u.email === email || u.phone === phone);
+    if (existing) {
+      currentMember = existing;
+    } else {
+      currentMember = {
+        name,
+        email,
+        phone,
+        growType,
+        seeds: 100, // 100 seeds welcome bonus
+        joinedAt: new Date().toISOString(),
+        surveyCompleted: false,
+        raffleTicket: null
+      };
+      registeredUsers.push(currentMember);
+      localStorage.setItem('boeweb_registered_users', JSON.stringify(registeredUsers));
+    }
 
-    localStorage.setItem('boeweb_member', JSON.stringify(currentMember));
+    saveCurrentMemberState();
     updateClubButtons();
 
-    // Close Register Modal & Open Portal Dashboard
     toggleModal(authModal, false);
-    
-    // Smooth transition
-    setTimeout(() => {
-      openMemberPortal();
-    }, 300);
+    setTimeout(() => openMemberPortal(), 300);
 
-    // If global cart update exists, refresh it to show club discounts
-    if (window.updateCartDisplay) {
-      window.updateCartDisplay();
+    if (window.updateCartDisplay) window.updateCartDisplay();
+  }
+
+  function handleLogin(e) {
+    e.preventDefault();
+    const inputVal = document.getElementById('login-credential').value.trim().toLowerCase();
+    loginFeedback.style.display = 'none';
+
+    if (!inputVal) return;
+
+    // Search by email or phone
+    const foundUser = registeredUsers.find(u => u.email === inputVal || u.phone.includes(inputVal));
+
+    if (foundUser) {
+      currentMember = foundUser;
+      saveCurrentMemberState();
+      updateClubButtons();
+
+      toggleModal(authModal, false);
+      setTimeout(() => openMemberPortal(), 300);
+
+      if (window.updateCartDisplay) window.updateCartDisplay();
+    } else {
+      loginFeedback.style.display = 'block';
+      loginFeedback.textContent = '❌ Usuario no encontrado. Por favor registrate primero.';
     }
   }
 
@@ -156,23 +259,32 @@ document.addEventListener('DOMContentLoaded', () => {
     updateClubButtons();
     toggleModal(portalModal, false);
 
-    // Reset mobile active state back to Shop
     const shopBtn = document.getElementById('mobile-shop-btn');
     if (shopBtn) {
       document.querySelectorAll('.mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
       shopBtn.classList.add('active');
     }
 
-    if (window.updateCartDisplay) {
-      window.updateCartDisplay();
+    if (window.updateCartDisplay) window.updateCartDisplay();
+  }
+
+  function saveCurrentMemberState() {
+    if (!currentMember) return;
+    localStorage.setItem('boeweb_member', JSON.stringify(currentMember));
+
+    // Update inside registeredUsers array as well
+    const idx = registeredUsers.findIndex(u => u.email === currentMember.email);
+    if (idx !== -1) {
+      registeredUsers[idx] = currentMember;
+    } else {
+      registeredUsers.push(currentMember);
     }
+    localStorage.setItem('boeweb_registered_users', JSON.stringify(registeredUsers));
   }
 
   function updateClubButtons() {
     const text = currentMember ? 'Perfil VIP' : 'Club BÔ';
-    if (clubBtnText) {
-      clubBtnText.textContent = text;
-    }
+    if (clubBtnText) clubBtnText.textContent = text;
   }
 
   function getMemberTier(seeds) {
@@ -188,11 +300,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const seedsVal = currentMember.seeds || 0;
     const tier = getMemberTier(seedsVal);
 
-    // Basic fields
     if (vipName) vipName.textContent = nameVal;
     if (vipBadge) {
       vipBadge.textContent = tier.name;
-      // Change color dynamically
       vipBadge.className = 'member-badge';
       if (tier === TIERS.ARBOL) vipBadge.classList.add('badge-gold');
       else if (tier === TIERS.PLANTA) vipBadge.classList.add('badge-silver');
@@ -200,7 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (vipSeeds) vipSeeds.textContent = seedsVal;
 
-    // Progress Bar Calculation
+    // Progress Bar
     if (currentTierLabel) currentTierLabel.textContent = tier.label;
     if (tier.nextMin !== null) {
       if (nextTierLabel) {
@@ -220,96 +330,222 @@ document.addEventListener('DOMContentLoaded', () => {
       if (progressText) progressText.textContent = '¡Eres un sabio Árbol Zen VIP! Disfrutas de todos los beneficios.';
     }
 
-    // Render Lunar Calendar
-    renderLunarCalendar();
+    // Check Academy Certificate Button Visibility
+    const academyProgress = JSON.parse(localStorage.getItem('boeweb_academy_progress')) || { completedModules: [] };
+    if (viewCertBtn) {
+      if (academyProgress.completedModules.length >= 4) {
+        viewCertBtn.style.display = 'inline-flex';
+      } else {
+        viewCertBtn.style.display = 'none';
+      }
+    }
 
-    // Render Coupons
-    renderVIPCoupons(tier);
+    renderLunarCalendar();
   }
 
-  function renderVIPCoupons(userTier) {
-    if (!couponsContainer) return;
-    couponsContainer.innerHTML = '';
+  // --- TAB 2: ORDER HISTORY ---
+  function renderOrderHistory() {
+    if (!historyContainer) return;
+    orderHistory = JSON.parse(localStorage.getItem('boeweb_order_history')) || [];
+    
+    // Filter orders matching current member email/phone
+    const userOrders = orderHistory.filter(o => 
+      currentMember && (o.email === currentMember.email || o.phone === currentMember.phone)
+    );
 
-    VIP_COUPONS.forEach(coupon => {
-      // Check if user has sufficient tier to unlock
-      const isUnlocked = getTierWeight(userTier) >= getTierWeightByName(coupon.tier);
-      
-      const couponCard = document.createElement('div');
-      couponCard.className = `vip-coupon-card ${isUnlocked ? 'unlocked' : 'locked'}`;
-      
-      if (isUnlocked) {
-        couponCard.innerHTML = `
-          <div class="coupon-details">
-            <span class="coupon-code">${coupon.code}</span>
-            <span class="coupon-desc">${coupon.desc}</span>
+    if (userOrders.length === 0) {
+      historyContainer.innerHTML = `
+        <div class="empty-tab-state">
+          <p>📦 Aún no has realizado pedidos desde este usuario.</p>
+          <a href="#catalog-section" class="btn btn-secondary" onclick="document.getElementById('close-club-portal-btn').click();">Explorar Catálogo</a>
+        </div>
+      `;
+      return;
+    }
+
+    historyContainer.innerHTML = userOrders.map(order => `
+      <div class="history-order-card">
+        <div class="order-card-header">
+          <div>
+            <strong>Pedido #${order.id}</strong>
+            <span class="order-date">${new Date(order.date).toLocaleDateString('es-AR')}</span>
           </div>
-          <button class="btn btn-secondary btn-copy-coupon" data-code="${coupon.code}">
-            Copiar
+          <span class="order-status-tag">${order.status || 'Enviado a WhatsApp'}</span>
+        </div>
+        <div class="order-card-body">
+          <ul class="order-items-list">
+            ${order.items.map(item => `
+              <li>${item.quantity}x ${item.name} ($${formatPrice(item.price * item.quantity)})</li>
+            `).join('')}
+          </ul>
+          <div class="order-total-row">
+            <span>Total:</span>
+            <strong>$${formatPrice(order.total)}</strong>
+          </div>
+        </div>
+        <div class="order-card-footer">
+          <button class="btn btn-secondary btn-reorder" data-order-id="${order.id}">
+            🔄 Volver a Pedir
           </button>
-        `;
-      } else {
-        const tierName = coupon.tier === 'PLANTA' ? 'Miembro Planta' : 'Árbol Zen VIP';
-        couponCard.innerHTML = `
-          <div class="coupon-details">
-            <span class="coupon-code" style="filter: blur(4px);">XXXXXX</span>
-            <span class="coupon-desc">${coupon.desc}</span>
-          </div>
-          <span class="lock-indicator">🔒 Nivel ${tierName}</span>
-        `;
-      }
-      
-      couponsContainer.appendChild(couponCard);
-    });
+        </div>
+      </div>
+    `).join('');
 
-    // Add copy listener
-    document.querySelectorAll('.btn-copy-coupon').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const code = btn.getAttribute('data-code');
-        navigator.clipboard.writeText(code).then(() => {
-          const originalText = btn.textContent;
-          btn.textContent = 'Copiado!';
-          btn.style.backgroundColor = 'var(--color-primary)';
-          btn.style.color = '#fff';
-          
-          // Apply automatically to active coupon in checkout
-          localStorage.setItem('boeweb_applied_coupon', JSON.stringify({
-            code: code,
-            desc: VIP_COUPONS.find(c => c.code === code).desc,
-            type: 'percent',
-            value: VIP_COUPONS.find(c => c.code === code).value
-          }));
-
-          if (window.updateCartDisplay) {
-            window.updateCartDisplay();
-          }
-
-          setTimeout(() => {
-            btn.textContent = originalText;
-            btn.style.backgroundColor = '';
-            btn.style.color = '';
-          }, 1500);
-        });
+    // Reorder event listeners
+    document.querySelectorAll('.btn-reorder').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const orderId = btn.getAttribute('data-order-id');
+        const targetOrder = userOrders.find(o => o.id === orderId);
+        if (targetOrder && window.reorderItems) {
+          window.reorderItems(targetOrder.items);
+          toggleModal(portalModal, false);
+        }
       });
     });
   }
 
-  function getTierWeight(tier) {
-    if (tier.name === TIERS.ARBOL.name) return 3;
-    if (tier.name === TIERS.PLANTA.name) return 2;
-    return 1;
+  // --- TAB 3: SURVEY & RAFFLE ---
+  function renderRaffleSection() {
+    if (!currentMember) return;
+
+    if (currentMember.surveyCompleted && currentMember.raffleTicket) {
+      if (surveyContainer) surveyContainer.style.display = 'none';
+      if (raffleTicketBox) raffleTicketBox.style.display = 'block';
+      if (ticketNumberEl) ticketNumberEl.textContent = currentMember.raffleTicket;
+    } else {
+      if (surveyContainer) surveyContainer.style.display = 'block';
+      if (raffleTicketBox) raffleTicketBox.style.display = 'none';
+    }
   }
 
-  function getTierWeightByName(tierName) {
-    if (tierName === 'ARBOL') return 3;
-    if (tierName === 'PLANTA') return 2;
-    return 1;
+  function handleSurveySubmit(e) {
+    e.preventDefault();
+    if (!currentMember) return;
+
+    // Generate Ticket
+    const ticketNum = `#BO-${Math.floor(1000 + Math.random() * 9000)}`;
+    currentMember.surveyCompleted = true;
+    currentMember.raffleTicket = ticketNum;
+    currentMember.seeds = (currentMember.seeds || 0) + 150; // +150 Seeds award!
+
+    saveCurrentMemberState();
+    updatePortalUI();
+    renderRaffleSection();
+
+    if (window.updateCartDisplay) window.updateCartDisplay();
   }
 
-  // --- LUNAR CALENDAR ALGORITHM ---
+  // --- TAB 4: REDEMPTION STORE ---
+  function renderRedemptionStore() {
+    if (!currentMember) return;
+    const userSeeds = currentMember.seeds || 0;
+
+    // 1. Render Redeemable Coupons
+    if (redeemCouponsContainer) {
+      redeemCouponsContainer.innerHTML = REDEEMABLE_COUPONS.map(c => {
+        const canAfford = userSeeds >= c.seedsCost;
+        return `
+          <div class="store-item-card ${canAfford ? 'affordable' : 'locked'}">
+            <div class="store-item-info">
+              <span class="store-item-title">${c.code} (${c.desc})</span>
+              <span class="store-item-cost">🪙 ${c.seedsCost} Semillas</span>
+            </div>
+            <button class="btn btn-secondary btn-redeem-coupon" data-code="${c.code}" data-cost="${c.seedsCost}" ${!canAfford ? 'disabled' : ''}>
+              ${canAfford ? 'Canjear' : 'Insuficientes'}
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      document.querySelectorAll('.btn-redeem-coupon').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const code = btn.getAttribute('data-code');
+          const cost = parseInt(btn.getAttribute('data-cost'));
+          redeemCoupon(code, cost);
+        });
+      });
+    }
+
+    // 2. Render Redeemable Physical Products ($0)
+    if (redeemProductsContainer) {
+      redeemProductsContainer.innerHTML = REDEEMABLE_PRODUCTS.map(p => {
+        const canAfford = userSeeds >= p.seedsCost;
+        return `
+          <div class="store-item-card product-card-gift ${canAfford ? 'affordable' : 'locked'}">
+            <img src="${p.img}" alt="${p.name}" class="gift-thumb">
+            <div class="store-item-info">
+              <span class="store-item-title">${p.name}</span>
+              <span class="store-item-cost">🪙 ${p.seedsCost} Semillas (Regalo $0)</span>
+            </div>
+            <button class="btn btn-primary btn-redeem-product" data-id="${p.id}" data-cost="${p.seedsCost}" ${!canAfford ? 'disabled' : ''}>
+              ${canAfford ? 'Canjear Producto' : 'Insuficientes'}
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      document.querySelectorAll('.btn-redeem-product').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const pId = btn.getAttribute('data-id');
+          const cost = parseInt(btn.getAttribute('data-cost'));
+          redeemProductGift(pId, cost);
+        });
+      });
+    }
+  }
+
+  function redeemCoupon(code, cost) {
+    if (!currentMember || (currentMember.seeds || 0) < cost) return;
+
+    currentMember.seeds -= cost;
+    saveCurrentMemberState();
+    updatePortalUI();
+    renderRedemptionStore();
+
+    const couponObj = REDEEMABLE_COUPONS.find(c => c.code === code);
+    localStorage.setItem('boeweb_applied_coupon', JSON.stringify({
+      code: code,
+      desc: couponObj.desc,
+      type: 'percent',
+      value: couponObj.value
+    }));
+
+    if (window.updateCartDisplay) window.updateCartDisplay();
+    alert(`🎉 ¡Canje exitoso! Se descontaron ${cost} semillas y el cupón ${code} ha sido aplicado a tu carrito.`);
+  }
+
+  function redeemProductGift(productId, cost) {
+    if (!currentMember || (currentMember.seeds || 0) < cost) return;
+
+    const gift = REDEEMABLE_PRODUCTS.find(p => p.id === productId);
+    if (!gift) return;
+
+    currentMember.seeds -= cost;
+    saveCurrentMemberState();
+    updatePortalUI();
+    renderRedemptionStore();
+
+    if (window.addGiftToCart) {
+      window.addGiftToCart({
+        id: gift.id,
+        name: `🎁 [REGALO CANJE] ${gift.name}`,
+        price: 0,
+        image: gift.img
+      });
+    }
+
+    alert(`🎉 ¡Felicidades! Se descontaron ${cost} semillas y tu regalo "${gift.name}" ($0) fue agregado al carrito.`);
+  }
+
+  // --- LUNAR CALENDAR ---
   function renderLunarCalendar() {
     const today = new Date();
     const phaseData = getMoonPhase(today);
+
+    const lunarIcon = document.getElementById('lunar-phase-icon');
+    const lunarName = document.getElementById('lunar-phase-name');
+    const lunarAge = document.getElementById('lunar-phase-age');
+    const lunarTip = document.getElementById('lunar-phase-tip');
 
     if (lunarIcon) lunarIcon.textContent = phaseData.icon;
     if (lunarName) lunarName.textContent = phaseData.phaseName;
@@ -329,11 +565,11 @@ document.addEventListener('DOMContentLoaded', () => {
       tempMonth += 12;
     }
     
-    let jd = 365.25 * tempYear + 30.6 * (tempMonth + 1) + day - 694038.75; // days since 1900
-    jd /= 29.530588853; // synodic cycle
+    let jd = 365.25 * tempYear + 30.6 * (tempMonth + 1) + day - 694038.75;
+    jd /= 29.530588853;
     
-    const phase = jd - Math.floor(jd); // fractional part (0.0 to 1.0)
-    const age = phase * 29.53; // age in days
+    const phase = jd - Math.floor(jd);
+    const age = phase * 29.53;
     
     let phaseName = "";
     let icon = "🌑";
@@ -342,41 +578,59 @@ document.addEventListener('DOMContentLoaded', () => {
     if (age < 1.845) {
       phaseName = "Luna Nueva";
       icon = "🌑";
-      recommendation = "Ideal para podar plantas enfermas, desmalezar y aplicar abonos orgánicos al sustrato. No se recomienda germinar ni trasplantar.";
+      recommendation = "Ideal para podar plantas enfermas, desmalezar y aplicar abonos orgánicos al sustrato.";
     } else if (age < 5.5369) {
       phaseName = "Luna Creciente";
       icon = "🌒";
-      recommendation = "Excelente para la germinación de semillas y realizar trasplantes rápidos. La savia asciende hacia las hojas, estimulando el follaje.";
+      recommendation = "Excelente para la germinación de semillas y realizar trasplantes rápidos.";
     } else if (age < 9.2288) {
       phaseName = "Cuarto Creciente";
       icon = "🌓";
-      recommendation = "Óptimo para realizar podas de ramas débiles y fomentar un crecimiento lateral tupido. Las raíces absorben nutrientes rápidamente.";
+      recommendation = "Óptimo para podar ramas débiles y fomentar crecimiento lateral. Absorción radicular rápida.";
     } else if (age < 12.9206) {
       phaseName = "Gibosa Creciente";
       icon = "🌔";
-      recommendation = "Excelente periodo para el riego y el abonado foliar. Tus plantas están activas y receptivas al nitrógeno.";
+      recommendation = "Excelente periodo para el riego y el abonado foliar.";
     } else if (age < 16.6125) {
       phaseName = "Luna Llena";
       icon = "🌕";
-      recommendation = "La savia se concentra en flores y cogollos. Fase ideal para cosechar o recolectar plantas aromáticas. Evita cortes de esquejes.";
+      recommendation = "Fase ideal para cosechar flores y recolectar aromáticas. Evita podas agresivas.";
     } else if (age < 20.3044) {
       phaseName = "Gibosa Menguante";
       icon = "🌖";
-      recommendation = "La energía empieza a bajar a las raíces. Momento ideal para aplicar enmiendas de fósforo y potasio en floración.";
+      recommendation = "La energía baja a las raíces. Ideal para aplicar fósforo y potasio en floración.";
     } else if (age < 23.9963) {
       phaseName = "Cuarto Menguante";
       icon = "🌗";
-      recommendation = "Fase perfecta para trasplantes delicados ya que las raíces se asientan rápido. Momento propicio para podas de control de altura.";
+      recommendation = "Perfecto para trasplantes delicados y podas de control de altura.";
     } else if (age < 27.6881) {
       phaseName = "Luna Menguante";
       icon = "🌘";
-      recommendation = "Excelente periodo para combatir plagas y hongos del sustrato. La savia desciende al mínimo y la planta tolera limpiezas de raíces.";
+      recommendation = "Excelente periodo para combatir plagas y hongos del sustrato.";
     } else {
       phaseName = "Luna Nueva";
       icon = "🌑";
-      recommendation = "Ideal para podar plantas enfermas, desmalezar y aplicar abonos orgánicos al sustrato. No se recomienda germinar ni trasplantar.";
+      recommendation = "Ideal para podar plantas enfermas y desmalezar.";
     }
     
     return { phaseName, icon, recommendation, age: age.toFixed(1) };
+  }
+
+  function formatPrice(price) {
+    return price.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function openCertificateModal() {
+    const certModal = document.getElementById('academy-certificate-modal');
+    const certNameEl = document.getElementById('cert-student-name');
+    const certDateEl = document.getElementById('cert-issue-date');
+
+    if (certNameEl && currentMember) certNameEl.textContent = currentMember.name;
+    if (certDateEl) {
+      const now = new Date();
+      certDateEl.textContent = now.toLocaleDateString('es-AR', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    if (certModal) certModal.classList.add('active');
   }
 });
