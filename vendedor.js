@@ -283,11 +283,19 @@ async function fetchB2BProducts(clearGrid = true) {
     }
   } catch (err) {
     console.error('Error fetching B2B catalog:', err.message);
-    productGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: red;">Error al conectar con Supabase: ${err.message}</p>`;
+    productGrid.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 40px 20px; color: #721c24; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px;">
+        <p style="font-weight: bold; margin-bottom: 8px;">Error al conectar con la base de datos de Supabase</p>
+        <p style="font-size: 0.9rem; margin-bottom: 12px;">${err.message || err}</p>
+        <button onclick="window.fetchB2BProducts && window.fetchB2BProducts(true)" style="padding: 8px 16px; background: #721c24; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">Reintentar Carga</button>
+      </div>
+    `;
   } finally {
     showLoader(false);
   }
 }
+
+window.fetchB2BProducts = fetchB2BProducts;
 
 // --- CATEGORY COUNTS ---
 async function updateCategoryCounts() {

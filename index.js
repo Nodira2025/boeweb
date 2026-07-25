@@ -167,6 +167,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function updateCartDisplay() {
+    updateCartBadge();
+    renderCartItems();
+  }
+
   // Expose cart update globally for memberPortal.js
   window.updateCartDisplay = updateCartDisplay;
 
@@ -174,13 +179,78 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- INITIALIZE & FETCH CATALOG ---
   async function loadCatalog() {
     try {
-      const response = await fetch('products.json');
-      if (!response.ok) throw new Error('Catalog database file not found.');
-      products = await response.json();
-      
-      // Clean duplicate IDs or empty names if any
-      products = products.filter(p => p.id && p.name);
-      
+      let fetchedSuccessfully = false;
+
+      // 1. Try local JSON first
+      try {
+        const response = await fetch('products.json');
+        if (response.ok) {
+          products = await response.json();
+          products = products.filter(p => p && p.id && p.name);
+          if (products.length > 0) {
+            fetchedSuccessfully = true;
+          }
+        }
+      } catch (jsonErr) {
+        console.warn('Local products.json fetch failed, trying Supabase fallback...', jsonErr);
+      }
+
+      // 2. Fallback to Supabase if products.json failed or was blocked by CORS
+      if (!fetchedSuccessfully && window.supabase) {
+        try {
+          const supabaseUrl = 'https://sxbhrgvizqylnfcqzhin.supabase.co';
+          const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4YmhyZ3ZpenF5bG5mY3F6aGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMjM1MzEsImV4cCI6MjA5Njg5OTUzMX0.UUOwXsHXKNCjlJKdxMUlAuCtNAnNWgAroBwMlWAdTag';
+          const client = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+          
+          const { data, error } = await client.from('products').select(`
+            id,
+            name,
+            image,
+            category,
+            description,
+            supplier_products (
+              id,
+              price,
+              stock,
+              available,
+              link
+            )
+          `).order('name', { ascending: true });
+
+          if (!error && data && data.length > 0) {
+            products = data.map(p => {
+              const suppliers = p.supplier_products || [];
+              const validPrices = suppliers.map(s => Number(s.price)).filter(pr => !isNaN(pr) && pr > 0);
+              const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
+              const totalStock = suppliers.reduce((acc, s) => acc + (s.stock || 0), 0);
+              const isAvailable = suppliers.length === 0 || suppliers.some(s => s.available);
+              return {
+                id: String(p.id),
+                name: p.name || 'Producto sin nombre',
+                price: minPrice,
+                image: p.image || 'assets/logo.jpg',
+                link: suppliers[0]?.link || '',
+                slug: (p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+                stock: totalStock,
+                available: isAvailable,
+                category: p.category || 'Otros',
+                description: p.description || ''
+              };
+            });
+            products = products.filter(p => p.id && p.name);
+            if (products.length > 0) {
+              fetchedSuccessfully = true;
+            }
+          }
+        } catch (spErr) {
+          console.warn('Supabase catalog fetch failed:', spErr);
+        }
+      }
+
+      if (!fetchedSuccessfully) {
+        throw new Error('No se pudo establecer conexión con el catálogo de productos.');
+      }
+
       // Default Sort Order: Relevance (relevance matches index order)
       filteredProducts = [...products];
       
@@ -195,33 +265,23 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       console.error("Error loading products catalog:", error);
       
-      if (window.location.protocol === 'file:') {
-        productGrid.innerHTML = `
-          <div style="grid-column: 1 / -1; display: flex; justify-content: center; width: 100%; padding: 40px 0;">
-            <div style="background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; padding: 25px; border-radius: var(--border-radius-md); max-width: 600px; width: 100%; text-align: center; font-weight: 500; line-height: 1.6; box-shadow: var(--shadow-sm);">
-              <p style="font-size: 1.15rem; margin-bottom: 12px; font-weight: 700; color: #721c24;">⚠️ Restricción de Seguridad del Navegador (CORS)</p>
-              <p style="margin-bottom: 15px; font-size: 0.95rem;">Estás abriendo la página web haciendo doble clic en el archivo local (<code>file://</code>). Los navegadores modernos bloquean la carga de bases de datos locales por motivos de seguridad.</p>
-              <p style="margin-bottom: 8px; font-size: 0.95rem;"><strong>Para ver los productos y probar la web, por favor ingresa aquí:</strong></p>
-              <p><a href="http://localhost:8000/" style="color: var(--color-primary); text-decoration: underline; font-weight: 700; font-size: 1.25rem;">http://localhost:8000/</a></p>
-            </div>
-          </div>
-        `;
-        return;
-      }
-      
       productGrid.innerHTML = `
-        <div class="grid-loading" style="color: #721c24;">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 40px; height: 40px;">
+        <div class="grid-loading" style="color: #721c24; grid-column: 1 / -1; width: 100%; text-align: center; padding: 40px 20px;">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 40px; height: 40px; margin: 0 auto 15px auto; display: block;">
             <circle cx="12" cy="12" r="10"></circle>
             <line x1="12" y1="8" x2="12" y2="12"></line>
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
           </svg>
-          <p>No se pudo conectar con el catálogo de productos.</p>
-          <p style="font-size: 0.85rem; opacity: 0.7;">Por favor, recarga la página o asegúrate de que el servidor local esté corriendo en la carpeta del proyecto.</p>
+          <p style="font-size: 1.1rem; font-weight: 700; margin-bottom: 8px;">No se pudo conectar con el catálogo de productos.</p>
+          <p style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 16px;">Por favor, comprobá tu conexión a internet o recargá la página.</p>
+          <button onclick="window.loadCatalog && window.loadCatalog()" style="padding: 10px 20px; background: var(--color-primary, #152d24); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Reintentar Carga</button>
         </div>
       `;
     }
   }
+
+  // Expose loadCatalog globally for retry buttons
+  window.loadCatalog = loadCatalog;
 
 
   // --- CATALOG FILTER & RENDER ENGINE ---
@@ -244,8 +304,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase().trim();
       filteredProducts = filteredProducts.filter(p => 
-        p.name.toLowerCase().includes(query) || 
-        p.slug.toLowerCase().includes(query)
+        (p.name || '').toLowerCase().includes(query) || 
+        (p.slug || '').toLowerCase().includes(query)
       );
     }
 
