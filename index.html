@@ -18,7 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
   
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="index.css?v=2.2">
+  <link rel="stylesheet" href="index.css?v=2.3">
 </head>
 <body>
 
@@ -38,6 +38,15 @@
 
       <!-- Navigation & Cart Area -->
       <div class="header-cart-area" style="display: flex; gap: 15px; align-items: center;">
+        <!-- Academia BÔ Button -->
+        <button class="btn btn-secondary nav-academy-btn no-mobile" id="academy-trigger" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px;" aria-label="Academia de Cultivo">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: var(--color-accent-gold);">
+            <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+            <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+          </svg>
+          <span>Academia BÔ</span>
+        </button>
+
         <button class="btn btn-secondary nav-blog-btn no-mobile" id="blog-trigger" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px;" aria-label="Ver guías de cultivo">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
             <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
@@ -194,6 +203,42 @@
 
     </div>
   </main>
+
+  <!-- Academia BÔ Main Section -->
+  <section class="academy-section" id="academy-section" style="display: none;">
+    <div class="academy-hero-banner">
+      <div class="academy-hero-container">
+        <span class="academy-tagline">🎓 ECOSISTEMA EDUCATIVO CIENTÍFICO</span>
+        <h1 class="academy-hero-title">Academia de Cultivo BÔ</h1>
+        <p class="academy-hero-desc">Capacitate con las últimas investigaciones en agronomía de cannabis indoor, iluminación LED y control climático VPD. Completá los módulos, ganá Semillas para el Club y obtené tu Certificado de Cultivador Experto.</p>
+        
+        <div class="academy-progress-card">
+          <div class="academy-progress-info">
+            <span>Progreso del Curso:</span>
+            <strong id="academy-progress-percent">0% Completo</strong>
+          </div>
+          <div class="academy-progress-bar-bg">
+            <div class="academy-progress-bar-fill" id="academy-progress-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="academy-main-container">
+      <!-- Sidebar with Module List -->
+      <aside class="academy-sidebar">
+        <h3 class="sidebar-mod-title">Módulos de Aprendizaje</h3>
+        <ul class="academy-modules-list" id="academy-modules-list">
+          <!-- Filled dynamically by academy.js -->
+        </ul>
+      </aside>
+
+      <!-- Main Lesson Panel -->
+      <main class="academy-content-panel" id="academy-lesson-content">
+        <!-- Filled dynamically by academy.js -->
+      </main>
+    </div>
+  </section>
 
   <!-- Blog Section -->
   <section class="blog-section" id="blog-section" style="display: none;">
@@ -715,6 +760,14 @@
       <span>Tienda</span>
     </button>
     
+    <button type="button" class="mobile-nav-btn" id="mobile-academy-btn">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+        <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+        <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+      </svg>
+      <span>Academia</span>
+    </button>
+
     <button type="button" class="mobile-nav-btn" id="mobile-blog-btn">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
@@ -852,8 +905,57 @@
     </div>
   </div>
 
+  <!-- Modal 3: Printable VIP Certificate -->
+  <div class="modal-backdrop" id="academy-certificate-modal">
+    <div class="modal-card cert-modal-card">
+      <button class="close-modal-btn" id="close-cert-btn">&times;</button>
+      
+      <div class="certificate-paper" id="printable-certificate">
+        <div class="cert-border-outer">
+          <div class="cert-border-inner">
+            <div class="cert-watermark">BÔ</div>
+            
+            <div class="cert-header">
+              <img src="assets/logo.jpg" alt="BO Logo" class="cert-logo">
+              <h2>CERTIFICADO DE EXCELENCIA</h2>
+              <span class="cert-subtitle">ACADEMIA DE CULTIVO CANNÁBICO BÔ GROWCLUB</span>
+            </div>
+
+            <div class="cert-body">
+              <p class="cert-text-intro">Otorgado con distinción a:</p>
+              <h1 class="cert-student-name" id="cert-student-name">Cultivador Experto</h1>
+              <p class="cert-text-body">Por haber completado satisfactoriamente el programa académico de <strong>Cultivo Indoor Avanzado, Fotobiología LED, Control de VPD y Curado Terpénico</strong>, demostrando dominio en agronomía botánica y prácticas orgánicas sostenibles.</p>
+            </div>
+
+            <div class="cert-footer">
+              <div class="cert-signature-box">
+                <span class="signature-line"></span>
+                <span class="signature-title">Estudio de Cultivo BÔ</span>
+              </div>
+              <div class="cert-seal">
+                <div class="seal-inner">
+                  <span>EGRESADO</span>
+                  <strong>VIP</strong>
+                </div>
+              </div>
+              <div class="cert-date-box">
+                <span class="cert-date" id="cert-issue-date">25 de Julio de 2026</span>
+                <span class="signature-title">Fecha de Emisión</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cert-actions-bar">
+        <button class="btn btn-primary" id="print-cert-btn">🖨️ Imprimir / Guardar como PDF</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Main JavaScript Files -->
-  <script src="index.js?v=2.2"></script>
-  <script src="memberPortal.js?v=2.2"></script>
+  <script src="index.js?v=2.3"></script>
+  <script src="memberPortal.js?v=2.3"></script>
+  <script src="academy.js?v=2.3"></script>
 </body>
 </html>
