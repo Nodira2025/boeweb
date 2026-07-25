@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BÔ growclub - Portal de Pacientes & Vinculación Médica</title>
+  <meta name="description" content="Trámite y derivación para pacientes. Vinculación con psiquiatras y médicos especialistas en cultivo medicinal y REPROCANN.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  
+  <!-- Supabase JS SDK CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="index.css?v=2.5">
+  
+  <style>
+    .patients-hero {
+      padding: 60px 24px 40px 24px;
+      text-align: center;
+      position: relative;
+    }
+    
+    .patients-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 20px 80px 20px;
+    }
+
+    .wizard-card {
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(195, 155, 75, 0.3);
+      border-radius: 24px;
+      padding: 40px 36px;
+      box-shadow: 0 20px 50px rgba(15, 30, 24, 0.08);
+      position: relative;
+    }
+
+    /* Step Progress Indicator */
+    .wizard-progress {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 36px;
+      position: relative;
+    }
+
+    .wizard-progress::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 10%;
+      right: 10%;
+      height: 2px;
+      background: rgba(195, 155, 75, 0.2);
+      z-index: 0;
+      transform: translateY(-50%);
+    }
+
+    .progress-step {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .step-number {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 2px solid rgba(195, 155, 75, 0.3);
+      color: var(--color-neutral-stone-dark);
+      font-weight: 700;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+
+    .progress-step.active .step-number {
+      background: var(--color-primary);
+      border-color: var(--color-accent-gold);
+      color: var(--color-accent-gold);
+      box-shadow: 0 0 15px rgba(195, 155, 75, 0.4);
+    }
+
+    .progress-step.completed .step-number {
+      background: #2e7d32;
+      border-color: #2e7d32;
+      color: #ffffff;
+    }
+
+    .step-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--color-neutral-stone-dark);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .progress-step.active .step-label {
+      color: var(--color-primary);
+      font-weight: 700;
+    }
+
+    /* Form Fields */
+    .form-group-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--color-primary);
+      margin-bottom: 8px;
+    }
+
+    .form-input, .form-select, .form-textarea {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: var(--border-radius-md);
+      border: 1px solid rgba(195, 155, 75, 0.3);
+      background: rgba(255, 255, 255, 0.95);
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      color: #333333;
+      transition: all 0.25s ease;
+    }
+
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: var(--color-accent-gold);
+      box-shadow: 0 0 0 3px rgba(195, 155, 75, 0.2);
+      background: #ffffff;
+    }
+
+    .form-textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    /* Specialist Selection Cards */
+    .specialists-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 10px;
+    }
+
+    .specialist-card {
+      border: 2px solid rgba(195, 155, 75, 0.25);
+      border-radius: 16px;
+      padding: 20px 16px;
+      background: rgba(255, 255, 255, 0.8);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .specialist-card:hover {
+      border-color: var(--color-accent-gold);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(195, 155, 75, 0.15);
+    }
+
+    .specialist-card.selected {
+      border-color: var(--color-accent-gold);
+      background: rgba(21, 45, 36, 0.04);
+      box-shadow: 0 0 0 2px var(--color-accent-gold);
+    }
+
+    .specialist-card.selected::after {
+      content: '✓';
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      color: var(--color-accent-gold);
+      font-weight: 700;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .specialist-role {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--color-accent-gold-dark, #b88e28);
+      margin-bottom: 4px;
+    }
+
+    .specialist-name {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--color-primary);
+      margin-bottom: 6px;
+    }
+
+    .specialist-meta {
+      font-size: 0.82rem;
+      color: var(--color-neutral-stone-dark);
+    }
+
+    /* Wizard Navigation Actions */
+    .wizard-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(195, 155, 75, 0.2);
+    }
+
+    .btn-step-prev {
+      background: transparent;
+      border: 1px solid var(--color-neutral-stone-dark);
+      color: var(--color-primary);
+      padding: 12px 24px;
+      border-radius: var(--border-radius-full);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-step-prev:hover {
+      background: rgba(21, 45, 36, 0.05);
+    }
+
+    .btn-step-next {
+      background: var(--color-primary);
+      color: #ffffff;
+      border: none;
+      padding: 14px 28px;
+      border-radius: var(--border-radius-full);
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 15px rgba(21, 45, 36, 0.2);
+      transition: all 0.3s ease;
+    }
+
+    .btn-step-next:hover {
+      background: var(--color-primary-light, #1a382d);
+      box-shadow: 0 8px 25px rgba(21, 45, 36, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .btn-submit-final {
+      background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+      color: #ffffff;
+      border: none;
+      padding: 16px 32px;
+      border-radius: var(--border-radius-full);
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 8px 25px rgba(37, 211, 102, 0.35);
+      transition: all 0.3s ease;
+    }
+
+    .btn-submit-final:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 12px 30px rgba(37, 211, 102, 0.5);
+    }
+
+    @media (max-width: 640px) {
+      .form-group-grid, .specialists-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .wizard-card {
+        padding: 28px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header Navigation -->
+  <header class="main-header">
+    <div class="header-container">
+      <a href="index.html" class="header-logo-area" style="text-decoration: none;">
+        <img src="assets/logo.jpg" alt="BO growclub Logo" class="brand-logo">
+        <div class="brand-text">
+          <span class="brand-title">BO</span>
+          <span class="brand-subtitle">growclub</span>
+        </div>
+      </a>
+
+      <div class="header-cart-area">
+        <a href="index.html" class="btn btn-secondary" style="padding: 10px 18px; font-size: 0.9rem; border-radius: var(--border-radius-sm); text-decoration: none;">
+          ← Volver al Catálogo
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Banner -->
+  <section class="patients-hero">
+    <div class="contact-badge" style="margin: 0 auto 16px auto;">
+      <span class="badge-dot"></span>
+      <span>TRÁMITE DE SALUD & DERIVACIÓN MÉDICA</span>
+    </div>
+    <h1 class="contact-title" style="font-size: 2.8rem;">Vinculación con Especialistas</h1>
+    <p class="contact-subtitle">
+      Completá tu solicitud de atención para iniciar o renovar tu REPROCANN, realizar consultas médicas o recibir asesoramiento de cultivo terapéutico con profesionales capacitados.
+    </p>
+  </section>
+
+  <!-- Wizard Form Container -->
+  <div class="patients-container">
+    <div class="wizard-card">
+      
+      <!-- Wizard Progress -->
+      <div class="wizard-progress">
+        <div class="progress-step active" id="pstep-1">
+          <div class="step-number">1</div>
+          <span class="step-label">Paciente</span>
+        </div>
+        <div class="progress-step" id="pstep-2">
+          <div class="step-number">2</div>
+          <span class="step-label">Trámite</span>
+        </div>
+        <div class="progress-step" id="pstep-3">
+          <div class="step-number">3</div>
+          <span class="step-label">Especialista</span>
+        </div>
+      </div>
+
+      <form id="patient-wizard-form" onsubmit="return false;">
+        
+        <!-- STEP 1: Datos del Paciente -->
+        <div class="wizard-step-content" id="step-content-1">
+          <h2 style="font-family: var(--font-display); font-size: 1.4rem; color: var(--color-primary); margin-bottom: 20px;">
+            Paso 1: Datos Personales del Paciente
+          </h2>
+          <div class="form-group-grid">
+            <div class="form-group">
+              <label class="form-label" for="patient-fullname">Nombre y Apellido *</label>
+              <input type="text" id="patient-fullname" class="form-input" placeholder="Ej: Juan Pérez" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="patient-dni">DNI / Documento *</label>
+              <input type="text" id="patient-dni" class="form-input" placeholder="Ej: 38450123" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="patient-phone">Teléfono / WhatsApp *</label>
+              <input type="tel" id="patient-phone" class="form-input" placeholder="Ej: 381 5123456" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="patient-email">Correo Electrónico</label>
+              <input type="email" id="patient-email" class="form-input" placeholder="ejemplo@email.com">
+            </div>
+            <div class="form-group full-width">
+              <label class="form-label" for="patient-province">Provincia / Localidad *</label>
+              <input type="text" id="patient-province" class="form-input" placeholder="Ej: San Miguel de Tucumán, Tucumán" required>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2: Detalle del Trámite -->
+        <div class="wizard-step-content" id="step-content-2" style="display: none;">
+          <h2 style="font-family: var(--font-display); font-size: 1.4rem; color: var(--color-primary); margin-bottom: 20px;">
+            Paso 2: Selección de Trámite o Consulta
+          </h2>
+          <div class="form-group">
+            <label class="form-label" for="procedure-type">Tipo de Trámite o Consulta *</label>
+            <select id="procedure-type" class="form-select" required>
+              <option value="">-- Seleccioná una opción --</option>
+              <option value="Alta REPROCANN (Primera Vez)">🌱 Alta REPROCANN (Primera Vez)</option>
+              <option value="Renovación REPROCANN">🔄 Renovación REPROCANN</option>
+              <option value="Consulta Evaluativa Psiquiátrica">🧠 Consulta Evaluativa Psiquiátrica</option>
+              <option value="Consulta Médica General / Clínica">🩺 Consulta Médica General / Clínica</option>
+              <option value="Asesoramiento de Cultivo Medicinal">🌿 Asesoramiento de Cultivo Medicinal</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="patient-notes">Detalles o Motivo de la Consulta (Opcional)</label>
+            <textarea id="patient-notes" class="form-textarea" placeholder="Contanos brevemente tu consulta o patología a evaluar..."></textarea>
+          </div>
+        </div>
+
+        <!-- STEP 3: Selección de Especialista -->
+        <div class="wizard-step-content" id="step-content-3" style="display: none;">
+          <h2 style="font-family: var(--font-display); font-size: 1.4rem; color: var(--color-primary); margin-bottom: 12px;">
+            Paso 3: Selección de Especialista
+          </h2>
+          <p style="font-size: 0.9rem; color: var(--color-neutral-stone-dark); margin-bottom: 20px;">
+            Seleccioná el profesional con el que deseás vincularte o elegí la asignación por recomendación BÔ.
+          </p>
+
+          <div class="specialists-grid" id="specialists-list">
+            <!-- Dynamically loaded from Supabase or default list -->
+            <div class="specialist-card selected" data-id="auto" onclick="selectSpecialist(this)">
+              <div class="specialist-role">RECOMENDACIÓN BÔ</div>
+              <div class="specialist-name">Asignación Automática</div>
+              <div class="specialist-meta">Asignamos el especialista con mayor disponibilidad inmediata.</div>
+            </div>
+
+            <div class="specialist-card" data-id="psiq-1" onclick="selectSpecialist(this)">
+              <div class="specialist-role">PSIQUIATRÍA</div>
+              <div class="specialist-name">Dra. M. Psiquiatra Evaluadora</div>
+              <div class="specialist-meta">Mat. Prof. // Especialista en Salud Mental y Cannabis Terapéutico.</div>
+            </div>
+
+            <div class="specialist-card" data-id="med-1" onclick="selectSpecialist(this)">
+              <div class="specialist-role">MEDICINA GENERAL</div>
+              <div class="specialist-name">Dr. J. Evaluador REPROCANN</div>
+              <div class="specialist-meta">Mat. Prof. // Evaluaciones Clínicas e Integrales.</div>
+            </div>
+
+            <div class="specialist-card" data-id="grow-1" onclick="selectSpecialist(this)">
+              <div class="specialist-role">ASESORÍA TÉCNICA</div>
+              <div class="specialist-name">Equipo de Cultivo BÔ</div>
+              <div class="specialist-meta">Acompañamiento en dosificación y extracción medicinal.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Navigation Buttons -->
+        <div class="wizard-actions">
+          <button type="button" class="btn-step-prev" id="btn-prev" style="visibility: hidden;" onclick="prevStep()">
+            ← Anterior
+          </button>
+          
+          <button type="button" class="btn-step-next" id="btn-next" onclick="nextStep()">
+            <span>Siguiente</span> →
+          </button>
+
+          <button type="button" class="btn-submit-final" id="btn-submit" style="display: none;" onclick="submitPatientForm()">
+            <svg style="width: 20px; height: 20px;" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+            <span>Confirmar y Enviar por WhatsApp</span>
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <script src="pacientes.js?v=1.0"></script>
+</body>
+</html>
