@@ -3236,6 +3236,280 @@ textarea.form-control {
   }
 }
 
+/* ==========================================================================
+   Club Member & VIP Portal Dashboard (Zen & Premium)
+   ========================================================================== */
+.auth-modal-card {
+  max-width: 420px;
+  width: 100%;
+}
+
+.portal-modal-card {
+  max-width: 720px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-accent-gold);
+}
+
+.portal-header {
+  background-color: var(--color-primary);
+  color: var(--color-neutral-light);
+  padding: 30px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--color-accent-gold);
+  position: relative;
+}
+
+.portal-profile-area {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.member-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: var(--color-accent-gold);
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.member-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 12px;
+  margin-top: 4px;
+  letter-spacing: 0.05em;
+}
+
+.badge-bronze {
+  background-color: rgba(139, 90, 43, 0.15);
+  color: #c08d5b;
+  border: 1px solid rgba(139, 90, 43, 0.3);
+}
+
+.badge-silver {
+  background-color: rgba(192, 192, 192, 0.15);
+  color: #b0b0b0;
+  border: 1px solid rgba(192, 192, 192, 0.3);
+}
+
+.badge-gold {
+  background-color: rgba(195, 155, 75, 0.15);
+  color: var(--color-accent-gold);
+  border: 1px solid rgba(195, 155, 75, 0.3);
+}
+
+.portal-seeds-display {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+}
+
+.seeds-amount {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--color-accent-gold);
+  line-height: 1;
+}
+
+.seeds-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+.portal-progress-section {
+  background-color: #fff;
+  border: 1px solid rgba(195, 155, 75, 0.15);
+  border-radius: var(--border-radius-sm);
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--color-primary);
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 10px;
+  background-color: var(--color-neutral-stone);
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(to right, var(--color-primary), var(--color-accent-gold));
+  border-radius: 5px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress-info-text {
+  font-size: 0.78rem;
+  color: var(--color-neutral-stone-dark);
+  margin: 0;
+}
+
+.portal-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.dashboard-box {
+  background-color: #fff;
+  border: 1px solid rgba(195, 155, 75, 0.15);
+  border-radius: var(--border-radius-sm);
+  padding: 20px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.box-title {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  border-bottom: 1px solid rgba(195, 155, 75, 0.1);
+  padding-bottom: 8px;
+}
+
+/* Lunar widget styles */
+.lunar-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.lunar-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.lunar-tip {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--color-neutral-stone-dark);
+  margin: 0;
+  background-color: rgba(21, 45, 36, 0.03);
+  padding: 10px 12px;
+  border-radius: 6px;
+  flex-grow: 1;
+}
+
+/* VIP coupons widget styles */
+#vip-coupons-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-grow: 1;
+}
+
+.vip-coupon-card {
+  border: 1px solid rgba(21, 45, 36, 0.06);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: rgba(21, 45, 36, 0.02);
+  transition: var(--transition-fast);
+}
+
+.vip-coupon-card.unlocked {
+  border-color: rgba(195, 155, 75, 0.3);
+  background-color: rgba(195, 155, 75, 0.05);
+}
+
+.vip-coupon-card.locked {
+  opacity: 0.6;
+}
+
+.coupon-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.coupon-code {
+  font-family: monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.vip-coupon-card.unlocked .coupon-code {
+  color: var(--color-accent-gold);
+}
+
+.coupon-desc {
+  font-size: 0.75rem;
+  color: var(--color-neutral-stone-dark);
+  margin-top: 2px;
+}
+
+.lock-indicator {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-neutral-stone-dark);
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+@media (max-width: 768px) {
+  .portal-modal-card {
+    max-height: 95vh;
+    border-radius: 24px 24px 0 0;
+    align-self: flex-end;
+  }
+  
+  .portal-header {
+    padding: 20px 16px;
+  }
+  
+  .portal-body-layout {
+    padding: 16px 16px !important;
+    overflow-y: auto;
+    flex-grow: 1;
+  }
+  
+  .portal-dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  
+  .dashboard-box {
+    padding: 16px;
+  }
+}
+
 
 
 

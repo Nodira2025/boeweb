@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const cartSubtotalEl = document.getElementById('cart-subtotal');
   const cartDiscountEl = document.getElementById('cart-discount');
   const cartDiscountRow = document.getElementById('cart-discount-row');
+  const cartDiscountLabelEl = document.getElementById('cart-discount-label');
   const cartTotalEl = document.getElementById('cart-total');
   const cartFooter = document.getElementById('cart-footer');
   const emptyCartShopBtn = document.getElementById('empty-cart-shop-btn');
@@ -110,6 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const summarySubtotal = document.getElementById('summary-subtotal');
   const summaryDiscountRow = document.getElementById('summary-discount-row');
   const summaryDiscount = document.getElementById('summary-discount');
+  const summaryDiscountLabel = document.getElementById('summary-discount-label');
   const summaryTotal = document.getElementById('summary-total');
 
   // Zen Discount Wheel Modal
@@ -134,6 +136,39 @@ document.addEventListener('DOMContentLoaded', () => {
   const couponCodeDisplay = document.getElementById('coupon-code-display');
   const couponDescDisplay = document.getElementById('coupon-desc-display');
   const claimCouponBtn = document.getElementById('claim-coupon-btn');
+
+
+  // --- CLUB MEMBER HELPERS ---
+  function getMemberDiscountPercent() {
+    const memberStr = localStorage.getItem('boeweb_member');
+    if (!memberStr) return 0;
+    try {
+      const member = JSON.parse(memberStr);
+      const seeds = member.seeds || 0;
+      if (seeds >= 1500) return 0.15;
+      if (seeds >= 500) return 0.10;
+      return 0.05;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  function getMemberTierName() {
+    const memberStr = localStorage.getItem('boeweb_member');
+    if (!memberStr) return "";
+    try {
+      const member = JSON.parse(memberStr);
+      const seeds = member.seeds || 0;
+      if (seeds >= 1500) return "Árbol Zen VIP";
+      if (seeds >= 500) return "Planta";
+      return "Brote";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  // Expose cart update globally for memberPortal.js
+  window.updateCartDisplay = updateCartDisplay;
 
 
   // --- INITIALIZE & FETCH CATALOG ---
@@ -522,28 +557,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Totals calculations
     let discount = 0;
+    let discountLabel = "Descuento";
+    
     if (appliedCoupon) {
-      if (appliedCoupon.type === 'percent') {
-        discount = subtotal * appliedCoupon.value;
-      } else if (appliedCoupon.type === 'wisdom') {
-        discount = subtotal * 0.05; // 5% flat
+      if (appliedCoupon.type === 'percent' || appliedCoupon.type === 'wisdom') {
+        discount = subtotal * (appliedCoupon.value || 0.05);
+      }
+    } else {
+      const memberDiscountPct = getMemberDiscountPercent();
+      if (memberDiscountPct > 0) {
+        discount = subtotal * memberDiscountPct;
+        discountLabel = `Descuento Club (${getMemberTierName()})`;
       }
     }
 
     const total = Math.max(0, subtotal - discount);
 
     cartSubtotalEl.textContent = `$${formatPrice(subtotal)}`;
+    if (cartDiscountLabelEl) {
+      cartDiscountLabelEl.textContent = discountLabel;
+    }
+    
     if (discount > 0) {
       cartDiscountRow.style.display = 'flex';
       cartDiscountEl.textContent = `-$${formatPrice(discount)}`;
-    } else {
-      cartDiscountRow.style.display = 'none';
-    }
-    
-    // Envío Gratis tag indicator
-    if (appliedCoupon && appliedCoupon.type === 'shipping') {
+    } else if (appliedCoupon && appliedCoupon.type === 'shipping') {
       cartDiscountRow.style.display = 'flex';
       cartDiscountEl.textContent = 'Envío Gratis';
+      if (cartDiscountLabelEl) {
+        cartDiscountLabelEl.textContent = 'Envío';
+      }
+    } else {
+      cartDiscountRow.style.display = 'none';
     }
 
     cartTotalEl.textContent = `$${formatPrice(total)}`;
@@ -577,9 +622,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Populate checkout values
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     let discount = 0;
+    let discountLabel = "Descuento aplicado:";
+    
     if (appliedCoupon) {
       if (appliedCoupon.type === 'percent' || appliedCoupon.type === 'wisdom') {
-        discount = subtotal * appliedCoupon.value;
+        discount = subtotal * (appliedCoupon.value || 0.05);
+      }
+    } else {
+      const memberDiscountPct = getMemberDiscountPercent();
+      if (memberDiscountPct > 0) {
+        discount = subtotal * memberDiscountPct;
+        discountLabel = `Descuento Club (${getMemberTierName()}):`;
       }
     }
     const total = Math.max(0, subtotal - discount);
@@ -588,12 +641,19 @@ document.addEventListener('DOMContentLoaded', () => {
     summaryItemsCount.textContent = totalQty;
     summarySubtotal.textContent = `$${formatPrice(subtotal)}`;
     
+    if (summaryDiscountLabel) {
+      summaryDiscountLabel.textContent = discountLabel;
+    }
+    
     if (discount > 0) {
       summaryDiscountRow.style.display = 'flex';
       summaryDiscount.textContent = `-$${formatPrice(discount)}`;
     } else if (appliedCoupon && appliedCoupon.type === 'shipping') {
       summaryDiscountRow.style.display = 'flex';
       summaryDiscount.textContent = 'Gratis';
+      if (summaryDiscountLabel) {
+        summaryDiscountLabel.textContent = 'Envío:';
+      }
     } else {
       summaryDiscountRow.style.display = 'none';
     }
@@ -659,16 +719,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     let discount = 0;
+    let discountLabel = "Descuento";
     if (appliedCoupon) {
       if (appliedCoupon.type === 'percent' || appliedCoupon.type === 'wisdom') {
-        discount = subtotal * appliedCoupon.value;
+        discount = subtotal * (appliedCoupon.value || 0.05);
+        discountLabel = `Descuento (Cupón: ${appliedCoupon.code})`;
+      }
+    } else {
+      const memberDiscountPct = getMemberDiscountPercent();
+      if (memberDiscountPct > 0) {
+        discount = subtotal * memberDiscountPct;
+        discountLabel = `Descuento Club BÔ (${getMemberTierName()})`;
       }
     }
     const total = Math.max(0, subtotal - discount);
 
     msg += `\n💰 *Subtotal:* $${formatPrice(subtotal)}\n`;
     if (discount > 0) {
-      msg += `📉 *Descuento:* -$${formatPrice(discount)}\n`;
+      msg += `📉 *${discountLabel}:* -$${formatPrice(discount)}\n`;
     }
     if (appliedCoupon && appliedCoupon.type === 'shipping') {
       msg += `🚚 *Envío:* Bonificado (Gratis)\n`;

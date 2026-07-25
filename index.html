@@ -18,7 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
   
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="index.css?v=2.1">
+  <link rel="stylesheet" href="index.css?v=2.2">
 </head>
 <body>
 
@@ -46,7 +46,15 @@
           Guías de Cultivo
         </button>
 
-        <button class="cart-trigger-btn" id="cart-trigger" aria-label="Ver carrito">
+        <!-- Club BÔ Button -->
+        <button class="btn btn-secondary nav-club-btn" id="club-trigger" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px; border-color: var(--color-accent-gold); color: var(--color-primary);" aria-label="Portal de Miembros">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: var(--color-accent-gold);">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+          </svg>
+          <span id="club-btn-text">Club BÔ</span>
+        </button>
+
+        <button class="btn btn-secondary cart-trigger-btn" id="cart-trigger" style="display: flex; align-items: center; gap: 8px;" aria-label="Ver carrito">
           <div class="cart-icon-wrapper">
             <svg class="icon cart-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="9" cy="21" r="1"></circle>
@@ -288,7 +296,7 @@
           <span id="cart-subtotal">$0,00</span>
         </div>
         <div class="totals-row discount-row" id="cart-discount-row" style="display: none;">
-          <span>Descuento</span>
+          <span id="cart-discount-label">Descuento</span>
           <span id="cart-discount">-$0,00</span>
         </div>
         <div class="totals-row total-final">
@@ -358,8 +366,8 @@
               <span>Productos (<span id="summary-items-count">0</span>):</span>
               <span id="summary-subtotal">$0,00</span>
             </div>
-            <div class="summary-line discount-line" id="summary-discount-row" style="display: none;">
-              <span>Descuento aplicado:</span>
+             <div class="summary-line discount-line" id="summary-discount-row" style="display: none;">
+              <span id="summary-discount-label">Descuento aplicado:</span>
               <span id="summary-discount">-$0,00</span>
             </div>
             <div class="summary-line summary-total">
@@ -714,6 +722,13 @@
       </svg>
       <span>Guías</span>
     </button>
+
+    <button type="button" class="mobile-nav-btn" id="mobile-club-btn">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+      </svg>
+      <span>Club BÔ</span>
+    </button>
     
     <button type="button" class="mobile-nav-btn" id="mobile-cart-btn">
       <div style="position: relative; display: inline-flex; align-items: center; justify-content: center;">
@@ -728,7 +743,117 @@
     </button>
   </div>
 
-  <!-- Main JavaScript File -->
-  <script src="index.js?v=2.1"></script>
+  <!-- Modal 1: Club Register / Login -->
+  <div class="modal-backdrop" id="club-auth-modal">
+    <div class="modal-card auth-modal-card">
+      <button class="close-modal-btn" id="close-club-auth-btn">&times;</button>
+      <div class="auth-modal-header" style="text-align: center; margin-bottom: 20px;">
+        <div class="auth-logo" style="margin-bottom: 12px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 40px; height: 40px; color: var(--color-accent-gold); display: inline-block;">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+          </svg>
+        </div>
+        <h3 style="font-family: var(--font-display); font-size: 1.6rem; color: var(--color-primary); margin-bottom: 8px;">Unite al Club BÔ</h3>
+        <p style="font-size: 0.9rem; color: var(--color-neutral-stone-dark); line-height: 1.4;">Registrate gratis para acumular semillas de lealtad, acceder al portal VIP y obtener descuentos exclusivos de cultivo.</p>
+      </div>
+      <div class="modal-body" style="padding: 0;">
+        <form id="club-register-form">
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label for="member-name" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Nombre Completo</label>
+            <input type="text" id="member-name" class="form-control" placeholder="Ej: Juan Pérez" required style="width: 100%; box-sizing: border-box;">
+          </div>
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label for="member-email" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Correo Electrónico</label>
+            <input type="email" id="member-email" class="form-control" placeholder="Ej: juan@example.com" required style="width: 100%; box-sizing: border-box;">
+          </div>
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label for="member-phone" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">WhatsApp (Celular)</label>
+            <input type="tel" id="member-phone" class="form-control" placeholder="Ej: +54 9 381 555-5555" required style="width: 100%; box-sizing: border-box;">
+          </div>
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label for="member-growtype" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Tu Tipo de Cultivo Preferido</label>
+            <select id="member-growtype" class="form-control" style="width: 100%; box-sizing: border-box;">
+              <option value="Indoor">Indoor (Luces & Carpa)</option>
+              <option value="Exterior">Exterior (Sol & Tierra)</option>
+              <option value="Mixto">Mixto (Invernadero / Balcón)</option>
+              <option value="Ninguno">No cultivo (Solo accesorios)</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full-width" style="margin-top: 10px; width: 100%;">Registrarse & Recibir +100 Semillas</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: VIP Member Portal Dashboard -->
+  <div class="modal-backdrop" id="club-portal-modal">
+    <div class="modal-card portal-modal-card">
+      <button class="close-modal-btn" id="close-club-portal-btn">&times;</button>
+      
+      <div class="portal-header">
+        <div class="portal-profile-area">
+          <div class="member-avatar">BÔ</div>
+          <div>
+            <h3 id="vip-member-name" style="margin: 0; font-family: var(--font-display); font-size: 1.4rem;">Cultivador</h3>
+            <span class="member-badge" id="vip-member-badge">Miembro Brote</span>
+          </div>
+        </div>
+        <div class="portal-seeds-display">
+          <span class="seeds-amount" id="vip-member-seeds">100</span>
+          <span class="seeds-label">Semillas</span>
+        </div>
+      </div>
+      
+      <div class="modal-body portal-body-layout" style="padding: 20px 24px;">
+        <!-- Progress Bar Section -->
+        <div class="portal-progress-section">
+          <div class="progress-labels">
+            <span id="current-tier-label">Brote (5% OFF)</span>
+            <span id="next-tier-label">Planta (10% OFF)</span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="vip-progress-fill" style="width: 20%;"></div>
+          </div>
+          <p class="progress-info-text" id="vip-progress-text">Te faltan 400 semillas para subir de nivel.</p>
+        </div>
+
+        <!-- Dashboard Subsections Grid -->
+        <div class="portal-dashboard-grid">
+          <!-- Column 1: Lunar Calendar -->
+          <div class="portal-dashboard-col">
+            <div class="dashboard-box lunar-widget">
+              <h4 class="box-title">🌙 Calendario Lunar de Cultivo</h4>
+              <div class="lunar-status">
+                <span class="lunar-icon" id="lunar-phase-icon">🌑</span>
+                <div>
+                  <h5 id="lunar-phase-name" style="margin: 0; font-size: 0.95rem; font-weight: 600;">Luna Nueva</h5>
+                  <span id="lunar-phase-age" style="font-size: 0.75rem; color: var(--color-neutral-stone-dark);">Edad: 0.0 días</span>
+                </div>
+              </div>
+              <p class="lunar-tip" id="lunar-phase-tip">Cargando consejos de cultivo...</p>
+            </div>
+          </div>
+
+          <!-- Column 2: VIP Coupons -->
+          <div class="portal-dashboard-col">
+            <div class="dashboard-box coupons-widget">
+              <h4 class="box-title">🎫 Cupones Activos</h4>
+              <div id="vip-coupons-container">
+                <!-- Filled dynamically by memberPortal.js -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="portal-footer-actions" style="margin-top: 24px; display: flex; justify-content: space-between; align-items: center;">
+          <button class="btn btn-secondary" id="club-logout-btn" style="padding: 8px 16px; font-size: 0.85rem; border-radius: var(--border-radius-sm);">Cerrar Sesión</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main JavaScript Files -->
+  <script src="index.js?v=2.2"></script>
+  <script src="memberPortal.js?v=2.2"></script>
 </body>
 </html>
