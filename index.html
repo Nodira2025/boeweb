@@ -21,7 +21,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="index.css?v=2.4">
+  <link rel="stylesheet" href="index.css?v=2.5">
 </head>
 <body>
 
@@ -648,64 +648,91 @@
 
   <!-- Contact & Community Section -->
   <section class="contact-section" id="contact-section">
+    <div class="contact-bg-glow"></div>
     <div class="contact-container">
       <div class="contact-header">
+        <div class="contact-badge">
+          <span class="badge-dot"></span>
+          <span>ESPACIO ZEN & ATENCIÓN PERSONALIZADA</span>
+        </div>
         <h2 class="contact-title">Estudio de Cultivo & Comunidad</h2>
-        <p class="contact-subtitle">Conectá con nosotros y formá parte del growclub. Te esperamos en nuestro espacio zen o en redes.</p>
+        <p class="contact-subtitle">Conectá con el santuario BÔ growclub. Te esperamos en nuestro estudio privado o a través de nuestros canales directos.</p>
       </div>
       
       <div class="contact-grid">
         <!-- Google Maps / Location -->
         <div class="contact-card">
-          <div class="contact-card-icon">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 28px; height: 28px;">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-              <circle cx="12" cy="10" r="3"></circle>
-            </svg>
+          <div class="contact-card-badge">
+            <span class="status-indicator online"></span> Presencial
           </div>
-          <h3>Encuentra tu Rumbo</h3>
-          <p>Ubicado en el corazón de Tucumán, nuestro estudio de cultivo privado te brinda asesoramiento presencial exclusivo.</p>
-          <a href="https://www.google.com/search?q=growshop&oq=growshop&gs_lcrp=EgZjaHJvbWUqCAgAEEUYJxg7MggIABBFGCcYOzIKCAEQABiSAxiABDINCAIQABiSAxiABBiKBTIHCAMQABiABDIHCAQQABiABDIHCAUQABiABDIHCAYQABiABDINCAcQLhivARjHARiABDIHCAgQABiABDIHCAkQABiABNIBCDYxODdqMGo3qAIAsAIA&sourceid=chrome&source=chrome.ob&ie=UTF-8#sv=CAwS_wEKBmxjbF9wdhIxCgNwdnESKkNnMHZaeTh4TVd0aWQzQmtkekkzSWc0S0NHZHliM2R6YUc5d0VBSVlBdxKKAQoDbHFpEoIBQ2dobmNtOTNjMmh2Y0VqSDJObTZxN0dBZ0FoYURCQUFJZ2huY205M2MyaHZjSklCRG1OaGJtNWhZbWx6WDNOMGIzSmxtZ0VrUTJoa1JGTlZhRTVOUnpsdVV6QldTbEV3Um01VFZWSTJUa2RXZUU1dVJtNVNVa0ZDLWdFRUNHUVFNURISCgN0YnMSC2xyZjohM3NJQUU9Eg0KAXESCGdyb3dzaG9wGhJsb2NhbC1wbGFjZS12aWV3ZXIYCiCNheXIBA" target="_blank" rel="noopener" class="btn btn-secondary contact-card-btn">Ver en Google Maps</a>
+          <div class="contact-card-icon-wrapper">
+            <div class="contact-card-icon">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+            </div>
+            <div class="icon-ring"></div>
+          </div>
+          <h3>Estudio Privado</h3>
+          <p>Ubicado en el corazón de Tucumán, nuestro estudio te ofrece asesoramiento presencial personalizado para llevar tu cultivo al máximo nivel.</p>
+          <a href="https://www.google.com/search?q=growshop&oq=growshop&gs_lcrp=EgZjaHJvbWUqCAgAEEUYJxg7MggIABBFGCcYOzIKCAEQABiSAxiABDINCAIQABiSAxiABBiKBTIHCAMQABiABDIHCAQQABiABDIHCAUQABiABDIHCAYQABiABDINCAcQLhivARjHARiABDIHCAgQABiABDIHCAkQABiABNIBCDYxODdqMGo3qAIAsAIA&sourceid=chrome&source=chrome.ob&ie=UTF-8#sv=CAwS_wEKBmxjbF9wdhIxCgNwdnESKkNnMHZaeTh4TVd0aWQzQmtkekkzSWc0S0NHZHliM2R6YUc5d0VBSVlBdxKKAQoDbHFpEoIBQ2dobmNtOTNjMmh2Y0VqSDJObTZxN0dBZ0FoYURCQUFJZ2huY205M2MyaHZjSklCRG1OaGJtNWhZbWx6WDNOMGIzSmxtZ0VrUTJoa1JGTlZhRTVOUnpsdVV6QldTbEV3Um01VFZWSTJUa2RXZUU1dVJtNVNVa0ZDLWdFRUNHUVFNURISCgN0YnMSC2xyZjohM3NJQUU9Eg0KAXESCGdyb3dzaG9wGhJsb2NhbC1wbGFjZS12aWV3ZXIYCiCNheXIBA" target="_blank" rel="noopener" class="btn btn-secondary contact-card-btn">
+            <span>Ubicación en Google Maps</span>
+            <svg class="btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+          </a>
         </div>
 
-        <!-- WhatsApp / Direct contact -->
+        <!-- WhatsApp / Direct contact (Featured Highlight) -->
         <div class="contact-card highlight">
-          <div class="contact-card-icon">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 28px; height: 28px;">
-              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-            </svg>
+          <div class="contact-card-badge highlight-badge">
+            <span class="status-indicator pulse"></span> Respuesta Inmediata
           </div>
-          <h3>Contacto Directo</h3>
-          <p>¿Tenés dudas sobre productos, sustratos o tu cultivo? Escribinos directamente al WhatsApp y coordinamos al instante.</p>
-          <a href="https://wa.me/5493813023185" target="_blank" rel="noopener" class="btn btn-primary contact-card-btn">Chatear por WhatsApp</a>
+          <div class="contact-card-icon-wrapper">
+            <div class="contact-card-icon whatsapp-icon">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+              </svg>
+            </div>
+            <div class="icon-ring golden"></div>
+          </div>
+          <h3>Asesoramiento WhatsApp</h3>
+          <p>¿Dudas sobre nutrientes, iluminación o genéticas? Escribinos directo y coordinamos tu pedido o consulta al instante.</p>
+          <a href="https://wa.me/5493813023185" target="_blank" rel="noopener" class="btn btn-primary contact-card-btn whatsapp-cta">
+            <svg class="icon-ws" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+            <span>Chatear por WhatsApp</span>
+          </a>
         </div>
 
         <!-- Social Media / Instagram & Facebook -->
         <div class="contact-card">
-          <div class="contact-card-icon">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 28px; height: 28px;">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="9" cy="7" r="4"></circle>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
+          <div class="contact-card-badge">
+            <span class="status-indicator community"></span> Red de Cultivadores
+          </div>
+          <div class="contact-card-icon-wrapper">
+            <div class="contact-card-icon social-icon">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+            </div>
+            <div class="icon-ring"></div>
           </div>
           <h3>Comunidad BÔ</h3>
-          <p>Seguinos en nuestras redes sociales para enterarte de ingresos, tips de cultivo, sorteos y novedades exclusivas.</p>
+          <p>Sumate a nuestras redes para participar de sorteos mensuales, ver guías de cultivo en video y formar parte de la comunidad.</p>
           <div class="contact-social-buttons">
             <a href="https://www.instagram.com/bo.growclub/" target="_blank" rel="noopener" class="social-btn instagram-btn">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; display: inline-block; vertical-align: text-bottom; margin-right: 4px;">
-                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+              <svg class="social-icon-svg" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
               </svg>
-              Instagram
+              <span>Instagram</span>
             </a>
             <a href="https://www.facebook.com/p/BO-growclub-61579315981629/" target="_blank" rel="noopener" class="social-btn facebook-btn">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; display: inline-block; vertical-align: text-bottom; margin-right: 4px;">
-                <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+              <svg class="social-icon-svg" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
               </svg>
-              Facebook
+              <span>Facebook</span>
             </a>
           </div>
         </div>
