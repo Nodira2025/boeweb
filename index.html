@@ -18,7 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
   
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="index.css?v=1.9">
+  <link rel="stylesheet" href="index.css?v=2.0">
 </head>
 <body>
 
@@ -34,20 +34,6 @@
           <span class="brand-title">BO</span>
           <span class="brand-subtitle">growclub</span>
         </div>
-      </div>
-
-      <!-- Search Bar -->
-      <div class="header-search-area">
-        <form class="search-form" id="search-form" onsubmit="event.preventDefault();">
-          <div class="search-input-wrapper">
-            <svg class="icon search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-            <input type="text" id="search-input" placeholder="Buscar sustrato, semillas, fertilizante..." aria-label="Buscar productos">
-            <button type="button" class="clear-search-btn" id="clear-search" style="display: none;">&times;</button>
-          </div>
-        </form>
       </div>
 
       <!-- Navigation & Cart Area -->
@@ -109,6 +95,20 @@
       <!-- Category Navigation (Pills on desktop, scrollable on mobile) -->
       <aside class="catalog-sidebar">
         <div class="sidebar-block">
+          <!-- Search Bar -->
+          <div class="catalog-search-area">
+            <form class="search-form" id="search-form" onsubmit="event.preventDefault();">
+              <div class="search-input-wrapper">
+                <svg class="icon search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="search-input" placeholder="Buscar sustrato, semillas, fertilizante..." aria-label="Buscar productos">
+                <button type="button" class="clear-search-btn" id="clear-search" style="display: none;">&times;</button>
+              </div>
+            </form>
+          </div>
+
           <h2 class="sidebar-title">Categorías</h2>
           <ul class="category-list" id="category-list">
             <li><button class="category-btn active" data-category="all">Todos los Productos</button></li>
@@ -661,6 +661,6 @@
   </div>
 
   <!-- Main JavaScript File -->
-  <script src="index.js?v=1.9"></script>
+  <script src="index.js?v=2.0"></script>
 </body>
 </html>

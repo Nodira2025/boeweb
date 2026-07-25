@@ -220,9 +220,9 @@ button, input, select, textarea {
 }
 
 /* Search Bar Area */
-.header-search-area {
-  flex: 1;
-  max-width: 500px;
+.catalog-search-area {
+  margin-bottom: 20px;
+  width: 100%;
 }
 
 .search-input-wrapper {
@@ -1881,9 +1881,10 @@ textarea.form-control {
 /* Mobile Devices (Narrow width) */
 @media (max-width: 768px) {
   .header-container {
-    padding: 8px 16px;
-    flex-wrap: wrap;
-    gap: 8px;
+    padding: 10px 16px;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    align-items: center;
   }
   
   .brand-logo {
@@ -1900,11 +1901,11 @@ textarea.form-control {
     font-weight: 700;
   }
   
-  .header-search-area {
-    order: 3; /* search wraps to next line */
+  .catalog-search-area {
+    margin-bottom: 16px;
+    padding: 0 16px;
     width: 100%;
-    max-width: 100%;
-    margin-top: 4px;
+    box-sizing: border-box;
   }
 
   .search-input-wrapper {
