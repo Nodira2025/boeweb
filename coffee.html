@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BÔ Coffee - Cafetería Gourmet & Botanical Lounge</title>
+  <meta name="description" content="BÔ Coffee & Botanical Lounge. Cafetería gourmet de especialidad, pastelería artesanal y beneficios exclusivos para pacientes REPROCANN.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  
+  <!-- Supabase JS SDK CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="index.css?v=2.5">
+  
+  <style>
+    body {
+      background-color: #0f1e18;
+      color: #f7f6f2;
+    }
+
+    .coffee-hero {
+      padding: 60px 24px 30px 24px;
+      text-align: center;
+      position: relative;
+    }
+
+    .reprocann-banner {
+      max-width: 800px;
+      margin: 0 auto 30px auto;
+      background: linear-gradient(135deg, rgba(21, 45, 36, 0.95) 0%, rgba(15, 30, 24, 0.98) 100%);
+      border: 1px solid rgba(195, 155, 75, 0.4);
+      border-radius: 20px;
+      padding: 20px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3), 0 0 20px rgba(195, 155, 75, 0.1);
+    }
+
+    .reprocann-info {
+      text-align: left;
+    }
+
+    .reprocann-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--color-accent-gold);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .reprocann-desc {
+      font-size: 0.88rem;
+      color: rgba(247, 246, 242, 0.8);
+    }
+
+    .toggle-btn-reprocann {
+      background: linear-gradient(135deg, var(--color-accent-gold) 0%, #b88e28 100%);
+      color: #0f1e18;
+      border: none;
+      padding: 12px 24px;
+      border-radius: var(--border-radius-full);
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: 0 4px 15px rgba(195, 155, 75, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    .toggle-btn-reprocann:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(195, 155, 75, 0.5);
+    }
+
+    .toggle-btn-reprocann.active {
+      background: #2e7d32;
+      color: #ffffff;
+      box-shadow: 0 0 15px rgba(46, 125, 50, 0.5);
+    }
+
+    /* Menu Container & Cards */
+    .coffee-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px 80px 24px;
+    }
+
+    .menu-categories {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 40px;
+    }
+
+    .category-pill {
+      background: rgba(21, 45, 36, 0.6);
+      border: 1px solid rgba(195, 155, 75, 0.2);
+      color: rgba(247, 246, 242, 0.8);
+      padding: 10px 22px;
+      border-radius: var(--border-radius-full);
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .category-pill.active, .category-pill:hover {
+      background: rgba(195, 155, 75, 0.2);
+      border-color: var(--color-accent-gold);
+      color: var(--color-accent-gold);
+    }
+
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 28px;
+    }
+
+    .coffee-card {
+      background: rgba(21, 45, 36, 0.75);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(195, 155, 75, 0.2);
+      border-radius: 20px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: all 0.35s cubic-bezier(0.165, 0.84, 0.44, 1);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .coffee-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35), 0 0 20px rgba(195, 155, 75, 0.15);
+      border-color: rgba(195, 155, 75, 0.45);
+    }
+
+    .coffee-card-img-wrapper {
+      height: 200px;
+      width: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .coffee-card-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.5s ease;
+    }
+
+    .coffee-card:hover .coffee-card-img {
+      transform: scale(1.08);
+    }
+
+    .coffee-card-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(15, 30, 24, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(195, 155, 75, 0.3);
+      color: var(--color-accent-gold);
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: var(--border-radius-full);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .coffee-card-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+    }
+
+    .coffee-card-title {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 8px;
+    }
+
+    .coffee-card-desc {
+      font-size: 0.88rem;
+      line-height: 1.6;
+      color: rgba(247, 246, 242, 0.75);
+      margin-bottom: 20px;
+      flex-grow: 1;
+    }
+
+    .coffee-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: auto;
+      padding-top: 16px;
+      border-top: 1px solid rgba(195, 155, 75, 0.15);
+    }
+
+    .price-box {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .price-regular {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--color-accent-gold);
+    }
+
+    .price-original {
+      font-size: 0.82rem;
+      text-decoration: line-through;
+      color: rgba(247, 246, 242, 0.4);
+    }
+
+    .price-reprocann-tag {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #25D366;
+      text-transform: uppercase;
+    }
+
+    .btn-add-coffee {
+      background: var(--color-primary);
+      border: 1px solid var(--color-accent-gold);
+      color: var(--color-accent-gold);
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .btn-add-coffee:hover {
+      background: var(--color-accent-gold);
+      color: #0f1e18;
+      transform: scale(1.08);
+    }
+
+    /* Floating Wheel Trigger Button */
+    .coffee-wheel-trigger {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background: linear-gradient(135deg, var(--color-accent-gold) 0%, #b88e28 100%);
+      color: #0f1e18;
+      border: none;
+      padding: 14px 24px;
+      border-radius: var(--border-radius-full);
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 30px rgba(195, 155, 75, 0.4);
+      z-index: 100;
+      transition: all 0.3s ease;
+    }
+
+    .coffee-wheel-trigger:hover {
+      transform: translateY(-3px) scale(1.03);
+      box-shadow: 0 15px 35px rgba(195, 155, 75, 0.6);
+    }
+
+    /* Modal Ruleta Zen */
+    .wheel-modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 30, 24, 0.92);
+      backdrop-filter: blur(15px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s ease;
+    }
+
+    .wheel-modal-backdrop.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .wheel-card {
+      background: rgba(21, 45, 36, 0.95);
+      border: 1px solid rgba(195, 155, 75, 0.4);
+      border-radius: 24px;
+      padding: 36px;
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+    }
+
+    .wheel-svg-container {
+      width: 280px;
+      height: 280px;
+      margin: 20px auto;
+      position: relative;
+    }
+
+    .wheel-pointer {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0; height: 0;
+      border-left: 14px solid transparent;
+      border-right: 14px solid transparent;
+      border-top: 24px solid var(--color-accent-gold);
+      z-index: 10;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+    }
+
+    .wheel-canvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      box-shadow: 0 0 30px rgba(195, 155, 75, 0.3);
+      transition: transform 4s cubic-bezier(0.15, 0.95, 0.35, 1);
+    }
+
+    @media (max-width: 992px) {
+      .menu-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .reprocann-banner { flex-direction: column; text-align: center; }
+      .reprocann-info { text-align: center; }
+    }
+
+    @media (max-width: 640px) {
+      .menu-grid { grid-template-columns: minmax(0, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header Navigation -->
+  <header class="main-header" style="background: rgba(15, 30, 24, 0.98);">
+    <div class="header-container">
+      <a href="index.html" class="header-logo-area" style="text-decoration: none;">
+        <img src="assets/logo.jpg" alt="BO growclub Logo" class="brand-logo">
+        <div class="brand-text">
+          <span class="brand-title">BO</span>
+          <span class="brand-subtitle">COFFEE & LOUNGE</span>
+        </div>
+      </a>
+
+      <div class="header-cart-area" style="display: flex; gap: 12px; align-items: center;">
+        <button class="btn btn-secondary" id="coffee-cart-btn" style="padding: 10px 18px; font-size: 0.9rem; border-color: var(--color-accent-gold); color: var(--color-accent-gold); display: flex; align-items: center; gap: 8px;">
+          🛒 Mi Pedido (<span id="coffee-cart-count">0</span>)
+        </button>
+        <a href="index.html" class="btn btn-secondary" style="padding: 10px 18px; font-size: 0.9rem; text-decoration: none;">
+          ← Volver a la Tienda
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="coffee-hero">
+    <div class="contact-badge" style="margin: 0 auto 16px auto;">
+      <span class="badge-dot"></span>
+      <span>CAFETERÍA DE ESPECIALIDAD & BOTANICAL LOUNGE</span>
+    </div>
+    <h1 class="contact-title" style="font-size: 2.8rem;">BÔ Coffee & Zen Lounge</h1>
+    <p class="contact-subtitle">
+      Un espacio zen de aromas y relajación. Disfrutá de nuestros cafés de especialidad, pastelería artesanal y elixires botánicos.
+    </p>
+  </section>
+
+  <!-- REPROCANN Discount Banner -->
+  <div class="coffee-container">
+    <div class="reprocann-banner">
+      <div class="reprocann-info">
+        <div class="reprocann-title">
+          <span>🌱 Beneficio Exclusivo Pacientes REPROCANN</span>
+        </div>
+        <div class="reprocann-desc">
+          Activá tu descuento previo automático del <strong>15% OFF</strong> en toda nuestra cafetería y pastelería.
+        </div>
+      </div>
+      <button class="toggle-btn-reprocann" id="reprocann-toggle-btn" onclick="toggleReprocannDiscount()">
+        <span>Activar 15% OFF REPROCANN</span>
+      </button>
+    </div>
+
+    <!-- Category Filter Pills -->
+    <div class="menu-categories">
+      <button class="category-pill active" onclick="filterCoffeeCategory('all', this)">Todos los Productos</button>
+      <button class="category-pill" onclick="filterCoffeeCategory('coffee', this)">☕ Cafés & Bebidas</button>
+      <button class="category-pill" onclick="filterCoffeeCategory('bakery', this)">🥐 Pastelería Artesanal</button>
+      <button class="category-pill" onclick="filterCoffeeCategory('brunch', this)">🥑 Brunch & Salados</button>
+      <button class="category-pill" onclick="filterCoffeeCategory('elixir', this)">🌿 Elixires Botánicos</button>
+    </div>
+
+    <!-- Menu Grid -->
+    <div class="menu-grid" id="coffee-menu-grid">
+      <!-- Populated dynamically by coffee.js -->
+    </div>
+  </div>
+
+  <!-- Floating Spin Wheel Trigger -->
+  <button class="coffee-wheel-trigger" onclick="openCoffeeWheel()">
+    <span style="font-size: 1.2rem;">🎡</span>
+    <span>Girar Rueda Zen</span>
+  </button>
+
+  <!-- Wheel Modal -->
+  <div class="wheel-modal-backdrop" id="coffee-wheel-modal">
+    <div class="wheel-card">
+      <button onclick="closeCoffeeWheel()" style="position: absolute; top: 16px; right: 16px; background: none; border: none; color: #fff; font-size: 1.5rem; cursor: pointer;">&times;</button>
+      
+      <div class="contact-badge" style="margin-bottom: 12px;">
+        <span>RUEDA DE LA FORTUNA ZEN</span>
+      </div>
+      <h2 style="font-family: var(--font-display); color: var(--color-accent-gold); font-size: 1.6rem; margin-bottom: 8px;">Girá y Ganá un Premio Extra</h2>
+      <p style="font-size: 0.85rem; color: rgba(247,246,242,0.7); margin-bottom: 16px;">Combinable con tu descuento REPROCANN.</p>
+
+      <div class="wheel-svg-container">
+        <div class="wheel-pointer"></div>
+        <canvas id="wheel-canvas" class="wheel-canvas" width="280" height="280"></canvas>
+      </div>
+
+      <button id="spin-btn" onclick="spinCoffeeWheel()" class="btn-admin-save" style="margin-top: 16px;">
+        🌀 ¡GIRAR AHORA!
+      </button>
+
+      <div id="wheel-result-box" style="display: none; margin-top: 20px; padding: 16px; background: rgba(195,155,75,0.15); border: 1px solid var(--color-accent-gold); border-radius: 12px;">
+        <h3 id="wheel-prize-title" style="color: var(--color-accent-gold); font-size: 1.2rem; margin-bottom: 4px;"></h3>
+        <p id="wheel-prize-desc" style="font-size: 0.85rem; color: #fff;"></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="coffee.js?v=1.0"></script>
+</body>
+</html>
