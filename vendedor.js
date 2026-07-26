@@ -955,3 +955,257 @@ function formatPrice(value) {
     maximumFractionDigits: 0
   });
 }
+
+// --- VENDOR AUTHENTICATION & AI SALES DEMO ENGINE ---
+let liveUSDRate = 1385.00; // Fallback rate
+let currentSamplePhoto = null;
+let lastRegisteredReceipt = null;
+
+// Auth check on load
+document.addEventListener('DOMContentLoaded', () => {
+  checkVendorAuth();
+  fetchLiveUSDRate();
+});
+
+function checkVendorAuth() {
+  const isLogged = sessionStorage.getItem('boeweb_vendor_logged');
+  const modal = document.getElementById('vendedor-auth-modal');
+  const userDisplay = document.getElementById('vendor-user-display');
+  
+  if (isLogged === 'true') {
+    if (modal) modal.style.display = 'none';
+    const storedName = sessionStorage.getItem('boeweb_vendor_name') || 'Vendedor';
+    if (userDisplay) userDisplay.textContent = `👤 ${storedName} (Vendedor Staff)`;
+    const vendorNameInput = document.getElementById('b2b-vendedor-name');
+    if (vendorNameInput) vendorNameInput.value = storedName;
+  } else {
+    if (modal) modal.style.display = 'flex';
+  }
+}
+
+function handleVendorLogin(e) {
+  e.preventDefault();
+  const nameInput = document.getElementById('auth-vendor-name');
+  const pinInput = document.getElementById('auth-vendor-pin');
+  
+  const name = nameInput ? nameInput.value.trim() : '';
+  const pin = pinInput ? pinInput.value.trim() : '';
+
+  if (!name) {
+    alert('Por favor ingresá tu nombre.');
+    return;
+  }
+
+  // Demo PIN Check (Accepts 1234 or vendedor2026)
+  if (pin === '1234' || pin === 'vendedor2026' || pin === 'admin') {
+    sessionStorage.setItem('boeweb_vendor_logged', 'true');
+    sessionStorage.setItem('boeweb_vendor_name', name);
+    checkVendorAuth();
+    showToast(`✅ ¡Bienvenido ${name}! Sesión iniciada.`);
+  } else {
+    alert('❌ PIN Incorrecto. El PIN de prueba es: 1234');
+  }
+}
+
+function vendorLogout() {
+  sessionStorage.removeItem('boeweb_vendor_logged');
+  sessionStorage.removeItem('boeweb_vendor_name');
+  checkVendorAuth();
+}
+
+function switchVendorTab(tab) {
+  const mainLayout = document.querySelector('.b2b-main-layout');
+  const salesSection = document.getElementById('sales-ai-section');
+  const btnReposicion = document.getElementById('vendor-tab-reposicion');
+  const btnSales = document.getElementById('vendor-tab-sales');
+
+  if (tab === 'reposicion') {
+    if (mainLayout) mainLayout.style.display = 'grid';
+    if (salesSection) salesSection.style.display = 'none';
+    if (btnReposicion) btnReposicion.classList.add('active');
+    if (btnSales) btnSales.classList.remove('active');
+  } else if (tab === 'sales') {
+    if (mainLayout) mainLayout.style.display = 'none';
+    if (salesSection) salesSection.style.display = 'block';
+    if (btnReposicion) btnReposicion.classList.remove('active');
+    if (btnSales) btnSales.classList.add('active');
+  }
+}
+
+// Fetch Official USD Rate in Real-Time
+async function fetchLiveUSDRate() {
+  const displayEl = document.getElementById('live-usd-rate-display');
+  try {
+    const res = await fetch('https://dolarapi.com/v1/dolares/oficial');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.promedio) {
+        liveUSDRate = Number(data.promedio);
+      } else if (data && data.venta) {
+        liveUSDRate = Number(data.venta);
+      }
+    }
+  } catch (err) {
+    console.warn('Usando tasa USD de respaldo:', err);
+  }
+
+  if (displayEl) {
+    displayEl.textContent = `$${liveUSDRate.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+  }
+}
+
+// Sample photo selector for AI vision demo
+function loadSamplePhoto(type) {
+  const box = document.getElementById('photo-preview-box');
+  if (!box) return;
+
+  currentSamplePhoto = type;
+
+  let imgUrl = '';
+
+  if (type === 'led') {
+    imgUrl = 'https://images.unsplash.com/photo-1508873696983-2df515122519?auto=format&fit=crop&w=400&q=80';
+  } else if (type === 'mighty') {
+    imgUrl = 'https://images.unsplash.com/photo-1527661591475-527312dd65f5?auto=format&fit=crop&w=400&q=80';
+  } else {
+    imgUrl = 'https://images.unsplash.com/photo-1585314062340-f1a5a7c9328d?auto=format&fit=crop&w=400&q=80';
+  }
+
+  box.innerHTML = `<img src="${imgUrl}" alt="Muestra" style="width:100%; height:100%; object-fit:cover;">`;
+  document.getElementById('ai-results-form').style.display = 'none';
+  document.getElementById('ai-receipt-result').style.display = 'none';
+}
+
+function triggerAIScan() {
+  if (!currentSamplePhoto) {
+    alert('📷 Por favor seleccioná una foto de prueba antes de escanear.');
+    return;
+  }
+
+  const progressBox = document.getElementById('ai-scan-progress');
+  const progressBar = document.getElementById('ai-progress-bar');
+  const btnScan = document.getElementById('btn-scan-ai');
+
+  if (progressBox) progressBox.style.display = 'block';
+  if (progressBar) progressBar.style.width = '0%';
+  if (btnScan) btnScan.disabled = true;
+
+  setTimeout(() => {
+    if (progressBar) progressBar.style.width = '100%';
+  }, 100);
+
+  setTimeout(() => {
+    if (progressBox) progressBox.style.display = 'none';
+    if (btnScan) btnScan.disabled = false;
+
+    // Autofill inferred AI data
+    const titleInput = document.getElementById('ai-product-title');
+    const skuInput = document.getElementById('ai-product-sku');
+    const categoryInput = document.getElementById('ai-product-category');
+    const priceArsInput = document.getElementById('ai-price-ars');
+
+    const skuCode = `#BO-PROD-${Math.floor(10000 + Math.random() * 90000)}`;
+
+    if (currentSamplePhoto === 'led') {
+      if (titleInput) titleInput.value = 'Quantum Board LED 240W Samsung LM301H';
+      if (categoryInput) categoryInput.value = 'Iluminación Indoor';
+      if (priceArsInput) priceArsInput.value = 450000;
+    } else if (currentSamplePhoto === 'mighty') {
+      if (titleInput) titleInput.value = 'Vaporizador Storz & Bickel Mighty+ Herbal';
+      if (categoryInput) categoryInput.value = 'Vaporizadores';
+      if (priceArsInput) priceArsInput.value = 680000;
+    } else {
+      if (titleInput) titleInput.value = 'Kit Trio Advanced Nutrients pH Perfect 500ml';
+      if (categoryInput) categoryInput.value = 'Fertilizantes';
+      if (priceArsInput) priceArsInput.value = 125000;
+    }
+
+    if (skuInput) skuInput.value = skuCode;
+
+    updateUSDConversion();
+    document.getElementById('ai-results-form').style.display = 'block';
+  }, 1600);
+}
+
+function updateUSDConversion() {
+  const arsVal = parseFloat(document.getElementById('ai-price-ars').value) || 0;
+  const usdInput = document.getElementById('ai-price-usd');
+
+  if (usdInput) {
+    if (arsVal > 0 && liveUSDRate > 0) {
+      const usdVal = arsVal / liveUSDRate;
+      usdInput.value = `USD $${usdVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    } else {
+      usdInput.value = 'USD $0,00';
+    }
+  }
+}
+
+function registerSalesItem() {
+  const title = document.getElementById('ai-product-title').value.trim();
+  const sku = document.getElementById('ai-product-sku').value.trim();
+  const category = document.getElementById('ai-product-category').value.trim();
+  const priceArs = parseFloat(document.getElementById('ai-price-ars').value) || 0;
+  const usdFormatted = document.getElementById('ai-price-usd').value;
+  const vendorName = sessionStorage.getItem('boeweb_vendor_name') || 'Vendedor Staff';
+
+  if (!title || priceArs <= 0) {
+    alert('Por favor completá el título y el precio en pesos ARS.');
+    return;
+  }
+
+  const receiptBox = document.getElementById('ai-receipt-result');
+  const receiptTitle = document.getElementById('receipt-title');
+  const receiptDetails = document.getElementById('receipt-details');
+
+  const now = new Date().toLocaleString('es-AR');
+
+  lastRegisteredReceipt = {
+    title,
+    sku,
+    category,
+    priceArs,
+    usdFormatted,
+    vendorName,
+    now
+  };
+
+  if (receiptTitle) receiptTitle.textContent = `✅ Venta Registrada Exitosamente (SKU: ${sku})`;
+  if (receiptDetails) {
+    receiptDetails.innerHTML = `
+      <strong>📦 Producto:</strong> ${title}<br>
+      <strong>🏷️ Categoría:</strong> ${category}<br>
+      <strong>💵 Monto ARS:</strong> $${formatPrice(priceArs)} ARS<br>
+      <strong>💲 Equivalente Dólar Oficial:</strong> ${usdFormatted}<br>
+      <strong>👤 Registrado por:</strong> ${vendorName}<br>
+      <strong>🕒 Fecha y Hora:</strong> ${now}
+    `;
+  }
+
+  if (receiptBox) receiptBox.style.display = 'block';
+  showToast('🎉 Venta registrada en el libro del local.');
+}
+
+function shareReceiptWhatsApp() {
+  if (!lastRegisteredReceipt) return;
+
+  let msg = `🧾 *COMPROBANTE DE VENTA BÔ GROWCLUB* 🧾\n\n`;
+  msg += `📦 *Producto:* ${lastRegisteredReceipt.title}\n`;
+  msg += `🏷️ *SKU Único:* ${lastRegisteredReceipt.sku}\n`;
+  msg += `💵 *Precio ARS:* $${formatPrice(lastRegisteredReceipt.priceArs)} ARS\n`;
+  msg += `💲 *Dólar Oficial:* ${lastRegisteredReceipt.usdFormatted}\n`;
+  msg += `👤 *Vendedor:* ${lastRegisteredReceipt.vendorName}\n`;
+  msg += `🕒 *Fecha:* ${lastRegisteredReceipt.now}\n`;
+
+  window.open(`https://wa.me/5493813023185?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+// Global exposure
+window.handleVendorLogin = handleVendorLogin;
+window.vendorLogout = vendorLogout;
+window.switchVendorTab = switchVendorTab;
+window.loadSamplePhoto = loadSamplePhoto;
+window.triggerAIScan = triggerAIScan;
+window.updateUSDConversion = updateUSDConversion;
+window.registerSalesItem = registerSalesItem;
+window.shareReceiptWhatsApp = shareReceiptWhatsApp;
