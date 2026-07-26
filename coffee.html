@@ -384,9 +384,25 @@
     </div>
     <h1 class="contact-title" style="font-size: 2.8rem;">BÔ Coffee & Zen Lounge</h1>
     <p class="contact-subtitle">
-      Un espacio zen de aromas y relajación. Disfrutá de nuestros cafés de especialidad, pastelería artesanal y elixires botánicos.
+      Un espacio zen de aromas y relajación. Pedí desde tu mesa mediante el QR o elegí la opción Para Llevar.
     </p>
   </section>
+
+  <!-- Table QR Active Banner (McDonald's Style) -->
+  <div class="coffee-container" style="padding-bottom: 0;">
+    <div class="table-active-banner" id="coffee-table-banner">
+      <div class="table-info-left">
+        <div class="table-icon-badge" id="table-icon-badge">📍</div>
+        <div>
+          <h3 class="table-banner-title" id="table-banner-title">Mesa #5 Activada</h3>
+          <span class="table-banner-subtitle" id="table-banner-subtitle">Servicio directo a tu mesa por mozo/barista</span>
+        </div>
+      </div>
+      <button class="btn-change-table" id="btn-change-table" onclick="openTableModal()">
+        🔄 Cambiar Mesa / Para Llevar
+      </button>
+    </div>
+  </div>
 
   <!-- REPROCANN Discount Banner -->
   <div class="coffee-container">
@@ -406,7 +422,8 @@
 
     <!-- Category Filter Pills -->
     <div class="menu-categories">
-      <button class="category-pill active" onclick="filterCoffeeCategory('all', this)">Todos los Productos</button>
+      <button class="category-pill active" onclick="filterCoffeeCategory('promos', this)">🔥 Promos Exclusivas</button>
+      <button class="category-pill" onclick="filterCoffeeCategory('all', this)">Todos los Productos</button>
       <button class="category-pill" onclick="filterCoffeeCategory('coffee', this)">☕ Cafés & Bebidas</button>
       <button class="category-pill" onclick="filterCoffeeCategory('bakery', this)">🥐 Pastelería Artesanal</button>
       <button class="category-pill" onclick="filterCoffeeCategory('brunch', this)">🥑 Brunch & Salados</button>
@@ -424,6 +441,82 @@
     <span style="font-size: 1.2rem;">🎡</span>
     <span>Girar Rueda Zen</span>
   </button>
+
+  <!-- Modal 1: Table Selector Modal (1 to 20 or Takeaway) -->
+  <div class="wheel-modal-backdrop" id="coffee-table-modal">
+    <div class="wheel-card" style="max-width: 500px;">
+      <button onclick="closeTableModal()" style="position: absolute; top: 16px; right: 16px; background: none; border: none; color: #fff; font-size: 1.5rem; cursor: pointer;">&times;</button>
+      
+      <div class="contact-badge" style="margin-bottom: 12px;">
+        <span>SISTEMA DE MESAS POR QR BÔ COFFEE</span>
+      </div>
+      <h2 style="font-family: var(--font-display); color: var(--color-accent-gold); font-size: 1.5rem; margin-bottom: 8px;">¿Dónde te encontrás?</h2>
+      <p style="font-size: 0.88rem; color: rgba(247,246,242,0.8); margin-bottom: 20px;">Seleccioná tu número de mesa o elegí la opción Para Llevar para preparar tu pedido.</p>
+
+      <button class="table-select-btn takeaway-btn" data-table="0" onclick="selectTable(0)">
+        🛍️ Para Llevar / Takeaway (Retiro por Mostrador)
+      </button>
+
+      <div class="table-grid-selection">
+        <button class="table-select-btn" data-table="1" onclick="selectTable(1)">Mesa 1</button>
+        <button class="table-select-btn" data-table="2" onclick="selectTable(2)">Mesa 2</button>
+        <button class="table-select-btn" data-table="3" onclick="selectTable(3)">Mesa 3</button>
+        <button class="table-select-btn" data-table="4" onclick="selectTable(4)">Mesa 4</button>
+        <button class="table-select-btn" data-table="5" onclick="selectTable(5)">Mesa 5</button>
+        <button class="table-select-btn" data-table="6" onclick="selectTable(6)">Mesa 6</button>
+        <button class="table-select-btn" data-table="7" onclick="selectTable(7)">Mesa 7</button>
+        <button class="table-select-btn" data-table="8" onclick="selectTable(8)">Mesa 8</button>
+        <button class="table-select-btn" data-table="9" onclick="selectTable(9)">Mesa 9</button>
+        <button class="table-select-btn" data-table="10" onclick="selectTable(10)">Mesa 10</button>
+        <button class="table-select-btn" data-table="11" onclick="selectTable(11)">Mesa 11</button>
+        <button class="table-select-btn" data-table="12" onclick="selectTable(12)">Mesa 12</button>
+        <button class="table-select-btn" data-table="13" onclick="selectTable(13)">Mesa 13</button>
+        <button class="table-select-btn" data-table="14" onclick="selectTable(14)">Mesa 14</button>
+        <button class="table-select-btn" data-table="15" onclick="selectTable(15)">Mesa 15</button>
+        <button class="table-select-btn" data-table="16" onclick="selectTable(16)">Mesa 16</button>
+        <button class="table-select-btn" data-table="17" onclick="selectTable(17)">Mesa 17</button>
+        <button class="table-select-btn" data-table="18" onclick="selectTable(18)">Mesa 18</button>
+        <button class="table-select-btn" data-table="19" onclick="selectTable(19)">Mesa 19</button>
+        <button class="table-select-btn" data-table="20" onclick="selectTable(20)">Mesa 20</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Coffee Cart & WhatsApp Order Modal -->
+  <div class="wheel-modal-backdrop" id="coffee-cart-modal">
+    <div class="wheel-card" style="max-width: 540px;">
+      <button onclick="closeCoffeeCartModal()" style="position: absolute; top: 16px; right: 16px; background: none; border: none; color: #fff; font-size: 1.5rem; cursor: pointer;">&times;</button>
+      
+      <div class="contact-badge" style="margin-bottom: 8px;">
+        <span id="cart-table-badge-display">📍 Mesa #5</span>
+      </div>
+      <h2 style="font-family: var(--font-display); color: var(--color-accent-gold); font-size: 1.6rem; margin-bottom: 12px;">Tu Pedido BÔ Coffee</h2>
+
+      <div class="coffee-cart-items-container" id="coffee-cart-items-list">
+        <!-- Filled dynamically by coffee.js -->
+      </div>
+
+      <div class="cart-form-section" style="margin-top: 20px; text-align: left;">
+        <label for="coffee-client-name" style="display: block; font-size: 0.85rem; font-weight: 600; color: rgba(247,246,242,0.9); margin-bottom: 6px;">Tu Nombre Completo *</label>
+        <input type="text" id="coffee-client-name" class="form-control" placeholder="Ej: Sofía Martínez" style="width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.08); border: 1px solid rgba(195,155,75,0.3); color: #fff; padding: 10px; border-radius: 8px; margin-bottom: 16px;">
+      </div>
+
+      <div class="coffee-cart-summary">
+        <div class="cart-summary-row">
+          <span>Subtotal:</span>
+          <span id="coffee-cart-subtotal">$0</span>
+        </div>
+        <div class="cart-summary-row total-row">
+          <span>Total Final:</span>
+          <strong id="coffee-cart-total" style="color: var(--color-accent-gold); font-size: 1.4rem;">$0</strong>
+        </div>
+      </div>
+
+      <button onclick="sendCoffeeOrderToWhatsApp()" class="btn-admin-save" style="margin-top: 20px; width: 100%; font-size: 1.05rem;">
+        📲 ENVIAR PEDIDO A LA BARISTA (WhatsApp)
+      </button>
+    </div>
+  </div>
 
   <!-- Wheel Modal -->
   <div class="wheel-modal-backdrop" id="coffee-wheel-modal">
@@ -452,6 +545,6 @@
     </div>
   </div>
 
-  <script src="coffee.js?v=1.0"></script>
+  <script src="coffee.js?v=2.5"></script>
 </body>
 </html>

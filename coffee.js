@@ -1,6 +1,49 @@
-// BÔ Coffee & Botanical Lounge Engine
+// BÔ Coffee & Botanical Lounge Engine (v2.5)
+// McDonald's style Table QR Ordering System & Exclusive Promos
 
 const coffeeMenu = [
+  // Promociones Exclusivas de la Mesa / Cafetería
+  {
+    id: 'p-1',
+    name: 'Combo Zen (Café de Especialidad + Brownie 420)',
+    category: 'promos',
+    categoryLabel: '🔥 Promo Exclusiva Mesa',
+    price: 7500,
+    originalPrice: 8800,
+    image: 'https://images.unsplash.com/photo-1510591509098-f4fdc6d0ff04?auto=format&fit=crop&w=600&q=80',
+    description: 'Espresso Doble Origen + Brownie Artesanal Especial (Sin THC) con nueces de Sorrento y dulce de leche de campo (15% OFF).'
+  },
+  {
+    id: 'p-2',
+    name: 'Combo Mañanero (Capuchino + 2 Medialunas)',
+    category: 'promos',
+    categoryLabel: '🔥 Promo Exclusiva Mesa',
+    price: 5200,
+    originalPrice: 6500,
+    image: 'https://images.unsplash.com/photo-1577968897966-3d4325b36b61?auto=format&fit=crop&w=600&q=80',
+    description: 'Capuchino italiano cremoso con lluvia de canela + 2 medialunas de manteca hojaldradas recién horneadas (20% OFF).'
+  },
+  {
+    id: 'p-3',
+    name: 'Combo Chill (Cold Brew + Muffin Arándanos)',
+    category: 'promos',
+    categoryLabel: '🔥 Promo Exclusiva Mesa',
+    price: 6900,
+    originalPrice: 7700,
+    image: 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=600&q=80',
+    description: 'Cold Brew macerado 12hs con toques de piel de naranja + Muffin gigante artesanal de vainilla y arándanos.'
+  },
+  {
+    id: 'p-4',
+    name: '2x1 Milkshake Botániko (Promo Mesa)',
+    category: 'promos',
+    categoryLabel: '🔥 Promo Exclusiva Mesa',
+    price: 8000,
+    originalPrice: 16000,
+    image: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=600&q=80',
+    description: '2 Milkshakes helados a elección (Frutos Rojos, Matcha Zen o Dulce de Leche) al precio de 1.'
+  },
+
   // Cafés & Bebidas
   {
     id: 'c-1',
@@ -111,18 +154,84 @@ const coffeeMenu = [
 
 // State Variables
 let isReprocannActive = false;
-let currentCategoryFilter = 'all';
+let currentCategoryFilter = 'promos'; // Default to Exclusive Promos!
 let coffeeCart = [];
 let activePrizeDiscount = 0; // percentage from wheel
+let currentTable = null; // null = unselected, 0 = takeaway, >0 = Table Number
 
 // Format currency
 function formatARS(num) {
   return num.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
+// --- TABLE SELECTION & QR DETECTOR ENGINE ---
+function initTableState() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const tableParam = urlParams.get('mesa') || urlParams.get('table') || urlParams.get('m') || urlParams.get('t');
+
+  if (tableParam !== null) {
+    currentTable = parseInt(tableParam) || 0;
+    sessionStorage.setItem('boeweb_coffee_table', currentTable);
+  } else {
+    const stored = sessionStorage.getItem('boeweb_coffee_table');
+    if (stored !== null) {
+      currentTable = parseInt(stored);
+    }
+  }
+
+  updateTableUI();
+}
+
+function updateTableUI() {
+  const titleEl = document.getElementById('table-banner-title');
+  const subtitleEl = document.getElementById('table-banner-subtitle');
+  const iconEl = document.getElementById('table-icon-badge');
+
+  if (!titleEl) return;
+
+  if (currentTable === 0) {
+    titleEl.textContent = '🛍️ Para Llevar / Takeaway';
+    subtitleEl.textContent = 'Tu pedido se preparará para retirar por el mostrador';
+    if (iconEl) iconEl.textContent = '🛍️';
+  } else if (currentTable !== null && currentTable > 0) {
+    titleEl.textContent = `📍 MESA #${currentTable} ACTIVADA`;
+    subtitleEl.textContent = 'Servicio directo a tu mesa por mozo/barista';
+    if (iconEl) iconEl.textContent = '📍';
+  } else {
+    titleEl.textContent = '❓ Ninguna Mesa Seleccionada';
+    subtitleEl.textContent = 'Tocá para indicar tu número de mesa o elegir Para Llevar';
+    if (iconEl) iconEl.textContent = '🪑';
+  }
+
+  // Update modal buttons active state
+  document.querySelectorAll('.table-select-btn').forEach(btn => {
+    const val = parseInt(btn.getAttribute('data-table'));
+    if (val === currentTable) btn.classList.add('active');
+    else btn.classList.remove('active');
+  });
+}
+
+function selectTable(tableNum) {
+  currentTable = tableNum;
+  sessionStorage.setItem('boeweb_coffee_table', currentTable);
+  updateTableUI();
+  closeTableModal();
+}
+
+function openTableModal() {
+  const modal = document.getElementById('coffee-table-modal');
+  if (modal) modal.classList.add('active');
+}
+
+function closeTableModal() {
+  const modal = document.getElementById('coffee-table-modal');
+  if (modal) modal.classList.remove('active');
+}
+
 // Render Menu Cards
 function renderCoffeeMenu() {
   const grid = document.getElementById('coffee-menu-grid');
+  if (!grid) return;
   grid.innerHTML = '';
 
   const items = currentCategoryFilter === 'all' 
@@ -132,11 +241,11 @@ function renderCoffeeMenu() {
   items.forEach(item => {
     const finalPrice = isReprocannActive ? Math.round(item.price * 0.85) : item.price;
     const card = document.createElement('article');
-    card.className = 'coffee-card';
+    card.className = `coffee-card ${item.category === 'promos' ? 'promo-featured-card' : ''}`;
 
     card.innerHTML = `
       <div class="coffee-card-img-wrapper">
-        <span class="coffee-card-badge">${item.categoryLabel}</span>
+        <span class="coffee-card-badge ${item.category === 'promos' ? 'promo-badge-gold' : ''}">${item.categoryLabel}</span>
         <img src="${item.image}" alt="${item.name}" class="coffee-card-img" loading="lazy">
       </div>
       <div class="coffee-card-body">
@@ -144,7 +253,7 @@ function renderCoffeeMenu() {
         <p class="coffee-card-desc">${item.description}</p>
         <div class="coffee-card-footer">
           <div class="price-box">
-            ${isReprocannActive ? `<span class="price-original">$${formatARS(item.price)}</span>` : ''}
+            ${item.originalPrice ? `<span class="price-original">$${formatARS(item.originalPrice)}</span>` : (isReprocannActive ? `<span class="price-original">$${formatARS(item.price)}</span>` : '')}
             <span class="price-regular">$${formatARS(finalPrice)}</span>
             ${isReprocannActive ? `<span class="price-reprocann-tag">🌱 15% OFF REPROCANN</span>` : ''}
           </div>
@@ -162,7 +271,7 @@ function renderCoffeeMenu() {
 function filterCoffeeCategory(cat, pillEl) {
   currentCategoryFilter = cat;
   document.querySelectorAll('.category-pill').forEach(p => p.classList.remove('active'));
-  pillEl.classList.add('active');
+  if (pillEl) pillEl.classList.add('active');
   renderCoffeeMenu();
 }
 
@@ -173,15 +282,19 @@ function toggleReprocannDiscount() {
     const dni = prompt('🌱 Verificación de Paciente REPROCANN:\nIngresá tu número de DNI registrado:');
     if (dni && dni.trim() !== '') {
       isReprocannActive = true;
-      btn.classList.add('active');
-      btn.innerHTML = '<span>✓ 15% OFF REPROCANN Activado</span>';
+      if (btn) {
+        btn.classList.add('active');
+        btn.innerHTML = '<span>✓ 15% OFF REPROCANN Activado</span>';
+      }
       renderCoffeeMenu();
       alert(`✅ ¡Excelente! Se activó el 15% OFF automático en todo el menú para el DNI: ${dni.trim()}`);
     }
   } else {
     isReprocannActive = false;
-    btn.classList.remove('active');
-    btn.innerHTML = '<span>Activar 15% OFF REPROCANN</span>';
+    if (btn) {
+      btn.classList.remove('active');
+      btn.innerHTML = '<span>Activar 15% OFF REPROCANN</span>';
+    }
     renderCoffeeMenu();
   }
 }
@@ -195,17 +308,141 @@ function addToCoffeeCart(itemId) {
   if (existing) {
     existing.quantity++;
   } else {
-    coffeeCart.push({ ...item, quantity: 1 });
+    const unitPrice = isReprocannActive ? Math.round(item.price * 0.85) : item.price;
+    coffeeCart.push({ ...item, unitPrice, quantity: 1 });
   }
 
   updateCoffeeCartCount();
-  alert(`🛒 ${item.name} se agregó a tu pedido de BÔ Coffee.`);
+  renderCoffeeCartModal();
 }
 
 function updateCoffeeCartCount() {
   const count = coffeeCart.reduce((acc, i) => acc + i.quantity, 0);
   const countEl = document.getElementById('coffee-cart-count');
   if (countEl) countEl.textContent = count;
+}
+
+// --- COFFEE CART & WHATSAPP CHECKOUT MODAL ---
+function openCoffeeCartModal() {
+  if (coffeeCart.length === 0) {
+    alert('🛒 Tu pedido de BÔ Coffee está vacío. Agregá algún café o promo para continuar.');
+    return;
+  }
+
+  if (currentTable === null) {
+    openTableModal();
+    return;
+  }
+
+  renderCoffeeCartModal();
+  const modal = document.getElementById('coffee-cart-modal');
+  if (modal) modal.classList.add('active');
+}
+
+function closeCoffeeCartModal() {
+  const modal = document.getElementById('coffee-cart-modal');
+  if (modal) modal.classList.remove('active');
+}
+
+function renderCoffeeCartModal() {
+  const container = document.getElementById('coffee-cart-items-list');
+  const subtotalEl = document.getElementById('coffee-cart-subtotal');
+  const totalEl = document.getElementById('coffee-cart-total');
+  const tableBadgeEl = document.getElementById('cart-table-badge-display');
+
+  if (!container) return;
+
+  if (tableBadgeEl) {
+    tableBadgeEl.textContent = currentTable === 0 
+      ? '🛍️ Para Llevar' 
+      : (currentTable ? `📍 Mesa #${currentTable}` : '❓ Sin Mesa');
+  }
+
+  let subtotal = 0;
+  container.innerHTML = coffeeCart.map((item, idx) => {
+    const itemTotal = item.unitPrice * item.quantity;
+    subtotal += itemTotal;
+    return `
+      <div class="coffee-cart-item-row">
+        <div class="cart-item-details">
+          <strong>${item.name}</strong>
+          <span class="cart-item-price">$${formatARS(item.unitPrice)} c/u</span>
+        </div>
+        <div class="cart-item-actions">
+          <button class="btn-qty-minus" onclick="changeCoffeeQty(${idx}, -1)">-</button>
+          <span>${item.quantity}</span>
+          <button class="btn-qty-plus" onclick="changeCoffeeQty(${idx}, 1)">+</button>
+          <span class="cart-item-subtotal">$${formatARS(itemTotal)}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  let discount = subtotal * activePrizeDiscount;
+  let total = Math.max(0, subtotal - discount);
+
+  if (subtotalEl) subtotalEl.textContent = `$${formatARS(subtotal)}`;
+  if (totalEl) totalEl.textContent = `$${formatARS(total)}`;
+}
+
+function changeCoffeeQty(idx, delta) {
+  if (coffeeCart[idx]) {
+    coffeeCart[idx].quantity += delta;
+    if (coffeeCart[idx].quantity <= 0) {
+      coffeeCart.splice(idx, 1);
+    }
+  }
+  updateCoffeeCartCount();
+  renderCoffeeCartModal();
+  if (coffeeCart.length === 0) closeCoffeeCartModal();
+}
+
+function sendCoffeeOrderToWhatsApp() {
+  if (coffeeCart.length === 0) return;
+
+  const clientNameInput = document.getElementById('coffee-client-name');
+  const clientName = clientNameInput ? clientNameInput.value.trim() : '';
+
+  if (!clientName) {
+    alert('Por favor ingresá tu nombre para enviarle la orden a la barista.');
+    return;
+  }
+
+  let locationText = '🛍️ Para Llevar / Takeaway';
+  if (currentTable && currentTable > 0) {
+    locationText = `📍 MESA #${currentTable} (Servicio en Mesa)`;
+  }
+
+  let msg = `☕ *PEDIDO BÔ COFFEE - MCDONALD'S STYLE* ☕\n\n`;
+  msg += `👤 *Cliente:* ${clientName}\n`;
+  msg += `📍 *Ubicación:* ${locationText}\n`;
+  msg += `\n🛒 *Detalle del Pedido:*\n`;
+
+  let subtotal = 0;
+  coffeeCart.forEach(item => {
+    const itemTotal = item.unitPrice * item.quantity;
+    subtotal += itemTotal;
+    msg += `- ${item.quantity}x ${item.name} ($${formatARS(item.unitPrice)} c/u)\n`;
+  });
+
+  let discount = subtotal * activePrizeDiscount;
+  let total = Math.max(0, subtotal - discount);
+
+  if (activePrizeDiscount > 0) {
+    msg += `\n🎁 *Descuento Rueda Zen:* -$${formatARS(discount)}\n`;
+  }
+
+  msg += `\n💰 *TOTAL A ABONAR:* $${formatARS(total)}\n`;
+  msg += `\n¡Muchas gracias! 🙏`;
+
+  const waPhone = "5493813023185";
+  const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
+
+  coffeeCart = [];
+  updateCoffeeCartCount();
+  closeCoffeeCartModal();
+
+  window.open(waUrl, '_blank');
 }
 
 // --- RUEDA DE LA FORTUNA ZEN ---
@@ -228,7 +465,6 @@ function drawWheel() {
   const sliceAngle = (2 * Math.PI) / numSlices;
 
   ctx.clearRect(0, 0, 280, 280);
-
   const colors = ['#152d24', '#c39b4b', '#1a382d', '#b88e28', '#0f1e18', '#d4af37'];
 
   prizes.forEach((prize, i) => {
@@ -242,7 +478,6 @@ function drawWheel() {
     ctx.strokeStyle = 'rgba(255,255,255,0.2)';
     ctx.stroke();
 
-    // Text
     ctx.save();
     ctx.translate(140, 140);
     ctx.rotate(angle + sliceAngle / 2);
@@ -271,7 +506,6 @@ function spinCoffeeWheel() {
   const randomPrizeIdx = Math.floor(Math.random() * prizes.length);
   const sliceAngle = 360 / prizes.length;
   
-  // Calculate rotation to land on selected slice
   const extraRotations = 5 * 360;
   const targetDegree = extraRotations + (360 - (randomPrizeIdx * sliceAngle + sliceAngle / 2));
 
@@ -292,10 +526,14 @@ function spinCoffeeWheel() {
 
 // Initial Load
 document.addEventListener('DOMContentLoaded', () => {
+  initTableState();
   renderCoffeeMenu();
+
+  const cartBtn = document.getElementById('coffee-cart-btn');
+  if (cartBtn) cartBtn.addEventListener('click', openCoffeeCartModal);
 });
 
-// Global exposure
+// Global Exposure
 window.renderCoffeeMenu = renderCoffeeMenu;
 window.filterCoffeeCategory = filterCoffeeCategory;
 window.toggleReprocannDiscount = toggleReprocannDiscount;
@@ -303,3 +541,10 @@ window.addToCoffeeCart = addToCoffeeCart;
 window.openCoffeeWheel = openCoffeeWheel;
 window.closeCoffeeWheel = closeCoffeeWheel;
 window.spinCoffeeWheel = spinCoffeeWheel;
+window.openTableModal = openTableModal;
+window.closeTableModal = closeTableModal;
+window.selectTable = selectTable;
+window.openCoffeeCartModal = openCoffeeCartModal;
+window.closeCoffeeCartModal = closeCoffeeCartModal;
+window.changeCoffeeQty = changeCoffeeQty;
+window.sendCoffeeOrderToWhatsApp = sendCoffeeOrderToWhatsApp;
