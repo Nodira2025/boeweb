@@ -19,9 +19,127 @@
   
   <style>
     body {
-      background-color: #0f1e18;
+      background-color: #07120d;
+      background-image: 
+        radial-gradient(at 15% 15%, rgba(21, 50, 38, 0.5) 0px, transparent 50%),
+        radial-gradient(at 85% 30%, rgba(195, 155, 75, 0.12) 0px, transparent 50%),
+        radial-gradient(at 50% 85%, rgba(15, 30, 24, 0.8) 0px, transparent 50%);
+      background-attachment: fixed;
       color: #f7f6f2;
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
     }
+
+    /* Animated Glow Orbs */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -15%;
+      left: -10%;
+      width: 60vw;
+      height: 60vw;
+      max-width: 600px;
+      max-height: 600px;
+      background: radial-gradient(circle, rgba(195, 155, 75, 0.18) 0%, rgba(21, 50, 38, 0.08) 50%, transparent 70%);
+      border-radius: 50%;
+      filter: blur(60px);
+      z-index: 0;
+      animation: floatGlowGold 14s infinite ease-in-out alternate;
+      pointer-events: none;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      bottom: -20%;
+      right: -10%;
+      width: 70vw;
+      height: 70vw;
+      max-width: 700px;
+      max-height: 700px;
+      background: radial-gradient(circle, rgba(46, 125, 50, 0.22) 0%, rgba(15, 30, 24, 0.05) 50%, transparent 75%);
+      border-radius: 50%;
+      filter: blur(80px);
+      z-index: 0;
+      animation: floatGlowGreen 18s infinite ease-in-out alternate;
+      pointer-events: none;
+    }
+
+    @keyframes floatGlowGold {
+      0% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(60px, 80px) scale(1.15); }
+      100% { transform: translate(-40px, 120px) scale(0.95); }
+    }
+
+    @keyframes floatGlowGreen {
+      0% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(-80px, -60px) scale(1.2); }
+      100% { transform: translate(40px, -100px) scale(1); }
+    }
+
+    /* Ambient Steam Particles */
+    .coffee-bg-particles {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .particle {
+      position: absolute;
+      bottom: -60px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(195, 155, 75, 0.3) 0%, transparent 70%);
+      animation: riseUp 12s linear infinite;
+      filter: blur(4px);
+    }
+
+    .p1 { left: 10%; width: 45px; height: 45px; animation-duration: 14s; animation-delay: 0s; }
+    .p2 { left: 25%; width: 75px; height: 75px; animation-duration: 18s; animation-delay: 3s; background: radial-gradient(circle, rgba(46, 125, 50, 0.25) 0%, transparent 70%); }
+    .p3 { left: 50%; width: 35px; height: 35px; animation-duration: 11s; animation-delay: 5s; }
+    .p4 { left: 70%; width: 65px; height: 65px; animation-duration: 16s; animation-delay: 1s; background: radial-gradient(circle, rgba(195, 155, 75, 0.28) 0%, transparent 70%); }
+    .p5 { left: 85%; width: 50px; height: 50px; animation-duration: 13s; animation-delay: 7s; }
+    .p6 { left: 40%; width: 95px; height: 95px; animation-duration: 20s; animation-delay: 2s; filter: blur(8px); opacity: 0.7; }
+
+    @keyframes riseUp {
+      0% {
+        transform: translateY(0) scale(0.6) rotate(0deg);
+        opacity: 0;
+      }
+      20% {
+        opacity: 0.6;
+      }
+      80% {
+        opacity: 0.4;
+      }
+      100% {
+        transform: translateY(-115vh) scale(1.4) rotate(360deg);
+        opacity: 0;
+      }
+    }
+
+    header, section, .coffee-container {
+      position: relative;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Animated Background Mesh & Steam Particles -->
+  <div class="coffee-bg-particles" aria-hidden="true">
+    <div class="particle p1"></div>
+    <div class="particle p2"></div>
+    <div class="particle p3"></div>
+    <div class="particle p4"></div>
+    <div class="particle p5"></div>
+    <div class="particle p6"></div>
+  </div>
 
     .coffee-hero {
       padding: 60px 24px 30px 24px;
