@@ -982,12 +982,23 @@ document.addEventListener('DOMContentLoaded', () => {
   function closeWheel() {
     if (isSpinning) return; // Cannot close while spinning
     wheelModal.classList.remove('active');
+    sessionStorage.setItem('boeweb_wheel_closed', 'true');
   }
 
   // Bind Open/Close
   wheelTriggerHero.addEventListener('click', openWheel);
   floatingWheelBtn.addEventListener('click', openWheel);
   closeWheelModal.addEventListener('click', closeWheel);
+
+  // Auto-popup Zen Wheel for first-time visitors
+  const hasSpunToday = localStorage.getItem('boeweb_last_spin_date') === new Date().toDateString();
+  const hasClosedWheelSession = sessionStorage.getItem('boeweb_wheel_closed');
+
+  if (!hasSpunToday && !hasClosedWheelSession) {
+    setTimeout(() => {
+      openWheel();
+    }, 900);
+  }
 
   // Wheel form submit -> transition to Game
   wheelForm.addEventListener('submit', (e) => {

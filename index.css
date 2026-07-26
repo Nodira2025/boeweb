@@ -1414,8 +1414,13 @@ textarea.form-control {
    Zen Discount Wheel (Specific details)
    ========================================================================== */
 .wheel-modal-card {
-  max-width: 580px;
+  max-width: 520px;
+  width: 94vw;
   position: relative;
+  border-radius: 24px;
+  border: 2px solid var(--color-accent-gold);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5), 0 0 25px rgba(195, 155, 75, 0.25);
+  overflow: hidden;
 }
 
 .close-wheel-btn {
@@ -1424,34 +1429,48 @@ textarea.form-control {
   top: 16px;
   z-index: 10;
   font-size: 2rem;
-  color: #fff; /* fits background outer ring */
+  color: #fff;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.close-wheel-btn:hover {
+  opacity: 1;
 }
 
 .wheel-modal-body {
-  padding: 40px 24px;
+  padding: 36px 20px 28px 20px;
   text-align: center;
   background-color: var(--color-primary);
   color: var(--color-neutral-light);
+  max-height: 90vh;
   overflow-y: auto;
+}
+
+@keyframes lotusGlow {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 12px rgba(195, 155, 75, 0.3); }
+  50% { transform: scale(1.06); box-shadow: 0 0 24px rgba(195, 155, 75, 0.7); }
 }
 
 .lotus-badge {
   background-color: rgba(195, 155, 75, 0.15);
   border: 1px solid var(--color-accent-gold);
-  width: 64px;
-  height: 64px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   color: var(--color-accent-gold);
+  animation: lotusGlow 3s infinite ease-in-out;
 }
 
 .lotus-badge.success {
   background-color: rgba(46, 125, 50, 0.15);
   border-color: var(--color-success);
   color: var(--color-success);
+  animation: none;
 }
 
 .mandala-lotus-icon, .check-lotus-icon {
@@ -1461,37 +1480,40 @@ textarea.form-control {
 
 .wheel-title {
   color: #fff;
-  font-size: 1.8rem;
-  margin-bottom: 8px;
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
 }
 
 .wheel-subtitle {
-  font-size: 0.95rem;
-  opacity: 0.8;
-  max-width: 420px;
-  margin: 0 auto 28px auto;
-  line-height: 1.5;
+  font-size: 0.9rem;
+  opacity: 0.85;
+  max-width: 400px;
+  margin: 0 auto 24px auto;
+  line-height: 1.45;
 }
 
 #wheel-form .form-control {
   border-color: rgba(236, 234, 228, 0.3);
-  background-color: rgba(253, 252, 249, 0.05);
+  background-color: rgba(253, 252, 249, 0.08);
   color: #fff;
-  font-size: 1.1rem;
-  height: 50px;
+  font-size: 1.05rem;
+  height: 48px;
   border-radius: var(--border-radius-md);
   margin-bottom: 16px;
 }
 
 #wheel-form .form-control:focus {
   border-color: var(--color-accent-gold);
+  box-shadow: 0 0 10px rgba(195, 155, 75, 0.3);
 }
 
 /* Spinner Game Grid Setup */
 .wheel-game-title {
   color: #fff;
-  font-size: 1.3rem;
-  margin-bottom: 24px;
+  font-size: 1.15rem;
+  margin-bottom: 20px;
   font-family: var(--font-sans);
 }
 
@@ -1502,22 +1524,22 @@ textarea.form-control {
 
 .wheel-wrapper {
   position: relative;
-  width: 340px;
-  height: 340px;
+  width: min(82vw, 320px);
+  height: min(82vw, 320px);
   margin: 0 auto;
 }
 
 .wheel-pointer {
   position: absolute;
-  top: -15px;
+  top: -14px;
   left: 50%;
   transform: translateX(-50%);
-  width: 30px;
-  height: 36px;
+  width: 28px;
+  height: 34px;
   background-color: var(--color-accent-gold);
   clip-path: polygon(50% 100%, 0 0, 100% 0);
   z-index: 20;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5));
 }
 
 .wheel-canvas-container {
@@ -1528,7 +1550,7 @@ textarea.form-control {
 .wheel-svg {
   width: 100%;
   height: 100%;
-  filter: drop-shadow(0 8px 16px rgba(0,0,0,0.25));
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.35));
 }
 
 /* Spin Button */
@@ -1537,26 +1559,24 @@ textarea.form-control {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 76px;
-  height: 76px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
-  background-color: var(--color-accent-gold);
+  background: linear-gradient(135deg, var(--color-accent-gold), #e5c158);
   color: var(--color-primary);
-  border: 4px solid var(--color-primary);
-  font-size: 0.9rem;
+  border: 3px solid #1e352f;
+  font-family: var(--font-display);
+  font-size: 0.92rem;
   font-weight: 700;
   cursor: pointer;
   z-index: 10;
-  box-shadow: var(--shadow-sm);
-  transition: var(--transition-fast);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.4);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.spin-btn:hover {
-  background-color: var(--color-accent-gold-dark);
+.spin-btn:hover:not(:disabled) {
   transform: translate(-50%, -50%) scale(1.05);
+  box-shadow: 0 6px 20px rgba(195, 155, 75, 0.6);
 }
 
 .spin-btn:disabled {
@@ -2127,8 +2147,9 @@ textarea.form-control {
   }
   
   .wheel-wrapper {
-    width: 280px;
-    height: 280px;
+    width: min(80vw, 270px);
+    height: min(80vw, 270px);
+    margin: 0 auto;
   }
   
   #wheel-inner-group {
