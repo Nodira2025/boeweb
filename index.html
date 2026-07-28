@@ -585,6 +585,77 @@
           </button>
         </div>
 
+  </div>
+
+  <!-- Dr. BÔ IA - Doctor de Cultivo Modal -->
+  <div class="modal-backdrop" id="dr-bo-modal">
+    <div class="modal-card drbo-modal-card" style="max-width: 680px; width: 94vw; border: 2px solid #66bb6a; border-radius: 24px; box-shadow: 0 15px 40px rgba(0,0,0,0.5), 0 0 25px rgba(102,187,106,0.3); position: relative; overflow: hidden; background: var(--color-primary);">
+      <button class="close-modal-btn" onclick="closeDrBoModal()" aria-label="Cerrar ventana" style="position: absolute; top: 16px; right: 16px; font-size: 2rem; color: #fff; background: none; border: none; cursor: pointer; z-index: 10;">&times;</button>
+      <div class="modal-body" style="padding: 32px 20px 24px 20px; text-align: center; color: #fff; max-height: 90vh; overflow-y: auto;">
+        
+        <div style="background: rgba(102,187,106,0.15); border: 1px solid #66bb6a; width: 64px; height: 64px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; font-size: 1.8rem; color: #66bb6a;">
+          🩺
+        </div>
+        <h2 style="font-family: var(--font-display); color: #66bb6a; font-size: 1.8rem; margin-bottom: 6px;">Dr. BÔ - Diagnóstico de Cultivo IA</h2>
+        <p style="font-size: 0.9rem; opacity: 0.85; max-width: 500px; margin: 0 auto 20px auto; line-height: 1.45;">
+          Subí o seleccioná una foto de la hoja afectada. La Inteligencia Artificial analizará la clorosis, plagas o nutrición y te recomendará la solución exacta de la tienda.
+        </p>
+
+        <!-- Paso 1: Muestras -->
+        <div style="background: rgba(15,30,24,0.6); border: 1px dashed rgba(102,187,106,0.4); border-radius: 16px; padding: 20px; margin-bottom: 20px;">
+          <span style="font-size: 0.85rem; color: #66bb6a; font-weight: 700; display: block; margin-bottom: 10px;">📷 Probá con estos casos de prueba rápida:</span>
+          
+          <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;">
+            <button class="btn btn-secondary" onclick="loadDrBoSample('nitrogen')" style="font-size: 0.82rem; padding: 8px 12px;">🍂 Hojas Amarillas (Nitrógeno)</button>
+            <button class="btn btn-secondary" onclick="loadDrBoSample('spidermite')" style="font-size: 0.82rem; padding: 8px 12px;">🕷️ Puntos Blancos (Arañuela)</button>
+            <button class="btn btn-secondary" onclick="loadDrBoSample('phburn')" style="font-size: 0.82rem; padding: 8px 12px;">⚡ Bordes Quemados (pH)</button>
+            <button class="btn btn-secondary" onclick="loadDrBoSample('overwater')" style="font-size: 0.82rem; padding: 8px 12px;">💧 Hojas Caídas (Riego)</button>
+          </div>
+
+          <div id="drbo-preview-box" style="width: 180px; height: 140px; margin: 0 auto 14px auto; background: rgba(0,0,0,0.4); border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.1);">
+            <span style="color: rgba(247,246,242,0.4); font-size: 0.8rem;">Sin Foto Seleccionada</span>
+          </div>
+
+          <button class="btn btn-primary btn-full-width" id="btn-run-drbo" onclick="runDrBoAnalysis()" style="background: linear-gradient(135deg, #2e7d32, #1b5e20); border-color: #66bb6a; max-width: 300px; margin: 0 auto; display: block;">
+            🔍 ANALIZAR HOJA CON IA
+          </button>
+
+          <div id="drbo-scan-progress" style="display: none; margin-top: 14px;">
+            <span style="font-size: 0.82rem; color: #66bb6a; display: block; margin-bottom: 4px;">Analizando microscopía y pigmentos foliares...</span>
+            <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+              <div id="drbo-progress-bar" style="width: 0%; height: 100%; background: #66bb6a; transition: width 1.6s ease;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Paso 2: Resultados & Solución 1-Clic -->
+        <div id="drbo-results-card" style="display: none; text-align: left; background: rgba(21,45,36,0.9); border: 1px solid #66bb6a; border-radius: 16px; padding: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <h3 id="drbo-diag-title" style="color: #66bb6a; font-size: 1.3rem; margin: 0; font-family: var(--font-display);"></h3>
+            <span id="drbo-diag-badge" style="padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; background: rgba(102,187,106,0.2); color: #66bb6a; border: 1px solid #66bb6a;"></span>
+          </div>
+
+          <div style="font-size: 0.88rem; line-height: 1.5; color: rgba(247,246,242,0.9); margin-bottom: 16px;">
+            <p style="margin-bottom: 6px;"><strong>🔍 Síntomas Detectados:</strong> <span id="drbo-diag-symptoms"></span></p>
+            <p style="margin-bottom: 6px;"><strong>🌱 Causa Probable:</strong> <span id="drbo-diag-cause"></span></p>
+            <p style="margin-bottom: 0;"><strong>🩺 Tratamiento Agronómico:</strong> <span id="drbo-diag-treatment"></span></p>
+          </div>
+
+          <!-- Recomendación de Producto en Tienda -->
+          <div style="background: rgba(15,30,24,0.8); border: 1px solid var(--color-accent-gold); border-radius: 14px; padding: 14px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap;">
+            <img id="drbo-prod-img" src="" alt="Producto" style="width: 60px; height: 60px; border-radius: 8px; object-fit: cover;">
+            <div style="flex-grow: 1;">
+              <span style="font-size: 0.72rem; color: var(--color-accent-gold); font-weight: 700; text-transform: uppercase;">SOLUCIÓN RECOMENDADA BÔ</span>
+              <h4 id="drbo-prod-title" style="color: #fff; font-size: 0.95rem; margin: 2px 0 2px 0;"></h4>
+              <p id="drbo-prod-desc" style="font-size: 0.78rem; color: rgba(247,246,242,0.7); margin: 0;"></p>
+              <strong id="drbo-prod-price" style="color: var(--color-accent-gold); font-size: 1.1rem; display: block; margin-top: 4px;"></strong>
+            </div>
+            <button id="drbo-btn-add-cart" class="btn btn-primary" style="padding: 10px 16px; font-size: 0.85rem; background: var(--color-accent-gold); color: var(--color-primary); font-weight: 700; white-space: nowrap;">
+              🛒 COMPRAR EN 1-CLIC
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -1104,5 +1175,6 @@
   <script src="index.js?v=2.5"></script>
   <script src="memberPortal.js?v=2.4"></script>
   <script src="academy.js?v=2.4"></script>
+  <script src="drbo.js?v=2.5"></script>
 </body>
 </html>
