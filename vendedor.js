@@ -1038,6 +1038,7 @@ function switchVendorTab(tab) {
   } else if (tab === 'sales') {
     if (salesSection) salesSection.style.display = 'block';
     if (btnSales) btnSales.classList.add('active');
+    loadSamplePhoto('led');
   } else if (tab === 'map') {
     if (mapSection) mapSection.style.display = 'block';
     if (btnMap) btnMap.classList.add('active');
@@ -1119,26 +1120,47 @@ async function fetchLiveUSDRate() {
   }
 }
 
-// Sample photo selector for AI vision demo
+// Sample photo selector Data URIs for 100% reliable AI vision demo fallback
+const sampleDataURIs = {
+  led: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="240" viewBox="0 0 300 240"><rect width="300" height="240" fill="%23152d24"/><rect x="25" y="25" width="250" height="190" rx="16" fill="%230f1e18" stroke="%23c39b4b" stroke-width="4"/><circle cx="75" cy="75" r="14" fill="%23ffee58"/><circle cx="150" cy="75" r="14" fill="%23ffee58"/><circle cx="225" cy="75" r="14" fill="%23ffee58"/><circle cx="75" cy="145" r="14" fill="%23ffee58"/><circle cx="150" cy="145" r="14" fill="%23ffee58"/><circle cx="225" cy="145" r="14" fill="%23ffee58"/><text x="150" y="198" fill="%23c39b4b" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Quantum LED 240W Pro</text></svg>`,
+  mighty: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="240" viewBox="0 0 300 240"><rect width="300" height="240" fill="%23152d24"/><rect x="75" y="20" width="150" height="200" rx="18" fill="%23222" stroke="%23c39b4b" stroke-width="3"/><rect x="95" y="40" width="110" height="45" rx="8" fill="%23ff9800"/><text x="150" y="68" fill="%23000" font-family="sans-serif" font-size="15" font-weight="bold" text-anchor="middle">MIGHTY%2B</text><circle cx="150" cy="135" r="22" fill="%23333" stroke="%23ff9800" stroke-width="3"/><text x="150" y="205" fill="%23fff" font-family="sans-serif" font-size="11" text-anchor="middle">Storz %26 Bickel</text></svg>`,
+  nutrients: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="240" viewBox="0 0 300 240"><rect width="300" height="240" fill="%23152d24"/><rect x="45" y="40" width="60" height="150" rx="10" fill="%234caf50"/><rect x="120" y="40" width="60" height="150" rx="10" fill="%232196f3"/><rect x="195" y="40" width="60" height="150" rx="10" fill="%239c27b0"/><text x="150" y="218" fill="%23c39b4b" font-family="sans-serif" font-size="13" font-weight="bold" text-anchor="middle">Kit Advanced Nutrients Tri-Part</text></svg>`
+};
+
 function loadSamplePhoto(type) {
   const box = document.getElementById('photo-preview-box');
   if (!box) return;
 
   currentSamplePhoto = type;
 
-  let imgUrl = '';
-
-  if (type === 'led') {
-    imgUrl = 'https://images.unsplash.com/photo-1508873696983-2df515122519?auto=format&fit=crop&w=400&q=80';
-  } else if (type === 'mighty') {
-    imgUrl = 'https://images.unsplash.com/photo-1527661591475-527312dd65f5?auto=format&fit=crop&w=400&q=80';
-  } else {
-    imgUrl = 'https://images.unsplash.com/photo-1585314062340-f1a5a7c9328d?auto=format&fit=crop&w=400&q=80';
+  // Highlight active demo button
+  document.querySelectorAll('.sample-photo-btn').forEach(btn => {
+    btn.style.background = 'rgba(255,255,255,0.08)';
+    btn.style.color = '#fff';
+  });
+  const activeBtn = document.getElementById(`sample-btn-${type}`);
+  if (activeBtn) {
+    activeBtn.style.background = 'rgba(195,155,75,0.35)';
+    activeBtn.style.color = 'var(--color-accent-gold)';
   }
 
-  box.innerHTML = `<img src="${imgUrl}" alt="Muestra" style="width:100%; height:100%; object-fit:cover;">`;
-  document.getElementById('ai-results-form').style.display = 'none';
-  document.getElementById('ai-receipt-result').style.display = 'none';
+  const fallbackDataURI = sampleDataURIs[type] || sampleDataURIs['led'];
+
+  let webUrl = '';
+  if (type === 'led') {
+    webUrl = 'https://images.unsplash.com/photo-1508873696983-2df515122519?auto=format&fit=crop&w=400&q=80';
+  } else if (type === 'mighty') {
+    webUrl = 'https://images.unsplash.com/photo-1527661591475-527312dd65f5?auto=format&fit=crop&w=400&q=80';
+  } else {
+    webUrl = 'https://images.unsplash.com/photo-1585314062340-f1a5a7c9328d?auto=format&fit=crop&w=400&q=80';
+  }
+
+  box.innerHTML = `<img src="${webUrl}" onerror="this.onerror=null; this.src='${fallbackDataURI}';" alt="Muestra Producto IA" style="width:100%; height:100%; object-fit:cover; border-radius:12px;">`;
+
+  const resultsForm = document.getElementById('ai-results-form');
+  const receiptResult = document.getElementById('ai-receipt-result');
+  if (resultsForm) resultsForm.style.display = 'none';
+  if (receiptResult) receiptResult.style.display = 'none';
 }
 
 function triggerAIScan() {
