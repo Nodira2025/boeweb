@@ -143,6 +143,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (registerForm) registerForm.addEventListener('submit', handleRegistration);
     if (loginForm) loginForm.addEventListener('submit', handleLogin);
     if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+    const perfilLogoutBtn = document.getElementById('perfil-logout-btn');
+    if (perfilLogoutBtn) perfilLogoutBtn.addEventListener('click', handleLogout);
     if (surveyForm) surveyForm.addEventListener('submit', handleSurveySubmit);
     if (viewCertBtn) viewCertBtn.addEventListener('click', openCertificateModal);
   }
@@ -235,9 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function openMemberPortal() {
     if (currentMember) {
-      updatePortalUI();
-      switchPortalTab('profile');
-      toggleModal(portalModal, true);
+      window.location.href = 'perfil.html';
     } else {
       switchAuthTab('login');
       toggleModal(authModal, true);
@@ -332,7 +332,11 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.removeItem('boeweb_member');
     currentMember = null;
     updateClubButtons();
-    toggleModal(portalModal, false);
+    if (portalModal) toggleModal(portalModal, false);
+
+    if (window.location.pathname.includes('perfil.html')) {
+      window.location.href = 'index.html';
+    }
 
     const shopBtn = document.getElementById('mobile-shop-btn');
     if (shopBtn) {
@@ -421,6 +425,42 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update QR Pass Name
     const qrNameEl = document.getElementById('qr-pass-customer-name');
     if (qrNameEl) qrNameEl.textContent = `${nameVal} (${tier.label})`;
+
+    // Dedicated perfil.html Page UI Updates
+    const headerName = document.getElementById('header-user-name');
+    const headerTier = document.getElementById('header-user-tier');
+    const headerSeeds = document.getElementById('header-user-seeds');
+    const perfilQrName = document.getElementById('perfil-qr-name');
+    const perfilTierCurrent = document.getElementById('perfil-tier-current');
+    const perfilTierNext = document.getElementById('perfil-tier-next');
+    const perfilProgressFill = document.getElementById('perfil-progress-fill');
+    const perfilProgressText = document.getElementById('perfil-progress-text');
+
+    const nextTierObj = getNextTier(tier);
+
+    if (headerName) headerName.textContent = nameVal;
+    if (headerTier) headerTier.textContent = tier.label;
+    if (headerSeeds) headerSeeds.textContent = `${seedsVal} SEMILLAS`;
+    if (perfilQrName) perfilQrName.textContent = `${nameVal} (${tier.label})`;
+    if (perfilTierCurrent) perfilTierCurrent.textContent = tier.label;
+    if (perfilTierNext) perfilTierNext.textContent = nextTierObj ? nextTierObj.label : 'Nivel Máximo (Leyenda)';
+    if (perfilProgressFill) {
+      if (tier.nextMin !== null) {
+        const range = tier.nextMin - tier.minSeeds;
+        const progress = ((seedsVal - tier.minSeeds) / range) * 100;
+        perfilProgressFill.style.width = `${Math.min(100, Math.max(0, progress))}%`;
+      } else {
+        perfilProgressFill.style.width = '100%';
+      }
+    }
+    if (perfilProgressText) {
+      if (tier.nextMin !== null) {
+        const missing = tier.nextMin - seedsVal;
+        perfilProgressText.textContent = `Te faltan ${missing} semillas para subir de nivel.`;
+      } else {
+        perfilProgressText.textContent = '¡Nivel Máximo Leyenda alcanzado!';
+      }
+    }
 
     // Check Academy Certificate Button Visibility
     const academyProgress = JSON.parse(localStorage.getItem('boeweb_academy_progress')) || { completedModules: [] };
