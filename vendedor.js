@@ -1265,6 +1265,35 @@ function shareReceiptWhatsApp() {
   window.open(`https://wa.me/5493813023185?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
+function approvePlusUltraMember(email) {
+  let registeredUsers = JSON.parse(localStorage.getItem('boeweb_registered_users')) || [];
+  const member = registeredUsers.find(u => u.email === email);
+  if (member) {
+    member.isPlusUltra = true;
+    localStorage.setItem('boeweb_registered_users', JSON.stringify(registeredUsers));
+
+    let currentMember = JSON.parse(localStorage.getItem('boeweb_member'));
+    if (currentMember && currentMember.email === email) {
+      currentMember.isPlusUltra = true;
+      localStorage.setItem('boeweb_member', JSON.stringify(currentMember));
+    }
+
+    if (window.showToast) window.showToast(`🔥 Suscripción BÔ Plus Ultra APROBADA para ${member.name}`);
+    alert(`🎉 ¡Suscripción BÔ Plus Ultra aprobada con éxito para ${member.name} (${member.email})! Se ha registrado el Kit de Bienvenida a entregar en el local.`);
+  } else {
+    alert(`🎉 ¡Solicitud recibida! Se ha aprobado la membresía BÔ Plus Ultra para ${email}.`);
+  }
+}
+
+// Check URL params on load
+document.addEventListener('DOMContentLoaded', () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const targetMember = urlParams.get('member');
+  if (targetMember) {
+    setTimeout(() => approvePlusUltraMember(targetMember), 500);
+  }
+});
+
 // Global exposure
 window.handleVendorLogin = handleVendorLogin;
 window.vendorLogout = vendorLogout;
@@ -1274,3 +1303,5 @@ window.triggerAIScan = triggerAIScan;
 window.updateUSDConversion = updateUSDConversion;
 window.registerSalesItem = registerSalesItem;
 window.shareReceiptWhatsApp = shareReceiptWhatsApp;
+window.approvePlusUltraMember = approvePlusUltraMember;
+

@@ -472,6 +472,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    renderMemberBadges();
+    renderRedemptionStore();
     renderLunarCalendar();
   }
 
@@ -572,17 +574,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!currentMember) return;
     const userSeeds = currentMember.seeds || 0;
 
+    const perfilCouponsContainer = document.getElementById('perfil-coupons-container');
+    const perfilProductsContainer = document.getElementById('perfil-products-container');
+
+    const couponsTarget = perfilCouponsContainer || redeemCouponsContainer;
+    const productsTarget = perfilProductsContainer || redeemProductsContainer;
+
     // 1. Render Redeemable Coupons
-    if (redeemCouponsContainer) {
-      redeemCouponsContainer.innerHTML = REDEEMABLE_COUPONS.map(c => {
+    if (couponsTarget) {
+      couponsTarget.innerHTML = REDEEMABLE_COUPONS.map(c => {
         const canAfford = userSeeds >= c.seedsCost;
         return `
-          <div class="store-item-card ${canAfford ? 'affordable' : 'locked'}">
+          <div class="store-item-card ${canAfford ? 'affordable' : 'locked'}" style="background: rgba(15,30,24,0.9); border: 1.5px solid var(--color-accent-gold); border-radius: 16px; padding: 16px;">
             <div class="store-item-info">
-              <span class="store-item-title">${c.code} (${c.desc})</span>
-              <span class="store-item-cost">🪙 ${c.seedsCost} Semillas</span>
+              <strong style="color: var(--color-accent-gold); display: block; font-size: 1rem;">${c.code} (${c.desc})</strong>
+              <span class="store-item-cost" style="color: #fff; font-size: 0.85rem;">🪙 ${c.seedsCost} Semillas</span>
             </div>
-            <button class="btn btn-secondary btn-redeem-coupon" data-code="${c.code}" data-cost="${c.seedsCost}" ${!canAfford ? 'disabled' : ''}>
+            <button class="btn btn-secondary btn-redeem-coupon" data-code="${c.code}" data-cost="${c.seedsCost}" ${!canAfford ? 'disabled' : ''} style="margin-top: 10px; width: 100%;">
               ${canAfford ? 'Canjear' : 'Insuficientes'}
             </button>
           </div>
@@ -599,17 +607,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 2. Render Redeemable Physical Products ($0)
-    if (redeemProductsContainer) {
-      redeemProductsContainer.innerHTML = REDEEMABLE_PRODUCTS.map(p => {
+    if (productsTarget) {
+      productsTarget.innerHTML = REDEEMABLE_PRODUCTS.map(p => {
         const canAfford = userSeeds >= p.seedsCost;
         return `
-          <div class="store-item-card product-card-gift ${canAfford ? 'affordable' : 'locked'}">
-            <img src="${p.img}" alt="${p.name}" class="gift-thumb">
+          <div class="store-item-card product-card-gift ${canAfford ? 'affordable' : 'locked'}" style="background: rgba(15,30,24,0.9); border: 1.5px solid var(--color-accent-gold); border-radius: 16px; padding: 16px; text-align: center;">
+            <img src="${p.img}" alt="${p.name}" class="gift-thumb" style="width: 80px; height: 80px; object-fit: cover; border-radius: 12px; border: 1px solid var(--color-accent-gold); margin-bottom: 8px;">
             <div class="store-item-info">
-              <span class="store-item-title">${p.name}</span>
-              <span class="store-item-cost">🪙 ${p.seedsCost} Semillas (Regalo $0)</span>
+              <strong style="color: #fff; display: block; font-size: 0.9rem;">${p.name}</strong>
+              <span class="store-item-cost" style="color: var(--color-accent-gold); font-size: 0.85rem; font-weight: 700;">🪙 ${p.seedsCost} Semillas (Regalo $0)</span>
             </div>
-            <button class="btn btn-primary btn-redeem-product" data-id="${p.id}" data-cost="${p.seedsCost}" ${!canAfford ? 'disabled' : ''}>
+            <button class="btn btn-primary btn-redeem-product" data-id="${p.id}" data-cost="${p.seedsCost}" ${!canAfford ? 'disabled' : ''} style="margin-top: 10px; width: 100%; font-weight: 700;">
               ${canAfford ? 'Canjear Producto' : 'Insuficientes'}
             </button>
           </div>

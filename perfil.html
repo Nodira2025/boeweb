@@ -363,23 +363,8 @@
         <!-- Vitrina de Insignias Doradas -->
         <div style="background: var(--card-bg-glass); backdrop-filter: blur(16px); border: 1.5px solid var(--card-border-gold); border-radius: 24px; padding: 24px; color: #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.4);">
           <h4 style="margin: 0 0 16px 0; color: var(--color-accent-gold); font-size: 1.05rem;">🎖️ Mis Insignias Ganadas</h4>
-          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;">
-            <div style="background: rgba(212,175,55,0.15); border: 1.5px solid var(--color-accent-gold); border-radius: 16px; padding: 14px; text-align: center;">
-              <span style="font-size: 2rem;">🌱</span>
-              <span style="font-size: 0.78rem; display: block; font-weight: 800; color: var(--color-accent-gold); margin-top: 4px;">Brote VIP</span>
-            </div>
-            <div style="background: rgba(102,187,106,0.15); border: 1.5px solid #66bb6a; border-radius: 16px; padding: 14px; text-align: center;">
-              <span style="font-size: 2rem;">🔬</span>
-              <span style="font-size: 0.78rem; display: block; font-weight: 800; color: #66bb6a; margin-top: 4px;">Fitopatología</span>
-            </div>
-            <div style="background: rgba(66,165,245,0.15); border: 1.5px solid #42a5f5; border-radius: 16px; padding: 14px; text-align: center;">
-              <span style="font-size: 2rem;">🎓</span>
-              <span style="font-size: 0.78rem; display: block; font-weight: 800; color: #42a5f5; margin-top: 4px;">Indoor Pro</span>
-            </div>
-            <div style="background: rgba(171,71,188,0.15); border: 1.5px solid #ab47bc; border-radius: 16px; padding: 14px; text-align: center;">
-              <span style="font-size: 2rem;">🎯</span>
-              <span style="font-size: 0.78rem; display: block; font-weight: 800; color: #ab47bc; margin-top: 4px;">Embajador BÔ</span>
-            </div>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;" id="perfil-badges-grid">
+            <!-- Rendered dynamically by memberPortal.js -->
           </div>
         </div>
 
@@ -477,7 +462,7 @@
           </div>
         </div>
 
-        <!-- PANEL 4: PLUS ULTRA -->
+        <!-- PANEL 4: PLUS ULTRA VIA WHATSAPP -->
         <div class="perfil-tab-panel" id="panel-plusultra" style="display: none;">
           <div style="background: linear-gradient(135deg, rgba(244, 67, 54, 0.25) 0%, rgba(212, 175, 55, 0.3) 100%); border: 2.5px solid #ff5252; border-radius: 28px; padding: 36px; color: #fff; box-shadow: 0 15px 40px rgba(244,67,54,0.3);">
             <span style="background: #ff5252; color: #fff; font-weight: 900; padding: 6px 16px; border-radius: 14px; font-size: 0.85rem; letter-spacing: 1px;">NIVEL MÁXIMO DE SUSCRIPCIÓN</span>
@@ -487,8 +472,14 @@
               • 🚚 <strong>Envío Gratis Permanente</strong> en compras superiores al monto mínimo.<br>
               • ⚡ <strong>Multiplicador 2x de Semillas VIP</strong> en todas tus actividades.
             </p>
-            <button class="btn btn-primary" onclick="subscribePlusUltra()" id="btn-subscribe-plus-ultra" style="background: #ff5252; border-color: #ff5252; font-weight: 900; padding: 16px 36px; font-size: 1.15rem; border-radius: 16px; box-shadow: 0 10px 30px rgba(244,67,54,0.4);">
-              🔥 SUSCRIBIRME A BÔ PLUS ULTRA AHORA
+
+            <div style="background: rgba(0,0,0,0.4); border: 1.5px dashed var(--color-accent-gold); border-radius: 16px; padding: 16px; margin-bottom: 20px; text-align: center;">
+              <span style="font-size: 0.85rem; color: var(--color-accent-gold); font-weight: 700;">📲 SOLICITUD DE VALIDACIÓN VÍA WHATSAPP:</span>
+              <p style="font-size: 0.82rem; color: rgba(247,246,242,0.8); margin: 4px 0 0 0;">Al presionar el botón se abre WhatsApp con tu solicitud lista para que el vendedor valide tu suscripción y entregue tu Kit de Bienvenida en el local.</p>
+            </div>
+
+            <button class="btn btn-primary" onclick="subscribePlusUltraWhatsApp()" id="btn-subscribe-plus-ultra" style="background: #ff5252; border-color: #ff5252; font-weight: 900; padding: 16px 36px; font-size: 1.15rem; border-radius: 16px; box-shadow: 0 10px 30px rgba(244,67,54,0.4); width: 100%;">
+              📲 ENVIAR SOLICITUD POR WHATSAPP AL VENDEDOR
             </button>
           </div>
         </div>
@@ -499,24 +490,54 @@
             <h3 style="margin: 0 0 6px 0; color: var(--color-accent-gold); font-family: 'Playfair Display', serif; font-size: 1.6rem;">🎁 Tienda de Canje de Semillas ($0)</h3>
             <p style="font-size: 0.95rem; color: rgba(247,246,242,0.85); margin-bottom: 24px;">Canjeá tus semillas acumuladas por productos físicos de regalo agregados por $0 a tu carrito.</p>
 
+            <h4 style="color: var(--color-accent-gold); margin-bottom: 16px; font-size: 1.2rem;">🎫 Cupones de Descuento Extra:</h4>
+            <div id="perfil-coupons-container" class="store-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;"></div>
+
             <h4 style="color: var(--color-accent-gold); margin-bottom: 16px; font-size: 1.2rem;">🌱 Productos Físicos de Regalo ($0):</h4>
-            <div id="redeem-products-container" class="store-grid"></div>
+            <div id="perfil-products-container" class="store-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;"></div>
           </div>
         </div>
 
-        <!-- PANEL 6: SORTEO MENSUAL -->
+        <!-- PANEL 6: SORTEO MENSUAL CON ENCUESTA COMPLETA -->
         <div class="perfil-tab-panel" id="panel-raffle" style="display: none;">
           <div style="background: var(--card-bg-glass); backdrop-filter: blur(16px); border: 1.5px solid var(--card-border-gold); border-radius: 28px; padding: 32px; box-shadow: 0 15px 40px rgba(0,0,0,0.5);">
             <h3 style="margin: 0 0 6px 0; color: var(--color-accent-gold); font-family: 'Playfair Display', serif; font-size: 1.6rem;">🎟️ Sorteo Mensual BÔ Growclub</h3>
-            <p style="font-size: 0.95rem; color: rgba(247,246,242,0.85); margin-bottom: 24px;">Completá la encuesta mensual y obtené tu Ticket Dorado de Rifa +150 Semillas extra.</p>
+            <p style="font-size: 0.95rem; color: rgba(247,246,242,0.85); margin-bottom: 24px;">Completá la encuesta mensual de 3 preguntas para ganar <strong>+150 Semillas VIP</strong> y obtener tu número de Ticket Dorado para el sorteo de premios en el local.</p>
             
-            <div id="raffle-ticket-box" class="golden-ticket-card" style="display: none;">
+            <div id="raffle-survey-container">
+              <form id="perfil-survey-form" onsubmit="submitRaffleSurvey(event)">
+                <div style="margin-bottom: 16px;">
+                  <label style="font-size: 0.9rem; font-weight: 800; color: var(--color-accent-gold); display: block; margin-bottom: 6px;">1. ¿Qué producto te gustaría que sumemos al catálogo de BÔ Growclub?</label>
+                  <input type="text" id="survey-q1" class="b2b-form-input" placeholder="Ej: Carpas 80x80, Iluminación LED Samsung LM301H..." required style="width: 100%; padding: 12px; font-size: 0.95rem; border-radius: 12px;">
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                  <label style="font-size: 0.9rem; font-weight: 800; color: var(--color-accent-gold); display: block; margin-bottom: 6px;">2. ¿Cómo calificás la atención presencial y digital de BÔ Growclub?</label>
+                  <select id="survey-q2" class="b2b-form-input" style="width: 100%; padding: 12px; font-size: 0.95rem; border-radius: 12px; background: rgba(0,0,0,0.8); color: #fff;">
+                    <option value="5">⭐⭐⭐⭐⭐ Excelente (5/5)</option>
+                    <option value="4">⭐⭐⭐⭐ Muy Buena (4/5)</option>
+                    <option value="3">⭐⭐⭐ Buena (3/5)</option>
+                  </select>
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                  <label style="font-size: 0.9rem; font-weight: 800; color: var(--color-accent-gold); display: block; margin-bottom: 6px;">3. ¿Qué contenido o herramienta te sirvió más de la Academia o Web?</label>
+                  <input type="text" id="survey-q3" class="b2b-form-input" placeholder="Ej: La calculadora de VPD, Curso de Fitopatología, Diario de Cultivo..." required style="width: 100%; padding: 12px; font-size: 0.95rem; border-radius: 12px;">
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; padding: 16px; font-weight: 900; font-size: 1.1rem; border-radius: 14px; background: var(--gold-gradient); border-color: var(--color-accent-gold); color: #070e0b;">
+                  🎟️ ENVIAR ENCUESTA & OBTENER TICKET DORADO (+150 SEMILLAS)
+                </button>
+              </form>
+            </div>
+
+            <div id="raffle-ticket-box" class="golden-ticket-card" style="display: none; margin-top: 20px;">
               <div class="ticket-header">
                 <span>🎟️ TICKET DE SORTEO MENSUAL</span>
                 <strong>BO GROWCLUB VIP</strong>
               </div>
               <div class="ticket-number" id="ticket-number-display">#BO-0000</div>
-              <p class="ticket-status">¡Ya estás participando en el sorteo de este mes!</p>
+              <p class="ticket-status">¡Ya estás participando en el sorteo de este mes! El ganador se anuncia en nuestro Instagram @bo.growclub.</p>
             </div>
           </div>
         </div>
