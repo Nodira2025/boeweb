@@ -4800,6 +4800,17 @@ textarea.form-control {
   box-shadow: 0 0 15px rgba(102, 187, 106, 0.4) !important;
 }
 
+@keyframes pulseGlow {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.04); opacity: 0.85; box-shadow: 0 0 25px var(--color-accent-gold); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.architect-furniture-item:hover {
+  transform: translateY(-2px);
+}
+
+
 
 
 

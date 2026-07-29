@@ -1,126 +1,137 @@
-// BÔ Growclub - Motor de Mapa Interactivo del Local Físico & Ubicación de Estantes (v2.5)
+// BÔ Growclub - Motor de Mapa Interactivo del Local Físico & Ubicación de Estantes (v2.6)
+// Includes 2D Architectural Blueprint Renderer & Custom Visual Layout Builder Engine
 
-const storeZones = {
-  'A': { name: 'Vitrina Principal / Parafernalia VIP', color: '#d4af37', description: 'Ubicada a la entrada, exhibición glassmorphism.' },
-  'B': { name: 'Estantería Botánica Central', color: '#66bb6a', description: 'Pasillo central, fertilizantes y sustratos orgánicos.' },
-  'C': { name: 'Módulo Indoor Fondo', color: '#42a5f5', description: 'Zona posterior, paneles LED, carpas y turbinas.' },
-  'D': { name: 'Depósito Auxiliar & Banco de Semillas', color: '#ab47bc', description: 'Área restringida de stock en frío y semillas.' },
-  'E': { name: 'Barra BÔ Coffee & Lounge', color: '#ffb74d', description: 'Mesas y mostrador de cafetería botánica.' }
-};
-
-// Default Sample Physical Inventory with Shelf Codes
-let localStoreInventory = JSON.parse(localStorage.getItem('boeweb_local_inventory')) || [
-  {
-    sku: '#BO-LOCAL-1001',
-    name: 'Quantum Board LED 240W Samsung LM301H',
-    category: 'Indoor & Luz',
-    priceArs: 450000,
-    stock: 8,
-    shelfCode: 'C-1',
-    zone: 'C',
-    details: 'Estante C-1 (Módulo Indoor Fondo - Estantería Metálica 1)'
-  },
-  {
-    sku: '#BO-LOCAL-1002',
-    name: 'Vaporizador Storz & Bickel Mighty+',
-    category: 'Vaporizadores',
-    priceArs: 680000,
-    stock: 5,
-    shelfCode: 'A-2',
-    zone: 'A',
-    details: 'Estante A-2 (Vitrina Principal - Mostrador Vidrio)'
-  },
-  {
-    sku: '#BO-LOCAL-1003',
-    name: 'Kit Trio Advanced Nutrients pH Perfect 500ml',
-    category: 'Fertilizantes',
-    priceArs: 125000,
-    stock: 14,
-    shelfCode: 'B-3',
-    zone: 'B',
-    details: 'Estante B-3 (Estantería Botánica Central - Nivel Medio)'
-  },
-  {
-    sku: '#BO-LOCAL-1004',
-    name: 'Picador Grinder BÔ Metal 4 Partes',
-    category: 'Parafernalia',
-    priceArs: 18500,
-    stock: 30,
-    shelfCode: 'A-1',
-    zone: 'A',
-    details: 'Cajón A-1 (Vitrina Entrada - Cajón Accesorios)'
-  }
+const defaultStoreElements = [
+  { id: 'zone-A', code: 'A', name: 'Vitrina Entrada / VIP', icon: '🪟', color: '#d4af37', x: 10, y: 15, width: 28, height: 25, type: 'vitrina' },
+  { id: 'zone-B', code: 'B', name: 'Pasillo Botánico Central', icon: '🌿', color: '#66bb6a', x: 42, y: 15, width: 22, height: 45, type: 'estanteria' },
+  { id: 'zone-C', code: 'C', name: 'Módulo Indoor Fondo', icon: '🏠', color: '#42a5f5', x: 68, y: 15, width: 24, height: 35, type: 'indoor' },
+  { id: 'zone-D', code: 'D', name: 'Depósito & Semillas', icon: '📦', color: '#ab47bc', x: 68, y: 55, width: 24, height: 35, type: 'deposito' },
+  { id: 'zone-E', code: 'E', name: 'Barra BÔ Coffee & Lounge', icon: '☕', color: '#ffb74d', x: 10, y: 50, width: 28, height: 40, type: 'coffee' }
 ];
 
-function saveLocalInventory() {
-  localStorage.setItem('boeweb_local_inventory', JSON.stringify(localStoreInventory));
+let customStoreLayout = JSON.parse(localStorage.getItem('boeweb_custom_store_layout')) || defaultStoreElements;
+let isEditMode = false;
+
+function saveStoreLayout() {
+  localStorage.setItem('boeweb_custom_store_layout', JSON.stringify(customStoreLayout));
 }
 
-// Render Interactive Store Map SVG / HTML Canvas
+// Render Interactive Store Map SVG / Grid Blueprint
 function renderStoreMapHTML(activeZone = null, activeShelf = null) {
+  const activeItem = customStoreLayout.find(el => el.code === activeZone || (activeShelf && activeShelf.startsWith(el.code)));
+
   return `
-    <div class="store-map-container" style="background: rgba(15, 30, 24, 0.95); border: 2px solid var(--color-accent-gold); border-radius: 16px; padding: 20px; color: #fff;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+    <div class="store-map-container" style="background: rgba(15, 30, 24, 0.98); border: 2px solid var(--color-accent-gold); border-radius: 20px; padding: 24px; color: #fff; box-shadow: 0 15px 40px rgba(0,0,0,0.5);">
+      
+      <!-- Top Action Bar -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
         <div>
-          <span style="font-size: 0.75rem; color: var(--color-accent-gold); font-weight: 700; text-transform: uppercase;">PLANO INTERACTIVO DEL LOCAL FÍSICO BÔ</span>
-          <h3 style="font-family: var(--font-display); color: #fff; margin: 2px 0 0 0; font-size: 1.25rem;">Mapa de Estanterías y Ubicación</h3>
+          <span style="font-size: 0.75rem; color: var(--color-accent-gold); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">PLANO DE PLANTA ARQUITECTÓNICO 2D BÔ</span>
+          <h3 style="font-family: var(--font-display); color: #fff; margin: 2px 0 0 0; font-size: 1.35rem;">Mapa de Estanterías y Ubicación en Local</h3>
         </div>
-        ${activeShelf ? `<div style="background: rgba(195,155,75,0.2); border: 1px solid var(--color-accent-gold); padding: 6px 14px; border-radius: 20px; color: var(--color-accent-gold); font-weight: 700; font-size: 0.9rem;">📍 UBICACIÓN SOLICITADA: ${activeShelf}</div>` : ''}
+        <div style="display: flex; gap: 10px; align-items: center;">
+          ${activeShelf ? `<div style="background: rgba(195,155,75,0.25); border: 1.5px solid var(--color-accent-gold); padding: 6px 16px; border-radius: 20px; color: var(--color-accent-gold); font-weight: 700; font-size: 0.9rem; animation: pulseGlow 1.5s infinite;">🎯 DARDITO EN: ${activeShelf}</div>` : ''}
+          <button class="btn btn-secondary" onclick="toggleStoreLayoutEditMode()" style="padding: 8px 14px; font-size: 0.85rem; border-color: ${isEditMode ? '#ff5252' : 'var(--color-accent-gold)'}; color: ${isEditMode ? '#ff5252' : 'var(--color-accent-gold)'};">
+            ${isEditMode ? '💾 Guardar Plano' : '🧩 Diseñar / Mover Muebles'}
+          </button>
+        </div>
       </div>
 
-      <!-- Map Diagram Grid -->
-      <div class="store-floorplan-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+      ${isEditMode ? `
+        <div style="background: rgba(255,193,7,0.15); border: 1px solid #ffc107; padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; font-size: 0.85rem; color: #ffc107;">
+          🛠️ <strong>MODO EDITOR DE ARQUITECTURA ACTIVO:</strong> Seleccioná y arrastrá los módulos para ubicar tus vitrinas, mostrador o depósitos exactos según la forma de tu local.
+          <button class="btn btn-secondary" onclick="resetStoreLayoutToDefault()" style="margin-left: 10px; font-size: 0.75rem; padding: 4px 10px;">Restablecer Predeterminado</button>
+        </div>
+      ` : ''}
+
+      <!-- Architectural Canvas Grid -->
+      <div class="store-architect-canvas" style="position: relative; width: 100%; height: 380px; background: rgba(0,0,0,0.5); border: 2px solid rgba(195,155,75,0.3); border-radius: 14px; overflow: hidden; background-image: radial-gradient(rgba(195,155,75,0.15) 1px, transparent 1px); background-size: 20px 20px;">
         
-        <!-- Zona A -->
-        <div class="store-zone-box ${activeZone === 'A' ? 'active-zone' : ''}" style="background: rgba(212,175,55,0.12); border: 2px ${activeZone === 'A' ? 'solid #d4af37' : 'dashed rgba(212,175,55,0.4)'}; border-radius: 12px; padding: 14px; text-align: center; position: relative;">
-          <span style="background: #d4af37; color: #0f1e18; font-weight: 900; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem;">ZONA A</span>
-          <h4 style="font-size: 0.9rem; margin: 6px 0 4px 0; color: #d4af37;">Vitrina Entrada</h4>
-          <p style="font-size: 0.72rem; color: rgba(247,246,242,0.7); margin: 0;">Estantes A-1, A-2, A-3 (Vaporizadores & VIP)</p>
-          ${activeZone === 'A' ? '<div style="margin-top:8px; font-weight:700; color:#d4af37; font-size:0.8rem;">🎯 ¡PRODUCTO AQUÍ!</div>' : ''}
+        <!-- Entrance Marker -->
+        <div style="position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); background: var(--color-accent-gold); color: #0f1e18; padding: 4px 14px; border-radius: 12px; font-weight: 900; font-size: 0.75rem; letter-spacing: 1px; z-index: 5; box-shadow: 0 0 10px rgba(195,155,75,0.5);">
+          🚪 ENTRADA PRINCIPAL LOCAL
         </div>
 
-        <!-- Zona B -->
-        <div class="store-zone-box ${activeZone === 'B' ? 'active-zone' : ''}" style="background: rgba(102,187,106,0.12); border: 2px ${activeZone === 'B' ? 'solid #66bb6a' : 'dashed rgba(102,187,106,0.4)'}; border-radius: 12px; padding: 14px; text-align: center;">
-          <span style="background: #66bb6a; color: #0f1e18; font-weight: 900; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem;">ZONA B</span>
-          <h4 style="font-size: 0.9rem; margin: 6px 0 4px 0; color: #66bb6a;">Pasillo Botánico</h4>
-          <p style="font-size: 0.72rem; color: rgba(247,246,242,0.7); margin: 0;">Estantes B-1, B-2, B-3 (Fertilizantes & Aditivos)</p>
-          ${activeZone === 'B' ? '<div style="margin-top:8px; font-weight:700; color:#66bb6a; font-size:0.8rem;">🎯 ¡PRODUCTO AQUÍ!</div>' : ''}
-        </div>
+        <!-- Render Furniture Elements -->
+        ${customStoreLayout.map(item => {
+          const isActive = activeItem && activeItem.code === item.code;
+          return `
+            <div class="architect-furniture-item ${isActive ? 'active-target-pin' : ''}" 
+                 style="position: absolute; left: ${item.x}%; top: ${item.y}%; width: ${item.width}%; height: ${item.height}%; background: ${item.color}22; border: 2px ${isActive ? 'solid #fff' : 'solid ' + item.color}; border-radius: 10px; padding: 8px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.3s ease; ${isActive ? 'box-shadow: 0 0 25px ' + item.color + ', 0 0 10px #fff;' : ''}">
+              
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="background: ${item.color}; color: #0f1e18; font-weight: 900; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem;">ZONA ${item.code}</span>
+                <span style="font-size: 1.1rem;">${item.icon}</span>
+              </div>
 
-        <!-- Zona C -->
-        <div class="store-zone-box ${activeZone === 'C' ? 'active-zone' : ''}" style="background: rgba(66,165,245,0.12); border: 2px ${activeZone === 'C' ? 'solid #42a5f5' : 'dashed rgba(66,165,245,0.4)'}; border-radius: 12px; padding: 14px; text-align: center;">
-          <span style="background: #42a5f5; color: #0f1e18; font-weight: 900; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem;">ZONA C</span>
-          <h4 style="font-size: 0.9rem; margin: 6px 0 4px 0; color: #42a5f5;">Módulo Indoor Fondo</h4>
-          <p style="font-size: 0.72rem; color: rgba(247,246,242,0.7); margin: 0;">Estantes C-1, C-2 (LED, Carpas & Turbinas)</p>
-          ${activeZone === 'C' ? '<div style="margin-top:8px; font-weight:700; color:#42a5f5; font-size:0.8rem;">🎯 ¡PRODUCTO AQUÍ!</div>' : ''}
-        </div>
+              <div style="text-align: center; margin: 4px 0;">
+                <h5 style="margin: 0; color: #fff; font-size: 0.85rem; font-weight: 700;">${item.name}</h5>
+              </div>
 
-        <!-- Zona D -->
-        <div class="store-zone-box ${activeZone === 'D' ? 'active-zone' : ''}" style="background: rgba(171,71,188,0.12); border: 2px ${activeZone === 'D' ? 'solid #ab47bc' : 'dashed rgba(171,71,188,0.4)'}; border-radius: 12px; padding: 14px; text-align: center;">
-          <span style="background: #ab47bc; color: #fff; font-weight: 900; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem;">ZONA D</span>
-          <h4 style="font-size: 0.9rem; margin: 6px 0 4px 0; color: #ab47bc;">Depósito & Semillas</h4>
-          <p style="font-size: 0.72rem; color: rgba(247,246,242,0.7); margin: 0;">Estantes D-1 al D-4 (Stock Frío & Genéticas)</p>
-          ${activeZone === 'D' ? '<div style="margin-top:8px; font-weight:700; color:#ab47bc; font-size:0.8rem;">🎯 ¡PRODUCTO AQUÍ!</div>' : ''}
-        </div>
+              ${isActive ? `
+                <div style="background: ${item.color}; color: #0f1e18; font-weight: 900; padding: 4px; border-radius: 6px; font-size: 0.75rem; text-align: center; animation: pulseGlow 1.2s infinite;">
+                  🎯 DARDITO AQUÍ
+                </div>
+              ` : `
+                <span style="font-size: 0.68rem; color: rgba(247,246,242,0.6); text-align: center;">Código: ${item.code}-1 a ${item.code}-4</span>
+              `}
 
-        <!-- Zona E -->
-        <div class="store-zone-box ${activeZone === 'E' ? 'active-zone' : ''}" style="grid-column: span 2; background: rgba(255,183,77,0.12); border: 2px ${activeZone === 'E' ? 'solid #ffb74d' : 'dashed rgba(255,183,77,0.4)'}; border-radius: 12px; padding: 14px; text-align: center;">
-          <span style="background: #ffb74d; color: #0f1e18; font-weight: 900; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem;">ZONA E</span>
-          <h4 style="font-size: 0.9rem; margin: 6px 0 4px 0; color: #ffb74d;">Barra BÔ Coffee & Lounge</h4>
-          <p style="font-size: 0.72rem; color: rgba(247,246,242,0.7); margin: 0;">Mesas 1-20, Barra de Café & Repostería</p>
-          ${activeZone === 'E' ? '<div style="margin-top:8px; font-weight:700; color:#ffb74d; font-size:0.8rem;">🎯 ¡PRODUCTO AQUÍ!</div>' : ''}
-        </div>
+              ${isEditMode ? `
+                <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+                  <button onclick="moveStoreItem('${item.id}', -5, 0)" style="font-size:0.65rem; padding:2px 4px;">⬅️</button>
+                  <button onclick="moveStoreItem('${item.id}', 5, 0)" style="font-size:0.65rem; padding:2px 4px;">➡️</button>
+                  <button onclick="moveStoreItem('${item.id}', 0, -5)" style="font-size:0.65rem; padding:2px 4px;">⬆️</button>
+                  <button onclick="moveStoreItem('${item.id}', 0, 5)" style="font-size:0.65rem; padding:2px 4px;">⬇️</button>
+                </div>
+              ` : ''}
+
+            </div>
+          `;
+        }).join('')}
 
       </div>
 
-      <div style="text-align: center; font-size: 0.78rem; color: rgba(247,246,242,0.6);">
-        💡 Podés asignar o editar la ubicación de cualquier producto ingresando su código (ej: <strong>A-1</strong>, <strong>B-3</strong>, <strong>C-2</strong>).
+      <!-- Legend -->
+      <div style="display: flex; justify-content: space-around; margin-top: 16px; flex-wrap: wrap; gap: 8px; font-size: 0.78rem; color: rgba(247,246,242,0.8);">
+        ${customStoreLayout.map(el => `
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="width: 12px; height: 12px; border-radius: 3px; background: ${el.color}; display: inline-block;"></span>
+            <span><strong>Zona ${el.code}:</strong> ${el.name}</span>
+          </div>
+        `).join('')}
       </div>
+
     </div>
   `;
 }
 
+function toggleStoreLayoutEditMode() {
+  isEditMode = !isEditMode;
+  if (!isEditMode) {
+    saveStoreLayout();
+    if (window.showToast) window.showToast('💾 ¡Diseño de Plano del Local Guardado!');
+  }
+  if (window.renderStoreMapUI) window.renderStoreMapUI();
+}
+
+function moveStoreItem(id, dx, dy) {
+  const item = customStoreLayout.find(el => el.id === id);
+  if (item) {
+    item.x = Math.max(0, Math.min(75, item.x + dx));
+    item.y = Math.max(0, Math.min(70, item.y + dy));
+    saveStoreLayout();
+    if (window.renderStoreMapUI) window.renderStoreMapUI();
+  }
+}
+
+function resetStoreLayoutToDefault() {
+  customStoreLayout = JSON.parse(JSON.stringify(defaultStoreElements));
+  saveStoreLayout();
+  if (window.renderStoreMapUI) window.renderStoreMapUI();
+}
+
 // Global exposure
 window.renderStoreMapHTML = renderStoreMapHTML;
-window.localStoreInventory = localStoreInventory;
-window.saveLocalInventory = saveLocalInventory;
+window.toggleStoreLayoutEditMode = toggleStoreLayoutEditMode;
+window.moveStoreItem = moveStoreItem;
+window.resetStoreLayoutToDefault = resetStoreLayoutToDefault;
