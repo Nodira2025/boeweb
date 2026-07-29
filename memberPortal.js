@@ -982,6 +982,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
     alert(`🎉 ¡Abriste la Caja Mágica BÔ y ganaste: ${reward.title}!`);
   };
+
+  // --- BÔ PLUS ULTRA SUBSCRIPTION ENGINE ---
+  let plusUltraSubscribersCount = parseInt(localStorage.getItem('boeweb_plus_ultra_count')) || 3;
+
+  window.subscribePlusUltra = function() {
+    if (!currentMember) {
+      alert('Por favor iniciá sesión primero para suscribirte a BÔ Plus Ultra.');
+      return;
+    }
+
+    if (currentMember.isPlusUltra) {
+      alert('🔥 ¡Ya sos un Miembro Activo de BÔ Plus Ultra! Disfrutás de Envío Gratis y Multiplicador 2x.');
+      return;
+    }
+
+    const confirmSub = confirm('🔥 ¿Confirmar suscripción a BÔ Plus Ultra por $3 USD/mes (~$3.300 ARS)?\n\nBeneficios:\n• 🎁 Kit de Bienvenida Físico BÔ en el local (Si sos de los primeros 10).\n• 🚚 Envío Gratis Permanente en tus pedidos.\n• ⚡ Multiplicador 2x de Semillas VIP.');
+    
+    if (confirmSub) {
+      currentMember.isPlusUltra = true;
+      plusUltraSubscribersCount += 1;
+      localStorage.setItem('boeweb_plus_ultra_count', plusUltraSubscribersCount);
+      saveCurrentMemberState();
+      updatePortalUI();
+
+      const btn = document.getElementById('btn-subscribe-plus-ultra');
+      if (btn) {
+        btn.textContent = '🔥 ¡SUSCRIPCIÓN PLUS ULTRA ACTIVA!';
+        btn.style.background = '#66bb6a';
+      }
+
+      const kitsCountEl = document.getElementById('plus-ultra-kits-count');
+      if (kitsCountEl) {
+        const remaining = Math.max(0, 10 - plusUltraSubscribersCount);
+        kitsCountEl.textContent = `🎁 Quedan ${remaining}/10 Kits de Bienvenida Físicos`;
+      }
+
+      alert('🎉 ¡Felicitaciones! Te suscribiste a BÔ Plus Ultra. Podés retirar tu Kit de Bienvenida en la sucursal.');
+    }
+  };
 });
 
 
