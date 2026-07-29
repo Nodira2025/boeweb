@@ -143,8 +143,8 @@
   <main class="catalog-section" id="catalog-section">
     <div class="catalog-container">
       
-      <!-- Category Navigation (Pills on desktop, scrollable on mobile) -->
-      <aside class="catalog-sidebar">
+      <!-- Category Navigation & Dynamic Faceted Filter Sidebar (Desktop) -->
+      <aside class="catalog-sidebar" id="catalog-sidebar">
         <div class="sidebar-block">
           <!-- Search Bar -->
           <div class="catalog-search-area">
@@ -160,27 +160,139 @@
             </form>
           </div>
 
-          <h2 class="sidebar-title">Categorías</h2>
-          <ul class="category-list" id="category-list">
-            <li><button class="category-btn active" data-category="all">Todos los Productos</button></li>
-            <li><button class="category-btn" data-category="Semillas">🌱 Semillas</button></li>
-            <li><button class="category-btn" data-category="Sustratos">🌿 Sustratos</button></li>
-            <li><button class="category-btn" data-category="Fertilizantes">🧪 Fertilizantes</button></li>
-            <li><button class="category-btn" data-category="Indoor">🏠 Indoor & Luz</button></li>
-            <li><button class="category-btn" data-category="Vaporizadores">💨 Vaporizadores</button></li>
-            <li><button class="category-btn" data-category="Macetas">🪴 Macetas</button></li>
-            <li><button class="category-btn" data-category="Medición y Riego">📐 Medición y Riego</button></li>
-            <li><button class="category-btn" data-category="Parafernalia">🍁 Parafernalia</button></li>
-            <li><button class="category-btn" data-category="Tabaco de Armar">🍂 Tabaco de Armar</button></li>
-            <li><button class="category-btn" data-category="Tabaco de Pipa">💨 Tabaco de Pipa</button></li>
-            <li><button class="category-btn" data-category="Otros">✨ Otros</button></li>
-          </ul>
+          <!-- Dynamic Faceted Filter Panel (Accordion System) -->
+          <div class="faceted-filter-panel" id="faceted-filter-panel">
+            
+            <!-- Filter Header -->
+            <div class="facet-header">
+              <h3 class="facet-main-title">🎛️ Filtros</h3>
+              <button class="clear-all-filters-link" id="clear-all-filters-btn" style="display: none;">Limpiar todo</button>
+            </div>
+
+            <!-- 1. Categorías Principales -->
+            <div class="facet-group">
+              <h4 class="facet-title" onclick="toggleFacetAccordion(this)">
+                <span>Categorías</span>
+                <span class="facet-arrow">▼</span>
+              </h4>
+              <div class="facet-content">
+                <ul class="category-list" id="category-list">
+                  <li><button class="category-btn active" data-category="all">Todos los Productos <span class="facet-count" id="count-cat-all">(0)</span></button></li>
+                  <li><button class="category-btn" data-category="Semillas">🌱 Semillas <span class="facet-count" id="count-cat-semillas">(0)</span></button></li>
+                  <li><button class="category-btn" data-category="Sustratos">🌿 Sustratos <span class="facet-count" id="count-cat-sustratos">(0)</span></button></li>
+                  <li><button class="category-btn" data-category="Fertilizantes">🧪 Fertilizantes <span class="facet-count" id="count-cat-fertilizantes">(0)</span></button></li>
+                  <li><button class="category-btn" data-category="Indoor">🏠 Indoor & Luz <span class="facet-count" id="count-cat-indoor">(0)</span></button></li>
+                  <li><button class="category-btn" data-category="Vaporizadores">💨 Vaporizadores <span class="facet-count" id="count-cat-vaporizadores">(0)</span></button></li>
+                  <li><button class="category-btn" data-category="Macetas">🪴 Macetas <span class="facet-count" id="count-cat-macetas">(0)</span></button></li>
+                  <li><button class="category-btn" data-category="Medición y Riego">📐 Medición y Riego <span class="facet-count" id="count-cat-medicion">(0)</span></button></li>
+                  <li><button class="category-btn" data-category="Parafernalia">🍁 Parafernalia <span class="facet-count" id="count-cat-parafernalia">(0)</span></button></li>
+                  <li><button class="category-btn" data-category="Tabaco de Armar">🍂 Tabaco de Armar <span class="facet-count" id="count-cat-tabaco-armar">(0)</span></button></li>
+                  <li><button class="category-btn" data-category="Tabaco de Pipa">💨 Tabaco de Pipa <span class="facet-count" id="count-cat-tabaco-pipa">(0)</span></button></li>
+                  <li><button class="category-btn" data-category="Otros">✨ Otros <span class="facet-count" id="count-cat-otros">(0)</span></button></li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- 2. Subcategorías (Dinámicas según categoría seleccionada) -->
+            <div class="facet-group" id="facet-subcategories-group" style="display: none;">
+              <h4 class="facet-title" onclick="toggleFacetAccordion(this)">
+                <span>Subcategoría</span>
+                <span class="facet-arrow">▼</span>
+              </h4>
+              <div class="facet-content">
+                <div class="facet-checklist" id="facet-subcategories-list"></div>
+              </div>
+            </div>
+
+            <!-- 3. Filtros Contextuales Dinámicos (Semillas, Bongs, etc.) -->
+            <div class="facet-group" id="facet-contextual-group" style="display: none;">
+              <h4 class="facet-title" id="facet-contextual-title" onclick="toggleFacetAccordion(this)">
+                <span>Atributos Específicos</span>
+                <span class="facet-arrow">▼</span>
+              </h4>
+              <div class="facet-content">
+                <div class="facet-checklist" id="facet-contextual-list"></div>
+              </div>
+            </div>
+
+            <!-- 4. Filtro por Marcas -->
+            <div class="facet-group">
+              <h4 class="facet-title" onclick="toggleFacetAccordion(this)">
+                <span>Marca</span>
+                <span class="facet-arrow">▼</span>
+              </h4>
+              <div class="facet-content">
+                <div class="facet-search-box">
+                  <input type="text" id="brand-search-input" placeholder="Buscar marca..." onkeyup="filterBrandChecklist(this.value)">
+                </div>
+                <div class="facet-checklist" id="facet-brands-list"></div>
+              </div>
+            </div>
+
+            <!-- 5. Rango de Precio -->
+            <div class="facet-group">
+              <h4 class="facet-title" onclick="toggleFacetAccordion(this)">
+                <span>Rango de Precio</span>
+                <span class="facet-arrow">▼</span>
+              </h4>
+              <div class="facet-content">
+                <div class="price-range-inputs">
+                  <div class="price-field">
+                    <span>Mín $</span>
+                    <input type="number" id="price-min-input" placeholder="0">
+                  </div>
+                  <span class="price-sep">-</span>
+                  <div class="price-field">
+                    <span>Máx $</span>
+                    <input type="number" id="price-max-input" placeholder="250000">
+                  </div>
+                </div>
+
+                <!-- Range Presets -->
+                <div class="price-presets-list" id="price-presets-list">
+                  <button class="price-preset-btn" onclick="setPricePreset(0, 10000)">Hasta $10.000</button>
+                  <button class="price-preset-btn" onclick="setPricePreset(10000, 25000)">$10.000 a $25.000</button>
+                  <button class="price-preset-btn" onclick="setPricePreset(25000, 50000)">$25.000 a $50.000</button>
+                  <button class="price-preset-btn" onclick="setPricePreset(50000, 100000)">$50.000 a $100.000</button>
+                  <button class="price-preset-btn" onclick="setPricePreset(100000, 9999999)">Más de $100.000</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 6. Disponibilidad & Stock -->
+            <div class="facet-group">
+              <h4 class="facet-title" onclick="toggleFacetAccordion(this)">
+                <span>Disponibilidad</span>
+                <span class="facet-arrow">▼</span>
+              </h4>
+              <div class="facet-content">
+                <div class="facet-checklist">
+                  <label class="facet-check-item">
+                    <input type="checkbox" id="check-stock-in" value="instock" onchange="applyFacetedFilters()">
+                    <span>En Stock</span>
+                    <span class="facet-count" id="count-stock-in">(0)</span>
+                  </label>
+                  <label class="facet-check-item">
+                    <input type="checkbox" id="check-stock-low" value="lowstock" onchange="applyFacetedFilters()">
+                    <span>Últimas Unidades</span>
+                    <span class="facet-count" id="count-stock-low">(0)</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+          </div>
         </div>
       </aside>
 
       <div class="catalog-content">
-        <!-- Catalog Header (Filters, sorting and active state) -->
+        <!-- Catalog Header (Filters trigger, sorting and active state) -->
         <div class="catalog-header-controls">
+          <!-- Mobile Filter Trigger Button -->
+          <button class="mobile-filter-trigger-btn" id="mobile-filter-trigger-btn" onclick="openMobileFilterDrawer()">
+            🎛️ Filtrar <span id="mobile-filter-count-badge" class="mobile-filter-count-badge" style="display: none;">0</span>
+          </button>
+
           <div class="results-count">
             Mostrando <span id="displayed-count">0</span> de <span id="total-count">0</span> productos
           </div>
@@ -193,17 +305,17 @@
                 <option value="price-asc">Precio: Menor a Mayor</option>
                 <option value="price-desc">Precio: Mayor a Menor</option>
                 <option value="name-asc">Nombre: A - Z</option>
+                <option value="sales-desc">Más Vendidos</option>
+                <option value="newest">Más Nuevos</option>
               </select>
             </div>
           </div>
         </div>
 
-        <!-- Active Filter Badge -->
-        <div class="active-filters-area" id="active-filters-area" style="display: none;">
-          <span class="active-filter-badge" id="filter-badge">
-            <span id="filter-badge-text">Categoría: Semillas</span>
-            <button class="remove-filter-btn" id="remove-filter-btn">&times;</button>
-          </span>
+        <!-- Active Filter Chips Bar -->
+        <div class="active-chips-container" id="active-chips-container" style="display: none;">
+          <div class="active-chips-list" id="active-chips-list"></div>
+          <button class="clear-all-chips-btn" onclick="clearAllFacetedFilters()">Limpiar todo ✕</button>
         </div>
 
         <!-- Product Grid -->
@@ -1354,6 +1466,23 @@
       <div class="cert-actions-bar">
         <button class="btn btn-primary" id="print-cert-btn">🖨️ Imprimir / Guardar como PDF</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Mobile Filter Drawer Modal -->
+  <div class="mobile-filter-drawer-overlay" id="mobile-filter-drawer-overlay" onclick="closeMobileFilterDrawer()"></div>
+  <div class="mobile-filter-drawer" id="mobile-filter-drawer">
+    <div class="mobile-filter-drawer-header">
+      <h3>🎛️ Filtrar Productos</h3>
+      <button class="close-mobile-filter-btn" onclick="closeMobileFilterDrawer()">&times;</button>
+    </div>
+    <div class="mobile-filter-drawer-body" id="mobile-filter-drawer-body">
+      <!-- Dynamic faceted filters mirrored here -->
+    </div>
+    <div class="mobile-filter-drawer-footer">
+      <button class="btn btn-primary btn-apply-mobile-filters" onclick="applyMobileFilterDrawer()" style="width: 100%; font-weight: 800; padding: 14px; font-size: 1.05rem;">
+        Ver Resultados (<span id="mobile-apply-count">0</span>)
+      </button>
     </div>
   </div>
 

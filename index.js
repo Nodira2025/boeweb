@@ -284,23 +284,254 @@ document.addEventListener('DOMContentLoaded', () => {
   window.loadCatalog = loadCatalog;
 
 
+  // --- DYNAMIC FACETED FILTER ENGINE ---
+  let facetedState = {
+    category: 'all',
+    subcategory: null,
+    selectedBrands: [],
+    contextualFilters: {},
+    minPrice: null,
+    maxPrice: null,
+    stockOnly: false,
+    lowStockOnly: false
+  };
+
+  const KNOWN_BRANDS = [
+    'Biobizz', 'Grotek', 'Plagron', 'Advanced Nutrients', 'Storz & Bickel', 'Grenco',
+    'Davinci', 'Pax', 'Puffco', 'Dutch Passion', 'Buddha Seeds', 'BSF', 'Paradise Seeds',
+    'Sensi Seeds', 'Santa Planta', 'Growmix', 'Mad Grow', 'Jiffy', 'Klassmann', 'Top Crop',
+    'Namaste', 'Kawsay', 'Vamp', 'Ecocrop', 'Crop', 'Biolab', 'Treemix', 'Canna', 'Atami', 'Hesi'
+  ];
+
+  function extractProductFacets(product) {
+    const text = `${product.name || ''} ${product.description || ''}`.toLowerCase();
+    let foundBrand = null;
+    for (const b of KNOWN_BRANDS) {
+      if (text.includes(b.toLowerCase())) {
+        foundBrand = b;
+        break;
+      }
+    }
+
+    let subcategory = null;
+    let attributes = {};
+    const cat = product.category || 'Otros';
+
+    if (cat === 'Semillas') {
+      if (text.includes('auto')) attributes.tipo = 'Autofloreciente';
+      else if (text.includes('foto') || text.includes('feminizada')) attributes.tipo = 'Fotoperiódica';
+      else if (text.includes('cbd')) attributes.tipo = 'CBD';
+
+      if (text.includes('importad') || text.includes('dutch') || text.includes('buddha') || text.includes('bsf') || text.includes('sensi')) {
+        attributes.origen = 'Importada';
+      } else {
+        attributes.origen = 'Nacional';
+      }
+
+      const qtyMatch = text.match(/x\s*(\d+)/i);
+      if (qtyMatch) attributes.cantidad = `x${qtyMatch[1]}`;
+
+    } else if (cat === 'Parafernalia') {
+      if (text.includes('bong')) subcategory = 'Bongs';
+      else if (text.includes('pipa')) subcategory = 'Pipas';
+      else if (text.includes('papel') || text.includes('seda')) subcategory = 'Papeles';
+      else if (text.includes('filtro') || text.includes('tip')) subcategory = 'Filtros';
+      else if (text.includes('picador') || text.includes('grinder')) subcategory = 'Picadores';
+      else if (text.includes('extrac')) subcategory = 'Extracción';
+
+      if (text.includes('vidrio') || text.includes('pyrex')) attributes.material = 'Vidrio';
+      else if (text.includes('silicona')) attributes.material = 'Silicona';
+      else if (text.includes('metal') || text.includes('aluminio')) attributes.material = 'Metal';
+      else if (text.includes('cáñamo') || text.includes('canamo')) attributes.material = 'Cáñamo';
+      else if (text.includes('3d')) attributes.material = 'Impresión 3D';
+      else if (text.includes('acrílico') || text.includes('acrilico')) attributes.material = 'Acrílico';
+
+    } else if (cat === 'Fertilizantes') {
+      if (text.includes('estimul') || text.includes('root') || text.includes('tricho') || text.includes('mico')) subcategory = 'Bioestimulantes';
+      else if (text.includes('crecimiento') || text.includes('veg')) subcategory = 'Crecimiento';
+      else if (text.includes('floración') || text.includes('flora') || text.includes('bloom')) subcategory = 'Floración';
+      else subcategory = 'Aditivos y complementos';
+
+    } else if (cat === 'Vaporizadores') {
+      if (text.includes('extrac') || text.includes('wax')) attributes.uso = 'Para extracciones';
+      else if (text.includes('flor')) attributes.uso = 'Para flores';
+      else attributes.uso = 'Híbrido';
+    }
+
+    return { brand: foundBrand, subcategory, attributes };
+  }
+
+  function renderFacetedBrandsList() {
+    const container = document.getElementById('facet-brands-list');
+    if (!container) return;
+
+    const brandCounts = {};
+    KNOWN_BRANDS.forEach(b => brandCounts[b] = 0);
+
+    products.forEach(p => {
+      const facets = extractProductFacets(p);
+      if (facets.brand && brandCounts[facets.brand] !== undefined) {
+        brandCounts[facets.brand]++;
+      }
+    });
+
+    const activeBrands = KNOWN_BRANDS.filter(b => brandCounts[b] > 0);
+
+    container.innerHTML = activeBrands.map(b => {
+      const isChecked = facetedState.selectedBrands.includes(b);
+      return `
+        <label class="facet-check-item">
+          <input type="checkbox" value="${b}" ${isChecked ? 'checked' : ''} onchange="toggleBrandFilter('${b}')">
+          <span>${b}</span>
+          <span class="facet-count">(${brandCounts[b]})</span>
+        </label>
+      `;
+    }).join('');
+  }
+
+  window.toggleBrandFilter = function(brand) {
+    const idx = facetedState.selectedBrands.indexOf(brand);
+    if (idx >= 0) facetedState.selectedBrands.splice(idx, 1);
+    else facetedState.selectedBrands.push(brand);
+    applyFiltersAndRender(true);
+  };
+
+  window.filterBrandChecklist = function(query) {
+    const q = (query || '').toLowerCase();
+    document.querySelectorAll('#facet-brands-list .facet-check-item').forEach(item => {
+      const text = item.textContent.toLowerCase();
+      item.style.display = text.includes(q) ? 'flex' : 'none';
+    });
+  };
+
+  window.setPricePreset = function(min, max) {
+    const minInput = document.getElementById('price-min-input');
+    const maxInput = document.getElementById('price-max-input');
+    if (minInput) minInput.value = min || '';
+    if (maxInput) maxInput.value = (max && max < 9999999) ? max : '';
+    facetedState.minPrice = min || null;
+    facetedState.maxPrice = (max && max < 9999999) ? max : null;
+    applyFiltersAndRender(true);
+  };
+
+  window.clearAllFacetedFilters = function() {
+    facetedState = {
+      category: 'all',
+      subcategory: null,
+      selectedBrands: [],
+      contextualFilters: {},
+      minPrice: null,
+      maxPrice: null,
+      stockOnly: false,
+      lowStockOnly: false
+    };
+    currentCategory = 'all';
+    const minInput = document.getElementById('price-min-input');
+    const maxInput = document.getElementById('price-max-input');
+    if (minInput) minInput.value = '';
+    if (maxInput) maxInput.value = '';
+    updateCategoryActiveState();
+    applyFiltersAndRender(true);
+  };
+
+  function renderActiveChips() {
+    const container = document.getElementById('active-chips-container');
+    const list = document.getElementById('active-chips-list');
+    const clearBtn = document.getElementById('clear-all-filters-btn');
+    if (!container || !list) return;
+
+    const chips = [];
+
+    if (currentCategory !== 'all') {
+      chips.push({ label: `Categoría: ${currentCategory}`, remove: () => { currentCategory = 'all'; updateCategoryActiveState(); } });
+    }
+    if (facetedState.subcategory) {
+      chips.push({ label: `Subcat: ${facetedState.subcategory}`, remove: () => { facetedState.subcategory = null; } });
+    }
+    facetedState.selectedBrands.forEach(b => {
+      chips.push({ label: `Marca: ${b}`, remove: () => { window.toggleBrandFilter(b); return false; } });
+    });
+    Object.keys(facetedState.contextualFilters).forEach(k => {
+      const val = facetedState.contextualFilters[k];
+      chips.push({ label: `${k}: ${val}`, remove: () => { delete facetedState.contextualFilters[k]; } });
+    });
+    if (facetedState.minPrice || facetedState.maxPrice) {
+      const minText = facetedState.minPrice ? `$${formatPrice(facetedState.minPrice)}` : '$0';
+      const maxText = facetedState.maxPrice ? `$${formatPrice(facetedState.maxPrice)}` : 'Máx';
+      chips.push({ label: `Precio: ${minText} - ${maxText}`, remove: () => { window.setPricePreset(null, null); return false; } });
+    }
+
+    if (chips.length > 0) {
+      container.style.display = 'flex';
+      if (clearBtn) clearBtn.style.display = 'inline-block';
+      list.innerHTML = chips.map((c, idx) => `
+        <span class="filter-chip">
+          ${c.label}
+          <span class="filter-chip-remove" onclick="removeChipIndex(${idx})">&times;</span>
+        </span>
+      `).join('');
+
+      window._activeChips = chips;
+    } else {
+      container.style.display = 'none';
+      if (clearBtn) clearBtn.style.display = 'none';
+    }
+  }
+
+  window.removeChipIndex = function(idx) {
+    if (window._activeChips && window._activeChips[idx]) {
+      const shouldRender = window._activeChips[idx].remove();
+      if (shouldRender !== false) applyFiltersAndRender(true);
+    }
+  };
+
+  window.toggleFacetAccordion = function(el) {
+    const group = el.closest('.facet-group');
+    if (group) group.classList.toggle('collapsed');
+  };
+
+  window.openMobileFilterDrawer = function() {
+    const drawer = document.getElementById('mobile-filter-drawer');
+    const overlay = document.getElementById('mobile-filter-drawer-overlay');
+    const body = document.getElementById('mobile-filter-drawer-body');
+    const sourcePanel = document.getElementById('faceted-filter-panel');
+
+    if (body && sourcePanel) {
+      body.innerHTML = sourcePanel.innerHTML;
+    }
+
+    if (drawer) drawer.classList.add('active');
+    if (overlay) overlay.classList.add('active');
+  };
+
+  window.closeMobileFilterDrawer = function() {
+    const drawer = document.getElementById('mobile-filter-drawer');
+    const overlay = document.getElementById('mobile-filter-drawer-overlay');
+    if (drawer) drawer.classList.remove('active');
+    if (overlay) overlay.classList.remove('active');
+  };
+
+  window.applyMobileFilterDrawer = function() {
+    closeMobileFilterDrawer();
+  };
+
   // --- CATALOG FILTER & RENDER ENGINE ---
   function applyFiltersAndRender(resetPage = true) {
     if (resetPage) {
       currentPage = 1;
     }
 
-    // Filter by category
+    renderFacetedBrandsList();
+    renderActiveChips();
+
+    // 1. Filter by category
     if (currentCategory === 'all') {
       filteredProducts = [...products];
-      activeFiltersArea.style.display = 'none';
     } else {
       filteredProducts = products.filter(p => p.category === currentCategory);
-      filterBadgeText.textContent = `Categoría: ${currentCategory}`;
-      activeFiltersArea.style.display = 'flex';
     }
 
-    // Filter by search query
+    // 2. Filter by search query
     if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase().trim();
       filteredProducts = filteredProducts.filter(p => 
@@ -309,7 +540,45 @@ document.addEventListener('DOMContentLoaded', () => {
       );
     }
 
-    // Sort Products
+    // 3. Filter by Selected Brands (OR logic within brands)
+    if (facetedState.selectedBrands.length > 0) {
+      filteredProducts = filteredProducts.filter(p => {
+        const facets = extractProductFacets(p);
+        return facets.brand && facetedState.selectedBrands.includes(facets.brand);
+      });
+    }
+
+    // 4. Filter by Subcategory
+    if (facetedState.subcategory) {
+      filteredProducts = filteredProducts.filter(p => {
+        const facets = extractProductFacets(p);
+        return facets.subcategory === facetedState.subcategory;
+      });
+    }
+
+    // 5. Filter by Price Range
+    const minInputVal = parseFloat(document.getElementById('price-min-input')?.value) || facetedState.minPrice;
+    const maxInputVal = parseFloat(document.getElementById('price-max-input')?.value) || facetedState.maxPrice;
+
+    if (minInputVal) {
+      filteredProducts = filteredProducts.filter(p => p.price >= minInputVal);
+    }
+    if (maxInputVal) {
+      filteredProducts = filteredProducts.filter(p => p.price <= maxInputVal);
+    }
+
+    // 6. Filter by Stock Availability
+    const checkStockIn = document.getElementById('check-stock-in');
+    const checkStockLow = document.getElementById('check-stock-low');
+
+    if (checkStockIn && checkStockIn.checked) {
+      filteredProducts = filteredProducts.filter(p => p.available && p.stock > 0);
+    }
+    if (checkStockLow && checkStockLow.checked) {
+      filteredProducts = filteredProducts.filter(p => p.stock > 0 && p.stock <= 5);
+    }
+
+    // 7. Sort Products
     const sortVal = sortSelect.value;
     if (sortVal === 'price-asc') {
       filteredProducts.sort((a, b) => a.price - b.price);
@@ -317,8 +586,9 @@ document.addEventListener('DOMContentLoaded', () => {
       filteredProducts.sort((a, b) => b.price - a.price);
     } else if (sortVal === 'name-asc') {
       filteredProducts.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortVal === 'sales-desc') {
+      filteredProducts.sort((a, b) => (b.stock || 0) - (a.stock || 0));
     } else {
-      // relevance (reset sort to original array order)
       const idToIndex = {};
       products.forEach((p, idx) => idToIndex[p.id] = idx);
       filteredProducts.sort((a, b) => idToIndex[a.id] - idToIndex[b.id]);
@@ -326,6 +596,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Total Count Label
     totalCountEl.textContent = filteredProducts.length;
+    const mobileApplyCount = document.getElementById('mobile-apply-count');
+    if (mobileApplyCount) mobileApplyCount.textContent = filteredProducts.length;
+    const mobileBadge = document.getElementById('mobile-filter-count-badge');
+    if (mobileBadge) {
+      const count = (facetedState.selectedBrands.length + (currentCategory !== 'all' ? 1 : 0));
+      mobileBadge.textContent = count;
+      mobileBadge.style.display = count > 0 ? 'inline-block' : 'none';
+    }
 
     renderGrid();
   }
