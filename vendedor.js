@@ -968,13 +968,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function checkVendorAuth() {
-  const isLogged = sessionStorage.getItem('boeweb_vendor_logged');
+  const isLogged = sessionStorage.getItem('boeweb_vendor_logged') || localStorage.getItem('boeweb_vendor_logged');
   const modal = document.getElementById('vendedor-auth-modal');
   const userDisplay = document.getElementById('vendor-user-display');
   
   if (isLogged === 'true') {
     if (modal) modal.style.display = 'none';
-    const storedName = sessionStorage.getItem('boeweb_vendor_name') || 'Vendedor';
+    const storedName = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
     if (userDisplay) userDisplay.textContent = `👤 ${storedName} (Vendedor Staff)`;
     const vendorNameInput = document.getElementById('b2b-vendedor-name');
     if (vendorNameInput) vendorNameInput.value = storedName;
@@ -1000,6 +1000,8 @@ function handleVendorLogin(e) {
   if (pin === '1234' || pin === 'vendedor2026' || pin === 'admin') {
     sessionStorage.setItem('boeweb_vendor_logged', 'true');
     sessionStorage.setItem('boeweb_vendor_name', name);
+    localStorage.setItem('boeweb_vendor_logged', 'true');
+    localStorage.setItem('boeweb_vendor_name', name);
     checkVendorAuth();
     showToast(`✅ ¡Bienvenido ${name}! Sesión iniciada.`);
   } else {
@@ -1010,7 +1012,14 @@ function handleVendorLogin(e) {
 function vendorLogout() {
   sessionStorage.removeItem('boeweb_vendor_logged');
   sessionStorage.removeItem('boeweb_vendor_name');
+  localStorage.removeItem('boeweb_vendor_logged');
+  localStorage.removeItem('boeweb_vendor_name');
+
+  const pinInput = document.getElementById('auth-vendor-pin');
+  if (pinInput) pinInput.value = '';
+
   checkVendorAuth();
+  showToast('🔒 Sesión de vendedor cerrada.');
 }
 
 function switchVendorTab(tab) {
