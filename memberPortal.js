@@ -700,4 +700,107 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (certModal) certModal.classList.add('active');
   }
+
+  // --- GROW LOG & DAILY CHECK-IN REWARDS ENGINE ---
+  let growLogHistory = JSON.parse(localStorage.getItem('boeweb_grow_log_history')) || [];
+
+  window.claimDailyCheckin = function() {
+    if (!currentMember) {
+      alert('Por favor iniciá sesión para reclamar tu racha diaria.');
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const lastCheckin = localStorage.getItem(`boeweb_checkin_${currentMember.email}`);
+
+    if (lastCheckin === today) {
+      alert('✨ ¡Ya reclamaste tus +20 Semillas de hoy! Volvé mañana para mantener tu racha.');
+      return;
+    }
+
+    localStorage.setItem(`boeweb_checkin_${currentMember.email}`, today);
+    currentMember.seeds = (currentMember.seeds || 100) + 20;
+    saveMemberSession(currentMember);
+    updateDashboardUI();
+
+    const streakText = document.getElementById('growlog-streak-text');
+    if (streakText) streakText.textContent = '¡Racha Activa! (+20 Semillas Acreditadas Hoy 🎉)';
+    alert('🎉 ¡+20 Semillas acreditadas en tu cuenta por ingresar a cuidar tu cultivo hoy!');
+  };
+
+  window.saveGrowLogEntry = function() {
+    if (!currentMember) {
+      alert('Por favor iniciá sesión para registrar tus parámetros.');
+      return;
+    }
+
+    const ph = parseFloat(document.getElementById('log-ph').value) || null;
+    const ec = parseFloat(document.getElementById('log-ec').value) || null;
+    const temp = parseInt(document.getElementById('log-temp').value) || null;
+    const humidity = parseInt(document.getElementById('log-humidity').value) || null;
+
+    if (!ph && !ec && !temp && !humidity) {
+      alert('Por favor ingresá al menos un parámetro (pH, EC, Temp o Humedad).');
+      return;
+    }
+
+    const entry = {
+      date: new Date().toLocaleString('es-AR'),
+      ph,
+      ec,
+      temp,
+      humidity,
+      user: currentMember.email
+    };
+
+    growLogHistory.unshift(entry);
+    localStorage.setItem('boeweb_grow_log_history', JSON.stringify(growLogHistory));
+
+    // Award +30 Seeds
+    currentMember.seeds = (currentMember.seeds || 100) + 30;
+    saveMemberSession(currentMember);
+    updateDashboardUI();
+    renderGrowLogHistory();
+
+    // Clear inputs
+    document.getElementById('log-ph').value = '';
+    document.getElementById('log-ec').value = '';
+    document.getElementById('log-temp').value = '';
+    document.getElementById('log-humidity').value = '';
+
+    alert('💾 ¡Parámetros guardados correctamente! Acreditamos +30 Semillas VIP en tu cuenta.');
+  };
+
+  function renderGrowLogHistory() {
+    const listEl = document.getElementById('growlog-history-list');
+    if (!listEl) return;
+
+    if (growLogHistory.length === 0) {
+      listEl.innerHTML = '<p style="font-size:0.85rem; color:var(--color-neutral-stone-dark);">Aún no tenés registros. Cargá tu primer control de pH o temperatura arriba.</p>';
+      return;
+    }
+
+    listEl.innerHTML = growLogHistory.slice(0, 5).map(item => `
+      <div style="background: rgba(0,0,0,0.04); border: 1px solid var(--color-neutral-stone); padding: 10px 14px; border-radius: 10px; font-size: 0.85rem;">
+        <strong style="color: var(--color-primary);">${item.date}</strong><br>
+        ${item.ph ? `🧪 pH: <strong>${item.ph}</strong> ` : ''}
+        ${item.ec ? `⚡ EC: <strong>${item.ec} mS/cm</strong> ` : ''}
+        ${item.temp ? `🌡️ Temp: <strong>${item.temp}°C</strong> ` : ''}
+        ${item.humidity ? `💧 Humedad: <strong>${item.humidity}% HR</strong>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // --- IN-STORE PRODUCT QR SCANNER FOR CUSTOMERS ---
+  window.openCustomerQRProductScan = function() {
+    alert('📷 Simulación de Escáner QR: Escaneando etiqueta en el estante de BÔ Growclub...');
+    setTimeout(() => {
+      if (window.openProductDetailModal) {
+        window.openProductDetailModal(101);
+      } else {
+        alert('📦 Producto Identificado: Quantum Board LED 240W Samsung LM301H\n💵 Precio: $450.000 ARS (USD $324.90)\n🛒 ¡Listo para comprar en 1-Clic!');
+      }
+    }, 1000);
+  };
 });
+

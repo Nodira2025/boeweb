@@ -76,6 +76,16 @@
         </button>
 
         <!-- Club BÔ Button -->
+        <button class="btn btn-secondary nav-drbo-btn" id="drbo-trigger" onclick="openDrBoModal()" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px; border-color: #66bb6a; color: #66bb6a;" aria-label="Doctor de Cultivo IA">
+          <span style="font-size: 1rem;">🩺</span>
+          <span>Dr. BÔ IA</span>
+        </button>
+
+        <button class="btn btn-secondary nav-scanqr-btn" onclick="openCustomerQRProductScan()" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px; border-color: var(--color-accent-gold); color: var(--color-accent-gold);" aria-label="Escanear QR de Producto en Local">
+          <span style="font-size: 1rem;">📷</span>
+          <span>Escanear QR</span>
+        </button>
+
         <button class="btn btn-secondary nav-club-btn" id="club-trigger" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px; border-color: var(--color-accent-gold); color: var(--color-primary);" aria-label="Portal de Miembros">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: var(--color-accent-gold);">
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
@@ -585,6 +595,8 @@
           </button>
         </div>
 
+      </div>
+    </div>
   </div>
 
   <!-- Dr. BÔ IA - Doctor de Cultivo Modal -->
@@ -1001,6 +1013,7 @@
       <!-- Portal Dashboard Navigation Bar -->
       <nav class="portal-tabs-nav">
         <button class="portal-nav-item active" data-tab="profile">🏆 Mi Perfil</button>
+        <button class="portal-nav-item" data-tab="growlog">🌱 Mi Diario & Racha</button>
         <button class="portal-nav-item" data-tab="history">🛒 Mis Compras</button>
         <button class="portal-nav-item" data-tab="raffle">🎟️ Sorteo Mensual</button>
         <button class="portal-nav-item" data-tab="store">🎁 Canje de Semillas</button>
@@ -1010,6 +1023,21 @@
         
         <!-- Tab 1: Profile & Progress -->
         <div class="portal-tab-content active" id="tab-profile">
+          
+          <!-- VIP Credential Pass with QR -->
+          <div style="background: linear-gradient(135deg, rgba(21,45,36,0.95), rgba(15,30,24,0.98)); border: 2px solid var(--color-accent-gold); border-radius: 18px; padding: 20px; text-align: center; color: #fff; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+            <span style="font-size: 0.75rem; color: var(--color-accent-gold); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">PASE DIGITAL PRESENCIAL BÔ GROWCLUB</span>
+            <h3 style="font-family: var(--font-display); color: var(--color-accent-gold); font-size: 1.3rem; margin: 4px 0 12px 0;" id="qr-pass-customer-name">Credencial VIP Miembro</h3>
+            
+            <div style="width: 140px; height: 140px; margin: 0 auto 12px auto; background: #fff; border-radius: 12px; padding: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(195,155,75,0.4);" id="qr-pass-container">
+              <svg viewBox="0 0 100 100" style="width: 100%; height: 100%;">
+                <path d="M0,0 h30 v30 h-30 z M40,0 h20 v10 h-20 z M70,0 h30 v30 h-30 z M10,10 h10 v10 h-10 z M80,10 h10 v10 h-10 z M0,40 h10 v20 h-10 z M20,40 h30 v10 h-30 z M60,40 h40 v10 h-40 z M0,70 h30 v30 h-30 z M10,80 h10 v10 h-10 z M40,60 h20 v40 h-20 z M70,70 h20 v20 h-20 z" fill="#0f1e18"/>
+              </svg>
+            </div>
+
+            <span style="font-size: 0.8rem; color: rgba(247,246,242,0.8); display: block;">Muestra este código en el local para que el vendedor aplique tus semillas y beneficios.</span>
+          </div>
+
           <!-- Progress Bar Section -->
           <div class="portal-progress-section">
             <div class="progress-labels">
@@ -1056,6 +1084,44 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Tab Grow Log: Daily Check-in & Indoor Parameters -->
+        <div class="portal-tab-content" id="tab-growlog">
+          <div style="background: rgba(102,187,106,0.12); border: 1px solid #66bb6a; border-radius: 16px; padding: 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <span style="font-size: 0.78rem; color: #66bb6a; font-weight: 700; text-transform: uppercase;">🔥 RACHA DE INGRESO DIARIO</span>
+              <h4 style="margin: 2px 0 0 0; color: var(--color-primary); font-size: 1.15rem;" id="growlog-streak-text">¡1 Día Consecutivo! (+20 Semillas Ganadas Hoy)</h4>
+            </div>
+            <button class="btn btn-secondary" onclick="claimDailyCheckin()" id="btn-claim-daily" style="border-color: #66bb6a; color: #66bb6a; font-size: 0.85rem; font-weight: 700;">🎁 Reclamar +20 Semillas</button>
+          </div>
+
+          <h4 style="color: var(--color-primary); margin-bottom: 8px;">🎛️ Registro Diario de Parámetros de Indoor</h4>
+          <p style="font-size: 0.85rem; color: var(--color-neutral-stone-dark); margin-bottom: 16px;">Cargá los parámetros de tu cultivo de hoy y sumá <strong>+30 Semillas extra</strong>.</p>
+
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 16px;">
+            <div>
+              <label style="font-size: 0.82rem; font-weight: 600; color: var(--color-primary); display: block; margin-bottom: 4px;">pH del Riego (Ideal: 6.0 - 6.5)</label>
+              <input type="number" step="0.1" id="log-ph" class="b2b-form-input" placeholder="Ej: 6.3" style="width: 100%; padding: 8px; box-sizing: border-box;">
+            </div>
+            <div>
+              <label style="font-size: 0.82rem; font-weight: 600; color: var(--color-primary); display: block; margin-bottom: 4px;">EC / Electroconductividad (mS/cm)</label>
+              <input type="number" step="0.1" id="log-ec" class="b2b-form-input" placeholder="Ej: 1.4" style="width: 100%; padding: 8px; box-sizing: border-box;">
+            </div>
+            <div>
+              <label style="font-size: 0.82rem; font-weight: 600; color: var(--color-primary); display: block; margin-bottom: 4px;">Temperatura (°C)</label>
+              <input type="number" id="log-temp" class="b2b-form-input" placeholder="Ej: 24" style="width: 100%; padding: 8px; box-sizing: border-box;">
+            </div>
+            <div>
+              <label style="font-size: 0.82rem; font-weight: 600; color: var(--color-primary); display: block; margin-bottom: 4px;">Humedad Relativa (% HR)</label>
+              <input type="number" id="log-humidity" class="b2b-form-input" placeholder="Ej: 55" style="width: 100%; padding: 8px; box-sizing: border-box;">
+            </div>
+          </div>
+
+          <button class="btn btn-primary btn-full-width" onclick="saveGrowLogEntry()" style="margin-bottom: 24px;">💾 GUARDAR PARÁMETROS DE HOY (+30 SEMILLAS)</button>
+
+          <h4 style="color: var(--color-primary); margin-bottom: 12px;">📜 Historial de Registros de Cultivo</h4>
+          <div id="growlog-history-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
         </div>
 
         <!-- Tab 2: Order History -->

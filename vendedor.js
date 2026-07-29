@@ -1016,21 +1016,86 @@ function vendorLogout() {
 function switchVendorTab(tab) {
   const mainLayout = document.querySelector('.b2b-main-layout');
   const salesSection = document.getElementById('sales-ai-section');
+  const mapSection = document.getElementById('store-map-section');
+  const qrSection = document.getElementById('scan-customer-qr-section');
+
   const btnReposicion = document.getElementById('vendor-tab-reposicion');
   const btnSales = document.getElementById('vendor-tab-sales');
+  const btnMap = document.getElementById('vendor-tab-map');
+  const btnQr = document.getElementById('vendor-tab-qr');
+
+  const allBtns = [btnReposicion, btnSales, btnMap, btnQr];
+  allBtns.forEach(btn => { if (btn) btn.classList.remove('active'); });
+
+  if (mainLayout) mainLayout.style.display = 'none';
+  if (salesSection) salesSection.style.display = 'none';
+  if (mapSection) mapSection.style.display = 'none';
+  if (qrSection) qrSection.style.display = 'none';
 
   if (tab === 'reposicion') {
     if (mainLayout) mainLayout.style.display = 'grid';
-    if (salesSection) salesSection.style.display = 'none';
     if (btnReposicion) btnReposicion.classList.add('active');
-    if (btnSales) btnSales.classList.remove('active');
   } else if (tab === 'sales') {
-    if (mainLayout) mainLayout.style.display = 'none';
     if (salesSection) salesSection.style.display = 'block';
-    if (btnReposicion) btnReposicion.classList.remove('active');
     if (btnSales) btnSales.classList.add('active');
+  } else if (tab === 'map') {
+    if (mapSection) mapSection.style.display = 'block';
+    if (btnMap) btnMap.classList.add('active');
+    renderStoreMapUI();
+  } else if (tab === 'qr') {
+    if (qrSection) qrSection.style.display = 'block';
+    if (btnQr) btnQr.classList.add('active');
   }
 }
+
+function renderStoreMapUI(activeZone = null, activeShelf = null) {
+  const container = document.getElementById('store-map-render-container');
+  if (container && window.renderStoreMapHTML) {
+    container.innerHTML = window.renderStoreMapHTML(activeZone, activeShelf);
+  }
+}
+
+function searchShelfOnMap() {
+  const input = document.getElementById('map-search-input');
+  if (!input) return;
+  const val = input.value.trim().toUpperCase();
+
+  if (!val) {
+    renderStoreMapUI();
+    return;
+  }
+
+  const zoneMatch = val.charAt(0);
+  if (['A', 'B', 'C', 'D', 'E'].includes(zoneMatch)) {
+    renderStoreMapUI(zoneMatch, val);
+    showToast(`📍 Estante ${val} ubicado en la Zona ${zoneMatch} del local.`);
+  } else {
+    alert('⚠️ Por favor ingresá un código de estante válido (ej. A-1, B-3, C-2).');
+  }
+}
+
+function simulateCustomerQRScan() {
+  const resultBox = document.getElementById('customer-scan-result');
+  const nameEl = document.getElementById('scanned-customer-name');
+  const tierEl = document.getElementById('scanned-customer-tier');
+  const seedsEl = document.getElementById('scanned-customer-seeds');
+
+  showToast('🔍 Leyendo Código QR del celular del cliente...');
+
+  setTimeout(() => {
+    if (nameEl) nameEl.textContent = '👤 Franco P. (Cliente VIP BÔ)';
+    if (tierEl) tierEl.textContent = '🌳 RANGO ÁRBOL ZEN';
+    if (seedsEl) seedsEl.textContent = '650 Semillas VIP';
+    if (resultBox) resultBox.style.display = 'block';
+
+    showToast('✅ Cliente Verificado. Beneficios VIP y REPROCANN Aplicados.');
+  }, 1200);
+}
+
+// Global exposure
+window.searchShelfOnMap = searchShelfOnMap;
+window.simulateCustomerQRScan = simulateCustomerQRScan;
+
 
 // Fetch Official USD Rate in Real-Time
 async function fetchLiveUSDRate() {
