@@ -287,20 +287,27 @@ document.addEventListener('DOMContentLoaded', () => {
   async function handleLogin(e) {
     e.preventDefault();
     const inputVal = document.getElementById('login-credential').value.trim().toLowerCase();
-    loginFeedback.style.display = 'none';
+    if (loginFeedback) loginFeedback.style.display = 'none';
 
     if (!inputVal) return;
 
-    // 1. Try local list search
-    let foundUser = registeredUsers.find(u => u.email === inputVal || u.phone.includes(inputVal));
+    // 1. Try local list search (safe against undefined fields)
+    let foundUser = registeredUsers.find(u => 
+      (u.email && u.email.toLowerCase() === inputVal) || 
+      (u.phone && typeof u.phone === 'string' && u.phone.toLowerCase().includes(inputVal))
+    );
 
-    // 2. Fallback / Priority: Try Supabase Cloud Fetch
+    // 2. Fallback: Try Supabase Cloud Fetch with safety catch
     if (!foundUser && supabaseClient) {
-      const cloudUser = await fetchMemberFromCloud(inputVal);
-      if (cloudUser) {
-        foundUser = cloudUser;
-        registeredUsers.push(foundUser);
-        localStorage.setItem('boeweb_registered_users', JSON.stringify(registeredUsers));
+      try {
+        const cloudUser = await fetchMemberFromCloud(inputVal);
+        if (cloudUser) {
+          foundUser = cloudUser;
+          registeredUsers.push(foundUser);
+          localStorage.setItem('boeweb_registered_users', JSON.stringify(registeredUsers));
+        }
+      } catch (err) {
+        console.warn("Cloud fetch error:", err);
       }
     }
 
@@ -314,8 +321,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (window.updateCartDisplay) window.updateCartDisplay();
     } else {
-      loginFeedback.style.display = 'block';
-      loginFeedback.textContent = '❌ Usuario no encontrado. Por favor registrate primero.';
+      if (loginFeedback) {
+        loginFeedback.style.display = 'block';
+        loginFeedback.textContent = '❌ Usuario no encontrado. Por favor registrate primero.';
+      }
     }
   }
 
@@ -357,15 +366,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function getMemberTier(seeds) {
-    if (seeds >= TIERS.ARBOL.minSeeds) return TIERS.ARBOL;
-    if (seeds >= TIERS.PLANTA.minSeeds) return TIERS.PLANTA;
+    if (seeds >= TIERS.LEYENDA.minSeeds) return TIERS.LEYENDA;
+    if (seeds >= TIERS.MAESTRO.minSeeds) return TIERS.MAESTRO;
+    if (seeds >= TIERS.EXPERTO.minSeeds) return TIERS.EXPERTO;
+    if (seeds >= TIERS.CULTIVADOR.minSeeds) return TIERS.CULTIVADOR;
     return TIERS.BROTE;
+  }
+
+  function getNextTier(tier) {
+    if (tier === TIERS.BROTE) return TIERS.CULTIVADOR;
+    if (tier === TIERS.CULTIVADOR) return TIERS.EXPERTO;
+    if (tier === TIERS.EXPERTO) return TIERS.MAESTRO;
+    if (tier === TIERS.MAESTRO) return TIERS.LEYENDA;
+    return null;
   }
 
   function updatePortalUI() {
     if (!currentMember) return;
 
-    const nameVal = currentMember.name;
+    const nameVal = currentMember.name || 'Miembro VIP';
     const seedsVal = currentMember.seeds || 0;
     const tier = getMemberTier(seedsVal);
 
@@ -373,8 +392,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (vipBadge) {
       vipBadge.textContent = tier.name;
       vipBadge.className = 'member-badge';
-      if (tier === TIERS.ARBOL) vipBadge.classList.add('badge-gold');
-      else if (tier === TIERS.PLANTA) vipBadge.classList.add('badge-silver');
+      if (tier === TIERS.LEYENDA || tier === TIERS.MAESTRO) vipBadge.classList.add('badge-gold');
+      else if (tier === TIERS.EXPERTO || tier === TIERS.CULTIVADOR) vipBadge.classList.add('badge-silver');
       else vipBadge.classList.add('badge-bronze');
     }
     if (vipSeeds) vipSeeds.textContent = seedsVal;
@@ -382,8 +401,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Progress Bar
     if (currentTierLabel) currentTierLabel.textContent = tier.label;
     if (tier.nextMin !== null) {
-      if (nextTierLabel) {
-        const nextTier = tier === TIERS.BROTE ? TIERS.PLANTA : TIERS.ARBOL;
+      const nextTier = getNextTier(tier);
+      if (nextTierLabel && nextTier) {
         nextTierLabel.textContent = nextTier.label;
       }
       const range = tier.nextMin - tier.minSeeds;
@@ -394,15 +413,19 @@ document.addEventListener('DOMContentLoaded', () => {
         progressText.textContent = `Te faltan ${missing} semillas para subir de nivel.`;
       }
     } else {
-      if (nextTierLabel) nextTierLabel.textContent = 'Nivel Máximo alcanzado';
+      if (nextTierLabel) nextTierLabel.textContent = 'Nivel Máximo alcanzado (Leyenda)';
       if (progressFill) progressFill.style.width = '100%';
-      if (progressText) progressText.textContent = '¡Eres un sabio Árbol Zen VIP! Disfrutas de todos los beneficios.';
+      if (progressText) progressText.textContent = '¡Eres un legendario Leyenda VIP! Disfrutas de todos los beneficios máximos (25% OFF).';
     }
+
+    // Update QR Pass Name
+    const qrNameEl = document.getElementById('qr-pass-customer-name');
+    if (qrNameEl) qrNameEl.textContent = `${nameVal} (${tier.label})`;
 
     // Check Academy Certificate Button Visibility
     const academyProgress = JSON.parse(localStorage.getItem('boeweb_academy_progress')) || { completedModules: [] };
     if (viewCertBtn) {
-      if (academyProgress.completedModules.length >= 4) {
+      if (academyProgress.completedModules && academyProgress.completedModules.length >= 4) {
         viewCertBtn.style.display = 'inline-flex';
       } else {
         viewCertBtn.style.display = 'none';
