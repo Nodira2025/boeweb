@@ -23,11 +23,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let registeredUsers = JSON.parse(localStorage.getItem('boeweb_registered_users')) || [];
   let orderHistory = JSON.parse(localStorage.getItem('boeweb_order_history')) || [];
 
-  // Tiers definition
+  // 5 Tiers Definition (Matching Infographic)
   const TIERS = {
-    BROTE: { name: 'Miembro Brote', discount: 0.05, minSeeds: 0, nextMin: 500, label: 'Brote (5% OFF)' },
-    PLANTA: { name: 'Miembro Planta', discount: 0.10, minSeeds: 500, nextMin: 1500, label: 'Planta (10% OFF)' },
-    ARBOL: { name: 'Árbol Zen VIP', discount: 0.15, minSeeds: 1500, nextMin: null, label: 'Árbol Zen (15% OFF)' }
+    BROTE: { name: 'Nivel 1: Brote', discount: 0.05, minSeeds: 0, nextMin: 500, label: '🌱 Brote (5% OFF)', icon: '🌱' },
+    CULTIVADOR: { name: 'Nivel 2: Cultivador', discount: 0.10, minSeeds: 500, nextMin: 1500, label: '🌿 Cultivador (10% OFF)', icon: '🌿' },
+    EXPERTO: { name: 'Nivel 3: Experto', discount: 0.15, minSeeds: 1500, nextMin: 3500, label: '🍃 Experto (15% OFF)', icon: '🍃' },
+    MAESTRO: { name: 'Nivel 4: Maestro', discount: 0.20, minSeeds: 3500, nextMin: 7000, label: '👑 Maestro (20% OFF)', icon: '👑' },
+    LEYENDA: { name: 'Nivel 5: Leyenda', discount: 0.25, minSeeds: 7000, nextMin: null, label: '🏆 Leyenda (25% OFF)', icon: '🏆' }
   };
 
   // Redeemable Physical Products ($0 cost in cart)
@@ -910,6 +912,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
       alert('🎉 ¡Gracias por seguirnos en Facebook! Acreditamos +100 Semillas en tu cuenta.');
     }, 2000);
+  };
+
+  // --- MYSTERY LOOTBOX CHEST ENGINE ---
+  window.openMysteryChest = function() {
+    if (!currentMember) {
+      alert('Por favor iniciá sesión para abrir tu Caja Mágica BÔ.');
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const lastChest = localStorage.getItem(`boeweb_chest_${currentMember.email}`);
+
+    if (lastChest === today) {
+      alert('✨ ¡Ya abriste tu Caja Mágica de hoy! Volvé mañana para ganar más recompensas.');
+      return;
+    }
+
+    localStorage.setItem(`boeweb_chest_${currentMember.email}`, today);
+
+    const rewards = [
+      { type: 'seeds', amount: 50, title: '✨ +50 Semillas VIP' },
+      { type: 'seeds', amount: 100, title: '🎁 +100 Semillas VIP' },
+      { type: 'seeds', amount: 250, title: '🔥 ¡PREMIO MAYOR! +250 Semillas VIP' },
+      { type: 'coupon', amount: 0, title: '🎫 Cupón Especial 15% OFF' }
+    ];
+
+    const reward = rewards[Math.floor(Math.random() * rewards.length)];
+
+    if (reward.type === 'seeds') {
+      currentMember.seeds = (currentMember.seeds || 100) + reward.amount;
+      saveMemberSession(currentMember);
+      updateDashboardUI();
+    }
+
+    const chestResult = document.getElementById('mystery-chest-result');
+    if (chestResult) {
+      chestResult.innerHTML = `
+        <div style="background: rgba(195,155,75,0.2); border: 2px solid var(--color-accent-gold); border-radius: 14px; padding: 16px; margin-top: 14px; text-align: center; animation: pulseGlow 1.2s infinite;">
+          <span style="font-size: 2rem;">🎁</span>
+          <h4 style="color: var(--color-accent-gold-dark); margin: 6px 0 2px 0;">¡FELICITACIONES!</h4>
+          <p style="font-size: 1.1rem; font-weight: 700; color: var(--color-primary); margin: 0;">${reward.title}</p>
+        </div>
+      `;
+    }
+
+    alert(`🎉 ¡Abriste la Caja Mágica BÔ y ganaste: ${reward.title}!`);
   };
 });
 

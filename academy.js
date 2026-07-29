@@ -4,6 +4,74 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  // --- FITOPATOLOGIA COURSE DATA ---
+  const FITOPATOLOGIA_MODULES = [
+    {
+      id: 101,
+      title: 'Módulo 1: Fitopatología Micótica (Hongos Patógenos)',
+      shortTitle: '1. Hongos Patógenos',
+      subtitle: 'Botrytis, Oídio, Pythium y Fusarium bajo evidencia científica',
+      content: `
+        <div class="lesson-block">
+          <h3>🧫 1. Botrytis cinerea & Erysiphe macularis (Oídio)</h3>
+          <p>La esporulación micótica se desencadena cuando la humedad relativa excede el 65% HR en cogollos densos. El Oídio prolifera en la cara adaxial de las hojas por esporas anemófilas. La prevención científica exige flujo de aire constante de 0.5 m/s y uso de biopesticidas como <em>Bacillus subtilis</em>.</p>
+        </div>
+      `,
+      quiz: {
+        question: '¿Qué microorganismo antagonista es ampliamente utilizado en control biológico para inhibir la germinación de conidias de Botrytis y Oídio?',
+        options: [
+          { text: 'Bacillus subtilis', correct: true },
+          { text: 'Escherichia coli', correct: false },
+          { text: 'Saccharomyces cerevisiae', correct: false }
+        ],
+        explanation: 'Bacillus subtilis sintetiza lipopéptidos cíclicos que rompen la membrana plasmática de las hifas micóticas.'
+      }
+    },
+    {
+      id: 102,
+      title: 'Módulo 2: Entomología Agrícola & Manejo Integrado de Plagas (CIP)',
+      shortTitle: '2. Plagas & Biocontrol',
+      subtitle: 'Arañuela Roja, Trips y Mosca Blanca',
+      content: `
+        <div class="lesson-block">
+          <h3>🐛 1. Arañuela Roja (Tetranychus urticae) & Biocontrol</h3>
+          <p>Tetranychus urticae posee una velocidad de reproducción exponencial a T > 26°C. El tratamiento de biocontrol mediante el acaricida depredador <em>Phytoseiulus persimilis</em> o la aplicación de <strong>Sales Potásicas + Azadiractina (Neem)</strong> rompe la cutícula del ácaro sin generar resistencia ni dejar residuos tóxicos.</p>
+        </div>
+      `,
+      quiz: {
+        question: '¿Cuál es el ácaro depredador específico utilizado en control biológico para erradicar poblaciones de Arañuela Roja?',
+        options: [
+          { text: 'Phytoseiulus persimilis', correct: true },
+          { text: 'Tetranychus urticae', correct: false },
+          { text: 'Frankliniella occidentalis', correct: false }
+        ],
+        explanation: 'Phytoseiulus persimilis es un acaricida predador voraz especializado en consumir la Arañuela Roja.'
+      }
+    },
+    {
+      id: 103,
+      title: 'Módulo 3: Diagnóstico Diferencial & Bioseguridad',
+      shortTitle: '3. Diagnóstico & Saneamiento',
+      subtitle: 'Distinción entre patógenos, deficiencias nutricionales y bloqueo de pH',
+      content: `
+        <div class="lesson-block">
+          <h3>🧪 1. Diagnóstico Diferencial de Clorosis Foliar</h3>
+          <p>Una clorosis internerval puede confundirse entre deficiencia de Magnesio (Mg) o bloqueo por pH ácido. La microscopía digital 60x permite observar la presencia de ninfas o hifas para descartar o confirmar una causa biótica frente a una nutricional.</p>
+        </div>
+      `,
+      quiz: {
+        question: '¿Qué herramienta permite descartar un patógeno biótico observando la superficie celular a 60x-100x?',
+        options: [
+          { text: 'Microscopía Digital / Lupa 60x', correct: true },
+          { text: 'Termómetro Ambiental', correct: false },
+          { text: 'Medidor de Luxes', correct: false }
+        ],
+        explanation: 'La microscopía a 60x-100x permite observar directamente micelios y estructuras de ácaros.'
+      }
+    }
+  ];
+
+  window.FITOPATOLOGIA_MODULES = FITOPATOLOGIA_MODULES;
   // --- LESSONS DATA & QUIZZES ---
   const MODULES_DATA = [
     {
