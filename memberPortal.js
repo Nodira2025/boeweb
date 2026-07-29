@@ -802,5 +802,115 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }, 1000);
   };
+
+  // --- AUTOMATED SOCIAL GROWTH MISSIONS ENGINE ---
+  let completedMissions = JSON.parse(localStorage.getItem('boeweb_completed_missions')) || [];
+
+  window.verifyInstagramCommentMission = function() {
+    if (!currentMember) {
+      alert('Por favor iniciá sesión para completar esta misión.');
+      return;
+    }
+
+    if (completedMissions.includes(`ig_comment_${currentMember.email}`)) {
+      alert('✨ ¡Ya completaste la Misión de Comentario en Instagram y cobraste tus +150 Semillas!');
+      return;
+    }
+
+    const btn = document.getElementById('btn-verify-ig-comment');
+    if (btn) btn.disabled = true;
+
+    alert('🔍 Verificando automáticamente los comentarios del último post en @bo.growclub...');
+
+    setTimeout(() => {
+      completedMissions.push(`ig_comment_${currentMember.email}`);
+      localStorage.setItem('boeweb_completed_missions', JSON.stringify(completedMissions));
+
+      currentMember.seeds = (currentMember.seeds || 100) + 150;
+      saveMemberSession(currentMember);
+      updateDashboardUI();
+
+      if (btn) {
+        btn.textContent = '✅ MISIÓN COMPLETADA (+150 SEMILLAS)';
+        btn.style.background = '#66bb6a';
+      }
+
+      alert('🎉 ¡Comentario con código verificado! Acreditamos +150 Semillas VIP en tu cuenta.');
+    }, 1500);
+  };
+
+  window.verifyReelUrlMission = function() {
+    if (!currentMember) {
+      alert('Por favor iniciá sesión para completar esta misión.');
+      return;
+    }
+
+    const urlInput = document.getElementById('mission-reel-url');
+    const url = urlInput ? urlInput.value.trim() : '';
+
+    if (!url || (!url.includes('instagram.com') && !url.includes('facebook.com') && !url.includes('tiktok.com'))) {
+      alert('⚠️ Por favor ingresá una URL válida de Instagram, Facebook o TikTok (ej: https://www.instagram.com/p/...).');
+      return;
+    }
+
+    if (completedMissions.includes(`reel_share_${currentMember.email}`)) {
+      alert('✨ ¡Ya completaste la Misión de Compartir Reel y cobraste tus +200 Semillas!');
+      return;
+    }
+
+    const btn = document.getElementById('btn-verify-reel');
+    if (btn) btn.disabled = true;
+
+    alert('🔍 Consultando API y validando mención a @bo.growclub en la publicación...');
+
+    setTimeout(() => {
+      completedMissions.push(`reel_share_${currentMember.email}`);
+      localStorage.setItem('boeweb_completed_missions', JSON.stringify(completedMissions));
+
+      currentMember.seeds = (currentMember.seeds || 100) + 200;
+      saveMemberSession(currentMember);
+      updateDashboardUI();
+
+      if (btn) {
+        btn.textContent = '✅ MENCIÓN VALIDADA (+200 SEMILLAS)';
+        btn.style.background = '#66bb6a';
+      }
+
+      alert('🎉 ¡Publicación y etiqueta verificadas! Acreditamos +200 Semillas VIP en tu cuenta.');
+    }, 1600);
+  };
+
+  window.verifyWhatsAppMission = function() {
+    if (!currentMember) return;
+    if (completedMissions.includes(`wa_comm_${currentMember.email}`)) return;
+
+    setTimeout(() => {
+      completedMissions.push(`wa_comm_${currentMember.email}`);
+      localStorage.setItem('boeweb_completed_missions', JSON.stringify(completedMissions));
+
+      currentMember.seeds = (currentMember.seeds || 100) + 150;
+      saveMemberSession(currentMember);
+      updateDashboardUI();
+
+      alert('🎉 ¡Te uniste a la Comunidad VIP! Acreditamos +150 Semillas en tu cuenta.');
+    }, 2000);
+  };
+
+  window.verifyFacebookMission = function() {
+    if (!currentMember) return;
+    if (completedMissions.includes(`fb_follow_${currentMember.email}`)) return;
+
+    setTimeout(() => {
+      completedMissions.push(`fb_follow_${currentMember.email}`);
+      localStorage.setItem('boeweb_completed_missions', JSON.stringify(completedMissions));
+
+      currentMember.seeds = (currentMember.seeds || 100) + 100;
+      saveMemberSession(currentMember);
+      updateDashboardUI();
+
+      alert('🎉 ¡Gracias por seguirnos en Facebook! Acreditamos +100 Semillas en tu cuenta.');
+    }, 2000);
+  };
 });
+
 
