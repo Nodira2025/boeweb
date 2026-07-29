@@ -1,10 +1,10 @@
 /**
- * BO growclub - Academia BÔ (Interactive Indoor Cannabis Cultivation Course)
+ * BO growclub - Academia BÔ (Interactive Indoor Cannabis Cultivation & Fitopatología Courses)
  * Includes VPD Calculator, Trichome Maturity Simulator, Quizzes, Seed Rewards, and Printable Certificate.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-  // --- FITOPATOLOGIA COURSE DATA ---
+  // --- COURSE 2: FITOPATOLOGIA DATA ---
   const FITOPATOLOGIA_MODULES = [
     {
       id: 101,
@@ -15,38 +15,60 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="lesson-block">
           <h3>🧫 1. Botrytis cinerea & Erysiphe macularis (Oídio)</h3>
           <p>La esporulación micótica se desencadena cuando la humedad relativa excede el 65% HR en cogollos densos. El Oídio prolifera en la cara adaxial de las hojas por esporas anemófilas. La prevención científica exige flujo de aire constante de 0.5 m/s y uso de biopesticidas como <em>Bacillus subtilis</em>.</p>
+          <div class="tip-box">
+            <strong>💡 Protocolo Fungicida Orgánico:</strong> Aplicá <em>Bacillus subtilis</em> de forma preventiva cada 10 días o Jabón Potásico + Aceite de Neem al 2% para inhibir la germinación de conidias.
+          </div>
+        </div>
+
+        <div class="lesson-block">
+          <h3>🌱 2. Pythium & Fusarium (Damping Off / Pudrición de Raíz)</h3>
+          <p>Los patógenos del suelo atacan el sistema radicular por falta de oxigenación y encharcamiento constante. Mantené la temperatura del agua entre 18°C y 21°C y aplicá Trichoderma harzianum para proteger la rizosfera.</p>
         </div>
       `,
-      quiz: {
-        question: '¿Qué microorganismo antagonista es ampliamente utilizado en control biológico para inhibir la germinación de conidias de Botrytis y Oídio?',
-        options: [
-          { text: 'Bacillus subtilis', correct: true },
-          { text: 'Escherichia coli', correct: false },
-          { text: 'Saccharomyces cerevisiae', correct: false }
-        ],
-        explanation: 'Bacillus subtilis sintetiza lipopéptidos cíclicos que rompen la membrana plasmática de las hifas micóticas.'
-      }
+      quiz: [
+        {
+          q: '¿Qué microorganismo antagonista es ampliamente utilizado en control biológico para inhibir Botrytis y Oídio?',
+          options: ['Bacillus subtilis', 'Escherichia coli', 'Saccharomyces cerevisiae'],
+          correct: 0
+        },
+        {
+          q: '¿Cuál es la temperatura de agua de riego recomendada para prevenir patógenos de raíz como Pythium?',
+          options: ['18°C a 21°C', '30°C a 35°C', '5°C a 10°C'],
+          correct: 0
+        }
+      ]
     },
     {
       id: 102,
-      title: 'Módulo 2: Entomología Agrícola & Manejo Integrado de Plagas (CIP)',
+      title: 'Módulo 2: Entomología Agrícola & Manejo Integrado de Plagas (MIP)',
       shortTitle: '2. Plagas & Biocontrol',
-      subtitle: 'Arañuela Roja, Trips y Mosca Blanca',
+      subtitle: 'Arañuela Roja, Trips y Mosca Blanca bajo biocontrol',
       content: `
         <div class="lesson-block">
           <h3>🐛 1. Arañuela Roja (Tetranychus urticae) & Biocontrol</h3>
           <p>Tetranychus urticae posee una velocidad de reproducción exponencial a T > 26°C. El tratamiento de biocontrol mediante el acaricida depredador <em>Phytoseiulus persimilis</em> o la aplicación de <strong>Sales Potásicas + Azadiractina (Neem)</strong> rompe la cutícula del ácaro sin generar resistencia ni dejar residuos tóxicos.</p>
+          <div class="tip-box">
+            <strong>💡 Regla MIP:</strong> Nunca apliques insecticidas sintéticos en fase de floración. El biocontrol predador no altera el perfil terpénico de las flores.
+          </div>
+        </div>
+
+        <div class="lesson-block">
+          <h3>🪰 2. Trips (Frankliniella occidentalis) & Mosca Blanca</h3>
+          <p>Los trips raspan el mesófilo dejando manchas plateadas y puntos negros. Usá trampas cromáticas amarillas y azules combinadas con aplicaciones de tierra de diatomeas o <em>Beauveria bassiana</em>.</p>
         </div>
       `,
-      quiz: {
-        question: '¿Cuál es el ácaro depredador específico utilizado en control biológico para erradicar poblaciones de Arañuela Roja?',
-        options: [
-          { text: 'Phytoseiulus persimilis', correct: true },
-          { text: 'Tetranychus urticae', correct: false },
-          { text: 'Frankliniella occidentalis', correct: false }
-        ],
-        explanation: 'Phytoseiulus persimilis es un acaricida predador voraz especializado en consumir la Arañuela Roja.'
-      }
+      quiz: [
+        {
+          q: '¿Cuál es el ácaro depredador específico utilizado en biocontrol para erradicar la Arañuela Roja?',
+          options: ['Phytoseiulus persimilis', 'Tetranychus urticae', 'Frankliniella occidentalis'],
+          correct: 0
+        },
+        {
+          q: '¿Qué tipo de trampas se recomiendan para el monitoreo de Trips y Mosca Blanca?',
+          options: ['Trampas Cromáticas Amarillas y Azules', 'Trampas de Luz Negra', 'No se usan trampas'],
+          correct: 0
+        }
+      ]
     },
     {
       id: 103,
@@ -57,22 +79,34 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="lesson-block">
           <h3>🧪 1. Diagnóstico Diferencial de Clorosis Foliar</h3>
           <p>Una clorosis internerval puede confundirse entre deficiencia de Magnesio (Mg) o bloqueo por pH ácido. La microscopía digital 60x permite observar la presencia de ninfas o hifas para descartar o confirmar una causa biótica frente a una nutricional.</p>
+          <div class="tip-box">
+            <strong>💡 Regla de Diagnóstico:</strong> Si el síntoma aparece solo en hojas bajas viejas, suele ser deficiencia móvil (N, P, K, Mg). Si aparece en brotes nuevos, es deficiencia inmóvil (Ca, Fe, B) o patógeno.
+          </div>
+        </div>
+
+        <div class="lesson-block">
+          <h3>🧼 2. Bioseguridad & Sanitización del Indoor</h3>
+          <p>Desinfectá carpas, tijeras y macetas con alcohol al 70% o peróxido de hidrógeno entre cosechas para evitar reinfección por esporas de Fusarium o huevos de trips.</p>
         </div>
       `,
-      quiz: {
-        question: '¿Qué herramienta permite descartar un patógeno biótico observando la superficie celular a 60x-100x?',
-        options: [
-          { text: 'Microscopía Digital / Lupa 60x', correct: true },
-          { text: 'Termómetro Ambiental', correct: false },
-          { text: 'Medidor de Luxes', correct: false }
-        ],
-        explanation: 'La microscopía a 60x-100x permite observar directamente micelios y estructuras de ácaros.'
-      }
+      quiz: [
+        {
+          q: '¿Qué herramienta permite descartar un patógeno biótico observando la superficie foliar a 60x-100x?',
+          options: ['Microscopía Digital / Lupa 60x', 'Termómetro Ambiental', 'Medidor de Luxes'],
+          correct: 0
+        },
+        {
+          q: '¿Con qué solución se recomienda sanitizar tijeras de podar y carpas entre cosechas?',
+          options: ['Alcohol al 70% o Peróxido de Hidrógeno', 'Solo agua de canilla', 'Aceite comestible'],
+          correct: 0
+        }
+      ]
     }
   ];
 
   window.FITOPATOLOGIA_MODULES = FITOPATOLOGIA_MODULES;
-  // --- LESSONS DATA & QUIZZES ---
+
+  // --- COURSE 1: CULTIVO INDOOR DATA ---
   const MODULES_DATA = [
     {
       id: 1,
@@ -118,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <tr>
                 <td>Micorrizas & Trichodermas</td>
                 <td>10% / Inóculo</td>
-                <td>Simbiosis radicular: multiplica x10 la absorción de fósforo y agua.</td>
+                <td>Simbiosis micorrízica y protección radicular.</td>
               </tr>
             </tbody>
           </table>
@@ -126,19 +160,19 @@ document.addEventListener('DOMContentLoaded', () => {
       `,
       quiz: [
         {
-          q: '¿Cuál es el rango de temperatura óptimo para la germinación de semillas?',
-          options: ['10°C - 15°C', '22°C - 25°C', '30°C - 35°C'],
+          q: '¿Cuál es el rango de temperatura constante ideal para germinar semillas?',
+          options: ['10°C - 15°C', '22°C - 25°C', '35°C - 40°C'],
           correct: 1
         },
         {
-          q: '¿Qué función cumplen las Micorrizas en el sustrato?',
-          options: ['Eliminar la luz solar', 'Generar simbiosis con las raíces para absorber más agua y nutrientes', 'Compactar la tierra'],
-          correct: 1
-        },
-        {
-          q: '¿Qué componente del sustrato proporciona aireación y evita la compactación?',
-          options: ['Perlita Expansiva', 'Agua de grifo', 'Arcilla pesada'],
+          q: '¿Qué microorganismo benéfico forma una relación simbiótica con las raíces aumentando la absorción de nutrientes?',
+          options: ['Micorrizas', 'Fusarium', 'Oídio'],
           correct: 0
+        },
+        {
+          q: '¿Qué porcentaje de perlita se recomienda para asegurar una buena aireación?',
+          options: ['5%', '20%', '90%'],
+          correct: 1
         }
       ]
     },
@@ -146,58 +180,64 @@ document.addEventListener('DOMContentLoaded', () => {
       id: 2,
       title: 'Módulo 2: Iluminación LED & Clima Avanzado (VPD)',
       shortTitle: '2. Iluminación & VPD',
-      subtitle: 'Optimizá la fotosíntesis y el déficit de presión de vapor',
+      subtitle: 'Dominando el fotoperíodo, PPFD y la Presión de Vapor',
       content: `
         <div class="lesson-block">
-          <h3>💡 1. Fotoperiodos y Tecnología LED (PPFD & DLI)</h3>
-          <p>Las plantas de cannabis regulan su ciclo mediante las horas de luz ininterrumpida:</p>
+          <h3>💡 1. Espectro y Fotobiología LED</h3>
+          <p>Los paneles LED modernos con diodos <strong>Samsung LM301H</strong> entregan un espectro continuo de alta eficiencia fotosintética (PPFD):</p>
           <ul>
-            <li><strong>Crecimiento (Vegetativo):</strong> 18 horas de luz / 6 horas de oscuridad (18/6).</li>
-            <li><strong>Floración:</strong> 12 horas de luz / 12 horas de oscuridad absoluta (12/12).</li>
+            <li><strong>Fase Vegetativa:</strong> Fotoperíodo 18/6. Luz fría/azulada (4000K) que promueve entrenudos cortos y estructura robusta.</li>
+            <li><strong>Fase de Floración:</strong> Fotoperíodo 12/12. Luz cálida/roja (3000K + Far Red 730nm) que estimula la formación de flores y terpenos.</li>
           </ul>
         </div>
 
         <div class="lesson-block">
-          <h3>🌡️ 2. Simulador Interactivo de VPD (Déficit de Presión de Vapor)</h3>
-          <p>El VPD mide la diferencia entre la presión de vapor dentro de la hoja y la del aire. Determina si la planta puede transpirar e incorporar nutrientes por la raíz.</p>
+          <h3>🌡️ 2. Calculadora Interactiva de Deficit de Presión de Vapor (VPD)</h3>
+          <p>El VPD mide la transpiración real de las hojas según la temperatura y humedad. Ingresá los valores de tu carpa para calcular tu VPD instantáneo:</p>
           
           <!-- VPD CALCULATOR WIDGET -->
           <div class="interactive-widget-box vpd-widget">
-            <h4>🧮 Calculadora de VPD en Tiempo Real</h4>
-            <div class="vpd-inputs">
-              <div class="vpd-input-group">
-                <label for="vpd-temp">Temperatura de la Carpa (°C):</label>
-                <input type="number" id="vpd-temp" value="25" min="10" max="40" step="0.5">
+            <h4>🎛️ Calculadora VPD en Tiempo Real</h4>
+            <div class="widget-grid">
+              <div class="widget-field">
+                <label>Temperatura (°C):</label>
+                <input type="number" id="vpd-temp" value="24" step="0.5" min="10" max="40">
               </div>
-              <div class="vpd-input-group">
-                <label for="vpd-rh">Humedad Relativa (%):</label>
-                <input type="number" id="vpd-rh" value="60" min="20" max="95" step="1">
+              <div class="widget-field">
+                <label>Humedad Relativa (%):</label>
+                <input type="number" id="vpd-humidity" value="60" min="10" max="95">
+              </div>
+              <div class="widget-field">
+                <label>Fase de Cultivo:</label>
+                <select id="vpd-stage">
+                  <option value="veg">Vegetativo (Target: 0.8 - 1.1 kPa)</option>
+                  <option value="flower">Floración (Target: 1.1 - 1.4 kPa)</option>
+                </select>
               </div>
             </div>
-
-            <div class="vpd-result-display" id="vpd-result-box">
-              <span class="vpd-value" id="vpd-value-num">1.19 kPa</span>
-              <span class="vpd-status-badge status-veg" id="vpd-status-text">Zona Vegetativa Ideal</span>
+            <button class="btn btn-secondary btn-full-width" id="btn-calc-vpd" type="button" style="margin-top: 10px;">Calcular VPD Instantáneo</button>
+            <div class="vpd-result-display" id="vpd-result-box" style="display: none;">
+              <span class="vpd-val-text" id="vpd-val-text">0.00 kPa</span>
+              <p class="vpd-status-msg" id="vpd-status-msg">En rango ideal</p>
             </div>
-            <p class="vpd-tip-text" id="vpd-explanation">Tus estomas transpiran a un ritmo óptimo. Absorción de agua y nitrógeno perfecta.</p>
           </div>
         </div>
       `,
       quiz: [
         {
-          q: '¿Cuál es el fotoperiodo estándar para inducir la floración en cepas fotoperiódicas?',
-          options: ['24/0', '18/6', '12/12'],
+          q: '¿Cuál es el fotoperíodo estándar recomendado para inducir la etapa de floración?',
+          options: ['24/0 (Luz continua)', '18/6', '12 horas de Luz / 12 horas de Oscuridad'],
           correct: 2
         },
         {
-          q: '¿Qué mide el indicador VPD (Déficit de Presión de Vapor)?',
-          options: ['La velocidad de los ventiladores', 'La diferencia entre la presión de vapor de la hoja y el aire ambiente', 'El peso de las macetas'],
+          q: '¿Qué mide el Déficit de Presión de Vapor (VPD)?',
+          options: ['El precio del fertilizante', 'La velocidad de transpiración foliar según T y HR', 'La potencia de la bomba de agua'],
           correct: 1
         },
         {
-          q: 'Si la humedad relativa en floración es del 85%, ¿qué riesgo corren las flores?',
-          options: ['Aparición de hongos (Botrytis/Oídio)', 'Falta de luz', 'Crecimiento de raíces gigante'],
-          correct: 0
+          q: '¿Cuál es el rango de VPD óptimo para la fase de floración?',
+          options: ['0.2 - 0.4 kPa', '1.1 - 1.4 kPa', '3.0 - 4.0 kPa'],
+          correct: 1
         }
       ]
     },
@@ -302,11 +342,16 @@ document.addEventListener('DOMContentLoaded', () => {
   ];
 
   // --- STATE ---
+  let currentCourseId = 'indoor'; // 'indoor' | 'fitopatologia'
   let activeModuleIndex = 0;
   let userProgress = JSON.parse(localStorage.getItem('boeweb_academy_progress')) || {
     completedModules: [],
     quizScores: {}
   };
+
+  function getCurrentModules() {
+    return currentCourseId === 'fitopatologia' ? FITOPATOLOGIA_MODULES : MODULES_DATA;
+  }
 
   // --- DOM REFERENCES ---
   const academyNavBtn = document.getElementById('academy-trigger');
@@ -353,6 +398,35 @@ document.addEventListener('DOMContentLoaded', () => {
     updateProgressUI();
   }
 
+  // --- COURSE SWITCHER ---
+  window.switchAcademyCourse = function(courseId) {
+    currentCourseId = courseId;
+    activeModuleIndex = 0;
+
+    const btnIndoor = document.getElementById('btn-course-indoor');
+    const btnFito = document.getElementById('btn-course-fitopatologia');
+    const titleDisplay = document.getElementById('academy-course-title-display');
+
+    if (btnIndoor) {
+      btnIndoor.style.background = courseId === 'indoor' ? 'rgba(195,155,75,0.3)' : 'rgba(255,255,255,0.08)';
+      btnIndoor.style.borderColor = courseId === 'indoor' ? 'var(--color-accent-gold)' : 'rgba(255,255,255,0.2)';
+    }
+    if (btnFito) {
+      btnFito.style.background = courseId === 'fitopatologia' ? 'rgba(102,187,106,0.3)' : 'rgba(255,255,255,0.08)';
+      btnFito.style.borderColor = courseId === 'fitopatologia' ? '#66bb6a' : 'rgba(255,255,255,0.2)';
+    }
+
+    if (titleDisplay) {
+      titleDisplay.textContent = courseId === 'fitopatologia'
+        ? 'Progreso del Curso (Fitopatología & Plagas):'
+        : 'Progreso del Curso (Cultivo Indoor):';
+    }
+
+    renderSidebarModules();
+    renderActiveLesson();
+    updateProgressUI();
+  };
+
   // --- VIEW TOGGLE ---
   function showAcademyView() {
     if (catalogSection) catalogSection.style.display = 'none';
@@ -370,10 +444,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderSidebarModules() {
     if (!modulesListContainer) return;
     modulesListContainer.innerHTML = '';
+    const currentModules = getCurrentModules();
 
-    MODULES_DATA.forEach((mod, index) => {
+    currentModules.forEach((mod, index) => {
       const isCompleted = userProgress.completedModules.includes(mod.id);
-      const isUnlocked = index === 0 || userProgress.completedModules.includes(MODULES_DATA[index - 1].id);
+      const isUnlocked = index === 0 || userProgress.completedModules.includes(currentModules[index - 1].id);
 
       const li = document.createElement('li');
       li.className = `academy-mod-item ${index === activeModuleIndex ? 'active' : ''} ${!isUnlocked ? 'disabled' : ''}`;
@@ -399,8 +474,8 @@ document.addEventListener('DOMContentLoaded', () => {
       modulesListContainer.appendChild(li);
     });
 
-    // Append Certificate Download Button if all 4 completed
-    if (userProgress.completedModules.length === MODULES_DATA.length) {
+    // Append Certificate Download Button if all completed in current course
+    if (currentModules.every(m => userProgress.completedModules.includes(m.id))) {
       const certBtnLi = document.createElement('li');
       certBtnLi.className = 'academy-mod-item cert-unlocked-btn';
       certBtnLi.innerHTML = `
@@ -418,13 +493,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- RENDER ACTIVE LESSON ---
   function renderActiveLesson() {
     if (!lessonContentContainer) return;
-
-    const mod = MODULES_DATA[activeModuleIndex];
+    const currentModules = getCurrentModules();
+    const mod = currentModules[activeModuleIndex] || currentModules[0];
     const isCompleted = userProgress.completedModules.includes(mod.id);
 
     lessonContentContainer.innerHTML = `
       <div class="lesson-header">
-        <span class="lesson-badge">Módulo ${mod.id} de 4</span>
+        <span class="lesson-badge">Módulo ${activeModuleIndex + 1} de ${currentModules.length}</span>
         <h2 class="lesson-main-title">${mod.title}</h2>
         <p class="lesson-main-sub">${mod.subtitle}</p>
       </div>
@@ -435,8 +510,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       <!-- QUIZ SECTION -->
       <div class="quiz-container" id="quiz-section-${mod.id}">
-        <h3>📝 Cuestionario de Evaluación (Módulo ${mod.id})</h3>
-        <p>Aprobá las preguntas para ganar +100 Semillas y desbloquear el siguiente módulo.</p>
+        <h3>📝 Cuestionario de Evaluación (${mod.shortTitle})</h3>
+        <p>Aprobá las preguntas para ganar +100 Semillas y avanzar en tu certificación.</p>
         
         <form class="quiz-form" id="quiz-form-${mod.id}">
           ${renderQuizQuestions(mod.quiz, mod.id)}
@@ -510,7 +585,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Smooth scroll next
       setTimeout(() => {
-        if (activeModuleIndex < MODULES_DATA.length - 1) {
+        const currentModules = getCurrentModules();
+        if (activeModuleIndex < currentModules.length - 1) {
           activeModuleIndex++;
           renderSidebarModules();
           renderActiveLesson();
@@ -522,7 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     } else {
       feedbackEl.className = 'quiz-result-msg error';
-      feedbackEl.innerHTML = `❌ Respondiste ${correctCount}/3 correctamente. Revisa los apuntes e intentalo nuevamente.`;
+      feedbackEl.innerHTML = `❌ Respondiste ${correctCount}/${mod.quiz.length} correctamente. Revisa los apuntes e intentalo nuevamente.`;
     }
   }
 
@@ -547,9 +623,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateProgressUI() {
-    const total = MODULES_DATA.length;
-    const completed = userProgress.completedModules.length;
-    const pct = Math.round((completed / total) * 100);
+    const currentModules = getCurrentModules();
+    const total = currentModules.length;
+    const completedCount = currentModules.filter(m => userProgress.completedModules.includes(m.id)).length;
+    const pct = Math.round((completedCount / total) * 100);
 
     if (academyProgressFill) academyProgressFill.style.width = `${pct}%`;
     if (academyProgressPercent) academyProgressPercent.textContent = `${pct}% Completo`;
