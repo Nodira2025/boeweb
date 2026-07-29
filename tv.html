@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>BÔ Growclub - Cartelería Digital TV & Espacio Publicitario</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/jpeg" href="assets/logo.jpg">
+  <link rel="apple-touch-icon" href="assets/logo.jpg">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="index.css?v=2.7">
+  
+  <style>
+    :root {
+      --tv-bg-dark: #060d09;
+      --tv-card-bg: rgba(15, 30, 24, 0.92);
+      --tv-accent-gold: #c39b4b;
+      --tv-accent-green: #66bb6a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: var(--tv-bg-dark);
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* Ambient Background Glow */
+    .tv-ambient-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: radial-gradient(circle at 50% 30%, rgba(21, 45, 36, 0.6) 0%, rgba(6, 13, 9, 0.98) 75%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Outer TV Container */
+    .tv-container {
+      position: relative;
+      z-index: 1;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* TV Header Bar */
+    .tv-header {
+      background: linear-gradient(135deg, rgba(21, 45, 36, 0.98), rgba(15, 30, 24, 0.99));
+      border-bottom: 2px solid var(--tv-accent-gold);
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.7);
+      flex-shrink: 0;
+    }
+
+    .tv-brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .tv-brand img {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      border: 2px solid var(--tv-accent-gold);
+      box-shadow: 0 0 15px rgba(195,155,75,0.4);
+    }
+
+    .tv-brand-title {
+      margin: 0;
+      font-family: 'Playfair Display', serif;
+      color: var(--tv-accent-gold);
+      font-size: 1.8rem;
+      letter-spacing: 1px;
+    }
+
+    .tv-brand-sub {
+      margin: 0;
+      font-size: 0.85rem;
+      color: rgba(247,246,242,0.7);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .tv-live-widget {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .tv-clock {
+      font-size: 1.8rem;
+      font-weight: 900;
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+      background: rgba(0,0,0,0.4);
+      padding: 6px 18px;
+      border-radius: 12px;
+      border: 1px solid rgba(195,155,75,0.3);
+    }
+
+    /* Main Display Body (Adaptive Grid for Horizontal 16:9 vs Vertical 9:16) */
+    .tv-body {
+      flex-grow: 1;
+      display: grid;
+      gap: 24px;
+      padding: 24px 32px;
+      height: calc(100vh - 90px);
+      box-sizing: border-box;
+    }
+
+    /* Landscape (16:9 Widescreen TV) Layout */
+    @media (min-aspect-ratio: 1/1) {
+      .tv-body {
+        grid-template-columns: 1.6fr 1fr;
+      }
+    }
+
+    /* Portrait (9:16 Vertical TV Screen) Layout */
+    @media (max-aspect-ratio: 1/1) {
+      .tv-body {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1.5fr 1fr;
+        padding: 16px;
+        gap: 16px;
+      }
+    }
+
+    /* Section 1: Promo & Sponsored Ad Carousel */
+    .tv-ad-section {
+      background: var(--tv-card-bg);
+      border: 2px solid rgba(195,155,75,0.4);
+      border-radius: 28px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+    }
+
+    .tv-ad-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(195,155,75,0.2);
+      border: 1.5px solid var(--tv-accent-gold);
+      color: var(--tv-accent-gold);
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      align-self: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .tv-ad-content {
+      flex-grow: 1;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .tv-ad-image-container {
+      width: 45%;
+      height: 100%;
+      max-height: 380px;
+      background: #000;
+      border-radius: 20px;
+      border: 2px solid var(--tv-accent-gold);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      flex-shrink: 0;
+    }
+
+    .tv-ad-image-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.8s ease;
+    }
+
+    .tv-ad-info {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .tv-ad-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 2.4rem;
+      color: var(--tv-accent-gold);
+      margin: 0 0 12px 0;
+      line-height: 1.2;
+    }
+
+    .tv-ad-desc {
+      font-size: 1.15rem;
+      color: rgba(247,246,242,0.9);
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .tv-ad-promo-box {
+      background: linear-gradient(135deg, rgba(102,187,106,0.2), rgba(21,45,36,0.9));
+      border: 2px dashed var(--tv-accent-green);
+      border-radius: 16px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tv-ad-promo-text {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .tv-ad-promo-code {
+      background: var(--tv-accent-gold);
+      color: #0f1e18;
+      font-weight: 900;
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 1.2rem;
+      letter-spacing: 2px;
+    }
+
+    /* Carousel Progress Bar */
+    .tv-progress-container {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 20px;
+    }
+
+    .tv-progress-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--tv-accent-gold);
+      transition: width 0.1s linear;
+    }
+
+    /* Section 2: QR Code Catalog & Store Deals */
+    .tv-qr-section {
+      background: var(--tv-card-bg);
+      border: 2px solid var(--tv-accent-gold);
+      border-radius: 28px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      box-shadow: 0 15px 40px rgba(195,155,75,0.25);
+    }
+
+    .tv-qr-title {
+      font-family: 'Playfair Display', serif;
+      color: var(--tv-accent-gold);
+      font-size: 1.8rem;
+      margin: 0 0 8px 0;
+    }
+
+    .tv-qr-sub {
+      font-size: 1rem;
+      color: rgba(247,246,242,0.85);
+      margin-bottom: 20px;
+      max-width: 320px;
+    }
+
+    .tv-qr-box {
+      background: #fff;
+      padding: 16px;
+      border-radius: 20px;
+      border: 3px solid var(--tv-accent-gold);
+      box-shadow: 0 0 35px rgba(195,155,75,0.5);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tv-qr-box svg, .tv-qr-box canvas {
+      width: 180px;
+      height: 180px;
+    }
+
+    .tv-qr-cta {
+      background: rgba(195,155,75,0.15);
+      border: 1px solid var(--tv-accent-gold);
+      border-radius: 14px;
+      padding: 12px 20px;
+      color: var(--tv-accent-gold);
+      font-weight: 700;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="tv-ambient-bg"></div>
+
+  <div class="tv-container">
+
+    <!-- TV Header -->
+    <header class="tv-header">
+      <div class="tv-brand">
+        <img src="assets/logo.jpg" alt="BÔ Growclub">
+        <div>
+          <h1 class="tv-brand-title">BÔ GROWCLUB</h1>
+          <p class="tv-brand-sub">Estudio de Cultivo Privado & Espacio Publicitario</p>
+        </div>
+      </div>
+
+      <div class="tv-live-widget">
+        <div style="text-align: right;">
+          <span style="font-size: 0.75rem; color: var(--tv-accent-green); font-weight: 700; display: block; text-transform: uppercase;">🌙 CALENDARIO LUNAR DE HOY</span>
+          <span style="font-size: 0.95rem; font-weight: 600; color: #fff;" id="tv-lunar-phase">🌑 Creciendo (Fase Ideal Riego)</span>
+        </div>
+        <div class="tv-clock" id="tv-clock-display">12:00</div>
+      </div>
+    </header>
+
+    <!-- TV Body Content -->
+    <main class="tv-body">
+
+      <!-- Left Column: Sponsored Brand Showcase Carousel -->
+      <section class="tv-ad-section">
+        <div class="tv-ad-badge">
+          <span style="font-size: 1rem;">⭐</span> ESPACIO PUBLICITARIO / MARCA DESTACADA
+        </div>
+
+        <div class="tv-ad-content">
+          <div class="tv-ad-image-container">
+            <img id="tv-ad-img" src="assets/logo.jpg" alt="Marca Publicitaria">
+          </div>
+
+          <div class="tv-ad-info">
+            <h2 class="tv-ad-title" id="tv-ad-title">Sustratos & Nutrientes Premium</h2>
+            <p class="tv-ad-desc" id="tv-ad-desc">Descubrí la línea completa de la mejor calidad agronómica para potenciar la floración y el desarrollo terpénico de tus plantas.</p>
+
+            <div class="tv-ad-promo-box">
+              <span class="tv-ad-promo-text" id="tv-ad-promo-label">🎁 Presentá este código en caja:</span>
+              <span class="tv-ad-promo-code" id="tv-ad-promo-code">#MARCA-10</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tv-progress-container">
+          <div class="tv-progress-fill" id="tv-progress-fill"></div>
+        </div>
+      </section>
+
+      <!-- Right Column: QR Code Catalog & Store Access Tag -->
+      <section class="tv-qr-section">
+        <h2 class="tv-qr-title">📱 ESCANEAR CATÁLOGO</h2>
+        <p class="tv-qr-sub">Apuntá tu cámara para ver productos, precios actualizados y stock en vivo desde tu celular.</p>
+
+        <div class="tv-qr-box">
+          <svg viewBox="0 0 100 100" style="width: 180px; height: 180px;">
+            <path d="M0,0 h30 v30 h-30 z M40,0 h20 v10 h-20 z M70,0 h30 v30 h-30 z M10,10 h10 v10 h-10 z M80,10 h10 v10 h-10 z M0,40 h10 v20 h-10 z M20,40 h30 v10 h-30 z M60,40 h40 v10 h-40 z M0,70 h30 v30 h-30 z M10,80 h10 v10 h-10 z M40,60 h20 v40 h-20 z M70,70 h20 v20 h-20 z" fill="#0f1e18"/>
+          </svg>
+        </div>
+
+        <div class="tv-qr-cta">
+          <span style="font-size: 1.2rem;">✨</span>
+          <span>¡Accedé al E-Commerce en Vivo!</span>
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <script src="tv.js?v=1.0"></script>
+</body>
+</html>
