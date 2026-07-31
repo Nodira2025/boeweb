@@ -3062,10 +3062,81 @@ textarea.form-control {
    ========================================================================== */
 
 @media (max-width: 768px) {
+  /* Top Header Navigation Mobile Responsiveness */
+  .main-header {
+    padding: 8px 12px !important;
+  }
+
+  .header-container {
+    padding: 0 !important;
+    gap: 8px !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+  }
+
+  .header-logo-area {
+    gap: 6px !important;
+  }
+
+  .brand-logo {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .brand-title {
+    font-size: 1.1rem !important;
+  }
+
+  .brand-subtitle {
+    font-size: 0.62rem !important;
+    letter-spacing: 0.1em !important;
+  }
+
+  .header-cart-area {
+    gap: 6px !important;
+  }
+
+  .nav-header-btn {
+    height: 36px !important;
+    padding: 0 10px !important;
+    font-size: 0.78rem !important;
+    gap: 5px !important;
+  }
+
+  .nav-header-btn .nav-icon {
+    width: 15px !important;
+    height: 15px !important;
+  }
+
+  .nav-more-circle-btn {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  .more-dots-icon {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
   /* Helper to hide desktop navigation in mobile */
   .no-mobile {
     display: none !important;
   }
+}
+
+@media (max-width: 580px) {
+  /* On narrow phone screens (under 580px width), hide redundant Club BÔ button in top header
+     since Club BÔ is already right there in the bottom mobile navigation bar! */
+  .header-cart-area #club-trigger {
+    display: none !important;
+  }
+
+  .nav-more-menu-dropdown {
+    right: 8px !important;
+    left: 8px !important;
+    width: auto !important;
+  }
+}
 
   /* Bottom Navigation Bar */
   .mobile-nav {
