@@ -291,9 +291,10 @@
       <div class="catalog-content">
         <!-- Catalog Header (Filters trigger, sorting and active state) -->
         <div class="catalog-header-controls">
-          <!-- Mobile Filter Trigger Button -->
-          <button class="mobile-filter-trigger-btn" id="mobile-filter-trigger-btn" onclick="openMobileFilterDrawer()">
-            🎛️ Filtrar <span id="mobile-filter-count-badge" class="mobile-filter-count-badge" style="display: none;">0</span>
+          <!-- Mobile Filter Floating Trigger Icon Button -->
+          <button class="mobile-filter-trigger-btn" id="mobile-filter-trigger-btn" onclick="openMobileFilterDrawer()" aria-label="Filtrar productos">
+            <span>🎛️</span>
+            <span id="mobile-filter-count-badge" class="mobile-filter-count-badge" style="display: none;">0</span>
           </button>
 
           <div class="results-count">
