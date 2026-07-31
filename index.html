@@ -44,60 +44,67 @@
       </div>
 
       <!-- Navigation & Cart Area -->
-      <div class="header-cart-area" style="display: flex; gap: 15px; align-items: center;">
+      <div class="header-cart-area">
         <!-- Academia BÔ Button -->
-        <button class="btn btn-secondary nav-academy-btn no-mobile" id="academy-trigger" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px;" aria-label="Academia de Cultivo">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: var(--color-accent-gold);">
+        <button class="nav-header-btn no-mobile" id="academy-trigger" aria-label="Academia de Cultivo">
+          <svg class="icon nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
             <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
           </svg>
           <span>Academia BÔ</span>
         </button>
 
-        <a href="pacientes.html" class="btn btn-secondary nav-patients-btn no-mobile" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(195, 155, 75, 0.4);" aria-label="Trámites y Pacientes">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: #25D366;">
+        <!-- Pacientes & REPROCANN -->
+        <a href="pacientes.html" class="nav-header-btn no-mobile" aria-label="Trámites y Pacientes">
+          <svg class="icon nav-icon green-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
           </svg>
-          <span>Pacientes & REPROCANN</span>
+          <span>REPROCANN</span>
         </a>
 
-        <a href="coffee.html" class="btn btn-secondary nav-coffee-btn no-mobile" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px; text-decoration: none; border-color: var(--color-accent-gold); color: var(--color-accent-gold);" aria-label="BÔ Coffee Lounge">
-          <span style="font-size: 1rem;">☕</span>
+        <!-- BÔ Coffee -->
+        <a href="coffee.html" class="nav-header-btn no-mobile" aria-label="BÔ Coffee Lounge">
+          <span class="nav-emoji">☕</span>
           <span>BÔ Coffee</span>
         </a>
 
-        <a href="vendedor.html" class="btn btn-secondary nav-vendedor-btn no-mobile" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(195, 155, 75, 0.4); color: var(--color-accent-gold);" aria-label="Portal de Vendedores">
-          <span style="font-size: 1rem;">💼</span>
-          <span>Portal Vendedores</span>
+        <!-- Portal Vendedores -->
+        <a href="vendedor.html" class="nav-header-btn no-mobile" aria-label="Portal de Vendedores">
+          <span class="nav-emoji">💼</span>
+          <span>Vendedores</span>
         </a>
 
-        <button class="btn btn-secondary nav-blog-btn no-mobile" id="blog-trigger" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px;" aria-label="Ver guías de cultivo">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+        <!-- Guías de Cultivo -->
+        <button class="nav-header-btn no-mobile" id="blog-trigger" aria-label="Ver guías de cultivo">
+          <svg class="icon nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
           </svg>
-          Guías de Cultivo
+          <span>Guías</span>
         </button>
 
-        <!-- Club BÔ Button -->
-        <button class="btn btn-secondary nav-drbo-btn" id="drbo-trigger" onclick="openDrBoModal()" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px; border-color: #66bb6a; color: #66bb6a;" aria-label="Doctor de Cultivo IA">
-          <span style="font-size: 1rem;">🩺</span>
+        <!-- Dr. BÔ IA -->
+        <button class="nav-header-btn green-border" id="drbo-trigger" onclick="openDrBoModal()" aria-label="Doctor de Cultivo IA">
+          <span class="nav-emoji">🩺</span>
           <span>Dr. BÔ IA</span>
         </button>
 
-        <button class="btn btn-secondary nav-scanqr-btn" onclick="openCustomerQRProductScan()" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px; border-color: var(--color-accent-gold); color: var(--color-accent-gold);" aria-label="Escanear QR de Producto en Local">
-          <span style="font-size: 1rem;">📷</span>
+        <!-- Escanear QR -->
+        <button class="nav-header-btn" onclick="openCustomerQRProductScan()" aria-label="Escanear QR de Producto en Local">
+          <span class="nav-emoji">📷</span>
           <span>Escanear QR</span>
         </button>
 
-        <button class="btn btn-secondary nav-club-btn" id="club-trigger" style="padding: 10px 16px; font-size: 0.9rem; border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 6px; border-color: var(--color-accent-gold); color: var(--color-primary);" aria-label="Portal de Miembros">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: var(--color-accent-gold);">
+        <!-- Club BÔ -->
+        <button class="nav-header-btn" id="club-trigger" aria-label="Portal de Miembros">
+          <svg class="icon nav-icon gold-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
           </svg>
           <span id="club-btn-text">Club BÔ</span>
         </button>
 
-        <button class="btn btn-secondary cart-trigger-btn" id="cart-trigger" style="display: flex; align-items: center; gap: 8px;" aria-label="Ver carrito">
+        <!-- Mi Carrito -->
+        <button class="nav-header-btn nav-cart-btn" id="cart-trigger" aria-label="Ver carrito">
           <div class="cart-icon-wrapper">
             <svg class="icon cart-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="9" cy="21" r="1"></circle>
@@ -106,7 +113,7 @@
             </svg>
             <span class="cart-badge" id="cart-count">0</span>
           </div>
-          <span class="cart-text">Mi Carrito</span>
+          <span>Mi Carrito</span>
         </button>
       </div>
     </div>
