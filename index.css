@@ -4,24 +4,27 @@
 
 /* Design Tokens & Variables */
 :root {
-  --color-bg: #fdfcf9;               /* Soft linen background */
-  --color-surface-glass: rgba(253, 252, 249, 0.75); /* Glass surface */
-  --color-primary: #152d24;          /* Deep forest green */
-  --color-primary-light: #223f33;    /* Light forest green */
-  --color-accent-gold: #c39b4b;      /* Matte Gold */
-  --color-accent-gold-dark: #a68137; /* Darker Gold for hover/focus */
-  --color-neutral-stone: #eceae4;    /* Light stone */
-  --color-neutral-dark: #2c2925;     /* Dark charcoal for text */
-  --color-neutral-light: #f4f1ea;    /* Light sand */
-  --color-success: #2e7d32;          /* Success green */
+  /* Official Brand Manual Colors (Guía de Marca BÔ) */
+  --color-primary: #3E5F1F;          /* Verde Bosque Profundo (#3E5F1F) */
+  --color-primary-light: #7EA642;    /* Verde Hoja Vibrante (#7EA642) */
+  --color-accent-gold: #C2A246;      /* Dorado / Ocre Orgánico (#C2A246) */
+  --color-accent-gold-dark: #a68532; /* Darker Gold for hover/focus */
+  --color-earth-brown: #6B4E2E;      /* Tierra / Marrón Caluroso (#6B4E2E) */
+  --color-bg: #F6F3E8;               /* Crema Zen (#F6F3E8) */
+  --color-surface-glass: rgba(246, 243, 232, 0.92);
+  --color-neutral-stone: #E6DFC9;    /* Warm stone */
+  --color-neutral-dark: #2B4214;     /* Deep green text on light background */
+  --color-neutral-light: #F6F3E8;    /* Light cream */
+  --color-success: #7EA642;
   
-  --font-serif: 'Playfair Display', Georgia, serif;
-  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Official Brand Manual Typography */
+  --font-serif: 'Cinzel', 'Playfair Display', Georgia, serif;
+  --font-sans: 'Montserrat', 'Lato', 'Outfit', sans-serif;
   
-  --shadow-sm: 0 2px 8px rgba(21, 45, 36, 0.04);
-  --shadow-md: 0 8px 24px rgba(21, 45, 36, 0.08);
-  --shadow-lg: 0 16px 48px rgba(21, 45, 36, 0.12);
-  --shadow-gold: 0 0 15px rgba(195, 155, 75, 0.3);
+  --shadow-sm: 0 2px 8px rgba(62, 95, 31, 0.08);
+  --shadow-md: 0 8px 24px rgba(62, 95, 31, 0.12);
+  --shadow-lg: 0 16px 48px rgba(62, 95, 31, 0.18);
+  --shadow-gold: 0 0 15px rgba(194, 162, 70, 0.35);
   
   --border-radius-sm: 8px;
   --border-radius-md: 16px;
@@ -4860,39 +4863,141 @@ textarea.form-control {
   100% { transform: scale(1); opacity: 1; }
 }
 
-/* --- DYNAMIC FACETED FILTER SYSTEM STYLES (LUXURY GLASSMORPHIC V2.9) --- */
-.catalog-sidebar .sidebar-block {
-  background: linear-gradient(165deg, rgba(21, 45, 36, 0.95) 0%, rgba(10, 22, 17, 0.98) 100%);
+/* --- UNIFIED HEADER NAVIGATION BUTTON SYSTEM (STRICT BRAND MANUAL V3.0) --- */
+.header-cart-area {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.nav-header-btn {
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--color-primary);          /* Verde Bosque #3E5F1F */
+  border: 1.5px solid var(--color-accent-gold); /* Dorado #C2A246 */
+  color: #F6F3E8;                             /* Crema Zen - Máxima legibilidad */
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(62, 95, 31, 0.2);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-sizing: border-box;
+}
+
+.nav-header-btn:hover {
+  background: var(--color-earth-brown);      /* Tierra #6B4E2E */
+  border-color: #FFFFFF;
+  color: #FFFFFF;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(107, 78, 46, 0.35);
+}
+
+.nav-header-btn .nav-icon {
+  width: 17px;
+  height: 17px;
+  color: var(--color-accent-gold);
+  flex-shrink: 0;
+}
+
+.nav-header-btn .nav-icon.green-accent {
+  color: var(--color-primary-light);        /* Verde Hoja #7EA642 */
+}
+
+.nav-header-btn .nav-icon.gold-accent {
+  color: var(--color-accent-gold);
+}
+
+.nav-header-btn .nav-emoji {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+/* Green border variant for Dr. BÔ IA */
+.nav-header-btn.green-border {
+  background: var(--color-primary);
+  border-color: var(--color-primary-light);
+  color: #F6F3E8;
+}
+
+.nav-header-btn.green-border:hover {
+  background: var(--color-primary-light);
+  border-color: #FFFFFF;
+  color: #FFFFFF;
+}
+
+/* Gold Gradient Cart Button */
+.nav-header-btn.nav-cart-btn {
+  background: linear-gradient(135deg, #C2A246 0%, #a68532 100%);
   border: 1.5px solid var(--color-accent-gold);
+  color: #2B4214;                             /* Verde Oscuro sobre Fondo Dorado - Alto Contraste */
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(194, 162, 70, 0.4);
+}
+
+.nav-header-btn.nav-cart-btn:hover {
+  background: linear-gradient(135deg, #7EA642 0%, #3E5F1F 100%);
+  color: #FFFFFF;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(126, 166, 66, 0.45);
+}
+
+.nav-header-btn.nav-cart-btn .cart-icon {
+  width: 17px;
+  height: 17px;
+  color: #2B4214;
+}
+
+.nav-header-btn.nav-cart-btn:hover .cart-icon {
+  color: #FFFFFF;
+}
+
+.nav-header-btn.nav-cart-btn .cart-badge {
+  background: #2B4214;
+  color: #F6F3E8;
+  border: 1px solid var(--color-accent-gold);
+}
+
+/* --- DYNAMIC FACETED FILTER SYSTEM STYLES (STRICT BRAND MANUAL V3.0) --- */
+.catalog-sidebar .sidebar-block {
+  background: linear-gradient(165deg, #2B4214 0%, #1e310d 100%);
+  border: 2px solid var(--color-accent-gold);
   border-radius: 20px;
   padding: 22px 16px;
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5), inset 0 0 25px rgba(195, 155, 75, 0.08);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 12px 35px rgba(43, 66, 20, 0.4), inset 0 0 25px rgba(194, 162, 70, 0.12);
 }
 
 .catalog-search-area .search-input-wrapper {
-  background: rgba(7, 14, 11, 0.9);
-  border: 1.5px solid rgba(195, 155, 75, 0.4);
+  background: #F6F3E8;
+  border: 2px solid var(--color-accent-gold);
   border-radius: 14px;
   padding: 4px 12px;
   transition: all 0.3s ease;
 }
 
 .catalog-search-area .search-input-wrapper:focus-within {
-  border-color: var(--color-accent-gold);
-  box-shadow: 0 0 15px rgba(195, 155, 75, 0.35);
-  background: rgba(12, 25, 19, 0.95);
+  border-color: var(--color-primary-light);
+  box-shadow: 0 0 15px rgba(126, 166, 66, 0.4);
 }
 
 .catalog-search-area #search-input {
-  color: #fff;
+  color: #2B4214;
   font-family: var(--font-sans);
   font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .catalog-search-area #search-input::placeholder {
-  color: rgba(247, 246, 242, 0.5);
+  color: #6B4E2E;
+  font-weight: 500;
 }
 
 .faceted-filter-panel {
@@ -4912,7 +5017,7 @@ textarea.form-control {
 }
 
 .facet-main-title {
-  font-family: var(--font-display);
+  font-family: var(--font-serif);
   color: var(--color-accent-gold);
   font-size: 1.25rem;
   margin: 0;
@@ -4920,9 +5025,9 @@ textarea.form-control {
 }
 
 .clear-all-filters-link {
-  background: rgba(239, 83, 80, 0.15);
+  background: rgba(239, 83, 80, 0.2);
   border: 1px solid #ef5350;
-  color: #ef5350;
+  color: #ff8a80;
   font-size: 0.78rem;
   font-weight: 800;
   padding: 4px 10px;
@@ -4937,8 +5042,8 @@ textarea.form-control {
 }
 
 .facet-group {
-  background: rgba(12, 25, 20, 0.7);
-  border: 1px solid rgba(195, 155, 75, 0.3);
+  background: #1e310d;
+  border: 1.5px solid rgba(194, 162, 70, 0.4);
   border-radius: 14px;
   overflow: hidden;
   transition: all 0.3s ease;
@@ -4946,12 +5051,12 @@ textarea.form-control {
 
 .facet-group:hover {
   border-color: var(--color-accent-gold);
-  box-shadow: 0 6px 18px rgba(195, 155, 75, 0.15);
+  box-shadow: 0 6px 18px rgba(194, 162, 70, 0.2);
 }
 
 .facet-title {
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.4) 0%, rgba(195, 155, 75, 0.08) 100%);
-  color: var(--color-accent-gold);
+  background: linear-gradient(90deg, #6B4E2E 0%, #3E5F1F 100%);
+  color: #F6F3E8;
   padding: 13px 16px;
   font-size: 0.95rem;
   font-weight: 800;
@@ -4961,11 +5066,11 @@ textarea.form-control {
   justify-content: space-between;
   align-items: center;
   user-select: none;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
 }
 
 .facet-title:hover {
-  color: #fff;
+  color: var(--color-accent-gold);
 }
 
 .facet-arrow {
@@ -4988,8 +5093,8 @@ textarea.form-control {
 
 .facet-count {
   font-size: 0.72rem;
-  background: rgba(195, 155, 75, 0.18);
-  color: var(--color-accent-gold);
+  background: rgba(194, 162, 70, 0.25);
+  color: #F6F3E8;
   padding: 2px 8px;
   border-radius: 10px;
   font-weight: 800;
@@ -5011,11 +5116,11 @@ textarea.form-control {
   text-align: left;
   padding: 10px 14px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  color: rgba(247, 246, 242, 0.85);
+  background: rgba(246, 243, 232, 0.08);
+  border: 1px solid rgba(194, 162, 70, 0.25);
+  color: #F6F3E8;
   font-size: 0.88rem;
-  font-weight: 600;
+  font-weight: 700;
   transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   display: flex;
   justify-content: space-between;
@@ -5024,23 +5129,23 @@ textarea.form-control {
 }
 
 .category-btn:hover {
-  background: rgba(195, 155, 75, 0.15);
+  background: var(--color-earth-brown);
   border-color: var(--color-accent-gold);
-  color: var(--color-accent-gold);
+  color: #F6F3E8;
   transform: translateX(4px);
 }
 
 .category-btn.active {
-  background: linear-gradient(135deg, rgba(195, 155, 75, 0.3) 0%, rgba(46, 125, 50, 0.3) 100%);
-  border: 1.5px solid var(--color-accent-gold);
-  color: #fff;
+  background: linear-gradient(135deg, #7EA642 0%, #3E5F1F 100%);
+  border: 2px solid var(--color-accent-gold);
+  color: #FFFFFF;
   font-weight: 800;
-  box-shadow: 0 4px 15px rgba(195, 155, 75, 0.25);
+  box-shadow: 0 4px 15px rgba(126, 166, 66, 0.35);
 }
 
 .category-btn.active .facet-count {
-  background: var(--color-accent-gold);
-  color: #070e0b;
+  background: #F6F3E8;
+  color: #3E5F1F;
 }
 
 /* Custom Scrollbar for Brand Checklist */
