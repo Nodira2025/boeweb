@@ -701,40 +701,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   // --- SEARCH & SORT ACTIONS ---
-  searchInput.addEventListener('input', (e) => {
-    searchQuery = e.target.value;
-    if (searchQuery.trim() !== '') {
-      clearSearchBtn.style.display = 'block';
-    } else {
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      if (clearSearchBtn) {
+        clearSearchBtn.style.display = searchQuery.trim() !== '' ? 'block' : 'none';
+      }
+      applyFiltersAndRender(true);
+    });
+  }
+
+  if (clearSearchBtn) {
+    clearSearchBtn.addEventListener('click', () => {
+      if (searchInput) searchInput.value = '';
+      searchQuery = '';
       clearSearchBtn.style.display = 'none';
-    }
-    applyFiltersAndRender(true);
-  });
+      applyFiltersAndRender(true);
+    });
+  }
 
-  clearSearchBtn.addEventListener('click', () => {
-    searchInput.value = '';
-    searchQuery = '';
-    clearSearchBtn.style.display = 'none';
-    applyFiltersAndRender(true);
-  });
+  if (sortSelect) {
+    sortSelect.addEventListener('change', () => {
+      applyFiltersAndRender(false);
+    });
+  }
 
-  sortSelect.addEventListener('change', () => {
-    applyFiltersAndRender(false);
-  });
+  if (loadMoreBtn) {
+    loadMoreBtn.addEventListener('click', () => {
+      currentPage++;
+      renderGrid();
+    });
+  }
 
-  loadMoreBtn.addEventListener('click', () => {
-    currentPage++;
-    renderGrid();
-  });
-
-  resetSearchBtn.addEventListener('click', () => {
-    searchInput.value = '';
-    searchQuery = '';
-    clearSearchBtn.style.display = 'none';
-    currentCategory = 'all';
-    updateCategoryActiveState();
-    applyFiltersAndRender(true);
-  });
+  if (resetSearchBtn) {
+    resetSearchBtn.addEventListener('click', () => {
+      if (searchInput) searchInput.value = '';
+      searchQuery = '';
+      if (clearSearchBtn) clearSearchBtn.style.display = 'none';
+      currentCategory = 'all';
+      updateCategoryActiveState();
+      applyFiltersAndRender(true);
+    });
+  }
 
 
   // --- CATEGORY PILLS FILTER ---
@@ -757,17 +765,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Remove Category badge
-  removeFilterBtn.addEventListener('click', () => {
-    currentCategory = 'all';
-    updateCategoryActiveState();
-    applyFiltersAndRender(true);
-  });
+  if (removeFilterBtn) {
+    removeFilterBtn.addEventListener('click', () => {
+      currentCategory = 'all';
+      updateCategoryActiveState();
+      applyFiltersAndRender(true);
+    });
+  }
 
 
   // --- CART DRAWER ACTIONS ---
   function updateCartBadge() {
     const totalQty = cart.reduce((acc, item) => acc + item.quantity, 0);
-    cartCountEl.textContent = totalQty;
+    if (cartCountEl) cartCountEl.textContent = totalQty;
     const mobileCartCountEl = document.getElementById('mobile-cart-count');
     if (mobileCartCountEl) {
       mobileCartCountEl.textContent = totalQty;
@@ -775,18 +785,18 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function toggleCart() {
-    cartDrawer.classList.toggle('active');
-    cartOverlay.classList.toggle('active');
+    if (cartDrawer) cartDrawer.classList.toggle('active');
+    if (cartOverlay) cartOverlay.classList.toggle('active');
     
-    if (cartDrawer.classList.contains('active')) {
+    if (cartDrawer && cartDrawer.classList.contains('active')) {
       renderCartItems();
     }
   }
 
-  cartTrigger.addEventListener('click', toggleCart);
-  cartClose.addEventListener('click', toggleCart);
-  cartOverlay.addEventListener('click', toggleCart);
-  emptyCartShopBtn.addEventListener('click', toggleCart);
+  if (cartTrigger) cartTrigger.addEventListener('click', toggleCart);
+  if (cartClose) cartClose.addEventListener('click', toggleCart);
+  if (cartOverlay) cartOverlay.addEventListener('click', toggleCart);
+  if (emptyCartShopBtn) emptyCartShopBtn.addEventListener('click', toggleCart);
 
   function addToCart(productId) {
     const product = products.find(p => p.id === productId);
@@ -944,11 +954,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Remove Coupon Event
-  removeCouponBtn.addEventListener('click', () => {
-    appliedCoupon = null;
-    localStorage.removeItem('boeweb_applied_coupon');
-    renderCartItems();
-  });
+  if (removeCouponBtn) {
+    removeCouponBtn.addEventListener('click', () => {
+      appliedCoupon = null;
+      localStorage.removeItem('boeweb_applied_coupon');
+      renderCartItems();
+    });
+  }
 
 
   // --- CHECKOUT FORM & REDIRECTION ---
