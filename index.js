@@ -515,12 +515,42 @@ document.addEventListener('DOMContentLoaded', () => {
     closeMobileFilterDrawer();
   };
 
+  function updateCategoryCounts() {
+    const counts = { all: products.length };
+    
+    products.forEach(p => {
+      const cat = p.category;
+      if (cat) {
+        counts[cat] = (counts[cat] || 0) + 1;
+      }
+    });
+
+    document.querySelectorAll('.category-btn').forEach(btn => {
+      const cat = btn.getAttribute('data-category');
+      const countSpan = btn.querySelector('.facet-count');
+      if (countSpan) {
+        const num = cat === 'all' ? (counts.all || 0) : (counts[cat] || 0);
+        countSpan.textContent = `(${num})`;
+      }
+    });
+
+    const inStockCount = products.filter(p => p.available && p.stock > 0).length;
+    const lowStockCount = products.filter(p => p.stock > 0 && p.stock <= 5).length;
+
+    const countInStockEl = document.getElementById('count-instock');
+    if (countInStockEl) countInStockEl.textContent = `(${inStockCount})`;
+
+    const countLowStockEl = document.getElementById('count-lowstock');
+    if (countLowStockEl) countLowStockEl.textContent = `(${lowStockCount})`;
+  }
+
   // --- CATALOG FILTER & RENDER ENGINE ---
   function applyFiltersAndRender(resetPage = true) {
     if (resetPage) {
       currentPage = 1;
     }
 
+    updateCategoryCounts();
     renderFacetedBrandsList();
     renderActiveChips();
 
