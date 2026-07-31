@@ -379,16 +379,141 @@ button, input, select, textarea {
   font-size: 0.9rem;
 }
 
+/* --- CIRCULAR MENU TRIGGER BUTTON & DROPDOWN MODAL --- */
+.nav-more-circle-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--color-primary);          /* #3E5F1F Verde Bosque */
+  border: 1.5px solid var(--color-accent-gold); /* #C2A246 Dorado */
+  color: #F6F3E8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(62, 95, 31, 0.25);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.nav-more-circle-btn:hover {
+  background: var(--color-earth-brown);      /* #6B4E2E Tierra */
+  border-color: #FFFFFF;
+  color: #FFFFFF;
+  transform: scale(1.08);
+  box-shadow: 0 6px 18px rgba(107, 78, 46, 0.4);
+}
+
+.more-dots-icon {
+  width: 22px;
+  height: 22px;
+  fill: var(--color-accent-gold);
+  transition: fill 0.25s ease;
+}
+
+.nav-more-circle-btn:hover .more-dots-icon {
+  fill: #FFFFFF;
+}
+
+/* Dropdown Menu Modal */
+.nav-more-menu-dropdown {
+  position: absolute;
+  top: 65px;
+  right: 20px;
+  width: 310px;
+  background: #2B4214;                         /* Verde Bosque Brand Manual */
+  border: 2px solid var(--color-accent-gold);
+  border-radius: 18px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(194, 162, 70, 0.15);
+  padding: 18px;
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 999;
+  animation: dropdownSlideDown 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.nav-more-menu-dropdown.active {
+  display: flex;
+}
+
+@keyframes dropdownSlideDown {
+  from { opacity: 0; transform: translateY(-12px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.more-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1.5px solid var(--color-accent-gold);
+  padding-bottom: 10px;
+}
+
+.more-menu-title {
+  font-family: var(--font-serif);
+  color: var(--color-accent-gold);
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.more-menu-close {
+  background: none;
+  border: none;
+  color: #F6F3E8;
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.more-menu-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.more-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(246, 243, 232, 0.08);
+  border: 1px solid rgba(194, 162, 70, 0.3);
+  color: #F6F3E8;
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.more-menu-item:hover {
+  background: var(--color-earth-brown);
+  border-color: var(--color-accent-gold);
+  color: #FFFFFF;
+  transform: translateX(4px);
+}
+
+.menu-item-icon {
+  font-size: 1.1rem;
+}
+
 /* ==========================================================================
-   Hero Section
+   Hero Section (Brand Manual Colors & Aura)
    ========================================================================== */
 .hero-section {
-  padding: 100px 24px;
+  padding: 90px 24px;
   position: relative;
   overflow: hidden;
-  background: radial-gradient(circle at 80% 20%, #1c3d31 0%, #0d1d17 100%);
-  border-bottom: 2px solid var(--color-accent-gold);
-  color: #fdfcf9;
+  background: radial-gradient(circle at 80% 20%, #3E5F1F 0%, #1e310d 100%);
+  border-bottom: 3px solid var(--color-accent-gold);
+  color: #F6F3E8;
 }
 
 .hero-container {
@@ -405,16 +530,24 @@ button, input, select, textarea {
 }
 
 .hero-title {
+  font-family: var(--font-serif);
   font-size: 3.2rem;
   margin-bottom: 24px;
-  color: #fdfcf9 !important;
+  color: #F6F3E8 !important;
+  line-height: 1.15;
+}
+
+.hero-title .highlight-gold {
+  color: var(--color-accent-gold) !important;
+  text-shadow: 0 0 20px rgba(194, 162, 70, 0.4);
 }
 
 .hero-description {
+  font-family: var(--font-sans);
   font-size: 1.15rem;
   line-height: 1.7;
-  color: #eceae4;
-  opacity: 0.9;
+  color: #F6F3E8;
+  opacity: 0.95;
   margin-bottom: 36px;
   max-width: 550px;
 }
@@ -445,7 +578,7 @@ button, input, select, textarea {
   width: 100%;
   height: 100%;
   aspect-ratio: 1;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='none' stroke='%23c39b4b' stroke-width='0.5' opacity='0.35'%3E%3Ccircle cx='50' cy='50' r='45'/%3E%3Ccircle cx='50' cy='50' r='35' stroke-dasharray='1 1'/%3E%3Cpath d='M50 5 L50 95 M5 50 L95 50 M18 18 L82 82 M18 82 L82 18'/%3E%3Cpath d='M50 5 C55 35 45 35 50 95 C45 65 55 65 50 5'/%3E%3Cpath d='M5 50 C35 55 35 45 95 50 C65 45 65 55 5 50'/%3E%3Ccircle cx='50' cy='50' r='10' fill='none'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='none' stroke='%23C2A246' stroke-width='0.6' opacity='0.45'%3E%3Ccircle cx='50' cy='50' r='45'/%3E%3Ccircle cx='50' cy='50' r='35' stroke-dasharray='1 1'/%3E%3Cpath d='M50 5 L50 95 M5 50 L95 50 M18 18 L82 82 M18 82 L82 18'/%3E%3Cpath d='M50 5 C55 35 45 35 50 95 C45 65 55 65 50 5'/%3E%3Cpath d='M5 50 C35 55 35 45 95 50 C65 45 65 55 5 50'/%3E%3Ccircle cx='50' cy='50' r='10' fill='none'/%3E%3C/svg%3E");
   background-size: contain;
   background-repeat: no-repeat;
   z-index: 1;
@@ -454,10 +587,10 @@ button, input, select, textarea {
 .hero-center-logo {
   width: 240px;
   height: 240px;
-  border-radius: var(--border-radius-md);
+  border-radius: 50%;
   object-fit: cover;
   border: 4px solid var(--color-accent-gold);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 0 35px rgba(194, 162, 70, 0.4), 0 12px 30px rgba(0, 0, 0, 0.5);
   position: relative;
   z-index: 2;
   transition: var(--transition-smooth);
@@ -465,8 +598,8 @@ button, input, select, textarea {
 }
 
 .hero-center-logo:hover {
-  transform: scale(1.03);
-  box-shadow: var(--shadow-gold), 0 0 35px rgba(229, 193, 123, 0.5);
+  transform: scale(1.04);
+  box-shadow: 0 0 45px rgba(194, 162, 70, 0.6);
 }
 
 /* Zen 420 Particles & Floating Leaves */

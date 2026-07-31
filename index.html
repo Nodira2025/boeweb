@@ -45,57 +45,7 @@
 
       <!-- Navigation & Cart Area -->
       <div class="header-cart-area">
-        <!-- Academia BÔ Button -->
-        <button class="nav-header-btn no-mobile" id="academy-trigger" aria-label="Academia de Cultivo">
-          <svg class="icon nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
-            <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
-          </svg>
-          <span>Academia BÔ</span>
-        </button>
-
-        <!-- Pacientes & REPROCANN -->
-        <a href="pacientes.html" class="nav-header-btn no-mobile" aria-label="Trámites y Pacientes">
-          <svg class="icon nav-icon green-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-          </svg>
-          <span>REPROCANN</span>
-        </a>
-
-        <!-- BÔ Coffee -->
-        <a href="coffee.html" class="nav-header-btn no-mobile" aria-label="BÔ Coffee Lounge">
-          <span class="nav-emoji">☕</span>
-          <span>BÔ Coffee</span>
-        </a>
-
-        <!-- Portal Vendedores -->
-        <a href="vendedor.html" class="nav-header-btn no-mobile" aria-label="Portal de Vendedores">
-          <span class="nav-emoji">💼</span>
-          <span>Vendedores</span>
-        </a>
-
-        <!-- Guías de Cultivo -->
-        <button class="nav-header-btn no-mobile" id="blog-trigger" aria-label="Ver guías de cultivo">
-          <svg class="icon nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-          </svg>
-          <span>Guías</span>
-        </button>
-
-        <!-- Dr. BÔ IA -->
-        <button class="nav-header-btn green-border" id="drbo-trigger" onclick="openDrBoModal()" aria-label="Doctor de Cultivo IA">
-          <span class="nav-emoji">🩺</span>
-          <span>Dr. BÔ IA</span>
-        </button>
-
-        <!-- Escanear QR -->
-        <button class="nav-header-btn" onclick="openCustomerQRProductScan()" aria-label="Escanear QR de Producto en Local">
-          <span class="nav-emoji">📷</span>
-          <span>Escanear QR</span>
-        </button>
-
-        <!-- Club BÔ -->
+        <!-- Direct Quick Actions -->
         <button class="nav-header-btn" id="club-trigger" aria-label="Portal de Miembros">
           <svg class="icon nav-icon gold-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
@@ -103,7 +53,6 @@
           <span id="club-btn-text">Club BÔ</span>
         </button>
 
-        <!-- Mi Carrito -->
         <button class="nav-header-btn nav-cart-btn" id="cart-trigger" aria-label="Ver carrito">
           <div class="cart-icon-wrapper">
             <svg class="icon cart-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -115,6 +64,53 @@
           </div>
           <span>Mi Carrito</span>
         </button>
+
+        <!-- Circular Menu Trigger Button ("... MÁS") -->
+        <button class="nav-more-circle-btn" id="nav-more-trigger" onclick="toggleNavMoreMenu()" aria-label="Abrir menú desplegable de secciones">
+          <svg class="more-dots-icon" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="5" cy="12" r="2.2"></circle>
+            <circle cx="12" cy="12" r="2.2"></circle>
+            <circle cx="19" cy="12" r="2.2"></circle>
+          </svg>
+        </button>
+
+        <!-- Circular Dropdown Menu -->
+        <div class="nav-more-menu-dropdown" id="nav-more-menu-dropdown">
+          <div class="more-menu-header">
+            <span class="more-menu-title">Secciones BÔ Grow Club</span>
+            <button class="more-menu-close" onclick="closeNavMoreMenu()">&times;</button>
+          </div>
+          <div class="more-menu-grid">
+            <button class="more-menu-item" onclick="closeNavMoreMenu(); document.getElementById('academy-trigger')?.click();">
+              <span class="menu-item-icon">🎓</span>
+              <span class="menu-item-text">Academia BÔ</span>
+            </button>
+            <a href="pacientes.html" class="more-menu-item" onclick="closeNavMoreMenu();">
+              <span class="menu-item-icon">📋</span>
+              <span class="menu-item-text">REPROCANN & Pacientes</span>
+            </a>
+            <a href="coffee.html" class="more-menu-item" onclick="closeNavMoreMenu();">
+              <span class="menu-item-icon">☕</span>
+              <span class="menu-item-text">BÔ Coffee Lounge</span>
+            </a>
+            <a href="vendedor.html" class="more-menu-item" onclick="closeNavMoreMenu();">
+              <span class="menu-item-icon">💼</span>
+              <span class="menu-item-text">Portal Vendedores</span>
+            </a>
+            <button class="more-menu-item" onclick="closeNavMoreMenu(); document.getElementById('blog-trigger')?.click();">
+              <span class="menu-item-icon">📖</span>
+              <span class="menu-item-text">Guías de Cultivo</span>
+            </button>
+            <button class="more-menu-item" onclick="closeNavMoreMenu(); openDrBoModal();">
+              <span class="menu-item-icon">🩺</span>
+              <span class="menu-item-text">Dr. BÔ IA</span>
+            </button>
+            <button class="more-menu-item" onclick="closeNavMoreMenu(); openCustomerQRProductScan();">
+              <span class="menu-item-icon">📷</span>
+              <span class="menu-item-text">Escanear QR Local</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </header>

@@ -1795,6 +1795,32 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // --- CIRCULAR NAV MORE MENU HANDLERS ---
+  window.toggleNavMoreMenu = function() {
+    const dropdown = document.getElementById('nav-more-menu-dropdown');
+    if (dropdown) {
+      dropdown.classList.toggle('active');
+    }
+  };
+
+  window.closeNavMoreMenu = function() {
+    const dropdown = document.getElementById('nav-more-menu-dropdown');
+    if (dropdown) {
+      dropdown.classList.remove('active');
+    }
+  };
+
+  // Close dropdown menu when clicking outside
+  document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('nav-more-menu-dropdown');
+    const trigger = document.getElementById('nav-more-trigger');
+    if (dropdown && dropdown.classList.contains('active')) {
+      if (!dropdown.contains(e.target) && !trigger?.contains(e.target)) {
+        closeNavMoreMenu();
+      }
+    }
+  });
+
   // --- APP INITIALIZATION ---
   loadCatalog();
   loadBlog(); // load blog articles
