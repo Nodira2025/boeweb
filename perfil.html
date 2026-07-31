@@ -13,27 +13,34 @@
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Montserrat:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
   
   <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <!-- Base Stylesheet -->
-  <link rel="stylesheet" href="index.css?v=2.6">
+  <link rel="stylesheet" href="index.css?v=3.6">
   
   <style>
     :root {
-      --gold-gradient: linear-gradient(135deg, #f39c12 0%, #d4af37 50%, #aa7c11 100%);
-      --card-bg-glass: rgba(15, 30, 24, 0.75);
-      --card-border-gold: rgba(212, 175, 55, 0.35);
+      --color-primary: #3E5F1F;           /* Verde Bosque Profundo */
+      --color-primary-light: #7EA642;     /* Verde Hoja Vibrante */
+      --color-accent-gold: #C2A246;       /* Dorado / Ocre Orgánico */
+      --color-earth-brown: #6B4E2E;       /* Tierra / Marrón Caluroso */
+      --color-bg: #F6F3E8;                /* Crema Zen */
+      --gold-gradient: linear-gradient(135deg, #C2A246 0%, #9e8131 100%);
+      --card-bg-glass: rgba(30, 49, 13, 0.95);
+      --card-border-gold: rgba(194, 162, 70, 0.45);
+      --font-serif: 'Cinzel', serif;
+      --font-sans: 'Montserrat', sans-serif;
     }
 
     body {
-      background: radial-gradient(circle at 15% 15%, rgba(212, 175, 55, 0.12) 0%, transparent 45%),
-                  radial-gradient(circle at 85% 75%, rgba(46, 125, 50, 0.15) 0%, transparent 50%),
-                  #070e0b;
-      color: #fff;
-      font-family: 'Outfit', sans-serif;
+      background: radial-gradient(circle at 15% 15%, rgba(194, 162, 70, 0.18) 0%, transparent 45%),
+                  radial-gradient(circle at 85% 75%, rgba(126, 166, 66, 0.15) 0%, transparent 50%),
+                  #1e310d;
+      color: #F6F3E8;
+      font-family: var(--font-sans);
       min-height: 100vh;
       margin: 0;
       background-attachment: fixed;
@@ -41,15 +48,15 @@
     
     /* Top Header Bar */
     .perfil-header {
-      background: rgba(10, 20, 16, 0.85);
+      background: rgba(30, 49, 13, 0.96);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      border-bottom: 1.5px solid var(--card-border-gold);
+      border-bottom: 2px solid var(--color-accent-gold);
       padding: 16px 36px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
       position: sticky;
       top: 0;
       z-index: 100;
@@ -63,12 +70,12 @@
 
     /* Hero Welcome Banner */
     .hero-vip-banner {
-      background: linear-gradient(135deg, rgba(21, 45, 36, 0.9) 0%, rgba(12, 25, 20, 0.95) 100%);
-      border: 2px solid var(--card-border-gold);
+      background: linear-gradient(135deg, #2B4214 0%, #1e310d 100%);
+      border: 2px solid var(--color-accent-gold);
       border-radius: 28px;
       padding: 32px 40px;
       margin-bottom: 36px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(212, 175, 55, 0.08);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 0 35px rgba(194, 162, 70, 0.15);
       position: relative;
       overflow: hidden;
       display: flex;
@@ -85,7 +92,7 @@
       right: -10%;
       width: 300px;
       height: 300px;
-      background: radial-gradient(circle, rgba(212, 175, 55, 0.15) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(194, 162, 70, 0.18) 0%, transparent 70%);
       pointer-events: none;
     }
 
@@ -95,7 +102,7 @@
       border-radius: 50%;
       background: var(--gold-gradient);
       padding: 3px;
-      box-shadow: 0 0 20px rgba(212, 175, 55, 0.4);
+      box-shadow: 0 0 20px rgba(194, 162, 70, 0.4);
     }
 
     .user-avatar-badge img {
@@ -106,22 +113,22 @@
     }
 
     .seeds-counter-box {
-      background: rgba(7, 14, 11, 0.7);
-      border: 1.5px solid var(--color-accent-gold);
+      background: #2B4214;
+      border: 2px solid var(--color-accent-gold);
       border-radius: 20px;
       padding: 16px 28px;
       text-align: center;
-      box-shadow: 0 0 25px rgba(212, 175, 55, 0.25);
+      box-shadow: 0 0 25px rgba(194, 162, 70, 0.25);
     }
 
     .seeds-counter-val {
       font-size: 2.4rem;
       font-weight: 900;
-      background: var(--gold-gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      font-family: var(--font-serif);
+      color: var(--color-accent-gold);
       line-height: 1;
       margin-top: 4px;
+      text-shadow: 0 0 15px rgba(194, 162, 70, 0.4);
     }
 
     /* Launchpad Grid */
@@ -165,24 +172,24 @@
     }
 
     .launchpad-card:hover {
-      transform: translateY(-8px) scale(1.03);
+      transform: translateY(-6px) scale(1.03);
       border-color: var(--color-accent-gold);
-      box-shadow: 0 20px 40px rgba(212, 175, 55, 0.35), 0 0 20px rgba(212, 175, 55, 0.2);
-      background: rgba(25, 45, 36, 0.9);
+      box-shadow: 0 18px 35px rgba(194, 162, 70, 0.35);
+      background: #253C13;
     }
 
     .launchpad-card-active {
       border-color: var(--color-accent-gold) !important;
-      background: rgba(212, 175, 55, 0.15) !important;
-      box-shadow: 0 0 30px rgba(212, 175, 55, 0.4) !important;
+      background: linear-gradient(135deg, #3E5F1F 0%, #253C13 100%) !important;
+      box-shadow: 0 0 30px rgba(194, 162, 70, 0.45), inset 0 0 15px rgba(194, 162, 70, 0.2) !important;
     }
 
     .launchpad-icon-circle {
       width: 56px;
       height: 56px;
       border-radius: 50%;
-      background: rgba(212, 175, 55, 0.12);
-      border: 1px solid rgba(212, 175, 55, 0.3);
+      background: rgba(194, 162, 70, 0.15);
+      border: 1px solid rgba(194, 162, 70, 0.4);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -195,16 +202,17 @@
     }
 
     .launchpad-title {
-      font-weight: 800;
+      font-family: var(--font-serif);
+      font-weight: 700;
       font-size: 0.95rem;
-      color: #fff;
+      color: #F6F3E8;
       letter-spacing: 0.3px;
     }
 
     .launchpad-badge {
       font-size: 0.7rem;
-      background: var(--gold-gradient);
-      color: #070e0b;
+      background: var(--color-accent-gold);
+      color: #2B4214;
       font-weight: 900;
       padding: 3px 10px;
       border-radius: 12px;
@@ -213,12 +221,12 @@
 
     /* Pass Card 3D Gold Metal */
     .vip-pass-card-3d {
-      background: linear-gradient(135deg, #152d24 0%, #1e3e32 50%, #0d1a15 100%);
+      background: linear-gradient(135deg, #2B4214 0%, #1e310d 50%, #17260a 100%);
       border: 2px solid var(--color-accent-gold);
       border-radius: 24px;
       padding: 28px 24px;
       text-align: center;
-      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6), inset 0 0 25px rgba(212, 175, 55, 0.15);
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5), inset 0 0 25px rgba(194, 162, 70, 0.18);
       position: relative;
     }
 
@@ -226,6 +234,19 @@
       display: grid;
       grid-template-columns: 360px 1fr;
       gap: 32px;
+    }
+
+    .b2b-form-input {
+      background: #F6F3E8 !important;
+      color: #2B4214 !important;
+      border: 2px solid var(--color-accent-gold) !important;
+      font-family: var(--font-sans) !important;
+      font-weight: 700 !important;
+    }
+
+    .b2b-form-input::placeholder {
+      color: #6B4E2E !important;
+      opacity: 0.85;
     }
 
     @media (max-width: 992px) {
@@ -242,7 +263,7 @@
     <a href="index.html" style="text-decoration: none; display: flex; align-items: center; gap: 14px;">
       <img src="assets/logo.jpg" alt="BÔ Growclub" style="width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--color-accent-gold); box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);">
       <div>
-        <h2 style="margin: 0; font-family: 'Playfair Display', serif; color: var(--color-accent-gold); font-size: 1.4rem; letter-spacing: 1px;">BÔ GROWCLUB</h2>
+        <h2 style="margin: 0; font-family: 'Cinzel', serif; color: var(--color-accent-gold); font-size: 1.4rem; letter-spacing: 1px;">BÔ GROWCLUB</h2>
         <span style="font-size: 0.72rem; color: rgba(247,246,242,0.7); text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700;">MIEMBRO CLUB VIP</span>
       </div>
     </a>
@@ -263,7 +284,7 @@
         </div>
         <div>
           <span style="font-size: 0.8rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px;">¡HOLA DE NUEVO!</span>
-          <h1 style="font-family: 'Playfair Display', serif; color: #fff; margin: 4px 0 6px 0; font-size: 2rem;" id="header-user-name">Franco Ruiz</h1>
+          <h1 style="font-family: 'Cinzel', serif; color: #fff; margin: 4px 0 6px 0; font-size: 2rem;" id="header-user-name">Franco Ruiz</h1>
           <div style="display: flex; gap: 10px; align-items: center;">
             <span style="background: rgba(212, 175, 55, 0.2); border: 1px solid var(--color-accent-gold); padding: 4px 14px; border-radius: 12px; color: var(--color-accent-gold); font-weight: 800; font-size: 0.85rem;" id="header-user-tier">🌱 Nivel 1: Brote (5% OFF)</span>
             <span style="font-size: 0.8rem; color: rgba(247,246,242,0.7);">Cliente Preferencial Presencial & Web</span>
@@ -282,7 +303,7 @@
     <!-- LAUNCHPAD DE ACCESO RÁPIDO DE LUJO -->
     <section style="margin-bottom: 36px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
-        <h3 style="font-family: 'Playfair Display', serif; color: var(--color-accent-gold); margin: 0; font-size: 1.4rem;">🚀 Acceso Rápido & Funciones VIP</h3>
+        <h3 style="font-family: 'Cinzel', serif; color: var(--color-accent-gold); margin: 0; font-size: 1.4rem;">🚀 Acceso Rápido & Funciones VIP</h3>
         <span style="font-size: 0.8rem; color: rgba(247,246,242,0.6);">Seleccioná una función para interactuar al instante</span>
       </div>
 
@@ -336,7 +357,7 @@
         <!-- Credencial Pase Digital QR HOLOGRÁFICA 3D -->
         <div class="vip-pass-card-3d" style="margin-bottom: 28px;">
           <span style="font-size: 0.7rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px;">PASE DIGITAL PRESENCIAL BÔ</span>
-          <h3 style="font-family: 'Playfair Display', serif; color: var(--color-accent-gold); font-size: 1.35rem; margin: 6px 0 16px 0;" id="perfil-qr-name">Miembro VIP</h3>
+          <h3 style="font-family: 'Cinzel', serif; color: var(--color-accent-gold); font-size: 1.35rem; margin: 6px 0 16px 0;" id="perfil-qr-name">Miembro VIP</h3>
 
           <div style="width: 170px; height: 170px; margin: 0 auto 16px auto; background: #fff; border-radius: 16px; padding: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 25px rgba(212,175,55,0.5);" id="perfil-qr-container">
             <svg viewBox="0 0 100 100" style="width: 100%; height: 100%;">
@@ -378,7 +399,7 @@
           <div style="background: linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(15, 30, 24, 0.95) 100%); border: 2px solid var(--color-accent-gold); border-radius: 28px; padding: 40px; text-align: center; box-shadow: 0 15px 40px rgba(0,0,0,0.5);">
             <span style="font-size: 4rem; display: block; margin-bottom: 12px; filter: drop-shadow(0 0 15px rgba(212,175,55,0.6));">🎁</span>
             <span style="font-size: 0.8rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px;">COFRE MISTERIOSO DE PREMIOS BÔ</span>
-            <h2 style="font-family: 'Playfair Display', serif; color: #fff; margin: 8px 0 14px 0; font-size: 1.8rem;">Abrí tu Caja Mágica Semanal</h2>
+            <h2 style="font-family: 'Cinzel', serif; color: #fff; margin: 8px 0 14px 0; font-size: 1.8rem;">Abrí tu Caja Mágica Semanal</h2>
             <p style="color: rgba(247,246,242,0.85); max-width: 520px; margin: 0 auto 24px auto; font-size: 1rem; line-height: 1.5;">Ganá premios aleatorios instantáneos: +50, +100 o +250 Semillas VIP, cupones de descuento extra o regalos físicos por $0.</p>
             
             <button class="btn btn-primary" onclick="openMysteryChest()" style="background: var(--gold-gradient); border-color: var(--color-accent-gold); color: #070e0b; font-weight: 900; padding: 16px 40px; font-size: 1.15rem; border-radius: 16px; box-shadow: 0 10px 30px rgba(212,175,55,0.4);">
@@ -394,7 +415,7 @@
           <div style="background: var(--card-bg-glass); backdrop-filter: blur(16px); border: 1.5px solid var(--card-border-gold); border-radius: 28px; padding: 32px; box-shadow: 0 15px 40px rgba(0,0,0,0.5);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
               <div>
-                <h3 style="margin: 0; color: var(--color-accent-gold); font-family: 'Playfair Display', serif; font-size: 1.6rem;">🌱 Diario de Cultivo & Racha Diaria</h3>
+                <h3 style="margin: 0; color: var(--color-accent-gold); font-family: 'Cinzel', serif; font-size: 1.6rem;">🌱 Diario de Cultivo & Racha Diaria</h3>
                 <p style="margin: 6px 0 0 0; font-size: 0.9rem; color: rgba(247,246,242,0.8);">Registrá tu cultivo todos los días para ganar +20 Semillas de racha y +30 Semillas por instrumental.</p>
               </div>
               <button class="btn btn-primary" onclick="claimDailyCheckin()" style="padding: 12px 24px; font-weight: 900; background: var(--gold-gradient); border-color: var(--color-accent-gold); color: #070e0b; border-radius: 14px;">🔥 RECLAMAR RACHA DIARIA (+20 SEMILLAS)</button>
@@ -430,7 +451,7 @@
         <!-- PANEL 3: MISIONES REDES -->
         <div class="perfil-tab-panel" id="panel-missions" style="display: none;">
           <div style="background: var(--card-bg-glass); backdrop-filter: blur(16px); border: 1.5px solid var(--card-border-gold); border-radius: 28px; padding: 32px; box-shadow: 0 15px 40px rgba(0,0,0,0.5);">
-            <h3 style="margin: 0 0 6px 0; color: var(--color-accent-gold); font-family: 'Playfair Display', serif; font-size: 1.6rem;">🎯 Misiones Sociales Automáticas (+700 Semillas)</h3>
+            <h3 style="margin: 0 0 6px 0; color: var(--color-accent-gold); font-family: 'Cinzel', serif; font-size: 1.6rem;">🎯 Misiones Sociales Automáticas (+700 Semillas)</h3>
             <p style="font-size: 0.95rem; color: rgba(247,246,242,0.85); margin-bottom: 24px;">Completá las misiones en nuestras redes para sumar Semillas VIP acumulables al instante sin espera.</p>
 
             <div style="display: flex; flex-direction: column; gap: 20px;">
@@ -466,7 +487,7 @@
         <div class="perfil-tab-panel" id="panel-plusultra" style="display: none;">
           <div style="background: linear-gradient(135deg, rgba(244, 67, 54, 0.25) 0%, rgba(212, 175, 55, 0.3) 100%); border: 2.5px solid #ff5252; border-radius: 28px; padding: 36px; color: #fff; box-shadow: 0 15px 40px rgba(244,67,54,0.3);">
             <span style="background: #ff5252; color: #fff; font-weight: 900; padding: 6px 16px; border-radius: 14px; font-size: 0.85rem; letter-spacing: 1px;">NIVEL MÁXIMO DE SUSCRIPCIÓN</span>
-            <h2 style="font-family: 'Playfair Display', serif; color: var(--color-accent-gold); margin: 12px 0 16px 0; font-size: 2rem;">🔥 Membresía BÔ Plus Ultra ($3 USD/mes)</h2>
+            <h2 style="font-family: 'Cinzel', serif; color: var(--color-accent-gold); margin: 12px 0 16px 0; font-size: 2rem;">🔥 Membresía BÔ Plus Ultra ($3 USD/mes)</h2>
             <p style="font-size: 1.05rem; color: rgba(247,246,242,0.95); margin-bottom: 24px; line-height: 1.6;">
               • 🎁 <strong>Kit de Bienvenida Físico BÔ</strong> a retirar en el local (Quedan 7/10 vacantes disponibles).<br>
               • 🚚 <strong>Envío Gratis Permanente</strong> en compras superiores al monto mínimo.<br>
@@ -487,7 +508,7 @@
         <!-- PANEL 5: TIENDA $0 -->
         <div class="perfil-tab-panel" id="panel-store" style="display: none;">
           <div style="background: var(--card-bg-glass); backdrop-filter: blur(16px); border: 1.5px solid var(--card-border-gold); border-radius: 28px; padding: 32px; box-shadow: 0 15px 40px rgba(0,0,0,0.5);">
-            <h3 style="margin: 0 0 6px 0; color: var(--color-accent-gold); font-family: 'Playfair Display', serif; font-size: 1.6rem;">🎁 Tienda de Canje de Semillas ($0)</h3>
+            <h3 style="margin: 0 0 6px 0; color: var(--color-accent-gold); font-family: 'Cinzel', serif; font-size: 1.6rem;">🎁 Tienda de Canje de Semillas ($0)</h3>
             <p style="font-size: 0.95rem; color: rgba(247,246,242,0.85); margin-bottom: 24px;">Canjeá tus semillas acumuladas por productos físicos de regalo agregados por $0 a tu carrito.</p>
 
             <h4 style="color: var(--color-accent-gold); margin-bottom: 16px; font-size: 1.2rem;">🎫 Cupones de Descuento Extra:</h4>
@@ -501,7 +522,7 @@
         <!-- PANEL 6: SORTEO MENSUAL CON ENCUESTA COMPLETA -->
         <div class="perfil-tab-panel" id="panel-raffle" style="display: none;">
           <div style="background: var(--card-bg-glass); backdrop-filter: blur(16px); border: 1.5px solid var(--card-border-gold); border-radius: 28px; padding: 32px; box-shadow: 0 15px 40px rgba(0,0,0,0.5);">
-            <h3 style="margin: 0 0 6px 0; color: var(--color-accent-gold); font-family: 'Playfair Display', serif; font-size: 1.6rem;">🎟️ Sorteo Mensual BÔ Growclub</h3>
+            <h3 style="margin: 0 0 6px 0; color: var(--color-accent-gold); font-family: 'Cinzel', serif; font-size: 1.6rem;">🎟️ Sorteo Mensual BÔ Growclub</h3>
             <p style="font-size: 0.95rem; color: rgba(247,246,242,0.85); margin-bottom: 24px;">Completá la encuesta mensual de 3 preguntas para ganar <strong>+150 Semillas VIP</strong> y obtener tu número de Ticket Dorado para el sorteo de premios en el local.</p>
             
             <div id="raffle-survey-container">
