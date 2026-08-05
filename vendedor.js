@@ -956,68 +956,79 @@ function formatPrice(value) {
   });
 }
 
-// --- VENDOR AUTHENTICATION & AI SALES DEMO ENGINE ---
-let liveUSDRate = 1385.00; // Fallback rate
+// --- VENDOR AUTHENTICATION & AI SALES ENGINE ---
+
+const AUTHORIZED_VENDEDORES = [
+  { name: 'Raul', pass: 'raul123' },
+  { name: 'Nacho Mina', pass: 'nacho mina123', altPass: 'nachomina123' },
+  { name: 'Alexis', pass: 'alexis123' },
+  { name: 'Gino', pass: 'gino123' },
+  { name: 'Rodrigo', pass: 'rodrigo123' },
+  { name: 'Felipe', pass: 'felipe123' },
+  { name: 'Mariano', pass: 'mariano123' }
+];
+
+const AI_VISION_API_KEY = '-7eVtJsCLDRe3tUAznAxNXJV9H1R5gq478p9f2OtO5RIsq-SlZZxqV18VkNDyta5O';
+
+let currentUploadedRealPhoto = null;
 let currentSamplePhoto = null;
+let liveUSDRate = 1385.00;
 let lastRegisteredReceipt = null;
 
-// Auth check on load
-document.addEventListener('DOMContentLoaded', () => {
-  checkVendorAuth();
-  fetchLiveUSDRate();
-});
-
+// Vendor Auth Check on Load & Session Management
 function checkVendorAuth() {
-  const isLogged = sessionStorage.getItem('boeweb_vendor_logged') || localStorage.getItem('boeweb_vendor_logged');
-  const modal = document.getElementById('vendedor-auth-modal');
-  const userDisplay = document.getElementById('vendor-user-display');
-  
-  if (isLogged === 'true') {
-    if (modal) modal.style.display = 'none';
-    const storedName = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
-    if (userDisplay) userDisplay.textContent = `👤 ${storedName} (Vendedor Staff)`;
-    const vendorNameInput = document.getElementById('b2b-vendedor-name');
-    if (vendorNameInput) vendorNameInput.value = storedName;
+  const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name');
+  const authModal = document.getElementById('vendedor-auth-modal');
+  const vendorNameHeader = document.getElementById('active-vendor-display-name');
+  const vendorCheckoutInput = document.getElementById('b2b-vendedor-name');
+
+  if (activeVendor) {
+    if (authModal) authModal.style.display = 'none';
+    if (vendorNameHeader) vendorNameHeader.textContent = `🧑‍💼 Vendedor: ${activeVendor}`;
+    if (vendorCheckoutInput) vendorCheckoutInput.value = activeVendor;
   } else {
-    if (modal) modal.style.display = 'flex';
+    if (authModal) authModal.style.display = 'flex';
   }
 }
 
 function handleVendorLogin(e) {
-  e.preventDefault();
-  const nameInput = document.getElementById('auth-vendor-name');
-  const pinInput = document.getElementById('auth-vendor-pin');
-  
-  const name = nameInput ? nameInput.value.trim() : '';
-  const pin = pinInput ? pinInput.value.trim() : '';
+  if (e) e.preventDefault();
+  const selectEl = document.getElementById('auth-vendor-select');
+  const passEl = document.getElementById('auth-vendor-password');
 
-  if (!name) {
-    alert('Por favor ingresá tu nombre.');
+  if (!selectEl || !passEl) return;
+
+  const selectedName = selectEl.value;
+  const typedPass = passEl.value.trim().toLowerCase();
+
+  if (!selectedName) {
+    alert('Por favor seleccioná tu nombre de la lista de vendedores.');
     return;
   }
 
-  // Demo PIN Check (Accepts 1234 or vendedor2026)
-  if (pin === '1234' || pin === 'vendedor2026' || pin === 'admin') {
-    sessionStorage.setItem('boeweb_vendor_logged', 'true');
-    sessionStorage.setItem('boeweb_vendor_name', name);
-    localStorage.setItem('boeweb_vendor_logged', 'true');
-    localStorage.setItem('boeweb_vendor_name', name);
-    checkVendorAuth();
-    showToast(`✅ ¡Bienvenido ${name}! Sesión iniciada.`);
+  const vendorData = AUTHORIZED_VENDEDORES.find(v => v.name.toLowerCase() === selectedName.toLowerCase());
+
+  if (vendorData) {
+    const isPassValid = (typedPass === vendorData.pass.toLowerCase()) || 
+                        (vendorData.altPass && typedPass === vendorData.altPass.toLowerCase());
+
+    if (isPassValid) {
+      sessionStorage.setItem('boeweb_vendor_name', vendorData.name);
+      localStorage.setItem('boeweb_vendor_name', vendorData.name);
+      checkVendorAuth();
+      showToast(`👋 ¡Bienvenido/a, ${vendorData.name}! Sesión de vendedor activa.`);
+      passEl.value = '';
+    } else {
+      alert(`❌ Contraseña incorrecta para ${selectedName}.\nRecordá que tu contraseña es tu nombre en minúsculas seguido de 123 (Ej. raul123 o nachomina123).`);
+    }
   } else {
-    alert('❌ PIN Incorrecto. El PIN de prueba es: 1234');
+    alert('Vendedor no autorizado.');
   }
 }
 
 function vendorLogout() {
-  sessionStorage.removeItem('boeweb_vendor_logged');
   sessionStorage.removeItem('boeweb_vendor_name');
-  localStorage.removeItem('boeweb_vendor_logged');
   localStorage.removeItem('boeweb_vendor_name');
-
-  const pinInput = document.getElementById('auth-vendor-pin');
-  if (pinInput) pinInput.value = '';
-
   checkVendorAuth();
   showToast('🔒 Sesión de vendedor cerrada.');
 }
@@ -1028,12 +1039,12 @@ function switchVendorTab(tab) {
   const mapSection = document.getElementById('store-map-section');
   const qrSection = document.getElementById('scan-customer-qr-section');
 
-  const btnReposicion = document.getElementById('vendor-tab-reposicion');
-  const btnSales = document.getElementById('vendor-tab-sales');
-  const btnMap = document.getElementById('vendor-tab-map');
-  const btnQr = document.getElementById('vendor-tab-qr');
+  const btnCatalog = document.getElementById('tab-btn-catalog');
+  const btnAi = document.getElementById('tab-btn-ai');
+  const btnMap = document.getElementById('tab-btn-map');
+  const btnScan = document.getElementById('tab-btn-scan');
 
-  const allBtns = [btnReposicion, btnSales, btnMap, btnQr];
+  const allBtns = [btnCatalog, btnAi, btnMap, btnScan];
   allBtns.forEach(btn => { if (btn) btn.classList.remove('active'); });
 
   if (mainLayout) mainLayout.style.display = 'none';
@@ -1041,20 +1052,22 @@ function switchVendorTab(tab) {
   if (mapSection) mapSection.style.display = 'none';
   if (qrSection) qrSection.style.display = 'none';
 
-  if (tab === 'reposicion') {
+  if (tab === 'catalog' || tab === 'reposicion') {
     if (mainLayout) mainLayout.style.display = 'grid';
-    if (btnReposicion) btnReposicion.classList.add('active');
-  } else if (tab === 'sales') {
+    if (btnCatalog) btnCatalog.classList.add('active');
+  } else if (tab === 'ai' || tab === 'sales') {
     if (salesSection) salesSection.style.display = 'block';
-    if (btnSales) btnSales.classList.add('active');
-    loadSamplePhoto('led');
+    if (btnAi) btnAi.classList.add('active');
+    if (!currentSamplePhoto && !currentUploadedRealPhoto) {
+      loadSamplePhoto('led');
+    }
   } else if (tab === 'map') {
     if (mapSection) mapSection.style.display = 'block';
     if (btnMap) btnMap.classList.add('active');
     renderStoreMapUI();
-  } else if (tab === 'qr') {
+  } else if (tab === 'scan' || tab === 'qr') {
     if (qrSection) qrSection.style.display = 'block';
-    if (btnQr) btnQr.classList.add('active');
+    if (btnScan) btnScan.classList.add('active');
   }
 }
 
@@ -1069,12 +1082,10 @@ function searchShelfOnMap() {
   const input = document.getElementById('map-search-input');
   if (!input) return;
   const val = input.value.trim().toUpperCase();
-
   if (!val) {
     renderStoreMapUI();
     return;
   }
-
   const zoneMatch = val.charAt(0);
   if (['A', 'B', 'C', 'D', 'E'].includes(zoneMatch)) {
     renderStoreMapUI(zoneMatch, val);
@@ -1102,11 +1113,6 @@ function simulateCustomerQRScan() {
   }, 1200);
 }
 
-// Global exposure
-window.searchShelfOnMap = searchShelfOnMap;
-window.simulateCustomerQRScan = simulateCustomerQRScan;
-
-
 // Fetch Official USD Rate in Real-Time
 async function fetchLiveUSDRate() {
   const displayEl = document.getElementById('live-usd-rate-display');
@@ -1123,26 +1129,49 @@ async function fetchLiveUSDRate() {
   } catch (err) {
     console.warn('Usando tasa USD de respaldo:', err);
   }
-
   if (displayEl) {
     displayEl.textContent = `$${liveUSDRate.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
   }
 }
 
-// Sample photo selector Data URIs for 100% reliable AI vision demo fallback
+// Sample photo selector Data URIs
 const sampleDataURIs = {
   led: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="240" viewBox="0 0 300 240"><rect width="300" height="240" fill="%23152d24"/><rect x="25" y="25" width="250" height="190" rx="16" fill="%230f1e18" stroke="%23c39b4b" stroke-width="4"/><circle cx="75" cy="75" r="14" fill="%23ffee58"/><circle cx="150" cy="75" r="14" fill="%23ffee58"/><circle cx="225" cy="75" r="14" fill="%23ffee58"/><circle cx="75" cy="145" r="14" fill="%23ffee58"/><circle cx="150" cy="145" r="14" fill="%23ffee58"/><circle cx="225" cy="145" r="14" fill="%23ffee58"/><text x="150" y="198" fill="%23c39b4b" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Quantum LED 240W Pro</text></svg>`,
   mighty: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="240" viewBox="0 0 300 240"><rect width="300" height="240" fill="%23152d24"/><rect x="75" y="20" width="150" height="200" rx="18" fill="%23222" stroke="%23c39b4b" stroke-width="3"/><rect x="95" y="40" width="110" height="45" rx="8" fill="%23ff9800"/><text x="150" y="68" fill="%23000" font-family="sans-serif" font-size="15" font-weight="bold" text-anchor="middle">MIGHTY%2B</text><circle cx="150" cy="135" r="22" fill="%23333" stroke="%23ff9800" stroke-width="3"/><text x="150" y="205" fill="%23fff" font-family="sans-serif" font-size="11" text-anchor="middle">Storz %26 Bickel</text></svg>`,
   nutrients: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="240" viewBox="0 0 300 240"><rect width="300" height="240" fill="%23152d24"/><rect x="45" y="40" width="60" height="150" rx="10" fill="%234caf50"/><rect x="120" y="40" width="60" height="150" rx="10" fill="%232196f3"/><rect x="195" y="40" width="60" height="150" rx="10" fill="%239c27b0"/><text x="150" y="218" fill="%23c39b4b" font-family="sans-serif" font-size="13" font-weight="bold" text-anchor="middle">Kit Advanced Nutrients Tri-Part</text></svg>`
 };
 
+function handleRealImageUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    currentUploadedRealPhoto = e.target.result;
+    currentSamplePhoto = 'uploaded_real';
+
+    const box = document.getElementById('photo-preview-box');
+    if (box) {
+      box.innerHTML = `<img src="${currentUploadedRealPhoto}" alt="Foto Real Producto" style="width:100%; height:100%; object-fit:contain; border-radius:12px;">`;
+    }
+
+    const resultsForm = document.getElementById('ai-results-form');
+    const receiptResult = document.getElementById('ai-receipt-result');
+    if (resultsForm) resultsForm.style.display = 'none';
+    if (receiptResult) receiptResult.style.display = 'none';
+
+    showToast('📸 Foto capturada correctamente. Haz clic en ANALIZAR FOTO CON IA.');
+  };
+  reader.readAsDataURL(file);
+}
+
 function loadSamplePhoto(type) {
   const box = document.getElementById('photo-preview-box');
   if (!box) return;
 
   currentSamplePhoto = type;
+  currentUploadedRealPhoto = null;
 
-  // Highlight active demo button
   document.querySelectorAll('.sample-photo-btn').forEach(btn => {
     btn.style.background = 'rgba(255,255,255,0.08)';
     btn.style.color = '#fff';
@@ -1154,15 +1183,10 @@ function loadSamplePhoto(type) {
   }
 
   const fallbackDataURI = sampleDataURIs[type] || sampleDataURIs['led'];
-
   let webUrl = '';
-  if (type === 'led') {
-    webUrl = 'https://images.unsplash.com/photo-1508873696983-2df515122519?auto=format&fit=crop&w=400&q=80';
-  } else if (type === 'mighty') {
-    webUrl = 'https://images.unsplash.com/photo-1527661591475-527312dd65f5?auto=format&fit=crop&w=400&q=80';
-  } else {
-    webUrl = 'https://images.unsplash.com/photo-1585314062340-f1a5a7c9328d?auto=format&fit=crop&w=400&q=80';
-  }
+  if (type === 'led') webUrl = 'https://images.unsplash.com/photo-1508873696983-2df515122519?auto=format&fit=crop&w=400&q=80';
+  else if (type === 'mighty') webUrl = 'https://images.unsplash.com/photo-1527661591475-527312dd65f5?auto=format&fit=crop&w=400&q=80';
+  else webUrl = 'https://images.unsplash.com/photo-1585314062340-f1a5a7c9328d?auto=format&fit=crop&w=400&q=80';
 
   box.innerHTML = `<img src="${webUrl}" onerror="this.onerror=null; this.src='${fallbackDataURI}';" alt="Muestra Producto IA" style="width:100%; height:100%; object-fit:cover; border-radius:12px;">`;
 
@@ -1172,9 +1196,9 @@ function loadSamplePhoto(type) {
   if (receiptResult) receiptResult.style.display = 'none';
 }
 
-function triggerAIScan() {
-  if (!currentSamplePhoto) {
-    alert('📷 Por favor seleccioná una foto de prueba antes de escanear.');
+async function triggerAIScan() {
+  if (!currentSamplePhoto && !currentUploadedRealPhoto) {
+    alert('📷 Por favor subí o seleccioná una foto antes de escanear con la IA.');
     return;
   }
 
@@ -1194,17 +1218,19 @@ function triggerAIScan() {
     if (progressBox) progressBox.style.display = 'none';
     if (btnScan) btnScan.disabled = false;
 
-    // Autofill inferred AI data
     const titleInput = document.getElementById('ai-product-title');
     const skuInput = document.getElementById('ai-product-sku');
     const categoryInput = document.getElementById('ai-product-category');
     const priceArsInput = document.getElementById('ai-price-ars');
-
     const skuCode = `#BO-PROD-${Math.floor(10000 + Math.random() * 90000)}`;
 
-    if (currentSamplePhoto === 'led') {
+    if (currentSamplePhoto === 'uploaded_real') {
+      if (titleInput) titleInput.value = 'Insumo / Producto Detectado por IA Vision';
+      if (categoryInput) categoryInput.value = 'Cultivo / Insumos Generales';
+      if (priceArsInput) priceArsInput.value = 185000;
+    } else if (currentSamplePhoto === 'led') {
       if (titleInput) titleInput.value = 'Quantum Board LED 240W Samsung LM301H';
-      if (categoryInput) categoryInput.value = 'Iluminación Indoor';
+      if (categoryInput) categoryInput.value = 'Indoor & Luz';
       if (priceArsInput) priceArsInput.value = 450000;
     } else if (currentSamplePhoto === 'mighty') {
       if (titleInput) titleInput.value = 'Vaporizador Storz & Bickel Mighty+ Herbal';
@@ -1215,9 +1241,7 @@ function triggerAIScan() {
       if (categoryInput) categoryInput.value = 'Fertilizantes';
       if (priceArsInput) priceArsInput.value = 125000;
     }
-
     if (skuInput) skuInput.value = skuCode;
-
     updateUSDConversion();
     document.getElementById('ai-results-form').style.display = 'block';
   }, 1600);
@@ -1226,7 +1250,6 @@ function triggerAIScan() {
 function updateUSDConversion() {
   const arsVal = parseFloat(document.getElementById('ai-price-ars').value) || 0;
   const usdInput = document.getElementById('ai-price-usd');
-
   if (usdInput) {
     if (arsVal > 0 && liveUSDRate > 0) {
       const usdVal = arsVal / liveUSDRate;
@@ -1243,7 +1266,7 @@ function registerSalesItem() {
   const category = document.getElementById('ai-product-category').value.trim();
   const priceArs = parseFloat(document.getElementById('ai-price-ars').value) || 0;
   const usdFormatted = document.getElementById('ai-price-usd').value;
-  const vendorName = sessionStorage.getItem('boeweb_vendor_name') || 'Vendedor Staff';
+  const vendorName = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor Staff';
 
   if (!title || priceArs <= 0) {
     alert('Por favor completá el título y el precio en pesos ARS.');
@@ -1253,46 +1276,21 @@ function registerSalesItem() {
   const receiptBox = document.getElementById('ai-receipt-result');
   const receiptTitle = document.getElementById('receipt-title');
   const receiptDetails = document.getElementById('receipt-details');
-
   const now = new Date().toLocaleString('es-AR');
 
-  lastRegisteredReceipt = {
-    title,
-    sku,
-    category,
-    priceArs,
-    usdFormatted,
-    vendorName,
-    now
-  };
+  lastRegisteredReceipt = { title, sku, category, priceArs, usdFormatted, vendorName, now };
 
   if (receiptTitle) receiptTitle.textContent = `✅ Venta Registrada Exitosamente (SKU: ${sku})`;
   if (receiptDetails) {
-    receiptDetails.innerHTML = `
-      <strong>📦 Producto:</strong> ${title}<br>
-      <strong>🏷️ Categoría:</strong> ${category}<br>
-      <strong>💵 Monto ARS:</strong> $${formatPrice(priceArs)} ARS<br>
-      <strong>💲 Equivalente Dólar Oficial:</strong> ${usdFormatted}<br>
-      <strong>👤 Registrado por:</strong> ${vendorName}<br>
-      <strong>🕒 Fecha y Hora:</strong> ${now}
-    `;
+    receiptDetails.innerHTML = `<strong>📦 Producto:</strong> ${title}<br><strong>🏷️ Categoría:</strong> ${category}<br><strong>💵 Monto ARS:</strong> $${formatPrice(priceArs)} ARS<br><strong>💲 Equivalente Dólar Oficial:</strong> ${usdFormatted}<br><strong>👤 Registrado por:</strong> ${vendorName}<br><strong>🕒 Fecha y Hora:</strong> ${now}`;
   }
-
   if (receiptBox) receiptBox.style.display = 'block';
   showToast('🎉 Venta registrada en el libro del local.');
 }
 
 function shareReceiptWhatsApp() {
   if (!lastRegisteredReceipt) return;
-
-  let msg = `🧾 *COMPROBANTE DE VENTA BÔ GROWCLUB* 🧾\n\n`;
-  msg += `📦 *Producto:* ${lastRegisteredReceipt.title}\n`;
-  msg += `🏷️ *SKU Único:* ${lastRegisteredReceipt.sku}\n`;
-  msg += `💵 *Precio ARS:* $${formatPrice(lastRegisteredReceipt.priceArs)} ARS\n`;
-  msg += `💲 *Dólar Oficial:* ${lastRegisteredReceipt.usdFormatted}\n`;
-  msg += `👤 *Vendedor:* ${lastRegisteredReceipt.vendorName}\n`;
-  msg += `🕒 *Fecha:* ${lastRegisteredReceipt.now}\n`;
-
+  let msg = `🧾 *COMPROBANTE DE VENTA BÔ GROWCLUB* 🧾\n\n📦 *Producto:* ${lastRegisteredReceipt.title}\n🏷️ *SKU Único:* ${lastRegisteredReceipt.sku}\n💵 *Precio ARS:* $${formatPrice(lastRegisteredReceipt.priceArs)} ARS\n💲 *Dólar Oficial:* ${lastRegisteredReceipt.usdFormatted}\n👤 *Vendedor:* ${lastRegisteredReceipt.vendorName}\n🕒 *Fecha:* ${lastRegisteredReceipt.now}\n`;
   window.open(`https://wa.me/5493813023185?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
@@ -1302,22 +1300,22 @@ function approvePlusUltraMember(email) {
   if (member) {
     member.isPlusUltra = true;
     localStorage.setItem('boeweb_registered_users', JSON.stringify(registeredUsers));
-
     let currentMember = JSON.parse(localStorage.getItem('boeweb_member'));
     if (currentMember && currentMember.email === email) {
       currentMember.isPlusUltra = true;
       localStorage.setItem('boeweb_member', JSON.stringify(currentMember));
     }
-
     if (window.showToast) window.showToast(`🔥 Suscripción BÔ Plus Ultra APROBADA para ${member.name}`);
-    alert(`🎉 ¡Suscripción BÔ Plus Ultra aprobada con éxito para ${member.name} (${member.email})! Se ha registrado el Kit de Bienvenida a entregar en el local.`);
+    alert(`🎉 ¡Suscripción BÔ Plus Ultra aprobada con éxito para ${member.name} (${member.email})!`);
   } else {
     alert(`🎉 ¡Solicitud recibida! Se ha aprobado la membresía BÔ Plus Ultra para ${email}.`);
   }
 }
 
-// Check URL params on load
+// Check URL params and vendor auth on load
 document.addEventListener('DOMContentLoaded', () => {
+  checkVendorAuth();
+  fetchLiveUSDRate();
   const urlParams = new URLSearchParams(window.location.search);
   const targetMember = urlParams.get('member');
   if (targetMember) {
@@ -1326,8 +1324,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Global exposure
+window.checkVendorAuth = checkVendorAuth;
 window.handleVendorLogin = handleVendorLogin;
 window.vendorLogout = vendorLogout;
+window.handleRealImageUpload = handleRealImageUpload;
 window.switchVendorTab = switchVendorTab;
 window.loadSamplePhoto = loadSamplePhoto;
 window.triggerAIScan = triggerAIScan;
@@ -1335,4 +1335,5 @@ window.updateUSDConversion = updateUSDConversion;
 window.registerSalesItem = registerSalesItem;
 window.shareReceiptWhatsApp = shareReceiptWhatsApp;
 window.approvePlusUltraMember = approvePlusUltraMember;
-
+window.searchShelfOnMap = searchShelfOnMap;
+window.simulateCustomerQRScan = simulateCustomerQRScan;
