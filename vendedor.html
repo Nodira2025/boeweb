@@ -1059,20 +1059,6 @@
           </a>
         </div>
 
-        <!-- Top Navigation Tabs (Internal Modules) -->
-        <div class="b2b-nav-tabs" style="display: flex; gap: 8px;">
-          <button type="button" class="btn btn-secondary b2b-tab-btn active" id="tab-btn-catalog" onclick="switchVendorTab('catalog')" style="padding: 8px 16px; font-size: 0.85rem; border-color: var(--color-accent-gold); color: #fff; background: rgba(195,155,75,0.2);">
-            📦 Catálogo B2B
-          </button>
-
-          <button type="button" class="btn btn-secondary b2b-tab-btn" id="tab-btn-map" onclick="switchVendorTab('map')" style="padding: 8px 16px; font-size: 0.85rem; border-color: #42a5f5; color: #42a5f5;">
-            📍 Mapa de Estantes
-          </button>
-          <button type="button" class="btn btn-secondary b2b-tab-btn" id="tab-btn-scan" onclick="switchVendorTab('scan')" style="padding: 8px 16px; font-size: 0.85rem; border-color: #66bb6a; color: #66bb6a;">
-            📷 Escanear QR Cliente
-          </button>
-        </div>
-
         <div class="b2b-search-wrapper no-mobile">
           <svg class="b2b-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"></circle>
@@ -1105,35 +1091,163 @@
       </div>
     </header>
 
-    <!-- VENDOR LAUNCHPAD / ACCESOS RÁPIDOS DE FUNCIONES (PRIMERA SECCIÓN) -->
-    <section style="max-width: 1400px; margin: 24px auto 10px auto; padding: 0 20px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
-        <h3 style="font-family: var(--font-sans); color: var(--color-accent-gold); margin: 0; font-size: 1.2rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">🚀 Funciones del Vendedor</h3>
-        <span style="font-size: 0.8rem; color: rgba(247,246,242,0.7); font-weight: 600;">Seleccioná una función para trabajar</span>
+    <!-- VENDOR LAUNCHPAD / ACCESOS RÁPIDOS DE FUNCIONES EN 2 COLUMNAS -->
+    <section style="max-width: 1400px; margin: 20px auto 10px auto; padding: 0 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+        <h3 style="font-family: var(--font-sans); color: var(--color-accent-gold); margin: 0; font-size: 1.15rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">🚀 Funciones del Vendedor</h3>
+        <span style="font-size: 0.78rem; color: rgba(247,246,242,0.7); font-weight: 600;">Seleccioná un acceso directo</span>
       </div>
 
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+      <style>
+        .vendor-2col-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+        }
+        @media (min-width: 900px) {
+          .vendor-2col-grid {
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+          }
+        }
+      </style>
+
+      <div class="vendor-2col-grid">
         
-        <div class="vendor-launchpad-card active" id="vcard-catalog" onclick="switchVendorTab('catalog')" style="background: rgba(21, 45, 36, 0.95); border: 2px solid var(--color-accent-gold); border-radius: 18px; padding: 20px 16px; text-align: center; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 8px 24px rgba(0,0,0,0.4);">
-          <span style="font-size: 2.4rem; display: block; margin-bottom: 8px;">📦</span>
-          <span style="font-size: 1.05rem; font-weight: 800; color: #fff; display: block; margin-bottom: 4px;">Catálogo & Pedidos B2B</span>
-          <span style="font-size: 0.78rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">PROCESAR VENTA</span>
+        <!-- Card 1: Catálogo B2B -->
+        <div class="vendor-launchpad-card active" id="vcard-catalog" onclick="switchVendorTab('catalog')" style="background: rgba(21, 45, 36, 0.95); border: 2px solid var(--color-accent-gold); border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: 0 6px 20px rgba(0,0,0,0.4);">
+          <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📦</span>
+          <span style="font-size: 0.95rem; font-weight: 800; color: #fff; display: block; margin-bottom: 2px;">Catálogo B2B</span>
+          <span style="font-size: 0.72rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase;">PROCESAR VENTA</span>
         </div>
 
-        <div class="vendor-launchpad-card" id="vcard-map" onclick="switchVendorTab('map')" style="background: rgba(21, 45, 36, 0.95); border: 1.5px solid rgba(66, 165, 245, 0.6); border-radius: 18px; padding: 18px; text-align: center; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 8px 24px rgba(0,0,0,0.4);">
-          <span style="font-size: 2.4rem; display: block; margin-bottom: 8px;">📍</span>
-          <span style="font-size: 1.05rem; font-weight: 800; color: #fff; display: block; margin-bottom: 4px;">Mapa de Estantes</span>
-          <span style="font-size: 0.78rem; color: #42a5f5; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">UBICACIÓN EN LOCAL</span>
+        <!-- Card 2: Caja y Arqueo Diario -->
+        <div class="vendor-launchpad-card" id="vcard-cash" onclick="switchVendorTab('cash')" style="background: rgba(21, 45, 36, 0.95); border: 1.5px solid #ffb74d; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: 0 6px 20px rgba(0,0,0,0.4);">
+          <span style="font-size: 2rem; display: block; margin-bottom: 6px;">💰</span>
+          <span style="font-size: 0.95rem; font-weight: 800; color: #fff; display: block; margin-bottom: 2px;">Caja & Arqueo</span>
+          <span style="font-size: 0.72rem; color: #ffb74d; font-weight: 800; text-transform: uppercase;">REGISTRO & CIERRE</span>
         </div>
 
-        <div class="vendor-launchpad-card" id="vcard-scan" onclick="switchVendorTab('scan')" style="background: rgba(21, 45, 36, 0.95); border: 1.5px solid rgba(102, 187, 106, 0.6); border-radius: 18px; padding: 18px; text-align: center; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 8px 24px rgba(0,0,0,0.4);">
-          <span style="font-size: 2.4rem; display: block; margin-bottom: 8px;">📷</span>
-          <span style="font-size: 1.05rem; font-weight: 800; color: #fff; display: block; margin-bottom: 4px;">Escanear QR Cliente</span>
-          <span style="font-size: 0.78rem; color: #66bb6a; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">VALIDAR CLIENTE VIP</span>
+        <!-- Card 3: Mapa de Estantes -->
+        <div class="vendor-launchpad-card" id="vcard-map" onclick="switchVendorTab('map')" style="background: rgba(21, 45, 36, 0.95); border: 1.5px solid #42a5f5; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: 0 6px 20px rgba(0,0,0,0.4);">
+          <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📍</span>
+          <span style="font-size: 0.95rem; font-weight: 800; color: #fff; display: block; margin-bottom: 2px;">Mapa Estantes</span>
+          <span style="font-size: 0.72rem; color: #42a5f5; font-weight: 800; text-transform: uppercase;">UBICACIÓN LOCAL</span>
+        </div>
+
+        <!-- Card 4: Escanear QR Cliente -->
+        <div class="vendor-launchpad-card" id="vcard-scan" onclick="switchVendorTab('scan')" style="background: rgba(21, 45, 36, 0.95); border: 1.5px solid #66bb6a; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: 0 6px 20px rgba(0,0,0,0.4);">
+          <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📷</span>
+          <span style="font-size: 0.95rem; font-weight: 800; color: #fff; display: block; margin-bottom: 2px;">QR Cliente VIP</span>
+          <span style="font-size: 0.72rem; color: #66bb6a; font-weight: 800; text-transform: uppercase;">VALIDAR CLIENTE</span>
+        </div>
+
+        <!-- Card 5: Modo Tablet Local -->
+        <div class="vendor-launchpad-card" onclick="window.open('tablet.html', '_blank')" style="background: rgba(21, 45, 36, 0.95); border: 1.5px solid #ba68c8; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: 0 6px 20px rgba(0,0,0,0.4);">
+          <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📱</span>
+          <span style="font-size: 0.95rem; font-weight: 800; color: #fff; display: block; margin-bottom: 2px;">Tablet Kiosco</span>
+          <span style="font-size: 0.72rem; color: #ba68c8; font-weight: 800; text-transform: uppercase;">MODO INTERACTIVO</span>
+        </div>
+
+        <!-- Card 6: Pantalla TV Promos -->
+        <div class="vendor-launchpad-card" onclick="window.open('tv.html', '_blank')" style="background: rgba(21, 45, 36, 0.95); border: 1.5px solid #ff7043; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: 0 6px 20px rgba(0,0,0,0.4);">
+          <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📺</span>
+          <span style="font-size: 0.95rem; font-weight: 800; color: #fff; display: block; margin-bottom: 2px;">TV Promos</span>
+          <span style="font-size: 0.72rem; color: #ff7043; font-weight: 800; text-transform: uppercase;">PANTALLA LOCAL</span>
+        </div>
+
+        <!-- Card 7: Coffee Club -->
+        <div class="vendor-launchpad-card" onclick="window.open('coffee.html', '_blank')" style="background: rgba(21, 45, 36, 0.95); border: 1.5px solid #d4a373; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: 0 6px 20px rgba(0,0,0,0.4); grid-column: span 2;">
+          <span style="font-size: 2rem; display: block; margin-bottom: 4px;">☕</span>
+          <span style="font-size: 0.95rem; font-weight: 800; color: #fff; display: inline-block; margin-right: 8px;">BO Coffee Club</span>
+          <span style="font-size: 0.72rem; color: #d4a373; font-weight: 800; text-transform: uppercase;">MODO CAFETERÍA & BAR</span>
         </div>
 
       </div>
     </section>
+
+    <!-- CASH REGISTER & SHIFT CLOSING MODULE -->
+    <div id="vendor-cash-section" style="display: none; max-width: 1000px; margin: 30px auto; padding: 0 20px;">
+      <div style="background: rgba(21, 45, 36, 0.95); border: 2px solid var(--color-accent-gold); border-radius: 20px; padding: 24px; box-shadow: 0 15px 40px rgba(0,0,0,0.4); color: #fff;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <span style="background: rgba(195,155,75,0.2); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 700;">GESTIÓN FINANCIERA & TURNO</span>
+            <h2 style="font-family: var(--font-display); color: var(--color-accent-gold); font-size: 1.6rem; margin: 6px 0 0 0;">💰 Caja & Arqueo Diario de Vendedor</h2>
+          </div>
+          <div id="cash-shift-status-badge" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(102,187,106,0.5); padding: 8px 16px; border-radius: 12px; font-size: 0.85rem; font-weight: 700; color: #66bb6a;">
+            🟢 TURNO EN CURSO
+          </div>
+        </div>
+
+        <!-- Metric Summary Cards -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px;">
+          <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(195,155,75,0.3); border-radius: 14px; padding: 14px; text-align: center;">
+            <span style="font-size: 0.75rem; color: rgba(247,246,242,0.7); display: block;">VENTAS Y COBROS ARS</span>
+            <strong id="cash-sum-sales" style="font-size: 1.4rem; color: #66bb6a; font-family: var(--font-sans);">$0,00</strong>
+          </div>
+          <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(195,155,75,0.3); border-radius: 14px; padding: 14px; text-align: center;">
+            <span style="font-size: 0.75rem; color: rgba(247,246,242,0.7); display: block;">MEMBRESÍAS / EXTRAS</span>
+            <strong id="cash-sum-income" style="font-size: 1.4rem; color: #42a5f5; font-family: var(--font-sans);">$0,00</strong>
+          </div>
+          <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(195,155,75,0.3); border-radius: 14px; padding: 14px; text-align: center;">
+            <span style="font-size: 0.75rem; color: rgba(247,246,242,0.7); display: block;">GASTOS Y RETIROS</span>
+            <strong id="cash-sum-expenses" style="font-size: 1.4rem; color: #ef5350; font-family: var(--font-sans);">$0,00</strong>
+          </div>
+          <div style="background: rgba(0,0,0,0.4); border: 1.5px solid var(--color-accent-gold); border-radius: 14px; padding: 14px; text-align: center;">
+            <span style="font-size: 0.75rem; color: var(--color-accent-gold); font-weight: 700; display: block;">SALDO NETO EN CAJA</span>
+            <strong id="cash-sum-net" style="font-size: 1.5rem; color: var(--color-accent-gold); font-family: var(--font-sans);">$0,00</strong>
+          </div>
+        </div>
+
+        <!-- Formular de Carga de Movimiento -->
+        <div style="background: rgba(15,30,24,0.6); border: 1px solid rgba(195,155,75,0.3); border-radius: 16px; padding: 20px; margin-bottom: 24px;">
+          <h4 style="margin: 0 0 14px 0; color: #fff; font-size: 1.05rem;">➕ Cargar Nuevo Movimiento de Caja</h4>
+          <form id="vendor-cash-entry-form" onsubmit="addCashMovement(event)">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px;">
+              <div>
+                <label style="font-size: 0.8rem; color: rgba(247,246,242,0.8); display: block; margin-bottom: 4px;">Tipo de Movimiento</label>
+                <select id="cash-entry-type" class="b2b-form-input" style="width:100%; padding:10px; border-radius:8px; background: rgba(0,0,0,0.8); color:#fff;">
+                  <option value="venta_efectivo">💵 Venta en Efectivo</option>
+                  <option value="venta_transf">📱 Venta por Transferencia</option>
+                  <option value="membresia">⭐ Ingreso por Membresía</option>
+                  <option value="gasto">🔻 Gasto de Caja (Insumos/Servicios)</option>
+                  <option value="retiro">🚨 Retiro de Caja / Propietario</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size: 0.8rem; color: rgba(247,246,242,0.8); display: block; margin-bottom: 4px;">Monto ($ ARS) *</label>
+                <input type="number" step="0.01" id="cash-entry-amount" class="b2b-form-input" placeholder="Ej: 25000" required style="width:100%; padding:10px; border-radius:8px;">
+              </div>
+              <div>
+                <label style="font-size: 0.8rem; color: rgba(247,246,242,0.8); display: block; margin-bottom: 4px;">Detalle / Concepto *</label>
+                <input type="text" id="cash-entry-desc" class="b2b-form-input" placeholder="Ej: Venta Sustrato + Maceta / Membresía Plus Ultra" required style="width:100%; padding:10px; border-radius:8px;">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; font-size: 0.95rem; border-radius: 10px; background: var(--gold-gradient); border-color: var(--color-accent-gold); color: #070e0b;">
+              ➕ REGISTRAR MOVIMIENTO EN CAJA
+            </button>
+          </form>
+        </div>
+
+        <!-- Tabla / Lista de Movimientos Cargados -->
+        <div style="margin-bottom: 24px;">
+          <h4 style="margin: 0 0 12px 0; color: var(--color-accent-gold); font-size: 1.05rem;">📜 Historial de Movimientos de Hoy</h4>
+          <div id="cash-movements-list" style="max-height: 250px; overflow-y: auto; background: rgba(0,0,0,0.3); border: 1px solid rgba(195,155,75,0.2); border-radius: 12px; padding: 12px;"></div>
+        </div>
+
+        <!-- Cierre de Caja & Validación Admin -->
+        <div style="border-top: 1.5px solid rgba(195,155,75,0.3); padding-top: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+          <button type="button" class="btn btn-secondary" onclick="performShiftClosure()" id="btn-close-shift" style="border-color: #ef5350; color: #ef5350; font-weight: 800; padding: 12px 24px; border-radius: 12px; font-size: 0.95rem;">
+            🔒 REALIZAR CIERRE DE CAJA Y FIN DE TURNO
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="validateAdminClosurePrompt()" id="btn-admin-validate" style="border-color: var(--color-accent-gold); color: var(--color-accent-gold); font-weight: 800; padding: 12px 24px; border-radius: 12px; font-size: 0.95rem;">
+            👑 VALIDACIÓN ADMIN / AUDITORÍA
+          </button>
+        </div>
+
+      </div>
+    </div>
 
     <!-- Interactive Store Map Section -->
     <div id="store-map-section" style="display: none; max-width: 1000px; margin: 30px auto; padding: 0 20px;">
