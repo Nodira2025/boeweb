@@ -976,18 +976,42 @@ let liveUSDRate = 1385.00;
 let lastRegisteredReceipt = null;
 
 // Vendor Auth Check on Load & Session Management
+function selectVendorCard(name) {
+  const selectEl = document.getElementById('auth-vendor-select');
+  if (selectEl) selectEl.value = name;
+
+  document.querySelectorAll('.vendor-select-card').forEach(card => {
+    card.style.background = 'rgba(255,255,255,0.06)';
+    card.style.borderColor = 'rgba(195,155,75,0.3)';
+    card.style.transform = 'none';
+  });
+
+  const activeCard = document.getElementById(`vcard-${name}`);
+  if (activeCard) {
+    activeCard.style.background = 'rgba(195,155,75,0.3)';
+    activeCard.style.borderColor = 'var(--color-accent-gold)';
+    activeCard.style.transform = 'translateY(-2px)';
+  }
+
+  const passEl = document.getElementById('auth-vendor-password');
+  if (passEl) passEl.focus();
+}
+
 function checkVendorAuth() {
   const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name');
-  const authModal = document.getElementById('vendedor-auth-modal');
+  const loginScreen = document.getElementById('vendedor-login-screen');
+  const portalApp = document.getElementById('vendedor-portal-app');
   const vendorNameHeader = document.getElementById('active-vendor-display-name');
   const vendorCheckoutInput = document.getElementById('b2b-vendedor-name');
 
   if (activeVendor) {
-    if (authModal) authModal.style.display = 'none';
+    if (loginScreen) loginScreen.style.display = 'none';
+    if (portalApp) portalApp.style.display = 'block';
     if (vendorNameHeader) vendorNameHeader.textContent = `🧑‍💼 Vendedor: ${activeVendor}`;
     if (vendorCheckoutInput) vendorCheckoutInput.value = activeVendor;
   } else {
-    if (authModal) authModal.style.display = 'flex';
+    if (loginScreen) loginScreen.style.display = 'flex';
+    if (portalApp) portalApp.style.display = 'none';
   }
 }
 
@@ -1324,6 +1348,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Global exposure
+window.selectVendorCard = selectVendorCard;
 window.checkVendorAuth = checkVendorAuth;
 window.handleVendorLogin = handleVendorLogin;
 window.vendorLogout = vendorLogout;
