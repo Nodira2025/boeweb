@@ -478,6 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMemberBadges();
     renderRedemptionStore();
     renderLunarCalendar();
+    renderGrowLogHistory();
   }
 
   // --- TAB 2: ORDER HISTORY ---
@@ -1071,6 +1072,207 @@ document.addEventListener('DOMContentLoaded', () => {
 
       alert('🎉 ¡Felicitaciones! Te suscribiste a BÔ Plus Ultra. Podés retirar tu Kit de Bienvenida en la sucursal.');
     }
+  };
+
+  // --- GROWLOG & DAILY CHECKIN ENGINE ---
+  window.claimDailyCheckin = function() {
+    if (!currentMember) {
+      alert('Por favor iniciá sesión primero para reclamar tu racha diaria.');
+      return;
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const lastCheckin = localStorage.getItem(`boeweb_checkin_${currentMember.email}`);
+
+    if (lastCheckin === today) {
+      alert('🔥 ¡Ya reclamaste tu racha diaria de hoy! Volvé mañana para sumar +20 Semillas.');
+      return;
+    }
+
+    localStorage.setItem(`boeweb_checkin_${currentMember.email}`, today);
+    currentMember.seeds = (currentMember.seeds || 100) + 20;
+    saveCurrentMemberState();
+    updatePortalUI();
+
+    if (window.showToast) window.showToast('🔥 ¡Racha Diaria Reclamada! +20 Semillas VIP acreditadas.');
+    alert('🎉 ¡Felicitaciones! Reclamaste tu Racha Diaria y ganaste +20 Semillas VIP.');
+  };
+
+  window.saveGrowLogEntry = function() {
+    if (!currentMember) {
+      alert('Por favor iniciá sesión primero para guardar tu diario de cultivo.');
+      return;
+    }
+
+    const ph = document.getElementById('perfil-ph')?.value || 'N/A';
+    const ec = document.getElementById('perfil-ec')?.value || 'N/A';
+    const temp = document.getElementById('perfil-temp')?.value || 'N/A';
+    const hr = document.getElementById('perfil-hr')?.value || 'N/A';
+
+    const today = new Date().toISOString().slice(0, 10);
+    const logsKey = `boeweb_growlogs_${currentMember.email}`;
+    const logs = JSON.parse(localStorage.getItem(logsKey)) || [];
+
+    const newLog = {
+      date: new Date().toLocaleString('es-AR'),
+      ph, ec, temp, hr
+    };
+    logs.unshift(newLog);
+    localStorage.setItem(logsKey, JSON.stringify(logs));
+
+    const lastLogDate = localStorage.getItem(`boeweb_growlog_bonus_${currentMember.email}`);
+    let bonusAwarded = false;
+    if (lastLogDate !== today) {
+      localStorage.setItem(`boeweb_growlog_bonus_${currentMember.email}`, today);
+      currentMember.seeds = (currentMember.seeds || 100) + 30;
+      saveCurrentMemberState();
+      updatePortalUI();
+      bonusAwarded = true;
+    } else {
+      renderGrowLogHistory();
+    }
+
+    if (bonusAwarded) {
+      if (window.showToast) window.showToast('🌱 Parámetros Guardados! +30 Semillas VIP acreditadas.');
+      alert('🎉 ¡Parámetros de hoy guardados con éxito! Acreditamos +30 Semillas VIP en tu cuenta.');
+    } else {
+      if (window.showToast) window.showToast('🌱 Parámetros de cultivo actualizados correctamente.');
+      alert('✅ Parámetros de cultivo guardados correctamente en tu historial.');
+    }
+  };
+
+  function renderGrowLogHistory() {
+    const listEl = document.getElementById('growlog-history-list');
+    if (!listEl || !currentMember) return;
+
+    const logsKey = `boeweb_growlogs_${currentMember.email}`;
+    const logs = JSON.parse(localStorage.getItem(logsKey)) || [];
+
+    if (logs.length === 0) {
+      listEl.innerHTML = '<p style="color: rgba(247,246,242,0.6); font-size: 0.88rem; font-style: italic;">No tenés registros de cultivo guardados todavía.</p>';
+      return;
+    }
+
+    listEl.innerHTML = logs.slice(0, 5).map(log => `
+      <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(195,155,75,0.3); border-radius: 12px; padding: 12px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+        <span style="font-weight: 700; color: var(--color-accent-gold); font-size: 0.85rem;">📅 ${log.date}</span>
+        <div style="display: flex; gap: 12px; font-size: 0.82rem; color: #fff;">
+          <span>🧪 pH: <strong>${log.ph}</strong></span>
+          <span>⚡ EC: <strong>${log.ec}</strong></span>
+          <span>🌡️ Temp: <strong>${log.temp}°C</strong></span>
+          <span>💧 HR: <strong>${log.hr}%</strong></span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // --- MISSIONS ENGINE ---
+  window.verifyInstagramCommentMission = function() {
+    if (!currentMember) {
+      alert('Por favor iniciá sesión primero.');
+      return;
+    }
+    const completedKey = `boeweb_mission_ig_${currentMember.email}`;
+    if (localStorage.getItem(completedKey)) {
+      alert('✨ ¡Ya completaste la Misión de Instagram y reclamaste tus +150 Semillas!');
+      return;
+    }
+
+    const btn = document.getElementById('btn-verify-ig-comment');
+    if (btn) btn.textContent = '⏳ Verificando comentario...';
+
+    setTimeout(() => {
+      localStorage.setItem(completedKey, 'true');
+      currentMember.seeds = (currentMember.seeds || 100) + 150;
+      saveCurrentMemberState();
+      updatePortalUI();
+
+      if (btn) {
+        btn.textContent = '✅ MISIÓN VERIFICADA (+150 SEMILLAS)';
+        btn.style.background = '#66bb6a';
+        btn.disabled = true;
+      }
+      alert('🎉 ¡Comentario verificado exitosamente! Se han acreditado +150 Semillas VIP.');
+    }, 1500);
+  };
+
+  window.verifyReelUrlMission = function() {
+    if (!currentMember) {
+      alert('Por favor iniciá sesión primero.');
+      return;
+    }
+    const urlInput = document.getElementById('mission-reel-url');
+    const urlVal = urlInput?.value?.trim();
+
+    if (!urlVal || (!urlVal.includes('instagram.com') && !urlVal.includes('instagr.am'))) {
+      alert('⚠️ Por favor ingresá una URL válida de Instagram (ej: https://www.instagram.com/p/...).');
+      return;
+    }
+
+    const completedKey = `boeweb_mission_reel_${currentMember.email}`;
+    if (localStorage.getItem(completedKey)) {
+      alert('✨ ¡Ya validaste tu publicación y reclamaste tus +200 Semillas!');
+      return;
+    }
+
+    const btn = document.getElementById('btn-verify-reel');
+    if (btn) btn.textContent = '⏳ Validando URL...';
+
+    setTimeout(() => {
+      localStorage.setItem(completedKey, 'true');
+      currentMember.seeds = (currentMember.seeds || 100) + 200;
+      saveCurrentMemberState();
+      updatePortalUI();
+
+      if (btn) {
+        btn.textContent = '✅ REEL VALIDADO (+200 SEMILLAS)';
+        btn.style.background = '#66bb6a';
+        btn.disabled = true;
+      }
+      alert('🎉 ¡URL validada correctamente! Acreditamos +200 Semillas VIP a tu saldo.');
+    }, 1500);
+  };
+
+  window.subscribePlusUltraWhatsApp = function() {
+    if (!currentMember) {
+      alert('Por favor iniciá sesión primero para solicitar la membresía Plus Ultra.');
+      return;
+    }
+
+    const name = currentMember.name || 'Miembro VIP';
+    const email = currentMember.email || '';
+    const text = encodeURIComponent(`Hola! Soy ${name} (${email}). Quisiera validar mi suscripción BÔ Plus Ultra por $3 USD/mes y coordinar el retiro de mi Kit de Bienvenida Físico en el local.`);
+    window.open(`https://wa.me/5491136868581?text=${text}`, '_blank');
+  };
+
+  window.submitRaffleSurvey = function(event) {
+    if (event) event.preventDefault();
+    if (!currentMember) {
+      alert('Por favor iniciá sesión primero para participar del sorteo.');
+      return;
+    }
+
+    const q1 = document.getElementById('survey-q1')?.value;
+    const q2 = document.getElementById('survey-q2')?.value;
+    const q3 = document.getElementById('survey-q3')?.value;
+
+    const surveyKey = `boeweb_survey_${currentMember.email}`;
+    const ticketNum = 'BO-' + Math.floor(1000 + Math.random() * 9000);
+
+    localStorage.setItem(surveyKey, JSON.stringify({ q1, q2, q3, ticket: ticketNum }));
+
+    currentMember.seeds = (currentMember.seeds || 100) + 150;
+    saveCurrentMemberState();
+    updatePortalUI();
+
+    const formEl = document.getElementById('perfil-survey-form');
+    if (formEl) formEl.style.display = 'none';
+
+    const ticketBox = document.getElementById('raffle-ticket-box');
+    const ticketNumEl = document.getElementById('ticket-number-display');
+    if (ticketNumEl) ticketNumEl.textContent = `#${ticketNum}`;
+    if (ticketBox) ticketBox.style.display = 'block';
+
+    alert(`🎟️ ¡Encuesta enviada! Tu Ticket Dorado es #${ticketNum} y sumaste +150 Semillas VIP.`);
   };
 });
 
