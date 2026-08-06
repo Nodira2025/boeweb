@@ -468,37 +468,15 @@
             <circle cx="20" cy="21" r="1"></circle>
             <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
           </svg>
-    <div class="wheel-card" style="max-width: 450px; background: rgba(15, 30, 24, 0.98); border: 2px solid var(--color-accent-gold); box-shadow: 0 15px 40px rgba(0,0,0,0.6); padding: 30px; border-radius: 24px;">
-      <div class="contact-badge" style="margin-bottom: 12px;">
-        <span>ACCESO EXCLUSIVO STAFF BÔ</span>
-      </div>
-      <h2 style="font-family: var(--font-display); color: var(--color-accent-gold); font-size: 1.6rem; margin-bottom: 8px;">Portal de Vendedores</h2>
-      <p style="font-size: 0.88rem; color: rgba(247,246,242,0.8); margin-bottom: 20px;">Seleccioná tu usuario e ingresá tu contraseña de vendedor (`nombre123`) para acceder.</p>
-
-      <form id="vendor-login-form" onsubmit="handleVendorLogin(event)">
-        <div style="text-align: left; margin-bottom: 16px;">
-          <label style="font-size: 0.85rem; color: rgba(247,246,242,0.9); font-weight: 700; display: block; margin-bottom: 6px;">Vendedor Autorizado *</label>
-          <select id="auth-vendor-select" class="b2b-form-input" required style="width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.1); border: 1.5px solid var(--color-accent-gold); color: #fff; padding: 12px; border-radius: 12px; font-size: 1rem; font-weight: 700;">
-            <option value="" disabled selected style="background: #152d24; color: #fff;">-- Seleccioná tu nombre --</option>
-            <option value="Raul" style="background: #152d24; color: #fff;">Raul</option>
-            <option value="Nacho Mina" style="background: #152d24; color: #fff;">Nacho Mina</option>
-            <option value="Alexis" style="background: #152d24; color: #fff;">Alexis</option>
-            <option value="Gino" style="background: #152d24; color: #fff;">Gino</option>
-            <option value="Rodrigo" style="background: #152d24; color: #fff;">Rodrigo</option>
-            <option value="Felipe" style="background: #152d24; color: #fff;">Felipe</option>
-            <option value="Mariano" style="background: #152d24; color: #fff;">Mariano</option>
-          </select>
+          <span class="b2b-mobile-cart-badge" id="b2b-mobile-cart-count">0</span>
         </div>
+        <span>Mi Pedido</span>
+      </button>
+    </div>
 
-        <div style="text-align: left; margin-bottom: 22px;">
-          <label style="font-size: 0.85rem; color: rgba(247,246,242,0.9); font-weight: 700; display: block; margin-bottom: 6px;">Contraseña (`nombre123`) *</label>
-          <input type="password" id="auth-vendor-password" class="b2b-form-input" placeholder="Ej: raul123 / nachomina123" required style="width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.1); border: 1.5px solid var(--color-accent-gold); color: #fff; padding: 12px; border-radius: 12px; font-size: 1.1rem; text-align: center; letter-spacing: 2px;">
-        </div>
-
-        <button type="submit" class="b2b-checkout-btn" style="width: 100%; font-size: 1.05rem;">
-          🚀 INGRESAR AL PORTAL
-        </button>
-      </form>
+    <!-- Toast Notification -->
+    <div class="b2b-toast b2b-toast-success" id="b2b-toast">
+      <span id="b2b-toast-message">Producto agregado al pedido</span>
     </div>
   </div>
 
