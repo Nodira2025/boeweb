@@ -250,6 +250,40 @@
       .perfil-main-grid {
         grid-template-columns: 1fr;
       }
+   <style>
+    /* Compact Navbar and Responsive Overrides */
+    @media (max-width: 768px) {
+      .perfil-header {
+        padding: 8px 12px !important;
+        gap: 8px !important;
+      }
+      .perfil-header-title h2 {
+        font-size: 1.05rem !important;
+      }
+      .perfil-header-title span {
+        display: none !important;
+      }
+      .perfil-header-actions {
+        gap: 6px !important;
+      }
+      .perfil-header-actions .btn {
+        padding: 6px 10px !important;
+        font-size: 0.78rem !important;
+        border-radius: 10px !important;
+      }
+      .btn-text-full {
+        display: none !important;
+      }
+      .perfil-container {
+        padding: 16px 12px !important;
+      }
+      .launchpad-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+      }
+      .sidebar-desktop-only {
+        display: none !important;
+      }
     }
   </style>
 </head>
@@ -257,56 +291,38 @@
 
   <!-- Top Bar Navbar -->
   <header class="perfil-header">
-    <a href="index.html" style="text-decoration: none; display: flex; align-items: center; gap: 14px;">
-      <img src="assets/logo.jpg" alt="BÔ Growclub" style="width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--color-accent-gold); box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);">
-      <div>
-        <h2 style="margin: 0; font-family: 'Cinzel', serif; color: var(--color-accent-gold); font-size: 1.4rem; letter-spacing: 1px;">BÔ GROWCLUB</h2>
-        <span style="font-size: 0.72rem; color: rgba(247,246,242,0.7); text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700;">MIEMBRO CLUB VIP</span>
+    <a href="index.html" style="text-decoration: none; display: flex; align-items: center; gap: 10px;">
+      <img src="assets/logo.jpg" alt="BÔ Growclub" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--color-accent-gold); box-shadow: 0 0 10px rgba(212, 175, 55, 0.4); flex-shrink: 0;">
+      <div class="perfil-header-title">
+        <h2 style="margin: 0; font-family: 'Cinzel', serif; color: var(--color-accent-gold); font-size: 1.25rem; letter-spacing: 1px; white-space: nowrap;">BÔ GROWCLUB</h2>
+        <span style="font-size: 0.7rem; color: rgba(247,246,242,0.7); text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700;">MIEMBRO CLUB VIP</span>
       </div>
     </a>
 
-    <div style="display: flex; align-items: center; gap: 16px;">
-      <a href="index.html" class="btn btn-secondary" style="padding: 10px 20px; font-size: 0.88rem; border-color: var(--color-accent-gold); color: var(--color-accent-gold); border-radius: 14px; font-weight: 700;">🛒 Volver a la Tienda</a>
-      <button class="btn btn-secondary" id="perfil-logout-btn" style="padding: 10px 18px; font-size: 0.88rem; border-color: #ff5252; color: #ff5252; border-radius: 14px; font-weight: 700;">Cerrar Sesión</button>
+    <div class="perfil-header-actions" style="display: flex; align-items: center; gap: 8px;">
+      <a href="index.html" class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.82rem; border-color: var(--color-accent-gold); color: var(--color-accent-gold); border-radius: 12px; font-weight: 700; white-space: nowrap;">🛒 <span class="btn-text-full">Volver a Tienda</span></a>
+      <button class="btn btn-secondary" id="perfil-logout-btn" style="padding: 8px 12px; font-size: 0.82rem; border-color: #ff5252; color: #ff5252; border-radius: 12px; font-weight: 700; white-space: nowrap;">Cerrar Sesión</button>
     </div>
   </header>
 
   <main class="perfil-container">
 
-    <!-- HERO WELCOME BANNER DE IMPACTO -->
-    <div class="hero-vip-banner">
-      <div style="display: flex; align-items: center; gap: 20px;">
-        <div class="user-avatar-badge">
-          <img src="assets/logo.jpg" alt="Avatar User">
-        </div>
-        <div>
-          <span style="font-size: 0.8rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px;">¡HOLA DE NUEVO!</span>
-          <h1 style="font-family: 'Cinzel', serif; color: #fff; margin: 4px 0 6px 0; font-size: 2rem;" id="header-user-name">Franco Ruiz</h1>
-          <div style="display: flex; gap: 10px; align-items: center;">
-            <span style="background: rgba(212, 175, 55, 0.2); border: 1px solid var(--color-accent-gold); padding: 4px 14px; border-radius: 12px; color: var(--color-accent-gold); font-weight: 800; font-size: 0.85rem;" id="header-user-tier">🌱 Nivel 1: Brote (5% OFF)</span>
-            <span style="font-size: 0.8rem; color: rgba(247,246,242,0.7);">Cliente Preferencial Presencial & Web</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Seed Counter Display -->
-      <div class="seeds-counter-box">
-        <span style="font-size: 0.72rem; color: rgba(247,246,242,0.8); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">SEMILLAS / VID DISPONIBLES</span>
-        <div class="seeds-counter-val" id="header-user-seeds">100</div>
-        <span style="font-size: 0.75rem; color: var(--color-accent-gold); font-weight: 700;">Canjeables por premios por $0</span>
-      </div>
-    </div>
-
-    <!-- LAUNCHPAD DE ACCESO RÁPIDO DE LUJO -->
-    <section style="margin-bottom: 36px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
-        <h3 style="font-family: 'Cinzel', serif; color: #2B4214; margin: 0; font-size: 1.4rem; font-weight: 800;">🚀 Acceso Rápido & Funciones VIP</h3>
-        <span style="font-size: 0.82rem; color: #6B4E2E; font-weight: 700;">Seleccioná una función para interactuar al instante</span>
+    <!-- LAUNCHPAD DE ACCESO RÁPIDO DE LUJO (PRIMERA SECCIÓN) -->
+    <section style="margin-bottom: 28px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+        <h3 style="font-family: 'Cinzel', serif; color: #2B4214; margin: 0; font-size: 1.35rem; font-weight: 800;">🚀 Acceso Rápido & Funciones VIP</h3>
+        <span style="font-size: 0.82rem; color: #6B4E2E; font-weight: 700;">Seleccioná una función para interactuar</span>
       </div>
 
       <div class="launchpad-grid">
         
-        <div class="launchpad-card launchpad-card-active" id="card-btn-chest" onclick="openPerfilTab('chest')">
+        <div class="launchpad-card launchpad-card-active" id="card-btn-qr" onclick="openPerfilTab('qr')">
+          <div class="launchpad-icon-circle">💳</div>
+          <span class="launchpad-title">Mi Pase QR</span>
+          <span class="launchpad-badge" id="badge-qr-seeds">PASE VIP</span>
+        </div>
+
+        <div class="launchpad-card" id="card-btn-chest" onclick="openPerfilTab('chest')">
           <div class="launchpad-icon-circle">🎁</div>
           <span class="launchpad-title">Caja Mágica</span>
           <span class="launchpad-badge">ABRIR AHORA</span>
@@ -348,8 +364,8 @@
     <!-- MAIN DASHBOARD GRID -->
     <div class="perfil-main-grid">
 
-      <!-- LEFT SIDEBAR: VIP CREDENTIAL & LEVEL PROGRESS -->
-      <aside>
+      <!-- LEFT SIDEBAR: DESKTOP ONLY -->
+      <aside class="sidebar-desktop-only">
         
         <!-- Credencial Pase Digital QR HOLOGRÁFICA 3D -->
         <div class="vip-pass-card-3d" style="margin-bottom: 28px;">
@@ -365,19 +381,6 @@
           <span style="font-size: 0.8rem; color: rgba(247,246,242,0.85); display: block; line-height: 1.4;">Presentá este código en el local para registrar tus compras y sumar Semillas presenciales.</span>
         </div>
 
-        <!-- Escala de Progreso de 5 Niveles -->
-        <div style="background: var(--card-bg-glass); backdrop-filter: blur(16px); border: 1.5px solid var(--card-border-gold); border-radius: 24px; padding: 24px; color: #fff; margin-bottom: 28px; box-shadow: 0 10px 30px rgba(0,0,0,0.4);">
-          <h4 style="margin: 0 0 14px 0; color: var(--color-accent-gold); font-size: 1.05rem;">📊 Progreso de Nivel VIP</h4>
-          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 800; margin-bottom: 10px;">
-            <span id="perfil-tier-current" style="color: var(--color-accent-gold);">🌱 Brote (5% OFF)</span>
-            <span id="perfil-tier-next" style="color: rgba(247,246,242,0.7);">🌿 Cultivador (10% OFF)</span>
-          </div>
-          <div style="width: 100%; height: 14px; background: rgba(0,0,0,0.6); border-radius: 8px; overflow: hidden; border: 1px solid var(--color-accent-gold); margin-bottom: 10px; padding: 2px;">
-            <div id="perfil-progress-fill" style="width: 25%; height: 100%; background: var(--gold-gradient); border-radius: 6px;"></div>
-          </div>
-          <p id="perfil-progress-text" style="font-size: 0.82rem; color: rgba(247,246,242,0.8); margin: 0; font-weight: 600;">Te faltan 400 semillas para el siguiente nivel.</p>
-        </div>
-
         <!-- Vitrina de Insignias Doradas -->
         <div style="background: var(--card-bg-glass); backdrop-filter: blur(16px); border: 1.5px solid var(--card-border-gold); border-radius: 24px; padding: 24px; color: #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.4);">
           <h4 style="margin: 0 0 16px 0; color: var(--color-accent-gold); font-size: 1.05rem;">🎖️ Mis Insignias Ganadas</h4>
@@ -391,8 +394,47 @@
       <!-- RIGHT INTERACTIVE CONTENT PANELS -->
       <section>
 
+        <!-- PANEL 0: MI PASE QR & PERFIL VIP -->
+        <div class="perfil-tab-panel" id="panel-qr" style="display: block;">
+          <div style="background: var(--card-bg-glass); backdrop-filter: blur(16px); border: 1.5px solid var(--card-border-gold); border-radius: 28px; padding: 28px; box-shadow: 0 15px 40px rgba(0,0,0,0.5); color: #fff;">
+            
+            <div style="text-align: center; margin-bottom: 20px;">
+              <span style="font-size: 0.75rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px;">PASE DIGITAL PRESENCIAL BÔ</span>
+              <h2 style="font-family: 'Cinzel', serif; color: #fff; margin: 4px 0 8px 0; font-size: 1.8rem;" id="header-user-name">Franco Ruiz</h2>
+              <span style="background: rgba(212, 175, 55, 0.2); border: 1px solid var(--color-accent-gold); padding: 4px 14px; border-radius: 12px; color: var(--color-accent-gold); font-weight: 800; font-size: 0.85rem;" id="header-user-tier">🌱 Nivel 1: Brote (5% OFF)</span>
+            </div>
+
+            <!-- Credencial Pase Digital QR HOLOGRÁFICA 3D -->
+            <div class="vip-pass-card-3d" style="margin-bottom: 24px; text-align: center;">
+              <div style="width: 170px; height: 170px; margin: 0 auto 16px auto; background: #fff; border-radius: 16px; padding: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 25px rgba(212,175,55,0.5);">
+                <svg viewBox="0 0 100 100" style="width: 100%; height: 100%;">
+                  <path d="M0,0 h30 v30 h-30 z M40,0 h20 v10 h-20 z M70,0 h30 v30 h-30 z M10,10 h10 v10 h-10 z M80,10 h10 v10 h-10 z M0,40 h10 v20 h-10 z M20,40 h30 v10 h-30 z M60,40 h40 v10 h-40 z M0,70 h30 v30 h-30 z M10,80 h10 v10 h-10 z M40,60 h20 v40 h-20 z M70,70 h20 v20 h-20 z" fill="#070e0b"/>
+                </svg>
+              </div>
+              
+              <span style="font-size: 0.85rem; color: rgba(247,246,242,0.85); display: block; line-height: 1.4;">Presentá este código QR en la caja del local para registrar tus compras presenciales y sumar semillas acumulables.</span>
+            </div>
+
+            <!-- Escala de Nivel & Semillas -->
+            <div style="background: rgba(43,66,20,0.8); border: 1.5px solid var(--color-accent-gold); border-radius: 20px; padding: 20px; text-align: center;">
+              <span style="font-size: 0.72rem; color: rgba(247,246,242,0.8); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">SEMILLAS DISPONIBLES CANJEABLES POR $0</span>
+              <div style="font-size: 2.2rem; font-family: 'Cinzel', serif; color: var(--color-accent-gold); font-weight: 900; margin: 4px 0;" id="header-user-seeds">100</div>
+              
+              <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 800; margin: 12px 0 6px 0;">
+                <span id="perfil-tier-current" style="color: var(--color-accent-gold);">🌱 Brote (5% OFF)</span>
+                <span id="perfil-tier-next" style="color: rgba(247,246,242,0.7);">🌿 Cultivador (10% OFF)</span>
+              </div>
+              <div style="width: 100%; height: 12px; background: rgba(0,0,0,0.6); border-radius: 6px; overflow: hidden; border: 1px solid var(--color-accent-gold); margin-bottom: 8px; padding: 2px;">
+                <div id="perfil-progress-fill" style="width: 25%; height: 100%; background: var(--gold-gradient); border-radius: 4px;"></div>
+              </div>
+              <p id="perfil-progress-text" style="font-size: 0.82rem; color: rgba(247,246,242,0.8); margin: 0; font-weight: 600;">Te faltan 400 semillas para el siguiente nivel.</p>
+            </div>
+
+          </div>
+        </div>
+
         <!-- PANEL 1: CAJA MÁGICA SEMANAL -->
-        <div class="perfil-tab-panel" id="panel-chest" style="display: block;">
+        <div class="perfil-tab-panel" id="panel-chest" style="display: none;">
           <div style="background: linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(15, 30, 24, 0.95) 100%); border: 2px solid var(--color-accent-gold); border-radius: 28px; padding: 40px; text-align: center; box-shadow: 0 15px 40px rgba(0,0,0,0.5);">
             <span style="font-size: 4rem; display: block; margin-bottom: 12px; filter: drop-shadow(0 0 15px rgba(212,175,55,0.6));">🎁</span>
             <span style="font-size: 0.8rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px;">COFRE MISTERIOSO DE PREMIOS BÔ</span>

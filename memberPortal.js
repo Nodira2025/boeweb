@@ -443,7 +443,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (headerName) headerName.textContent = nameVal;
     if (headerTier) headerTier.textContent = tier.label;
-    if (headerSeeds) headerSeeds.textContent = `${seedsVal} SEMILLAS`;
+    if (headerSeeds) headerSeeds.textContent = `${seedsVal}`;
+    const badgeQrSeeds = document.getElementById('badge-qr-seeds');
+    if (badgeQrSeeds) badgeQrSeeds.textContent = `${seedsVal} SEMILLAS`;
     if (perfilQrName) perfilQrName.textContent = `${nameVal} (${tier.label})`;
     if (perfilTierCurrent) perfilTierCurrent.textContent = tier.label;
     if (perfilTierNext) perfilTierNext.textContent = nextTierObj ? nextTierObj.label : 'Nivel Máximo (Leyenda)';
