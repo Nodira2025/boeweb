@@ -2545,9 +2545,15 @@ textarea.form-control {
 
 /* Responsive Overrides for Product Detail Modal */
 @media (max-width: 768px) {
-  .modal-backdrop {
+  #product-detail-modal.modal-backdrop {
     align-items: flex-end; /* Align bottom sheet to bottom */
     padding: 0;
+  }
+  
+  #wheel-modal.modal-backdrop {
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
   }
   
   .product-detail-card {
