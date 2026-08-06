@@ -575,7 +575,10 @@
       document.querySelectorAll('.launchpad-card').forEach(c => c.classList.remove('launchpad-card-active'));
 
       const targetPanel = document.getElementById(`panel-${tabId}`);
-      if (targetPanel) targetPanel.style.display = 'block';
+      if (targetPanel) {
+        targetPanel.style.display = 'block';
+        targetPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
 
       const targetCard = document.getElementById(`card-btn-${tabId}`);
       if (targetCard) targetCard.classList.add('launchpad-card-active');

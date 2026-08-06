@@ -225,7 +225,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     portalTabContents.forEach(content => {
-      if (content.id === `tab-${tabId}`) content.classList.add('active');
+      if (content.id === `tab-${tabId}`) {
+        content.classList.add('active');
+        content.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
       else content.classList.remove('active');
     });
 
