@@ -1064,9 +1064,7 @@
           <button type="button" class="btn btn-secondary b2b-tab-btn active" id="tab-btn-catalog" onclick="switchVendorTab('catalog')" style="padding: 8px 16px; font-size: 0.85rem; border-color: var(--color-accent-gold); color: #fff; background: rgba(195,155,75,0.2);">
             📦 Catálogo B2B
           </button>
-          <button type="button" class="btn btn-secondary b2b-tab-btn" id="tab-btn-ai" onclick="switchVendorTab('ai')" style="padding: 8px 16px; font-size: 0.85rem; border-color: var(--color-accent-gold); color: #fff;">
-            📸 Venta por Foto (IA)
-          </button>
+
           <button type="button" class="btn btn-secondary b2b-tab-btn" id="tab-btn-map" onclick="switchVendorTab('map')" style="padding: 8px 16px; font-size: 0.85rem; border-color: #42a5f5; color: #42a5f5;">
             📍 Mapa de Estantes
           </button>
@@ -1106,102 +1104,6 @@
         </div>
       </div>
     </header>
-
-    <!-- AI Photo Sales Scanner Section -->
-    <div id="sales-ai-section" style="display: none; max-width: 1000px; margin: 30px auto; padding: 0 20px;">
-      <div style="background: rgba(21, 45, 36, 0.9); border: 2px solid var(--color-accent-gold); border-radius: 20px; padding: 30px; box-shadow: 0 15px 40px rgba(0,0,0,0.4); color: #fff;">
-        
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
-          <div>
-            <span style="background: rgba(195,155,75,0.2); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 700;">RECONOCIMIENTO DE PRODUCTOS IA CON API ACTIVADA</span>
-            <h2 style="font-family: var(--font-display); color: var(--color-accent-gold); font-size: 1.8rem; margin: 8px 0 4px 0;">Carga Rápida de Ventas por Foto (IA)</h2>
-            <p style="font-size: 0.88rem; color: rgba(247,246,242,0.75);">Sacá una foto con la cámara de tu celular o subí la imagen del producto. La API de IA analiza la foto, genera SKU e infiere precio en Dólares Oficiales.</p>
-          </div>
-          <div style="text-align: right; background: rgba(0,0,0,0.3); padding: 12px 18px; border-radius: 12px; border: 1px solid rgba(195,155,75,0.3);">
-            <span style="font-size: 0.75rem; color: rgba(247,246,242,0.7); display: block;">DÓLAR OFICIAL EN VIVO</span>
-            <strong id="live-usd-rate-display" style="color: var(--color-accent-gold); font-size: 1.3rem;">$1.385,00</strong>
-          </div>
-        </div>
-
-        <!-- Paso 1: Foto -->
-        <div style="background: rgba(15,30,24,0.6); border: 1px dashed rgba(195,155,75,0.4); border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 24px;">
-          <h3 style="font-size: 1.1rem; color: #fff; margin-bottom: 14px;">📷 Paso 1: Capturar / Subir Foto Real del Producto</h3>
-          
-          <input type="file" id="real-ai-file-input" accept="image/*" onchange="handleRealImageUpload(event)" style="display: none;">
-          
-          <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
-            <button type="button" class="btn btn-primary" onclick="document.getElementById('real-ai-file-input').click()" style="background: linear-gradient(135deg, #3E5F1F 0%, #253C13 100%); border: 2px solid var(--color-accent-gold); color: #F6F3E8; font-weight: 800; padding: 10px 22px; border-radius: 12px; font-size: 0.9rem; cursor: pointer;">
-              📸 TOMAR O SUBIR FOTO REAL DE PRODUCTO
-            </button>
-          </div>
-
-          <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;">
-            <span style="font-size: 0.78rem; color: rgba(247,246,242,0.6); display: block; width: 100%;">O probá con fotos de muestra rápida:</span>
-            <button class="btn btn-secondary sample-photo-btn" id="sample-btn-led" onclick="loadSamplePhoto('led')" style="font-size: 0.82rem; border-color: var(--color-accent-gold); color: #fff; background: rgba(195,155,75,0.25); font-weight: 700; padding: 6px 12px; border-radius: 10px; cursor: pointer;">⚡ Quantum LED 240W</button>
-            <button class="btn btn-secondary sample-photo-btn" id="sample-btn-mighty" onclick="loadSamplePhoto('mighty')" style="font-size: 0.82rem; border-color: var(--color-accent-gold); color: #fff; background: rgba(255,255,255,0.08); font-weight: 700; padding: 6px 12px; border-radius: 10px; cursor: pointer;">⚡ Vaporizador Mighty+</button>
-            <button class="btn btn-secondary sample-photo-btn" id="sample-btn-nutrients" onclick="loadSamplePhoto('nutrients')" style="font-size: 0.82rem; border-color: var(--color-accent-gold); color: #fff; background: rgba(255,255,255,0.08); font-weight: 700; padding: 6px 12px; border-radius: 10px; cursor: pointer;">⚡ Kit Advanced Nutrients</button>
-          </div>
-
-          <div id="photo-preview-box" style="width: 240px; height: 190px; margin: 0 auto 16px auto; background: rgba(0,0,0,0.4); border-radius: 14px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1.5px solid var(--color-accent-gold);">
-            <span style="color: rgba(247,246,242,0.4); font-size: 0.85rem;">Sin Foto Seleccionada</span>
-          </div>
-
-          <button class="b2b-checkout-btn" onclick="triggerAIScan()" id="btn-scan-ai" style="margin: 0 auto; max-width: 320px; font-size: 0.95rem;">
-            🔍 ANALIZAR FOTO CON IA VISION (API)
-          </button>
-
-          <div id="ai-scan-progress" style="display: none; margin-top: 16px;">
-            <span style="font-size: 0.85rem; color: var(--color-accent-gold); display: block; margin-bottom: 6px;">Procesando imagen con API Key y red neuronal...</span>
-            <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
-              <div id="ai-progress-bar" style="width: 0%; height: 100%; background: var(--color-accent-gold); transition: width 1.5s ease;"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Paso 2: Datos Inferred -->
-        <div id="ai-results-form" style="display: none;">
-          <h3 style="font-size: 1.1rem; color: var(--color-accent-gold); margin-bottom: 16px;">📝 Paso 2: Información Extraída & Precios</h3>
-          
-          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px;">
-            <div>
-              <label style="font-size: 0.85rem; color: rgba(247,246,242,0.8); display: block; margin-bottom: 4px;">Nombre del Producto (Reconocido por IA)</label>
-              <input type="text" id="ai-product-title" class="b2b-form-input" style="width:100%; background: rgba(255,255,255,0.08); border: 1px solid rgba(195,155,75,0.3); color:#fff; padding:10px; border-radius:8px;">
-            </div>
-            <div>
-              <label style="font-size: 0.85rem; color: rgba(247,246,242,0.8); display: block; margin-bottom: 4px;">Código SKU Único (Generado)</label>
-              <input type="text" id="ai-product-sku" class="b2b-form-input" readonly style="width:100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(195,155,75,0.3); color:var(--color-accent-gold); padding:10px; border-radius:8px; font-weight:700;">
-            </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px;">
-            <div>
-              <label style="font-size: 0.85rem; color: rgba(247,246,242,0.8); display: block; margin-bottom: 4px;">Categoría Inferred</label>
-              <input type="text" id="ai-product-category" class="b2b-form-input" style="width:100%; background: rgba(255,255,255,0.08); border: 1px solid rgba(195,155,75,0.3); color:#fff; padding:10px; border-radius:8px;">
-            </div>
-            <div>
-              <label style="font-size: 0.85rem; color: rgba(247,246,242,0.8); display: block; margin-bottom: 4px;">Precio Venta ($ Pesos ARS) *</label>
-              <input type="number" id="ai-price-ars" class="b2b-form-input" oninput="updateUSDConversion()" placeholder="Ej: 450000" style="width:100%; background: rgba(255,255,255,0.08); border: 1px solid rgba(195,155,75,0.3); color:#fff; padding:10px; border-radius:8px; font-size:1.1rem; font-weight:700;">
-            </div>
-            <div>
-              <label style="font-size: 0.85rem; color: rgba(247,246,242,0.8); display: block; margin-bottom: 4px;">Equivalente Dólar Oficial (USD)</label>
-              <input type="text" id="ai-price-usd" class="b2b-form-input" readonly style="width:100%; background: rgba(0,0,0,0.3); border: 1px solid #66bb6a; color:#66bb6a; padding:10px; border-radius:8px; font-size:1.1rem; font-weight:700;">
-            </div>
-          </div>
-
-          <button class="b2b-checkout-btn" onclick="registerSalesItem()" style="width: 100%; font-size: 1.05rem;">
-            💾 REGISTRAR VENTA Y EMITIR COMPROBANTE
-          </button>
-        </div>
-
-        <!-- Comprobante de Venta Emitido -->
-        <div id="ai-receipt-result" style="display: none; margin-top: 24px; padding: 20px; background: rgba(46,125,50,0.15); border: 1px solid #66bb6a; border-radius: 16px; text-align: left;">
-          <h4 id="receipt-title" style="color: #66bb6a; font-size: 1.2rem; margin-bottom: 8px;"></h4>
-          <p id="receipt-details" style="font-size: 0.9rem; color: #fff; line-height: 1.6;"></p>
-          <button class="btn btn-secondary" onclick="shareReceiptWhatsApp()" style="margin-top: 12px; font-size: 0.85rem;">📲 Compartir Comprobante por WhatsApp</button>
-        </div>
-
-      </div>
-    </div>
 
     <!-- Interactive Store Map Section -->
     <div id="store-map-section" style="display: none; max-width: 1000px; margin: 30px auto; padding: 0 20px;">

@@ -968,12 +968,7 @@ const AUTHORIZED_VENDEDORES = [
   { name: 'Mariano', pass: 'mariano123' }
 ];
 
-const AI_VISION_API_KEY = '-7eVtJsCLDRe3tUAznAxNXJV9H1R5gq478p9f2OtO5RIsq-SlZZxqV18VkNDyta5O';
 
-let currentUploadedRealPhoto = null;
-let currentSamplePhoto = null;
-let liveUSDRate = 1385.00;
-let lastRegisteredReceipt = null;
 
 // Vendor Auth Check on Load & Session Management
 function selectVendorCard(name) {
@@ -1059,32 +1054,24 @@ function vendorLogout() {
 
 function switchVendorTab(tab) {
   const mainLayout = document.querySelector('.b2b-main-layout');
-  const salesSection = document.getElementById('sales-ai-section');
   const mapSection = document.getElementById('store-map-section');
   const qrSection = document.getElementById('scan-customer-qr-section');
 
   const btnCatalog = document.getElementById('tab-btn-catalog');
-  const btnAi = document.getElementById('tab-btn-ai');
   const btnMap = document.getElementById('tab-btn-map');
   const btnScan = document.getElementById('tab-btn-scan');
 
-  const allBtns = [btnCatalog, btnAi, btnMap, btnScan];
+  const allBtns = [btnCatalog, btnMap, btnScan];
   allBtns.forEach(btn => { if (btn) btn.classList.remove('active'); });
 
   if (mainLayout) mainLayout.style.display = 'none';
-  if (salesSection) salesSection.style.display = 'none';
+
   if (mapSection) mapSection.style.display = 'none';
   if (qrSection) qrSection.style.display = 'none';
 
   if (tab === 'catalog' || tab === 'reposicion') {
     if (mainLayout) mainLayout.style.display = 'grid';
     if (btnCatalog) btnCatalog.classList.add('active');
-  } else if (tab === 'ai' || tab === 'sales') {
-    if (salesSection) salesSection.style.display = 'block';
-    if (btnAi) btnAi.classList.add('active');
-    if (!currentSamplePhoto && !currentUploadedRealPhoto) {
-      loadSamplePhoto('led');
-    }
   } else if (tab === 'map') {
     if (mapSection) mapSection.style.display = 'block';
     if (btnMap) btnMap.classList.add('active');
@@ -1137,209 +1124,9 @@ function simulateCustomerQRScan() {
   }, 1200);
 }
 
-// Fetch Official USD Rate in Real-Time
-async function fetchLiveUSDRate() {
-  const displayEl = document.getElementById('live-usd-rate-display');
-  try {
-    const res = await fetch('https://dolarapi.com/v1/dolares/oficial');
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.promedio) {
-        liveUSDRate = Number(data.promedio);
-      } else if (data && data.venta) {
-        liveUSDRate = Number(data.venta);
-      }
-    }
-  } catch (err) {
-    console.warn('Usando tasa USD de respaldo:', err);
-  }
-  if (displayEl) {
-    displayEl.textContent = `$${liveUSDRate.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
-  }
-}
-
-// Sample photo selector Data URIs
-const sampleDataURIs = {
-  led: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="240" viewBox="0 0 300 240"><rect width="300" height="240" fill="%23152d24"/><rect x="25" y="25" width="250" height="190" rx="16" fill="%230f1e18" stroke="%23c39b4b" stroke-width="4"/><circle cx="75" cy="75" r="14" fill="%23ffee58"/><circle cx="150" cy="75" r="14" fill="%23ffee58"/><circle cx="225" cy="75" r="14" fill="%23ffee58"/><circle cx="75" cy="145" r="14" fill="%23ffee58"/><circle cx="150" cy="145" r="14" fill="%23ffee58"/><circle cx="225" cy="145" r="14" fill="%23ffee58"/><text x="150" y="198" fill="%23c39b4b" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Quantum LED 240W Pro</text></svg>`,
-  mighty: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="240" viewBox="0 0 300 240"><rect width="300" height="240" fill="%23152d24"/><rect x="75" y="20" width="150" height="200" rx="18" fill="%23222" stroke="%23c39b4b" stroke-width="3"/><rect x="95" y="40" width="110" height="45" rx="8" fill="%23ff9800"/><text x="150" y="68" fill="%23000" font-family="sans-serif" font-size="15" font-weight="bold" text-anchor="middle">MIGHTY%2B</text><circle cx="150" cy="135" r="22" fill="%23333" stroke="%23ff9800" stroke-width="3"/><text x="150" y="205" fill="%23fff" font-family="sans-serif" font-size="11" text-anchor="middle">Storz %26 Bickel</text></svg>`,
-  nutrients: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="240" viewBox="0 0 300 240"><rect width="300" height="240" fill="%23152d24"/><rect x="45" y="40" width="60" height="150" rx="10" fill="%234caf50"/><rect x="120" y="40" width="60" height="150" rx="10" fill="%232196f3"/><rect x="195" y="40" width="60" height="150" rx="10" fill="%239c27b0"/><text x="150" y="218" fill="%23c39b4b" font-family="sans-serif" font-size="13" font-weight="bold" text-anchor="middle">Kit Advanced Nutrients Tri-Part</text></svg>`
-};
-
-function handleRealImageUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    currentUploadedRealPhoto = e.target.result;
-    currentSamplePhoto = 'uploaded_real';
-
-    const box = document.getElementById('photo-preview-box');
-    if (box) {
-      box.innerHTML = `<img src="${currentUploadedRealPhoto}" alt="Foto Real Producto" style="width:100%; height:100%; object-fit:contain; border-radius:12px;">`;
-    }
-
-    const resultsForm = document.getElementById('ai-results-form');
-    const receiptResult = document.getElementById('ai-receipt-result');
-    if (resultsForm) resultsForm.style.display = 'none';
-    if (receiptResult) receiptResult.style.display = 'none';
-
-    showToast('📸 Foto capturada correctamente. Haz clic en ANALIZAR FOTO CON IA.');
-  };
-  reader.readAsDataURL(file);
-}
-
-function loadSamplePhoto(type) {
-  const box = document.getElementById('photo-preview-box');
-  if (!box) return;
-
-  currentSamplePhoto = type;
-  currentUploadedRealPhoto = null;
-
-  document.querySelectorAll('.sample-photo-btn').forEach(btn => {
-    btn.style.background = 'rgba(255,255,255,0.08)';
-    btn.style.color = '#fff';
-  });
-  const activeBtn = document.getElementById(`sample-btn-${type}`);
-  if (activeBtn) {
-    activeBtn.style.background = 'rgba(195,155,75,0.35)';
-    activeBtn.style.color = 'var(--color-accent-gold)';
-  }
-
-  const fallbackDataURI = sampleDataURIs[type] || sampleDataURIs['led'];
-  let webUrl = '';
-  if (type === 'led') webUrl = 'https://images.unsplash.com/photo-1508873696983-2df515122519?auto=format&fit=crop&w=400&q=80';
-  else if (type === 'mighty') webUrl = 'https://images.unsplash.com/photo-1527661591475-527312dd65f5?auto=format&fit=crop&w=400&q=80';
-  else webUrl = 'https://images.unsplash.com/photo-1585314062340-f1a5a7c9328d?auto=format&fit=crop&w=400&q=80';
-
-  box.innerHTML = `<img src="${webUrl}" onerror="this.onerror=null; this.src='${fallbackDataURI}';" alt="Muestra Producto IA" style="width:100%; height:100%; object-fit:cover; border-radius:12px;">`;
-
-  const resultsForm = document.getElementById('ai-results-form');
-  const receiptResult = document.getElementById('ai-receipt-result');
-  if (resultsForm) resultsForm.style.display = 'none';
-  if (receiptResult) receiptResult.style.display = 'none';
-}
-
-async function triggerAIScan() {
-  if (!currentSamplePhoto && !currentUploadedRealPhoto) {
-    alert('📷 Por favor subí o seleccioná una foto antes de escanear con la IA.');
-    return;
-  }
-
-  const progressBox = document.getElementById('ai-scan-progress');
-  const progressBar = document.getElementById('ai-progress-bar');
-  const btnScan = document.getElementById('btn-scan-ai');
-
-  if (progressBox) progressBox.style.display = 'block';
-  if (progressBar) progressBar.style.width = '0%';
-  if (btnScan) btnScan.disabled = true;
-
-  setTimeout(() => {
-    if (progressBar) progressBar.style.width = '100%';
-  }, 100);
-
-  setTimeout(() => {
-    if (progressBox) progressBox.style.display = 'none';
-    if (btnScan) btnScan.disabled = false;
-
-    const titleInput = document.getElementById('ai-product-title');
-    const skuInput = document.getElementById('ai-product-sku');
-    const categoryInput = document.getElementById('ai-product-category');
-    const priceArsInput = document.getElementById('ai-price-ars');
-    const skuCode = `#BO-PROD-${Math.floor(10000 + Math.random() * 90000)}`;
-
-    if (currentSamplePhoto === 'uploaded_real') {
-      if (titleInput) titleInput.value = 'Insumo / Producto Detectado por IA Vision';
-      if (categoryInput) categoryInput.value = 'Cultivo / Insumos Generales';
-      if (priceArsInput) priceArsInput.value = 185000;
-    } else if (currentSamplePhoto === 'led') {
-      if (titleInput) titleInput.value = 'Quantum Board LED 240W Samsung LM301H';
-      if (categoryInput) categoryInput.value = 'Indoor & Luz';
-      if (priceArsInput) priceArsInput.value = 450000;
-    } else if (currentSamplePhoto === 'mighty') {
-      if (titleInput) titleInput.value = 'Vaporizador Storz & Bickel Mighty+ Herbal';
-      if (categoryInput) categoryInput.value = 'Vaporizadores';
-      if (priceArsInput) priceArsInput.value = 680000;
-    } else {
-      if (titleInput) titleInput.value = 'Kit Trio Advanced Nutrients pH Perfect 500ml';
-      if (categoryInput) categoryInput.value = 'Fertilizantes';
-      if (priceArsInput) priceArsInput.value = 125000;
-    }
-    if (skuInput) skuInput.value = skuCode;
-    updateUSDConversion();
-    document.getElementById('ai-results-form').style.display = 'block';
-  }, 1600);
-}
-
-function updateUSDConversion() {
-  const arsVal = parseFloat(document.getElementById('ai-price-ars').value) || 0;
-  const usdInput = document.getElementById('ai-price-usd');
-  if (usdInput) {
-    if (arsVal > 0 && liveUSDRate > 0) {
-      const usdVal = arsVal / liveUSDRate;
-      usdInput.value = `USD $${usdVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    } else {
-      usdInput.value = 'USD $0,00';
-    }
-  }
-}
-
-function registerSalesItem() {
-  const title = document.getElementById('ai-product-title').value.trim();
-  const sku = document.getElementById('ai-product-sku').value.trim();
-  const category = document.getElementById('ai-product-category').value.trim();
-  const priceArs = parseFloat(document.getElementById('ai-price-ars').value) || 0;
-  const usdFormatted = document.getElementById('ai-price-usd').value;
-  const vendorName = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor Staff';
-
-  if (!title || priceArs <= 0) {
-    alert('Por favor completá el título y el precio en pesos ARS.');
-    return;
-  }
-
-  const receiptBox = document.getElementById('ai-receipt-result');
-  const receiptTitle = document.getElementById('receipt-title');
-  const receiptDetails = document.getElementById('receipt-details');
-  const now = new Date().toLocaleString('es-AR');
-
-  lastRegisteredReceipt = { title, sku, category, priceArs, usdFormatted, vendorName, now };
-
-  if (receiptTitle) receiptTitle.textContent = `✅ Venta Registrada Exitosamente (SKU: ${sku})`;
-  if (receiptDetails) {
-    receiptDetails.innerHTML = `<strong>📦 Producto:</strong> ${title}<br><strong>🏷️ Categoría:</strong> ${category}<br><strong>💵 Monto ARS:</strong> $${formatPrice(priceArs)} ARS<br><strong>💲 Equivalente Dólar Oficial:</strong> ${usdFormatted}<br><strong>👤 Registrado por:</strong> ${vendorName}<br><strong>🕒 Fecha y Hora:</strong> ${now}`;
-  }
-  if (receiptBox) receiptBox.style.display = 'block';
-  showToast('🎉 Venta registrada en el libro del local.');
-}
-
-function shareReceiptWhatsApp() {
-  if (!lastRegisteredReceipt) return;
-  let msg = `🧾 *COMPROBANTE DE VENTA BÔ GROWCLUB* 🧾\n\n📦 *Producto:* ${lastRegisteredReceipt.title}\n🏷️ *SKU Único:* ${lastRegisteredReceipt.sku}\n💵 *Precio ARS:* $${formatPrice(lastRegisteredReceipt.priceArs)} ARS\n💲 *Dólar Oficial:* ${lastRegisteredReceipt.usdFormatted}\n👤 *Vendedor:* ${lastRegisteredReceipt.vendorName}\n🕒 *Fecha:* ${lastRegisteredReceipt.now}\n`;
-  window.open(`https://wa.me/5493813023185?text=${encodeURIComponent(msg)}`, '_blank');
-}
-
-function approvePlusUltraMember(email) {
-  let registeredUsers = JSON.parse(localStorage.getItem('boeweb_registered_users')) || [];
-  const member = registeredUsers.find(u => u.email === email);
-  if (member) {
-    member.isPlusUltra = true;
-    localStorage.setItem('boeweb_registered_users', JSON.stringify(registeredUsers));
-    let currentMember = JSON.parse(localStorage.getItem('boeweb_member'));
-    if (currentMember && currentMember.email === email) {
-      currentMember.isPlusUltra = true;
-      localStorage.setItem('boeweb_member', JSON.stringify(currentMember));
-    }
-    if (window.showToast) window.showToast(`🔥 Suscripción BÔ Plus Ultra APROBADA para ${member.name}`);
-    alert(`🎉 ¡Suscripción BÔ Plus Ultra aprobada con éxito para ${member.name} (${member.email})!`);
-  } else {
-    alert(`🎉 ¡Solicitud recibida! Se ha aprobado la membresía BÔ Plus Ultra para ${email}.`);
-  }
-}
-
 // Check URL params and vendor auth on load
 document.addEventListener('DOMContentLoaded', () => {
   checkVendorAuth();
-  fetchLiveUSDRate();
   const urlParams = new URLSearchParams(window.location.search);
   const targetMember = urlParams.get('member');
   if (targetMember) {
@@ -1352,13 +1139,7 @@ window.selectVendorCard = selectVendorCard;
 window.checkVendorAuth = checkVendorAuth;
 window.handleVendorLogin = handleVendorLogin;
 window.vendorLogout = vendorLogout;
-window.handleRealImageUpload = handleRealImageUpload;
 window.switchVendorTab = switchVendorTab;
-window.loadSamplePhoto = loadSamplePhoto;
-window.triggerAIScan = triggerAIScan;
-window.updateUSDConversion = updateUSDConversion;
-window.registerSalesItem = registerSalesItem;
-window.shareReceiptWhatsApp = shareReceiptWhatsApp;
 window.approvePlusUltraMember = approvePlusUltraMember;
 window.searchShelfOnMap = searchShelfOnMap;
 window.simulateCustomerQRScan = simulateCustomerQRScan;
