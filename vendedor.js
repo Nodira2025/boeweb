@@ -1061,24 +1061,62 @@ function switchVendorTab(tab) {
   const btnMap = document.getElementById('tab-btn-map');
   const btnScan = document.getElementById('tab-btn-scan');
 
+  const vcardCatalog = document.getElementById('vcard-catalog');
+  const vcardMap = document.getElementById('vcard-map');
+  const vcardScan = document.getElementById('vcard-scan');
+
   const allBtns = [btnCatalog, btnMap, btnScan];
   allBtns.forEach(btn => { if (btn) btn.classList.remove('active'); });
 
-  if (mainLayout) mainLayout.style.display = 'none';
+  const allCards = [vcardCatalog, vcardMap, vcardScan];
+  allCards.forEach(card => {
+    if (card) {
+      card.style.borderColor = 'rgba(255,255,255,0.15)';
+      card.style.transform = 'scale(1)';
+    }
+  });
 
+  if (mainLayout) mainLayout.style.display = 'none';
   if (mapSection) mapSection.style.display = 'none';
   if (qrSection) qrSection.style.display = 'none';
 
+  let targetSection = null;
+
   if (tab === 'catalog' || tab === 'reposicion') {
-    if (mainLayout) mainLayout.style.display = 'grid';
+    if (mainLayout) {
+      mainLayout.style.display = 'grid';
+      targetSection = mainLayout;
+    }
     if (btnCatalog) btnCatalog.classList.add('active');
+    if (vcardCatalog) {
+      vcardCatalog.style.borderColor = 'var(--color-accent-gold)';
+      vcardCatalog.style.transform = 'scale(1.02)';
+    }
   } else if (tab === 'map') {
-    if (mapSection) mapSection.style.display = 'block';
+    if (mapSection) {
+      mapSection.style.display = 'block';
+      targetSection = mapSection;
+    }
     if (btnMap) btnMap.classList.add('active');
+    if (vcardMap) {
+      vcardMap.style.borderColor = '#42a5f5';
+      vcardMap.style.transform = 'scale(1.02)';
+    }
     renderStoreMapUI();
   } else if (tab === 'scan' || tab === 'qr') {
-    if (qrSection) qrSection.style.display = 'block';
+    if (qrSection) {
+      qrSection.style.display = 'block';
+      targetSection = qrSection;
+    }
     if (btnScan) btnScan.classList.add('active');
+    if (vcardScan) {
+      vcardScan.style.borderColor = '#66bb6a';
+      vcardScan.style.transform = 'scale(1.02)';
+    }
+  }
+
+  if (targetSection && window.innerWidth <= 768) {
+    targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }
 
