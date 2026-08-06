@@ -479,6 +479,21 @@ document.addEventListener('DOMContentLoaded', () => {
     renderRedemptionStore();
     renderLunarCalendar();
     renderGrowLogHistory();
+
+    // Set user unique mission code display
+    const codeEl = document.getElementById('user-mission-code');
+    if (codeEl && currentMember) {
+      let codeNum = 8492;
+      if (currentMember.email) {
+        let hash = 0;
+        for (let i = 0; i < currentMember.email.length; i++) {
+          hash = ((hash << 5) - hash) + currentMember.email.charCodeAt(i);
+          hash |= 0;
+        }
+        codeNum = Math.abs(hash) % 9000 + 1000;
+      }
+      codeEl.textContent = `#BO-${codeNum}`;
+    }
   }
 
   // --- TAB 2: ORDER HISTORY ---
@@ -1274,6 +1289,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     alert(`🎟️ ¡Encuesta enviada! Tu Ticket Dorado es #${ticketNum} y sumaste +150 Semillas VIP.`);
   };
+
+  window.copyMissionCode = function() {
+    const codeEl = document.getElementById('user-mission-code');
+    const codeText = codeEl ? codeEl.textContent.trim() : '#BO-8492';
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(codeText).then(() => {
+        if (window.showToast) window.showToast(`📋 ¡Código ${codeText} copiado al portapapeles!`);
+        else alert(`📋 ¡Código ${codeText} copiado al portapapeles! Pegalo en el comentario de Instagram.`);
+      }).catch(() => {
+        fallbackCopyText(codeText);
+      });
+    } else {
+      fallbackCopyText(codeText);
+    }
+  };
+
+  function fallbackCopyText(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    if (window.showToast) window.showToast(`📋 ¡Código ${text} copiado al portapapeles!`);
+    else alert(`📋 ¡Código ${text} copiado al portapapeles! Pegalo en el comentario de Instagram.`);
+  }
 });
 
 
