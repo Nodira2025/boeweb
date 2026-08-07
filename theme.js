@@ -8,12 +8,12 @@
     const btns = document.querySelectorAll('.theme-toggle-btn');
     btns.forEach(function (btn) {
       if (theme === 'dark') {
-        btn.innerHTML = '☀️ <span class="no-mobile">Claro</span>';
+        btn.innerHTML = '☀️ Modo Claro';
         btn.title = 'Cambiar a Modo Claro';
         btn.style.borderColor = 'var(--color-accent-gold)';
         btn.style.color = 'var(--color-accent-gold)';
       } else {
-        btn.innerHTML = '🌙 <span class="no-mobile">Oscuro</span>';
+        btn.innerHTML = '🌙 Modo Oscuro';
         btn.title = 'Cambiar a Modo Oscuro';
         btn.style.borderColor = 'var(--color-primary)';
         btn.style.color = 'var(--color-primary)';
