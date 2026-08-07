@@ -17,6 +17,7 @@
 
   <!-- Base Stylesheet (Retail) -->
   <link rel="stylesheet" href="index.css?v=1.5">
+  <script src="theme.js"></script>
   
   <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1069,6 +1070,11 @@
 
         <!-- Logged-in Seller Status & Cart -->
         <div style="display: flex; align-items: center; gap: 12px;">
+          <!-- Light / Dark Theme Switcher Button -->
+          <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Oscuro">
+            🌙 <span class="no-mobile">Oscuro</span>
+          </button>
+
           <div id="vendor-user-status" style="display: flex; align-items: center; gap: 8px;">
             <span id="active-vendor-display-name" style="background: rgba(195,155,75,0.2); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 6px 12px; border-radius: 12px; font-weight: 700; font-size: 0.82rem;">
               🧑‍💼 Vendedor: Sin Iniciar

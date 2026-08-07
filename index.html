@@ -26,6 +26,7 @@
 
   <!-- Stylesheet -->
   <link rel="stylesheet" href="index.css?v=2.5">
+  <script src="theme.js"></script>
 </head>
 <body>
 
@@ -45,6 +46,11 @@
 
       <!-- Navigation & Cart Area -->
       <div class="header-cart-area">
+        <!-- Light / Dark Theme Switcher Button -->
+        <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Oscuro">
+          🌙 <span class="no-mobile">Oscuro</span>
+        </button>
+
         <!-- Direct Quick Actions -->
         <button class="nav-header-btn" id="club-trigger" aria-label="Portal de Miembros">
           <svg class="icon nav-icon gold-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

@@ -1,38 +1,75 @@
 /* ==========================================================================
-   BO growclub CSS Style System (Zen & Premium Theme)
+   BO growclub CSS Style System (Zen Minimalist Theme)
    ========================================================================== */
 
-/* Design Tokens & Variables */
-:root {
-  /* Official Brand Manual Colors (Guía de Marca BÔ) */
-  --color-primary: #3E5F1F;          /* Verde Bosque Profundo (#3E5F1F) */
-  --color-primary-light: #7EA642;    /* Verde Hoja Vibrante (#7EA642) */
-  --color-accent-gold: #C2A246;      /* Dorado / Ocre Orgánico (#C2A246) */
-  --color-accent-gold-dark: #a68532; /* Darker Gold for hover/focus */
-  --color-earth-brown: #6B4E2E;      /* Tierra / Marrón Caluroso (#6B4E2E) */
-  --color-bg: #F6F3E8;               /* Crema Zen (#F6F3E8) */
-  --color-surface-glass: rgba(246, 243, 232, 0.92);
-  --color-neutral-stone: #E6DFC9;    /* Warm stone */
-  --color-neutral-dark: #2B4214;     /* Deep green text on light background */
-  --color-neutral-light: #F6F3E8;    /* Light cream */
-  --color-success: #7EA642;
+/* Design Tokens & Theme Variables */
+:root, [data-theme="light"] {
+  /* Theme Base Colors (Light Crema Zen) */
+  --color-bg: #F6F3E8;               /* Crema Zen fondo */
+  --color-card-bg: #FFFFFF;          /* Tarjetas sólidas en blanco */
+  --color-card-bg-alt: #FAF7EF;      /* Tarjeta alt */
+  --color-text-main: #152D24;        /* Texto principal en verde bosque muy oscuro */
+  --color-text-muted: #5C6E65;       /* Texto secundario */
   
-  /* Official Brand Manual Typography */
+  /* Verde reservado para BORDES, BOTONES y ACENTOS (NO para fondos) */
+  --color-primary: #3E5F1F;          /* Verde Bosque para acentos/botones */
+  --color-primary-light: #7EA642;    /* Verde Hoja para estados */
+  --color-accent-gold: #C2A246;      /* Dorado Ocre */
+  --color-accent-gold-dark: #a68532;
+  --color-earth-brown: #6B4E2E;
+  
+  --color-border-accent: #3E5F1F;    /* Borde verde bosque */
+  --color-border-subtle: #E2DAC8;    /* Borde suave crema */
+  --color-surface-glass: #FFFFFF;
+  --color-neutral-stone: #E6DFC9;
+  --color-neutral-dark: #152D24;
+  --color-neutral-light: #F6F3E8;
+  --color-success: #2E7D32;
+  
+  --shadow-sm: 0 2px 8px rgba(21, 45, 36, 0.05);
+  --shadow-md: 0 4px 16px rgba(21, 45, 36, 0.08);
+  --shadow-lg: 0 8px 30px rgba(21, 45, 36, 0.12);
+  --shadow-gold: 0 0 12px rgba(194, 162, 70, 0.25);
+  
   --font-serif: 'Cinzel', 'Playfair Display', Georgia, serif;
-  --font-sans: 'Montserrat', 'Lato', 'Outfit', sans-serif;
-  
-  --shadow-sm: 0 2px 8px rgba(62, 95, 31, 0.08);
-  --shadow-md: 0 8px 24px rgba(62, 95, 31, 0.12);
-  --shadow-lg: 0 16px 48px rgba(62, 95, 31, 0.18);
-  --shadow-gold: 0 0 15px rgba(194, 162, 70, 0.35);
+  --font-sans: 'Montserrat', 'Outfit', sans-serif;
   
   --border-radius-sm: 8px;
-  --border-radius-md: 16px;
-  --border-radius-lg: 24px;
+  --border-radius-md: 14px;
+  --border-radius-lg: 20px;
   --border-radius-full: 9999px;
   
-  --transition-smooth: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  --transition-smooth: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
   --transition-fast: all 0.15s ease;
+}
+
+[data-theme="dark"] {
+  /* Theme Base Colors (Dark Obsidiana Zen) */
+  --color-bg: #0D1612;               /* Obsidiana Zen fondo */
+  --color-card-bg: #141F1A;          /* Tarjetas sólidas oscuras */
+  --color-card-bg-alt: #1A2822;      /* Tarjeta alt */
+  --color-text-main: #F6F3E8;        /* Texto principal en Crema Zen */
+  --color-text-muted: #A3B5AA;       /* Texto secundario claro */
+  
+  /* Verde reservado para BORDES, BOTONES y ACENTOS (NO para fondos) */
+  --color-primary: #58872F;          /* Verde brillante acentos */
+  --color-primary-light: #8EC44B;
+  --color-accent-gold: #D4AF37;      /* Dorado brillante */
+  --color-accent-gold-dark: #b8972e;
+  --color-earth-brown: #8D6B45;
+  
+  --color-border-accent: #58872F;    /* Borde verde brillante */
+  --color-border-subtle: #24352C;    /* Borde oscuro */
+  --color-surface-glass: #141F1A;
+  --color-neutral-stone: #24352C;
+  --color-neutral-dark: #F6F3E8;
+  --color-neutral-light: #0D1612;
+  --color-success: #4CAF50;
+  
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.7);
+  --shadow-gold: 0 0 12px rgba(212, 175, 55, 0.3);
 }
 
 /* Base Reset & Layout */
@@ -51,8 +88,9 @@ html {
   scroll-behavior: smooth;
   font-size: 16px;
   background-color: var(--color-bg);
-  color: var(--color-neutral-dark);
+  color: var(--color-text-main);
   font-family: var(--font-sans);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 body {
@@ -60,24 +98,34 @@ body {
   display: flex;
   flex-direction: column;
   line-height: 1.6;
+  background-color: var(--color-bg);
+  color: var(--color-text-main);
 }
 
-/* Zen Background Glow */
-.zen-bg-glow {
-  position: fixed;
-  top: -20%;
-  left: -10%;
-  width: 60vw;
-  height: 60vw;
-  background: radial-gradient(circle, rgba(195, 155, 75, 0.05) 0%, rgba(253, 252, 249, 0) 70%);
-  z-index: -1;
-  pointer-events: none;
+/* Theme Switcher Button Style */
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: transparent;
+  border: 1.5px solid var(--color-primary);
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.theme-toggle-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Typography elements */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-serif);
-  color: var(--color-primary);
+  color: var(--color-text-main);
   font-weight: 700;
   line-height: 1.25;
 }
