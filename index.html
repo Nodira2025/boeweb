@@ -1102,9 +1102,13 @@
         <!-- Login Form Container -->
         <div id="auth-login-container" style="display: none;">
           <form id="club-login-form">
-            <div class="form-group" style="margin-bottom: 15px;">
+            <div class="form-group" style="margin-bottom: 12px;">
               <label for="login-credential" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Email o Celular (WhatsApp)</label>
               <input type="text" id="login-credential" class="form-control" placeholder="Ej: juan@example.com o +54381..." required style="width: 100%; box-sizing: border-box;">
+            </div>
+            <div class="form-group" style="margin-bottom: 15px;">
+              <label for="login-password" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Contraseña</label>
+              <input type="password" id="login-password" class="form-control" placeholder="Ingresá tu contraseña" required style="width: 100%; box-sizing: border-box;">
             </div>
             <div class="quiz-result-msg error" id="login-feedback" style="display: none; margin-bottom: 15px;"></div>
             <button type="submit" class="btn btn-primary btn-full-width" style="width: 100%;">Ingresar al Portal VIP</button>
@@ -1126,7 +1130,7 @@
               <label for="member-phone" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">WhatsApp (Celular)</label>
               <input type="tel" id="member-phone" class="form-control" placeholder="Ej: +54 9 381 555-5555" required style="width: 100%; box-sizing: border-box;">
             </div>
-            <div class="form-group" style="margin-bottom: 16px;">
+            <div class="form-group" style="margin-bottom: 12px;">
               <label for="member-growtype" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">Tu Tipo de Cultivo Preferido</label>
               <select id="member-growtype" class="form-control" style="width: 100%; box-sizing: border-box;">
                 <option value="Indoor">Indoor (Luces & Carpa)</option>
@@ -1134,6 +1138,14 @@
                 <option value="Mixto">Mixto (Invernadero / Balcón)</option>
                 <option value="Ninguno">No cultivo (Solo accesorios)</option>
               </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label for="member-password" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">Creá tu Contraseña *</label>
+              <input type="password" id="member-password" class="form-control" placeholder="Mínimo 6 caracteres" minlength="6" required style="width: 100%; box-sizing: border-box;">
+            </div>
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label for="member-password-confirm" class="form-label" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">Confirmá tu Contraseña *</label>
+              <input type="password" id="member-password-confirm" class="form-control" placeholder="Repetir contraseña" minlength="6" required style="width: 100%; box-sizing: border-box;">
             </div>
             <button type="submit" class="btn btn-primary btn-full-width" style="width: 100%;">Registrarse & Recibir +100 Semillas</button>
           </form>

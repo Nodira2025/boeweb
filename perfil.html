@@ -345,6 +345,12 @@
           <span class="launchpad-badge">PARTICIPAR</span>
         </div>
 
+        <div class="launchpad-card" id="card-btn-security" onclick="openPerfilTab('security')">
+          <div class="launchpad-icon-circle">🔒</div>
+          <span class="launchpad-title">Seguridad</span>
+          <span class="launchpad-badge">CONTRASEÑA</span>
+        </div>
+
       </div>
     </section>
 
@@ -600,6 +606,40 @@
               <div class="ticket-number" id="ticket-number-display">#BO-0000</div>
               <p class="ticket-status">¡Ya estás participando en el sorteo de este mes! El ganador se anuncia en nuestro Instagram @bo.growclub.</p>
             </div>
+          </div>
+        </div>
+
+        <!-- PANEL SECURITY: CAMBIAR CONTRASEÑA -->
+        <div class="perfil-tab-panel" id="panel-security" style="display: none;">
+          <div style="background: var(--color-card-bg); border: 1.5px solid var(--color-border-accent); border-radius: 28px; padding: 32px; box-shadow: var(--shadow-sm); color: var(--color-text-main); max-width: 600px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <span style="font-size: 2.5rem; display: block; margin-bottom: 8px;">🔒</span>
+              <h3 style="margin: 0; color: var(--color-primary); font-family: 'Cinzel', serif; font-size: 1.6rem; font-weight: 800;">Seguridad & Contraseña</h3>
+              <p style="margin: 6px 0 0 0; font-size: 0.9rem; color: var(--color-text-muted);">Creá o modificá tu contraseña para mantener tu cuenta del Club BÔ 100% protegida.</p>
+            </div>
+
+            <form id="change-password-form" onsubmit="handlePasswordChangeSubmit(event)">
+              <div style="margin-bottom: 16px;">
+                <label for="security-current-pass" style="display: block; font-size: 0.85rem; font-weight: 700; color: var(--color-text-main); margin-bottom: 6px;">Contraseña Actual *</label>
+                <input type="password" id="security-current-pass" class="form-control" required placeholder="Ingresá tu contraseña actual" style="width: 100%; padding: 12px; border-radius: 12px; border: 1.5px solid var(--color-border-accent); background: var(--color-card-bg-alt); color: var(--color-text-main); box-sizing: border-box;">
+              </div>
+
+              <div style="margin-bottom: 16px;">
+                <label for="security-new-pass" style="display: block; font-size: 0.85rem; font-weight: 700; color: var(--color-text-main); margin-bottom: 6px;">Nueva Contraseña (mínimo 6 caracteres) *</label>
+                <input type="password" id="security-new-pass" class="form-control" required minlength="6" placeholder="Escribí tu nueva clave segura" style="width: 100%; padding: 12px; border-radius: 12px; border: 1.5px solid var(--color-border-accent); background: var(--color-card-bg-alt); color: var(--color-text-main); box-sizing: border-box;">
+              </div>
+
+              <div style="margin-bottom: 24px;">
+                <label for="security-confirm-pass" style="display: block; font-size: 0.85rem; font-weight: 700; color: var(--color-text-main); margin-bottom: 6px;">Confirmar Nueva Contraseña *</label>
+                <input type="password" id="security-confirm-pass" class="form-control" required minlength="6" placeholder="Repetir nueva clave" style="width: 100%; padding: 12px; border-radius: 12px; border: 1.5px solid var(--color-border-accent); background: var(--color-card-bg-alt); color: var(--color-text-main); box-sizing: border-box;">
+              </div>
+
+              <div id="security-feedback-msg" style="display: none; padding: 12px; border-radius: 12px; font-weight: 700; font-size: 0.88rem; margin-bottom: 18px; text-align: center;"></div>
+
+              <button type="submit" class="btn btn-primary" style="width: 100%; padding: 14px; border-radius: 14px; font-weight: 800; font-size: 1rem;">
+                🔑 Guardar Nueva Contraseña
+              </button>
+            </form>
           </div>
         </div>
 

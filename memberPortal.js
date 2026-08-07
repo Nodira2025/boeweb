@@ -255,28 +255,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const email = document.getElementById('member-email').value.trim().toLowerCase();
     const phone = document.getElementById('member-phone').value.trim();
     const growType = document.getElementById('member-growtype').value;
+    const passwordEl = document.getElementById('member-password');
+    const passwordConfirmEl = document.getElementById('member-password-confirm');
+    const password = passwordEl ? passwordEl.value : '';
+    const passwordConfirm = passwordConfirmEl ? passwordConfirmEl.value : '';
 
     if (!name || !email || !phone) return;
 
+    if (password.length < 6) {
+      alert('⚠️ La contraseña debe tener al menos 6 caracteres por razones de seguridad.');
+      return;
+    }
+
+    if (password !== passwordConfirm) {
+      alert('❌ Las contraseñas no coinciden. Por favor verificalas.');
+      return;
+    }
+
     // Check if user already exists in local list
-    const existing = registeredUsers.find(u => u.email === email || u.phone === phone);
-    if (existing) {
-      currentMember = existing;
+    const existingIndex = registeredUsers.findIndex(u => u.email === email || u.phone === phone);
+    if (existingIndex !== -1) {
+      currentMember = registeredUsers[existingIndex];
+      currentMember.password = password; // Update password
+      registeredUsers[existingIndex] = currentMember;
     } else {
       currentMember = {
         name,
         email,
         phone,
         growType,
+        password,
         seeds: 100, // 100 seeds welcome bonus
         joinedAt: new Date().toISOString(),
         surveyCompleted: false,
         raffleTicket: null
       };
       registeredUsers.push(currentMember);
-      localStorage.setItem('boeweb_registered_users', JSON.stringify(registeredUsers));
     }
 
+    localStorage.setItem('boeweb_registered_users', JSON.stringify(registeredUsers));
     saveCurrentMemberState();
     syncMemberToCloud(currentMember); // Cloud Sync
 
@@ -290,6 +307,8 @@ document.addEventListener('DOMContentLoaded', () => {
   async function handleLogin(e) {
     e.preventDefault();
     const inputVal = document.getElementById('login-credential').value.trim().toLowerCase();
+    const passwordEl = document.getElementById('login-password');
+    const passwordVal = passwordEl ? passwordEl.value : '';
     if (loginFeedback) loginFeedback.style.display = 'none';
 
     if (!inputVal) return;
@@ -315,7 +334,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (foundUser) {
+      // Validate Password if user has password set
+      if (foundUser.password && foundUser.password !== passwordVal) {
+        if (loginFeedback) {
+          loginFeedback.style.display = 'block';
+          loginFeedback.textContent = '❌ Contraseña incorrecta. Por favor verificá tus datos.';
+        }
+        return;
+      }
+
       currentMember = foundUser;
+      // If legacy user without password logs in, set their password to passwordVal if provided
+      if (!currentMember.password && passwordVal) {
+        currentMember.password = passwordVal;
+        localStorage.setItem('boeweb_registered_users', JSON.stringify(registeredUsers));
+      }
+
       saveCurrentMemberState();
       updateClubButtons();
 
@@ -330,6 +364,75 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   }
+
+  function handlePasswordChangeSubmit(e) {
+    if (e) e.preventDefault();
+    const currentPass = document.getElementById('security-current-pass')?.value || '';
+    const newPass = document.getElementById('security-new-pass')?.value || '';
+    const confirmPass = document.getElementById('security-confirm-pass')?.value || '';
+    const feedbackEl = document.getElementById('security-feedback-msg');
+
+    if (!feedbackEl) return;
+
+    if (!currentMember) {
+      feedbackEl.style.display = 'block';
+      feedbackEl.style.background = 'rgba(239,83,80,0.15)';
+      feedbackEl.style.color = '#ef5350';
+      feedbackEl.style.border = '1px solid #ef5350';
+      feedbackEl.textContent = '❌ Tenés que iniciar sesión para cambiar tu contraseña.';
+      return;
+    }
+
+    // Check current password (if set)
+    if (currentMember.password && currentMember.password !== currentPass) {
+      feedbackEl.style.display = 'block';
+      feedbackEl.style.background = 'rgba(239,83,80,0.15)';
+      feedbackEl.style.color = '#ef5350';
+      feedbackEl.style.border = '1px solid #ef5350';
+      feedbackEl.textContent = '❌ La contraseña actual ingresada es incorrecta.';
+      return;
+    }
+
+    if (newPass.length < 6) {
+      feedbackEl.style.display = 'block';
+      feedbackEl.style.background = 'rgba(239,83,80,0.15)';
+      feedbackEl.style.color = '#ef5350';
+      feedbackEl.style.border = '1px solid #ef5350';
+      feedbackEl.textContent = '⚠️ La nueva contraseña debe tener al menos 6 caracteres.';
+      return;
+    }
+
+    if (newPass !== confirmPass) {
+      feedbackEl.style.display = 'block';
+      feedbackEl.style.background = 'rgba(239,83,80,0.15)';
+      feedbackEl.style.color = '#ef5350';
+      feedbackEl.style.border = '1px solid #ef5350';
+      feedbackEl.textContent = '❌ Las nuevas contraseñas no coinciden.';
+      return;
+    }
+
+    // Update password
+    currentMember.password = newPass;
+    saveCurrentMemberState();
+
+    const userIdx = registeredUsers.findIndex(u => u.email === currentMember.email || u.phone === currentMember.phone);
+    if (userIdx !== -1) {
+      registeredUsers[userIdx] = currentMember;
+      localStorage.setItem('boeweb_registered_users', JSON.stringify(registeredUsers));
+    }
+
+    syncMemberToCloud(currentMember);
+
+    feedbackEl.style.display = 'block';
+    feedbackEl.style.background = 'rgba(102,187,106,0.15)';
+    feedbackEl.style.color = '#66bb6a';
+    feedbackEl.style.border = '1px solid #66bb6a';
+    feedbackEl.textContent = '🎉 ¡Tu contraseña fue actualizada con éxito!';
+
+    document.getElementById('change-password-form')?.reset();
+  }
+
+  window.handlePasswordChangeSubmit = handlePasswordChangeSubmit;
 
   function handleLogout() {
     localStorage.removeItem('boeweb_member');
