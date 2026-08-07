@@ -23,22 +23,9 @@
   <script src="theme.js"></script>
   
   <style>
-    :root {
-      --color-primary: #3E5F1F;           /* Verde Bosque Profundo */
-      --color-primary-light: #7EA642;     /* Verde Hoja Vibrante */
-      --color-accent-gold: #C2A246;       /* Dorado / Ocre Orgánico */
-      --color-earth-brown: #6B4E2E;       /* Tierra / Marrón Caluroso */
-      --color-bg: #F6F3E8;                /* Crema Zen */
-      --gold-gradient: linear-gradient(135deg, #C2A246 0%, #9e8131 100%);
-      --card-bg-glass: rgba(30, 49, 13, 0.95);
-      --card-border-gold: rgba(194, 162, 70, 0.45);
-      --font-serif: 'Cinzel', serif;
-      --font-sans: 'Montserrat', sans-serif;
-    }
-
     body {
-      background: #F6F3E8;
-      color: #2B4214;
+      background: var(--color-bg);
+      color: var(--color-text-main);
       font-family: var(--font-sans);
       min-height: 100vh;
       margin: 0;
@@ -46,15 +33,13 @@
     
     /* Top Header Bar */
     .perfil-header {
-      background: rgba(30, 49, 13, 0.96);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-bottom: 2px solid var(--color-accent-gold);
-      padding: 16px 36px;
+      background: var(--color-card-bg);
+      border-bottom: 2px solid var(--color-border-accent);
+      padding: 16px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      box-shadow: var(--shadow-sm);
       position: sticky;
       top: 0;
       z-index: 100;
@@ -150,15 +135,13 @@
     }
 
     .launchpad-card {
-      background: var(--card-bg-glass);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1.5px solid var(--card-border-gold);
-      border-radius: 22px;
-      padding: 22px 16px;
+      background: var(--color-card-bg);
+      border: 1.5px solid var(--color-border-accent);
+      border-radius: 18px;
+      padding: 20px 14px;
       text-align: center;
       cursor: pointer;
-      transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: var(--transition-smooth);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -166,20 +149,19 @@
       gap: 10px;
       position: relative;
       overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      box-shadow: var(--shadow-sm);
     }
 
     .launchpad-card:hover {
-      transform: translateY(-6px) scale(1.03);
+      transform: translateY(-4px);
       border-color: var(--color-accent-gold);
-      box-shadow: 0 18px 35px rgba(194, 162, 70, 0.35);
-      background: #253C13;
+      box-shadow: var(--shadow-md);
     }
 
     .launchpad-card-active {
       border-color: var(--color-accent-gold) !important;
-      background: linear-gradient(135deg, #3E5F1F 0%, #253C13 100%) !important;
-      box-shadow: 0 0 30px rgba(194, 162, 70, 0.45), inset 0 0 15px rgba(194, 162, 70, 0.2) !important;
+      background: var(--color-card-bg-alt) !important;
+      box-shadow: var(--shadow-gold) !important;
     }
 
     .launchpad-icon-circle {
