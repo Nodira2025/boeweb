@@ -168,8 +168,8 @@
       width: 56px;
       height: 56px;
       border-radius: 50%;
-      background: rgba(194, 162, 70, 0.15);
-      border: 1px solid rgba(194, 162, 70, 0.4);
+      background: var(--color-card-bg-alt);
+      border: 1.5px solid var(--color-border-accent);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -183,18 +183,18 @@
 
     .launchpad-title {
       font-family: var(--font-serif);
-      font-weight: 700;
+      font-weight: 800;
       font-size: 0.95rem;
-      color: #F6F3E8;
+      color: var(--color-text-main) !important;
       letter-spacing: 0.3px;
     }
 
     .launchpad-badge {
       font-size: 0.7rem;
-      background: var(--color-accent-gold);
-      color: #2B4214;
-      font-weight: 900;
-      padding: 3px 10px;
+      background: var(--color-primary);
+      color: #FFFFFF;
+      font-weight: 800;
+      padding: 4px 10px;
       border-radius: 12px;
       letter-spacing: 0.5px;
     }
@@ -277,8 +277,8 @@
     <a href="index.html" style="text-decoration: none; display: flex; align-items: center; gap: 10px;">
       <img src="assets/logo.jpg" alt="BÔ Growclub" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--color-accent-gold); box-shadow: 0 0 10px rgba(212, 175, 55, 0.4); flex-shrink: 0;">
       <div class="perfil-header-title">
-        <h2 style="margin: 0; font-family: 'Cinzel', serif; color: var(--color-accent-gold); font-size: 1.25rem; letter-spacing: 1px; white-space: nowrap;">BÔ GROWCLUB</h2>
-        <span style="font-size: 0.7rem; color: rgba(247,246,242,0.7); text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700;">MIEMBRO CLUB VIP</span>
+        <h2 style="margin: 0; font-family: 'Cinzel', serif; color: var(--color-primary); font-size: 1.25rem; letter-spacing: 1px; white-space: nowrap; font-weight: 800;">BÔ GROWCLUB</h2>
+        <span style="font-size: 0.7rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 1.5px; font-weight: 800;">MIEMBRO CLUB VIP</span>
       </div>
     </a>
 
@@ -287,7 +287,7 @@
       <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Oscuro">
         🌙 Modo Oscuro
       </button>
-      <a href="index.html" class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.82rem; border-color: var(--color-accent-gold); color: var(--color-accent-gold); border-radius: 12px; font-weight: 700; white-space: nowrap;">🛒 <span class="btn-text-full">Volver a Tienda</span></a>
+      <a href="index.html" class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.82rem; border-color: var(--color-primary); color: var(--color-primary); border-radius: 12px; font-weight: 700; white-space: nowrap;">🛒 <span class="btn-text-full">Volver a Tienda</span></a>
       <button class="btn btn-secondary" id="perfil-logout-btn" style="padding: 8px 12px; font-size: 0.82rem; border-color: #ff5252; color: #ff5252; border-radius: 12px; font-weight: 700; white-space: nowrap;">Cerrar Sesión</button>
     </div>
   </header>
@@ -297,8 +297,8 @@
     <!-- LAUNCHPAD DE ACCESO RÁPIDO DE LUJO (PRIMERA SECCIÓN) -->
     <section style="margin-bottom: 28px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
-        <h3 style="font-family: 'Cinzel', serif; color: #2B4214; margin: 0; font-size: 1.35rem; font-weight: 800;">🚀 Acceso Rápido & Funciones VIP</h3>
-        <span style="font-size: 0.82rem; color: #6B4E2E; font-weight: 700;">Seleccioná una función para interactuar</span>
+        <h3 style="font-family: 'Cinzel', serif; color: var(--color-text-main); margin: 0; font-size: 1.35rem; font-weight: 800;">🚀 Acceso Rápido & Funciones VIP</h3>
+        <span style="font-size: 0.82rem; color: var(--color-text-muted); font-weight: 700;">Seleccioná una función para interactuar</span>
       </div>
 
       <div class="launchpad-grid">
@@ -383,11 +383,11 @@
 
         <!-- PANEL 0: MI PASE QR & PERFIL VIP -->
         <div class="perfil-tab-panel" id="panel-qr" style="display: block;">
-          <div style="background: var(--card-bg-glass); backdrop-filter: blur(16px); border: 1.5px solid var(--card-border-gold); border-radius: 28px; padding: 28px; box-shadow: 0 15px 40px rgba(0,0,0,0.5); color: #fff;">
+          <div style="background: var(--color-card-bg); border: 1.5px solid var(--color-border-accent); border-radius: 28px; padding: 28px; box-shadow: var(--shadow-sm); color: var(--color-text-main);">
             
             <div style="text-align: center; margin-bottom: 20px;">
               <span style="font-size: 0.75rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px;">PASE DIGITAL PRESENCIAL BÔ</span>
-              <h2 style="font-family: 'Cinzel', serif; color: #fff; margin: 4px 0 8px 0; font-size: 1.8rem;" id="header-user-name">Franco Ruiz</h2>
+              <h2 style="font-family: 'Cinzel', serif; color: var(--color-text-main); margin: 4px 0 8px 0; font-size: 1.8rem;" id="header-user-name">Franco Ruiz</h2>
               <span style="background: rgba(212, 175, 55, 0.2); border: 1px solid var(--color-accent-gold); padding: 4px 14px; border-radius: 12px; color: var(--color-accent-gold); font-weight: 800; font-size: 0.85rem;" id="header-user-tier">🌱 Nivel 1: Brote (5% OFF)</span>
             </div>
 
@@ -403,18 +403,18 @@
             </div>
 
             <!-- Escala de Nivel & Semillas -->
-            <div style="background: rgba(43,66,20,0.8); border: 1.5px solid var(--color-accent-gold); border-radius: 20px; padding: 20px; text-align: center;">
-              <span style="font-size: 0.72rem; color: rgba(247,246,242,0.8); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">SEMILLAS DISPONIBLES CANJEABLES POR $0</span>
+            <div style="background: var(--color-card-bg-alt); border: 1.5px solid var(--color-accent-gold); border-radius: 20px; padding: 20px; text-align: center;">
+              <span style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">SEMILLAS DISPONIBLES CANJEABLES POR $0</span>
               <div style="font-size: 2.2rem; font-family: 'Cinzel', serif; color: var(--color-accent-gold); font-weight: 900; margin: 4px 0;" id="header-user-seeds">100</div>
               
               <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 800; margin: 12px 0 6px 0;">
                 <span id="perfil-tier-current" style="color: var(--color-accent-gold);">🌱 Brote (5% OFF)</span>
-                <span id="perfil-tier-next" style="color: rgba(247,246,242,0.7);">🌿 Cultivador (10% OFF)</span>
+                <span id="perfil-tier-next" style="color: var(--color-text-muted);">🌿 Cultivador (10% OFF)</span>
               </div>
-              <div style="width: 100%; height: 12px; background: rgba(0,0,0,0.6); border-radius: 6px; overflow: hidden; border: 1px solid var(--color-accent-gold); margin-bottom: 8px; padding: 2px;">
+              <div style="width: 100%; height: 12px; background: var(--color-bg); border-radius: 6px; overflow: hidden; border: 1px solid var(--color-accent-gold); margin-bottom: 8px; padding: 2px;">
                 <div id="perfil-progress-fill" style="width: 25%; height: 100%; background: var(--gold-gradient); border-radius: 4px;"></div>
               </div>
-              <p id="perfil-progress-text" style="font-size: 0.82rem; color: rgba(247,246,242,0.8); margin: 0; font-weight: 600;">Te faltan 400 semillas para el siguiente nivel.</p>
+              <p id="perfil-progress-text" style="font-size: 0.82rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">Te faltan 400 semillas para el siguiente nivel.</p>
             </div>
 
           </div>
@@ -422,11 +422,11 @@
 
         <!-- PANEL 1: CAJA MÁGICA SEMANAL -->
         <div class="perfil-tab-panel" id="panel-chest" style="display: none;">
-          <div style="background: linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(15, 30, 24, 0.95) 100%); border: 2px solid var(--color-accent-gold); border-radius: 28px; padding: 40px; text-align: center; box-shadow: 0 15px 40px rgba(0,0,0,0.5);">
+          <div style="background: var(--color-card-bg); border: 2px solid var(--color-accent-gold); border-radius: 28px; padding: 40px; text-align: center; box-shadow: var(--shadow-sm); color: var(--color-text-main);">
             <span style="font-size: 4rem; display: block; margin-bottom: 12px; filter: drop-shadow(0 0 15px rgba(212,175,55,0.6));">🎁</span>
             <span style="font-size: 0.8rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px;">COFRE MISTERIOSO DE PREMIOS BÔ</span>
-            <h2 style="font-family: 'Cinzel', serif; color: #fff; margin: 8px 0 14px 0; font-size: 1.8rem;">Abrí tu Caja Mágica Semanal</h2>
-            <p style="color: rgba(247,246,242,0.85); max-width: 520px; margin: 0 auto 24px auto; font-size: 1rem; line-height: 1.5;">Ganá premios aleatorios instantáneos: +50, +100 o +250 Semillas VIP, cupones de descuento extra o regalos físicos por $0.</p>
+            <h2 style="font-family: 'Cinzel', serif; color: var(--color-text-main); margin: 8px 0 14px 0; font-size: 1.8rem;">Abrí tu Caja Mágica Semanal</h2>
+            <p style="color: var(--color-text-muted); max-width: 520px; margin: 0 auto 24px auto; font-size: 1rem; line-height: 1.5;">Ganá premios aleatorios instantáneos: +50, +100 o +250 Semillas VIP, cupones de descuento extra o regalos físicos por $0.</p>
             
             <button class="btn btn-primary" onclick="openMysteryChest()" style="background: var(--gold-gradient); border-color: var(--color-accent-gold); color: #070e0b; font-weight: 900; padding: 16px 40px; font-size: 1.15rem; border-radius: 16px; box-shadow: 0 10px 30px rgba(212,175,55,0.4);">
               🎁 ABRIR CAJA MÁGICA AHORA
@@ -438,11 +438,11 @@
 
         <!-- PANEL 2: DIARIO DE CULTIVO -->
         <div class="perfil-tab-panel" id="panel-growlog" style="display: none;">
-          <div style="background: var(--card-bg-glass); backdrop-filter: blur(16px); border: 1.5px solid var(--card-border-gold); border-radius: 28px; padding: 32px; box-shadow: 0 15px 40px rgba(0,0,0,0.5);">
+          <div style="background: var(--color-card-bg); border: 1.5px solid var(--color-border-accent); border-radius: 28px; padding: 32px; box-shadow: var(--shadow-sm); color: var(--color-text-main);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
               <div>
                 <h3 style="margin: 0; color: var(--color-accent-gold); font-family: 'Cinzel', serif; font-size: 1.6rem;">🌱 Diario de Cultivo & Racha Diaria</h3>
-                <p style="margin: 6px 0 0 0; font-size: 0.9rem; color: rgba(247,246,242,0.8);">Registrá tu cultivo todos los días para ganar +20 Semillas de racha y +30 Semillas por instrumental.</p>
+                <p style="margin: 6px 0 0 0; font-size: 0.9rem; color: var(--color-text-muted);">Registrá tu cultivo todos los días para ganar +20 Semillas de racha y +30 Semillas por instrumental.</p>
               </div>
               <button class="btn btn-primary" onclick="claimDailyCheckin()" style="padding: 12px 24px; font-weight: 900; background: var(--gold-gradient); border-color: var(--color-accent-gold); color: #070e0b; border-radius: 14px;">🔥 RECLAMAR RACHA DIARIA (+20 SEMILLAS)</button>
             </div>
