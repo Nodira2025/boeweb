@@ -26,12 +26,24 @@
 
   <!-- Stylesheet -->
   <link rel="stylesheet" href="index.css?v=zen_v4">
+  <link rel="stylesheet" href="storefront.css?v=bo_app_v1">
   <script src="theme.js"></script>
 </head>
 <body>
 
   <!-- Background Zen Decoration -->
   <div class="zen-bg-glow"></div>
+
+  <div class="brand-utility-bar" aria-label="Información de atención">
+    <div class="brand-utility-inner">
+      <span class="utility-status"><span class="utility-status-dot" aria-hidden="true"></span>Atención hoy de 11:00 a 21:30</span>
+      <div class="utility-links">
+        <a href="coffee.html">BÔ Coffee</a>
+        <a href="pacientes.html">Pacientes</a>
+        <a href="https://wa.me/5493813023185" target="_blank" rel="noopener">Hablar con un asesor</a>
+      </div>
+    </div>
+  </div>
 
   <!-- Header Navigation -->
   <header class="main-header">
@@ -43,6 +55,17 @@
           <span class="brand-subtitle">growclub</span>
         </div>
       </div>
+
+      <form class="search-form header-search-form" id="search-form" onsubmit="event.preventDefault();" role="search">
+        <div class="search-input-wrapper">
+          <svg class="icon search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="search" id="search-input" placeholder="Buscar productos, marcas o categorías" aria-label="Buscar productos">
+          <button type="button" class="clear-search-btn" id="clear-search" style="display: none;" aria-label="Limpiar búsqueda">&times;</button>
+        </div>
+      </form>
 
       <!-- Navigation & Cart Area -->
       <div class="header-cart-area">
@@ -99,10 +122,6 @@
               <span class="menu-item-icon">☕</span>
               <span class="menu-item-text">BÔ Coffee Lounge</span>
             </a>
-            <a href="vendedor.html" class="more-menu-item" onclick="closeNavMoreMenu();">
-              <span class="menu-item-icon">💼</span>
-              <span class="menu-item-text">Portal Vendedores</span>
-            </a>
             <button class="more-menu-item" onclick="closeNavMoreMenu(); document.getElementById('blog-trigger')?.click();">
               <span class="menu-item-icon">📖</span>
               <span class="menu-item-text">Guías de Cultivo</span>
@@ -119,34 +138,64 @@
         </div>
       </div>
     </div>
+    <nav class="desktop-primary-nav" aria-label="Navegación principal">
+      <div class="desktop-primary-nav-inner">
+        <a href="#home" class="desktop-nav-link active">Inicio</a>
+        <a href="#catalog-section" class="desktop-nav-link">Tienda</a>
+        <button type="button" class="desktop-nav-link" id="academy-trigger">Academia</button>
+        <button type="button" class="desktop-nav-link" id="blog-trigger">Guías</button>
+        <a href="pacientes.html" class="desktop-nav-link">Pacientes</a>
+        <a href="coffee.html" class="desktop-nav-link">BÔ Coffee</a>
+      </div>
+    </nav>
   </header>
 
   <!-- Hero Section -->
-  <section class="hero-section">
+  <section class="hero-section" id="home">
     <!-- Zen 420 Floating Leaves Container -->
     <div class="zen-leaves-container" id="zen-leaves-container"></div>
     <div class="hero-container">
       <div class="hero-content">
-        <h1 class="hero-title">Encuentra tu centro.<br><span class="highlight-gold">Cultiva tu paz.</span></h1>
-        <p class="hero-description">BO growclub une la pasión por el cultivo natural con la armonía del espíritu Zen. Productos premium seleccionados para el cuidado de tus plantas y tu bienestar.</p>
+        <span class="hero-eyebrow">Growshop boutique · Tucumán</span>
+        <h1 class="hero-title">Todo para cultivar<br><span class="highlight-gold">con equilibrio.</span></h1>
+        <p class="hero-description">Productos seleccionados, asesoramiento humano y herramientas para acompañar cada etapa de tu cultivo.</p>
         <div class="hero-actions">
-          <a href="#catalog-section" class="btn btn-primary">Explorar Catálogo</a>
+          <a href="#catalog-section" class="btn btn-primary">Explorar la tienda</a>
           <button class="btn btn-secondary" id="wheel-trigger-hero">
             <svg class="icon lotus-icon-btn" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zm0-1.5c-4.694 0-8.5-3.806-8.5-8.5s3.806-8.5 8.5-8.5 8.5 3.806 8.5 8.5-3.806 8.5-8.5 8.5zm-1.5-6.5c0-.828.672-1.5 1.5-1.5s1.5 0 1.5 1.5v2c0 .828-.672 1.5-1.5 1.5s-1.5-.672-1.5-1.5v-2z"></path>
               <path d="M12 5.5c-1.5 0-3 1.5-3 3.5s1.5 3 3 5c1.5-2 3-3 3-5s-1.5-3.5-3-3.5zm0 5c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"></path>
             </svg>
-            Girar Rueda de Descuentos
+            Beneficio del día
           </button>
         </div>
+        <div class="hero-proof" aria-label="Beneficios de la tienda">
+          <span><strong>+2.200</strong> productos</span>
+          <span><strong>Retiro</strong> en el local</span>
+          <span><strong>Asesoría</strong> personalizada</span>
+        </div>
       </div>
-      <div class="hero-visual">
-        <!-- Golden Lotus / Mandala Background Element -->
-        <div class="mandala-decoration animate-spin-slow"></div>
-        <img src="assets/logo.jpg" alt="Buddha Grow club Logo" class="hero-center-logo">
-      </div>
+      <aside class="hero-visual hero-service-card" aria-label="Servicios BÔ Grow Club">
+        <div class="hero-service-brand">
+          <img src="assets/logo.jpg" alt="BÔ Grow Club">
+          <div><span>Tu ecosistema BÔ</span><strong>Cultivo, comunidad y bienestar.</strong></div>
+        </div>
+        <div class="hero-service-list">
+          <div><span class="service-number">01</span><p><strong>Elegí con confianza</strong><small>Catálogo ordenado y stock visible.</small></p></div>
+          <div><span class="service-number">02</span><p><strong>Sumá beneficios</strong><small>Club BÔ, semillas y descuentos.</small></p></div>
+          <div><span class="service-number">03</span><p><strong>Retirá o coordiná envío</strong><small>Finalización simple por WhatsApp.</small></p></div>
+        </div>
+      </aside>
     </div>
   </section>
+
+  <nav class="home-category-strip" aria-label="Categorías destacadas">
+    <button type="button" class="category-btn home-category-btn" data-category="Semillas">Semillas</button>
+    <button type="button" class="category-btn home-category-btn" data-category="Indoor">Indoor y luz</button>
+    <button type="button" class="category-btn home-category-btn" data-category="Sustratos">Sustratos</button>
+    <button type="button" class="category-btn home-category-btn" data-category="Fertilizantes">Fertilizantes</button>
+    <button type="button" class="category-btn home-category-btn" data-category="Parafernalia">Accesorios</button>
+  </nav>
 
   <!-- Main Catalog Section -->
   <main class="catalog-section" id="catalog-section">
@@ -155,26 +204,12 @@
       <!-- Category Navigation & Dynamic Faceted Filter Sidebar (Desktop) -->
       <aside class="catalog-sidebar" id="catalog-sidebar">
         <div class="sidebar-block">
-          <!-- Search Bar -->
-          <div class="catalog-search-area">
-            <form class="search-form" id="search-form" onsubmit="event.preventDefault();">
-              <div class="search-input-wrapper">
-                <svg class="icon search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-                <input type="text" id="search-input" placeholder="Buscar sustrato, semillas, fertilizante..." aria-label="Buscar productos">
-                <button type="button" class="clear-search-btn" id="clear-search" style="display: none;">&times;</button>
-              </div>
-            </form>
-          </div>
-
           <!-- Dynamic Faceted Filter Panel (Accordion System) -->
           <div class="faceted-filter-panel" id="faceted-filter-panel">
             
             <!-- Filter Header -->
             <div class="facet-header">
-              <h3 class="facet-main-title">🎛️ Filtros</h3>
+              <h3 class="facet-main-title">Filtrar productos</h3>
               <button class="clear-all-filters-link" id="clear-all-filters-btn" style="display: none;">Limpiar todo</button>
             </div>
 
@@ -299,7 +334,12 @@
         <div class="catalog-header-controls">
           <!-- Mobile Filter Floating Trigger Icon Button -->
           <button class="mobile-filter-trigger-btn" id="mobile-filter-trigger-btn" onclick="openMobileFilterDrawer()" aria-label="Filtrar productos">
-            <span>🎛️</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <line x1="4" y1="6" x2="20" y2="6"></line>
+              <line x1="7" y1="12" x2="17" y2="12"></line>
+              <line x1="10" y1="18" x2="14" y2="18"></line>
+            </svg>
+            <span>Filtrar</span>
             <span id="mobile-filter-count-badge" class="mobile-filter-count-badge" style="display: none;">0</span>
           </button>
 
@@ -356,6 +396,33 @@
           <button class="btn btn-primary btn-sm" id="reset-search-btn">Ver todos los productos</button>
         </div>
       </div>
+
+      <aside class="store-utility-rail" id="store-utility-rail" aria-label="Resumen de compra y beneficios">
+        <section class="utility-card utility-card-club">
+          <span class="utility-card-kicker">Club BÔ</span>
+          <h2>Tu cultivo también suma.</h2>
+          <p>Accedé a beneficios y guardá tus avances en un solo lugar.</p>
+          <button type="button" class="utility-card-link" id="rail-open-club">Ver mi club <span aria-hidden="true">→</span></button>
+        </section>
+        <section class="utility-card utility-card-cart">
+          <div class="utility-card-heading">
+            <span class="utility-card-kicker">Tu pedido</span>
+            <span class="rail-cart-count" id="rail-cart-count">0 artículos</span>
+          </div>
+          <strong class="rail-cart-total" id="rail-cart-total">$0,00</strong>
+          <p id="rail-cart-message">Agregá productos y revisá el pedido sin salir del catálogo.</p>
+          <button type="button" class="btn btn-primary btn-full-width" id="rail-open-cart">Revisar carrito</button>
+        </section>
+        <section class="utility-card utility-card-service">
+          <span class="utility-card-kicker">Compra acompañada</span>
+          <ul>
+            <li><span aria-hidden="true">✓</span> Stock actualizado</li>
+            <li><span aria-hidden="true">✓</span> Retiro en Tucumán</li>
+            <li><span aria-hidden="true">✓</span> Asesoría por WhatsApp</li>
+          </ul>
+          <a href="https://wa.me/5493813023185" target="_blank" rel="noopener">Consultar a un asesor</a>
+        </section>
+      </aside>
 
     </div>
   </main>
@@ -1007,9 +1074,8 @@
           <li><a href="#catalog-section" class="footer-cat-link" data-category="Semillas">Semillas</a></li>
           <li><a href="#catalog-section" class="footer-cat-link" data-category="Fertilizantes">Fertilizantes</a></li>
           <li><a href="#catalog-section" class="footer-cat-link" data-category="Vaporizadores">Vaporizadores</a></li>
-          <li><a href="vendedor.html" style="color: var(--color-accent-gold); font-weight: 600;">💼 Portal Vendedores</a></li>
-          <li><a href="tablet.html" target="_blank" style="color: var(--color-accent-gold); font-weight: 600;">🎮 Tablet Arcade Presencial (9:16)</a></li>
-          <li><a href="tv.html" target="_blank" style="color: var(--color-accent-gold); font-weight: 600;">📺 Cartelería TV en Local (Modo Publicitario)</a></li>
+          <li><a href="pacientes.html">Pacientes y REPROCANN</a></li>
+          <li><a href="coffee.html">BÔ Coffee Lounge</a></li>
         </ul>
       </div>
 
@@ -1032,8 +1098,17 @@
   </footer>
 
   <!-- Mobile Bottom Navigation -->
-  <div class="mobile-nav">
+  <nav class="mobile-nav" aria-label="Navegación de la aplicación">
     <button type="button" class="mobile-nav-btn active" id="mobile-shop-btn">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+        <path d="M3 11l9-8 9 8"></path>
+        <path d="M5 10v10h14V10"></path>
+        <path d="M9 20v-6h6v6"></path>
+      </svg>
+      <span>Inicio</span>
+    </button>
+
+    <button type="button" class="mobile-nav-btn" id="mobile-store-btn">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
         <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
         <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -1041,28 +1116,20 @@
       </svg>
       <span>Tienda</span>
     </button>
-    
+
+    <button type="button" class="mobile-nav-btn" id="mobile-club-btn">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+      </svg>
+      <span>Club</span>
+    </button>
+
     <button type="button" class="mobile-nav-btn" id="mobile-academy-btn">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
         <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
         <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
       </svg>
       <span>Academia</span>
-    </button>
-
-    <button type="button" class="mobile-nav-btn" id="mobile-blog-btn">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-      </svg>
-      <span>Guías</span>
-    </button>
-
-    <button type="button" class="mobile-nav-btn" id="mobile-club-btn">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
-        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
-      </svg>
-      <span>Club BÔ</span>
     </button>
     
     <button type="button" class="mobile-nav-btn" id="mobile-cart-btn">
@@ -1076,7 +1143,7 @@
       </div>
       <span>Carrito</span>
     </button>
-  </div>
+  </nav>
 
   <!-- Modal 1: Club Register / Login -->
   <div class="modal-backdrop" id="club-auth-modal">
@@ -1504,12 +1571,12 @@
     </div>
   </div>
 
-  <!-- Mobile Filter Drawer Modal -->
+  <!-- Mobile inline filter panel -->
   <div class="mobile-filter-drawer-overlay" id="mobile-filter-drawer-overlay" onclick="closeMobileFilterDrawer()"></div>
   <div class="mobile-filter-drawer" id="mobile-filter-drawer">
     <div class="mobile-filter-drawer-header">
-      <h3>🎛️ Filtrar Productos</h3>
-      <button class="close-mobile-filter-btn" onclick="closeMobileFilterDrawer()">&times;</button>
+      <h3>Filtrar productos</h3>
+      <button type="button" class="close-mobile-filter-btn" onclick="closeMobileFilterDrawer()" aria-label="Cerrar filtros">&times;</button>
     </div>
     <div class="mobile-filter-drawer-body" id="mobile-filter-drawer-body">
       <!-- Dynamic faceted filters mirrored here -->

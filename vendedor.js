@@ -74,6 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateCartBadge();
   renderCart();
   updateCategoryCounts();
+  loadPendingProductDrafts();
 });
 
 // --- EVENT LISTENERS ---
@@ -1060,6 +1061,8 @@ function switchVendorTab(tab) {
   const qrSection = document.getElementById('scan-customer-qr-section');
   const cashSection = document.getElementById('vendor-cash-section');
   const portfolioSection = document.getElementById('vendor-portfolio-section');
+  const fastUploadSection = document.getElementById('vendor-fast-upload-section');
+  const draftsReviewSection = document.getElementById('vendor-drafts-review-section');
 
   const btnCatalog = document.getElementById('tab-btn-catalog');
   const btnMap = document.getElementById('tab-btn-map');
@@ -1070,11 +1073,13 @@ function switchVendorTab(tab) {
   const vcardCash = document.getElementById('vcard-cash');
   const vcardMap = document.getElementById('vcard-map');
   const vcardScan = document.getElementById('vcard-scan');
+  const vcardFastUpload = document.getElementById('vcard-fastupload');
+  const vcardDraftsReview = document.getElementById('vcard-draftsreview');
 
   const allBtns = [btnCatalog, btnMap, btnScan];
   allBtns.forEach(btn => { if (btn) btn.classList.remove('active'); });
 
-  const allCards = [vcardCatalog, vcardPortfolio, vcardCash, vcardMap, vcardScan];
+  const allCards = [vcardCatalog, vcardPortfolio, vcardCash, vcardMap, vcardScan, vcardFastUpload, vcardDraftsReview];
   allCards.forEach(card => {
     if (card) {
       card.style.borderColor = 'rgba(255,255,255,0.15)';
@@ -1087,6 +1092,8 @@ function switchVendorTab(tab) {
   if (qrSection) qrSection.style.display = 'none';
   if (cashSection) cashSection.style.display = 'none';
   if (portfolioSection) portfolioSection.style.display = 'none';
+  if (fastUploadSection) fastUploadSection.style.display = 'none';
+  if (draftsReviewSection) draftsReviewSection.style.display = 'none';
 
   let targetSection = null;
 
@@ -1141,6 +1148,25 @@ function switchVendorTab(tab) {
       vcardScan.style.borderColor = '#66bb6a';
       vcardScan.style.transform = 'scale(1.02)';
     }
+  } else if (tab === 'fast-upload') {
+    if (fastUploadSection) {
+      fastUploadSection.style.display = 'block';
+      targetSection = fastUploadSection;
+    }
+    if (vcardFastUpload) {
+      vcardFastUpload.style.borderColor = 'var(--color-accent-gold)';
+      vcardFastUpload.style.transform = 'scale(1.02)';
+    }
+  } else if (tab === 'drafts-review') {
+    if (draftsReviewSection) {
+      draftsReviewSection.style.display = 'block';
+      targetSection = draftsReviewSection;
+    }
+    if (vcardDraftsReview) {
+      vcardDraftsReview.style.borderColor = '#2e7d32';
+      vcardDraftsReview.style.transform = 'scale(1.02)';
+    }
+    loadPendingProductDrafts();
   }
 
   if (targetSection && window.innerWidth <= 768) {
@@ -1148,27 +1174,51 @@ function switchVendorTab(tab) {
   }
 }
 
-function renderStoreMapUI(activeZone = null, activeShelf = null) {
+function renderStoreMapUI(activeZone = null, activeShelf = null, targetLevel = null) {
   const container = document.getElementById('store-map-render-container');
   if (container && window.renderStoreMapHTML) {
-    container.innerHTML = window.renderStoreMapHTML(activeZone, activeShelf);
+    container.innerHTML = window.renderStoreMapHTML(activeZone, activeShelf, targetLevel);
   }
 }
 
 function searchShelfOnMap() {
   const input = document.getElementById('map-search-input');
   if (!input) return;
-  const val = input.value.trim().toUpperCase();
-  if (!val) {
+  const rawVal = input.value.trim();
+  if (!rawVal) {
     renderStoreMapUI();
     return;
   }
-  const zoneMatch = val.charAt(0);
-  if (['A', 'B', 'C', 'D', 'E'].includes(zoneMatch)) {
-    renderStoreMapUI(zoneMatch, val);
-    showToast(`📍 Estante ${val} ubicado en la Zona ${zoneMatch} del local.`);
+  
+  const upperVal = rawVal.toUpperCase();
+  
+  // Check for shelf pattern e.g. "A-1", "A-1 NIVEL 2", "B-2"
+  const shelfMatch = upperVal.match(/([A-E])[-_]?([1-4])/);
+  let targetLevel = null;
+  
+  if (upperVal.includes('NIVEL 3') || upperVal.includes('SUPERIOR')) targetLevel = 3;
+  else if (upperVal.includes('NIVEL 2') || upperVal.includes('MEDIO')) targetLevel = 2;
+  else if (upperVal.includes('NIVEL 1') || upperVal.includes('INFERIOR')) targetLevel = 1;
+
+  if (shelfMatch) {
+    const zoneCode = shelfMatch[1];
+    const shelfCode = `${zoneCode}-${shelfMatch[2]}`;
+    
+    renderStoreMapUI(zoneCode, shelfCode, targetLevel);
+    
+    const levelStr = targetLevel ? ` → Nivel ${targetLevel}` : '';
+    showToast(`📍 Estante ${shelfCode}${levelStr} ubicado en Zona ${zoneCode} (Planta Baja).`);
   } else {
-    alert('⚠️ Por favor ingresá un código de estante válido (ej. A-1, B-3, C-2).');
+    // Check if zone code alone e.g. "A", "B"
+    const firstChar = upperVal.charAt(0);
+    if (['A', 'B', 'C', 'D', 'E'].includes(firstChar)) {
+      renderStoreMapUI(firstChar, `${firstChar}-1`, targetLevel);
+      showToast(`📍 Zona ${firstChar} encontrada en Planta Baja.`);
+    } else {
+      // Default fallback search by keyword
+      renderStoreMapUI('A', 'A-1', targetLevel);
+      showToast(`🔍 Buscando "${rawVal}" en el plano del local...`);
+    }
   }
 }
 
@@ -1483,6 +1533,363 @@ function sendVendorWhatsAppPromo(phone, clientName, promoType) {
   window.open(`https://wa.me/${phone}?text=${encodedMsg}`, '_blank');
 }
 
+// ==========================================
+// MÓDULO DE CARGA RÁPIDA POR FOTO & APROBACIÓN MARIANO
+// ==========================================
+
+let fastUploadSelectedFile = null;
+
+function handleFastUploadPhotoChange(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  fastUploadSelectedFile = file;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const previewImg = document.getElementById('fastupload-photo-img');
+    const placeholder = document.getElementById('fastupload-photo-placeholder');
+    const previewContainer = document.getElementById('fastupload-photo-preview-container');
+
+    if (previewImg) previewImg.src = e.target.result;
+    if (placeholder) placeholder.style.display = 'none';
+    if (previewContainer) previewContainer.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+// Canvas Compression Helper
+function compressImageFile(file, maxWidth = 1000, maxHeight = 1000, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Error al comprimir la imagen en Canvas.'));
+          }
+        }, 'image/jpeg', quality);
+      };
+      img.onerror = (err) => reject(err);
+      img.src = e.target.result;
+    };
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Submit Fast Upload Draft (Vendedor)
+async function submitProductDraft(event) {
+  event.preventDefault();
+  const submitBtn = document.getElementById('fastupload-submit-btn');
+
+  try {
+    if (!fastUploadSelectedFile) {
+      showToast('⚠️ Por favor sacá o elegí una foto antes de enviar.');
+      return;
+    }
+
+    const stockVal = parseInt(document.getElementById('fastupload-stock-input').value, 10);
+    if (isNaN(stockVal) || stockVal < 0) {
+      showToast('⚠️ El stock debe ser mayor o igual a 0.');
+      return;
+    }
+
+    const locationVal = document.getElementById('fastupload-location-input').value.trim();
+    const obsVal = document.getElementById('fastupload-obs-input').value.trim();
+    const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'Vendedor Local';
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '⏳ Comprimiendo y subiendo foto...';
+    }
+
+    // 1. Comprimir en cliente con Canvas
+    const compressedBlob = await compressImageFile(fastUploadSelectedFile, 1000, 1000, 0.75);
+
+    // 2. Generar nombre de archivo único con crypto.randomUUID()
+    const uniqueFileName = `draft_${crypto.randomUUID()}_${Date.now()}.jpg`;
+    const filePath = `drafts/${uniqueFileName}`;
+
+    // 3. Subir a Supabase Storage usando anon key
+    const { data: uploadData, error: uploadError } = await supabaseClient
+      .storage
+      .from('product-images')
+      .upload(filePath, compressedBlob, { contentType: 'image/jpeg', upsert: false });
+
+    if (uploadError) {
+      throw new Error(`Error al subir imagen a Supabase Storage: ${uploadError.message}`);
+    }
+
+    // 4. Obtener URL pública
+    const { data: urlData } = supabaseClient
+      .storage
+      .from('product-images')
+      .getPublicUrl(filePath);
+
+    const imageUrl = urlData ? urlData.publicUrl : '';
+
+    // 5. Insertar en product_drafts guardando tanto image_path como image_url
+    const { error: insertError } = await supabaseClient
+      .from('product_drafts')
+      .insert([{
+        image_url: imageUrl,
+        image_path: filePath,
+        stock: stockVal,
+        location: locationVal || null,
+        observations: obsVal || null,
+        seller_name: activeVendor,
+        status: 'PENDING_REVIEW'
+      }]);
+
+    if (insertError) {
+      throw new Error(`Error al guardar borrador en Supabase DB: ${insertError.message}`);
+    }
+
+    showToast('🚀 ¡Borrador guardado con éxito! Enviado a la cola de Mariano.');
+
+    // Limpiar formulario
+    fastUploadSelectedFile = null;
+    document.getElementById('fast-upload-form').reset();
+    document.getElementById('fastupload-photo-placeholder').style.display = 'block';
+    document.getElementById('fastupload-photo-preview-container').style.display = 'none';
+
+    // Actualizar cola y volver al catálogo
+    loadPendingProductDrafts();
+    switchVendorTab('catalog');
+
+  } catch (err) {
+    console.error('Error en submitProductDraft:', err);
+    showToast(`❌ Error: ${err.message}`);
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '🚀 ENVIAR BORRADOR A MARIANO';
+    }
+  }
+}
+
+// Cargar y mostrar Borradores Pendientes (Mariano / Admin)
+async function loadPendingProductDrafts() {
+  const container = document.getElementById('pending-drafts-grid');
+  const badge = document.getElementById('drafts-pending-count-badge');
+  if (!container) return;
+
+  try {
+    const { data: drafts, error } = await supabaseClient
+      .from('product_drafts')
+      .select('*')
+      .eq('status', 'PENDING_REVIEW')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const pendingCount = (drafts || []).length;
+    if (badge) {
+      badge.textContent = pendingCount;
+      badge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+    }
+
+    if (pendingCount === 0) {
+      container.innerHTML = `
+        <div style="grid-column: 1/-1; text-align: center; padding: 40px 20px; background: rgba(0,0,0,0.2); border: 1px dashed var(--color-border-accent); border-radius: 16px; color: var(--color-text-muted);">
+          <div style="font-size: 2.5rem; margin-bottom: 8px;">✨</div>
+          <p style="font-weight: 700; font-size: 1.1rem; color: #66bb6a; margin: 0 0 4px 0;">¡No hay borradores pendientes!</p>
+          <p style="font-size: 0.85rem; margin: 0;">Los productos cargados por los vendedores aparecerán acá para tu revisión.</p>
+        </div>
+      `;
+      return;
+    }
+
+    const categoriesList = ['Semillas', 'Sustratos', 'Fertilizantes', 'Indoor', 'Vaporizadores', 'Macetas', 'Medición y Riego', 'Parafernalia', 'Otros'];
+
+    container.innerHTML = drafts.map(draft => {
+      const dateStr = new Date(draft.created_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+      return `
+        <div style="background: var(--color-card-bg-alt); border: 1.5px solid var(--color-border-accent); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-sm);">
+          <div style="aspect-ratio: 1/1; max-height: 200px; background: #000; position: relative; overflow: hidden;">
+            <img src="${draft.image_url}" alt="Foto producto" style="width: 100%; height: 100%; object-fit: contain;">
+            <span style="position: absolute; top: 8px; left: 8px; background: rgba(21,45,36,0.9); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 8px;">
+              🧑‍💼 ${draft.seller_name || 'Vendedor'} • ${dateStr}
+            </span>
+          </div>
+
+          <div style="padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 10px;">
+            <div style="background: rgba(195,155,75,0.1); border: 1px solid rgba(195,155,75,0.3); border-radius: 10px; padding: 8px 12px; font-size: 0.8rem;">
+              <p style="margin: 0 0 4px 0; color: #fff;"><strong>📦 Stock Cargado:</strong> ${draft.stock} unidades</p>
+              <p style="margin: 0 0 4px 0; color: #fff;"><strong>📍 Ubicación:</strong> ${draft.location || 'No especificada'}</p>
+              ${draft.observations ? `<p style="margin: 0; color: rgba(247,246,242,0.8); font-style: italic;">" ${draft.observations} "</p>` : ''}
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--color-accent-gold); margin-bottom: 2px;">Nombre del Producto (Requerido) *</label>
+              <input type="text" id="draft-name-${draft.id}" placeholder="Ej: Sustrato Klasmann 50L" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.9rem; border-radius: 8px;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <div>
+                <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--color-accent-gold); margin-bottom: 2px;">Categoría *</label>
+                <select id="draft-cat-${draft.id}" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.85rem; border-radius: 8px;">
+                  ${categoriesList.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
+                </select>
+              </div>
+
+              <div>
+                <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--color-accent-gold); margin-bottom: 2px;">Costo de Compra ($)</label>
+                <input type="number" step="0.01" id="draft-cost-${draft.id}" placeholder="Ej: 15000" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.85rem; border-radius: 8px;">
+              </div>
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 0.78rem; font-weight: 800; color: #66bb6a; margin-bottom: 2px;">PRECIO FINAL AL PÚBLICO ($ ARS) *</label>
+              <input type="number" step="0.01" id="draft-price-${draft.id}" placeholder="Ej: 22500" required class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 1rem; font-weight: 800; border-radius: 8px; border-color: #66bb6a;">
+            </div>
+
+            <div style="display: flex; gap: 8px; margin-top: 6px;">
+              <button type="button" onclick="approveProductDraft('${draft.id}', ${draft.stock}, '${draft.image_url.replace(/'/g, "\\'")}')" style="flex: 1; background: #2e7d32; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 0.88rem;">
+                ✅ Aprobar y Publicar
+              </button>
+              <button type="button" onclick="rejectProductDraft('${draft.id}')" style="background: rgba(239,83,80,0.2); color: #ef5350; border: 1px solid #ef5350; padding: 10px 14px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 0.85rem;">
+                ❌ Rechazar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  } catch (err) {
+    console.error('Error al cargar borradores pendientes:', err);
+    container.innerHTML = `<p style="color: #ef5350;">Error al cargar borradores: ${err.message}</p>`;
+  }
+}
+
+// Aprobar Borrador y Publicar en Catálogo Activo (Mariano)
+async function approveProductDraft(draftId, stock, imageUrl) {
+  try {
+    const nameInput = document.getElementById(`draft-name-${draftId}`);
+    const catInput = document.getElementById(`draft-cat-${draftId}`);
+    const costInput = document.getElementById(`draft-cost-${draftId}`);
+    const priceInput = document.getElementById(`draft-price-${draftId}`);
+
+    const nameVal = nameInput ? nameInput.value.trim() : '';
+    const catVal = catInput ? catInput.value : 'Otros';
+    const costVal = costInput ? parseFloat(costInput.value) || 0 : 0;
+    const priceVal = priceInput ? parseFloat(priceInput.value) || 0 : 0;
+
+    if (!nameVal) {
+      showToast('⚠️ Por favor ingresá un nombre para el producto.');
+      if (nameInput) nameInput.focus();
+      return;
+    }
+
+    if (isNaN(priceVal) || priceVal <= 0) {
+      showToast('⚠️ Por favor ingresá un precio final válido mayor a 0.');
+      if (priceInput) priceInput.focus();
+      return;
+    }
+
+    const productId = `prod_${crypto.randomUUID()}`;
+
+    // 1. Insertar en tabla products
+    const { error: prodErr } = await supabaseClient
+      .from('products')
+      .insert([{
+        id: productId,
+        name: nameVal,
+        category: catVal,
+        image: imageUrl,
+        description: `Costo: $${costVal} ARS. Ingresado por Mariano.`
+      }]);
+
+    if (prodErr) throw new Error(`Error al crear producto: ${prodErr.message}`);
+
+    // 2. Insertar en supplier_products para disponibilizar en catálogo B2B local
+    const { error: spErr } = await supabaseClient
+      .from('supplier_products')
+      .insert([{
+        supplier_id: 'local_store',
+        supplier_product_id: productId,
+        name: nameVal,
+        price: priceVal,
+        stock: stock,
+        available: true,
+        image: imageUrl,
+        mapped_product_id: productId
+      }]);
+
+    if (spErr) console.warn('Aviso supplier_products:', spErr.message);
+
+    // 3. Marcar borrador como APPROVED
+    const { error: updateErr } = await supabaseClient
+      .from('product_drafts')
+      .update({
+        status: 'APPROVED',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', draftId);
+
+    if (updateErr) throw new Error(`Error al actualizar estado del borrador: ${updateErr.message}`);
+
+    showToast(`🎉 ¡Producto "${nameVal}" APROBADO y publicado en el catálogo por $${priceVal}!`);
+
+    // Recargar cola y catálogo B2B
+    loadPendingProductDrafts();
+    if (window.fetchB2BProducts) window.fetchB2BProducts(true);
+
+  } catch (err) {
+    console.error('Error al aprobar borrador:', err);
+    showToast(`❌ Error al aprobar: ${err.message}`);
+  }
+}
+
+// Rechazar Borrador
+async function rejectProductDraft(draftId) {
+  if (!confirm('¿Estás seguro de que querés rechazar este borrador?')) return;
+
+  try {
+    const { error } = await supabaseClient
+      .from('product_drafts')
+      .update({
+        status: 'REJECTED',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', draftId);
+
+    if (error) throw error;
+
+    showToast('🚫 Borrador rechazado.');
+    loadPendingProductDrafts();
+  } catch (err) {
+    console.error('Error al rechazar borrador:', err);
+    showToast(`❌ Error al rechazar borrador: ${err.message}`);
+  }
+}
+
 // Global exposure
 window.selectVendorCard = selectVendorCard;
 window.checkVendorAuth = checkVendorAuth;
@@ -1498,5 +1905,11 @@ window.validateAdminClosurePrompt = validateAdminClosurePrompt;
 window.renderVendorPortfolioUI = renderVendorPortfolioUI;
 window.copyVendorRefLink = copyVendorRefLink;
 window.sendVendorWhatsAppPromo = sendVendorWhatsAppPromo;
+window.handleFastUploadPhotoChange = handleFastUploadPhotoChange;
+window.submitProductDraft = submitProductDraft;
+window.loadPendingProductDrafts = loadPendingProductDrafts;
+window.approveProductDraft = approveProductDraft;
+window.rejectProductDraft = rejectProductDraft;
+
 
 

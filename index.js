@@ -82,6 +82,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const appliedCouponCodeEl = document.getElementById('applied-coupon-code');
   const appliedCouponDescEl = document.getElementById('applied-coupon-desc');
   const removeCouponBtn = document.getElementById('remove-coupon-btn');
+  const railOpenCartBtn = document.getElementById('rail-open-cart');
+  const railOpenClubBtn = document.getElementById('rail-open-club');
+  const railCartCount = document.getElementById('rail-cart-count');
+  const railCartTotal = document.getElementById('rail-cart-total');
+  const railCartMessage = document.getElementById('rail-cart-message');
 
   // Product Detail Modal
   const productDetailModal = document.getElementById('product-detail-modal');
@@ -492,27 +497,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.openMobileFilterDrawer = function() {
     const drawer = document.getElementById('mobile-filter-drawer');
-    const overlay = document.getElementById('mobile-filter-drawer-overlay');
     const body = document.getElementById('mobile-filter-drawer-body');
     const sourcePanel = document.getElementById('faceted-filter-panel');
+    const catalogControls = document.querySelector('.catalog-header-controls');
 
-    if (body && sourcePanel) {
-      body.innerHTML = sourcePanel.innerHTML;
+    if (drawer && catalogControls && drawer.previousElementSibling !== catalogControls) {
+      catalogControls.insertAdjacentElement('afterend', drawer);
     }
 
+    // Move the real filter panel so controls keep their state and unique IDs.
+    if (body && sourcePanel && sourcePanel.parentElement !== body) body.appendChild(sourcePanel);
     if (drawer) drawer.classList.add('active');
-    if (overlay) overlay.classList.add('active');
+    drawer?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
 
   window.closeMobileFilterDrawer = function() {
     const drawer = document.getElementById('mobile-filter-drawer');
-    const overlay = document.getElementById('mobile-filter-drawer-overlay');
+    const sourcePanel = document.getElementById('faceted-filter-panel');
+    const sidebarBlock = document.querySelector('#catalog-sidebar .sidebar-block');
     if (drawer) drawer.classList.remove('active');
-    if (overlay) overlay.classList.remove('active');
+    if (sourcePanel && sidebarBlock && sourcePanel.parentElement !== sidebarBlock) {
+      sidebarBlock.appendChild(sourcePanel);
+    }
   };
 
   window.applyMobileFilterDrawer = function() {
+    applyFiltersAndRender(true);
     closeMobileFilterDrawer();
+  };
+
+  window.applyFacetedFilters = function() {
+    applyFiltersAndRender(true);
   };
 
   function updateCategoryCounts() {
@@ -537,10 +552,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const inStockCount = products.filter(p => p.available && p.stock > 0).length;
     const lowStockCount = products.filter(p => p.stock > 0 && p.stock <= 5).length;
 
-    const countInStockEl = document.getElementById('count-instock');
+    const countInStockEl = document.getElementById('count-stock-in');
     if (countInStockEl) countInStockEl.textContent = `(${inStockCount})`;
 
-    const countLowStockEl = document.getElementById('count-lowstock');
+    const countLowStockEl = document.getElementById('count-stock-low');
     if (countLowStockEl) countLowStockEl.textContent = `(${lowStockCount})`;
   }
 
@@ -679,40 +694,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Fallback image if empty
       const imageUrl = product.image && product.image !== '' ? product.image : 'assets/logo.jpg';
+      const safeName = escapeHtml(product.name || 'Producto BÔ');
+      const safeCategory = escapeHtml(product.category || 'Cultivo');
 
       // Weight badge if present
       let weightTag = '';
       if (product.weight) {
-        weightTag = `<span class="product-card-weight-badge">${product.weight}</span>`;
+        weightTag = `<span class="product-card-weight-badge">${escapeHtml(product.weight)}</span>`;
       }
 
       card.innerHTML = `
         ${stockTag}
         <div class="product-card-img-wrapper">
           <div class="product-card-img-container">
-            <img src="${imageUrl}" alt="${product.name}" class="product-card-img" loading="lazy" onerror="this.onerror=null;this.src='assets/logo.jpg';">
-            <div class="product-card-logo-pill">
-              <img src="assets/logo.jpg" alt="BO Logo">
-              <span class="pill-logo-text">BO growclub</span>
-            </div>
+            <img src="${imageUrl}" alt="${safeName}" class="product-card-img" loading="lazy" onerror="this.onerror=null;this.src='assets/logo.jpg';">
           </div>
         </div>
         <div class="product-card-content">
           <div class="product-card-category-row">
-            <div class="product-card-category" style="margin-bottom: 0;">${product.category}</div>
+            <div class="product-card-category" style="margin-bottom: 0;">${safeCategory}</div>
             ${weightTag}
           </div>
-          <h3 class="product-card-title" title="${product.name}">${product.name}</h3>
+          <h3 class="product-card-title" title="${safeName}">${safeName}</h3>
+          <button type="button" class="product-card-detail-link" data-id="${product.id}" aria-label="Ver detalles de ${safeName}">Ver detalles</button>
           <div class="product-card-footer">
             <div class="product-card-price">$${formatPrice(product.price)}</div>
             <button class="add-to-cart-btn ${!product.available ? 'disabled' : ''}" 
                     data-id="${product.id}" 
-                    aria-label="Agregar ${product.name} al carrito"
+                    aria-label="Agregar ${safeName} al carrito"
                     ${!product.available ? 'disabled' : ''}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
               </svg>
+              <span class="add-to-cart-label">Agregar</span>
             </button>
           </div>
         </div>
@@ -727,6 +742,16 @@ document.addEventListener('DOMContentLoaded', () => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>'"]/g, character => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;'
+    }[character]));
   }
 
 
@@ -781,6 +806,11 @@ document.addEventListener('DOMContentLoaded', () => {
       currentCategory = btn.getAttribute('data-category');
       updateCategoryActiveState();
       applyFiltersAndRender(true);
+      if (btn.classList.contains('home-category-btn')) {
+        document.getElementById('catalog-section')?.scrollIntoView({ behavior: 'smooth' });
+      } else if (btn.closest('#mobile-filter-drawer')) {
+        closeMobileFilterDrawer();
+      }
     });
   });
 
@@ -805,6 +835,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   // --- CART DRAWER ACTIONS ---
+  function showInlineStorefrontView(element) {
+    if (!element) return;
+    const catalog = document.getElementById('catalog-section');
+    if (catalog) catalog.insertAdjacentElement('beforebegin', element);
+    element.scrollIntoView({ behavior: 'auto', block: 'start' });
+  }
+
+  function updateStorefrontUtilityRail() {
+    const totalQty = cart.reduce((acc, item) => acc + item.quantity, 0);
+    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+    if (railCartCount) railCartCount.textContent = `${totalQty} ${totalQty === 1 ? 'artículo' : 'artículos'}`;
+    if (railCartTotal) railCartTotal.textContent = `$${formatPrice(subtotal)}`;
+    if (railCartMessage) {
+      railCartMessage.textContent = totalQty > 0
+        ? 'Tu selección queda guardada mientras seguís recorriendo la tienda.'
+        : 'Agregá productos y revisá el pedido sin salir del catálogo.';
+    }
+  }
+
   function updateCartBadge() {
     const totalQty = cart.reduce((acc, item) => acc + item.quantity, 0);
     if (cartCountEl) cartCountEl.textContent = totalQty;
@@ -812,14 +862,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (mobileCartCountEl) {
       mobileCartCountEl.textContent = totalQty;
     }
+    updateStorefrontUtilityRail();
   }
 
   function toggleCart() {
     if (cartDrawer) cartDrawer.classList.toggle('active');
-    if (cartOverlay) cartOverlay.classList.toggle('active');
+    if (cartOverlay) cartOverlay.classList.remove('active');
     
     if (cartDrawer && cartDrawer.classList.contains('active')) {
+      productDetailModal?.classList.remove('active');
+      checkoutModal?.classList.remove('active');
       renderCartItems();
+      setActiveMobileNav('mobile-cart-btn');
+      showInlineStorefrontView(cartDrawer);
+    } else if (window.innerWidth <= 900) {
+      setActiveMobileNav('mobile-store-btn');
     }
   }
 
@@ -827,6 +884,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (cartClose) cartClose.addEventListener('click', toggleCart);
   if (cartOverlay) cartOverlay.addEventListener('click', toggleCart);
   if (emptyCartShopBtn) emptyCartShopBtn.addEventListener('click', toggleCart);
+  if (railOpenCartBtn) railOpenCartBtn.addEventListener('click', toggleCart);
+  if (railOpenClubBtn) {
+    railOpenClubBtn.addEventListener('click', () => document.getElementById('club-trigger')?.click());
+  }
 
   function addToCart(productId) {
     const product = products.find(p => p.id === productId);
@@ -849,12 +910,8 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('boeweb_cart', JSON.stringify(cart));
     updateCartBadge();
     
-    // Automatically slide drawer open so they see it added
-    if (!cartDrawer.classList.contains('active')) {
-      toggleCart();
-    } else {
-      renderCartItems(); // refresh items
-    }
+    renderCartItems();
+    if (window.showToast) window.showToast('Producto agregado al carrito');
   }
 
   function updateCartQty(productId, delta) {
@@ -894,6 +951,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cart.length === 0) {
       emptyCartStateEl.style.display = 'flex';
       cartFooter.style.display = 'none';
+      updateStorefrontUtilityRail();
       return;
     }
 
@@ -970,6 +1028,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     cartTotalEl.textContent = `$${formatPrice(total)}`;
+    updateStorefrontUtilityRail();
 
     // Quantity selectors events
     cartItemsContainer.querySelectorAll('.qty-minus').forEach(btn => {
@@ -1042,6 +1101,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Open Modal
     checkoutModal.classList.add('active');
+    showInlineStorefrontView(checkoutModal);
   }
 
   function closeCheckout() {
@@ -1310,15 +1370,7 @@ document.addEventListener('DOMContentLoaded', () => {
   floatingWheelBtn.addEventListener('click', openWheel);
   closeWheelModal.addEventListener('click', closeWheel);
 
-  // Auto-popup Zen Wheel for first-time visitors
-  const hasSpunToday = localStorage.getItem('boeweb_last_spin_date') === new Date().toDateString();
-  const hasClosedWheelSession = sessionStorage.getItem('boeweb_wheel_closed');
-
-  if (!hasSpunToday && !hasClosedWheelSession) {
-    setTimeout(() => {
-      openWheel();
-    }, 900);
-  }
+  // The benefit remains user-initiated from the hero to avoid interrupting browsing.
 
   // Wheel form submit -> transition to Game
   wheelForm.addEventListener('submit', (e) => {
@@ -1495,6 +1547,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Open
     productDetailModal.classList.add('active');
+    cartDrawer?.classList.remove('active');
+    checkoutModal?.classList.remove('active');
+    showInlineStorefrontView(productDetailModal);
   }
 
   function closeProductDetail() {
@@ -1549,12 +1604,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Close detail modal
     closeProductDetail();
     
-    // Open cart drawer
-    if (!cartDrawer.classList.contains('active')) {
-      toggleCart();
-    } else {
-      renderCartItems();
-    }
+    renderCartItems();
+    if (window.showToast) window.showToast('Producto agregado al carrito');
   });
 
   // --- GRID EVENT DELEGATION ---
@@ -1622,9 +1673,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Switch between Catalog view and Blog view
+  function setActiveMobileNav(activeId) {
+    document.querySelectorAll('.mobile-nav-btn').forEach(button => {
+      button.classList.toggle('active', button.id === activeId);
+    });
+  }
+
   function showView(view) {
     const mobileShopBtn = document.getElementById('mobile-shop-btn');
-    const mobileBlogBtn = document.getElementById('mobile-blog-btn');
+    const mobileStoreBtn = document.getElementById('mobile-store-btn');
 
     if (view === 'shop') {
       catalogSection.style.display = 'block';
@@ -1633,8 +1690,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (blogTrigger) blogTrigger.classList.remove('active');
       
       // Update mobile bottom nav active classes
-      if (mobileShopBtn) mobileShopBtn.classList.add('active');
-      if (mobileBlogBtn) mobileBlogBtn.classList.remove('active');
+      if (mobileStoreBtn) setActiveMobileNav('mobile-store-btn');
       
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (view === 'blog') {
@@ -1644,8 +1700,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (blogTrigger) blogTrigger.classList.add('active');
       
       // Update mobile bottom nav active classes
-      if (mobileShopBtn) mobileShopBtn.classList.remove('active');
-      if (mobileBlogBtn) mobileBlogBtn.classList.add('active');
+      if (mobileShopBtn) setActiveMobileNav('');
       
       renderBlogGrid();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1839,23 +1894,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- MOBILE BOTTOM NAVIGATION LISTENERS ---
   const mobileShopBtn = document.getElementById('mobile-shop-btn');
-  const mobileBlogBtn = document.getElementById('mobile-blog-btn');
+  const mobileStoreBtn = document.getElementById('mobile-store-btn');
   const mobileCartBtn = document.getElementById('mobile-cart-btn');
 
   if (mobileShopBtn) {
     mobileShopBtn.addEventListener('click', () => {
       showView('shop');
-      // If we are already on shop, scroll to catalog
-      const catalogEl = document.getElementById('catalog-section');
-      if (catalogEl) {
-        catalogEl.scrollIntoView({ behavior: 'smooth' });
-      }
+      setActiveMobileNav('mobile-shop-btn');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }
 
-  if (mobileBlogBtn) {
-    mobileBlogBtn.addEventListener('click', () => {
-      showView('blog');
+  if (mobileStoreBtn) {
+    mobileStoreBtn.addEventListener('click', () => {
+      showView('shop');
+      setActiveMobileNav('mobile-store-btn');
+      document.getElementById('catalog-section')?.scrollIntoView({ behavior: 'smooth' });
     });
   }
 

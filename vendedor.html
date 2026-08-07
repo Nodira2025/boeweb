@@ -30,6 +30,58 @@
       --color-b2b-border: #e6e3d8;
       --color-badge-cheapest: #e2f0d9;
       --color-badge-cheapest-text: #385723;
+      --shadow-sm: none !important;
+      --shadow-md: none !important;
+      --shadow-lg: none !important;
+      --shadow-gold: none !important;
+      --gold-gradient: linear-gradient(135deg, #C2A246 0%, #a68532 100%);
+    }
+
+    .vendor-kpi-card {
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+    }
+    .vendor-kpi-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .vendor-btn-cta {
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+    .vendor-btn-cta:hover {
+      transform: translateY(-1.5px);
+      opacity: 0.95;
+    }
+    .vendor-btn-cta:active {
+      transform: translateY(0);
+    }
+
+    .vendor-btn-secondary-red {
+      transition: background-color 0.2s ease, transform 0.15s ease;
+    }
+    .vendor-btn-secondary-red:hover {
+      background-color: rgba(211, 47, 47, 0.08) !important;
+      transform: translateY(-1.5px);
+    }
+
+    .vendor-btn-secondary-gold {
+      transition: background-color 0.2s ease, transform 0.15s ease;
+    }
+    .vendor-btn-secondary-gold:hover {
+      background-color: rgba(194, 162, 70, 0.1) !important;
+      transform: translateY(-1.5px);
+    }
+
+    #cash-movements-list p {
+      color: var(--color-text-muted) !important;
+    }
+    #cash-movements-list div {
+      border-bottom-color: var(--color-border-subtle) !important;
+    }
+    #cash-movements-list span {
+      color: var(--color-text-main) !important;
+    }
+    #cash-movements-list span[style*="font-size: 0.72rem"] {
+      color: var(--color-text-muted) !important;
     }
 
     html, body {
@@ -601,16 +653,19 @@
 
     .b2b-form-input {
       width: 100%;
-      border: 1px solid var(--color-b2b-border);
+      border: 1.5px solid var(--color-border-subtle);
       border-radius: var(--border-radius-sm);
-      padding: 8px 12px;
+      padding: 10px 14px;
       font-size: 0.9rem;
+      background-color: var(--color-card-bg);
+      color: var(--color-text-main);
       outline: none;
       transition: var(--transition-fast);
     }
 
     .b2b-form-input:focus {
       border-color: var(--color-accent-gold);
+      box-shadow: 0 0 0 3px rgba(194, 162, 70, 0.2) !important;
     }
 
     .b2b-checkout-btn {
@@ -1176,12 +1231,109 @@
           <span style="font-size: 0.72rem; color: #d4a373; font-weight: 800; text-transform: uppercase;">CAFETERÍA & BAR</span>
         </div>
 
+        <!-- Card 9: Carga Rápida por Foto -->
+        <div class="vendor-launchpad-card" id="vcard-fastupload" onclick="switchVendorTab('fast-upload')" style="background: var(--color-card-bg); border: 2px solid var(--color-accent-gold); border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
+          <span style="font-size: 2rem; display: block; margin-bottom: 4px;">📸</span>
+          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Carga Rápida Foto</span>
+          <span style="font-size: 0.72rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase;">SUBIR PRODUCTO</span>
+        </div>
+
+        <!-- Card 10: Cola de Borradores (Mariano / Admin) -->
+        <div class="vendor-launchpad-card" id="vcard-draftsreview" onclick="switchVendorTab('drafts-review')" style="background: var(--color-card-bg); border: 2px solid #2e7d32; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm); position: relative;">
+          <span id="drafts-pending-count-badge" style="position: absolute; top: -8px; right: -8px; background: #2e7d32; color: #fff; font-size: 0.75rem; font-weight: 800; padding: 3px 8px; border-radius: 12px; border: 1px solid var(--color-accent-gold); display: none;">0</span>
+          <span style="font-size: 2rem; display: block; margin-bottom: 4px;">👑</span>
+          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Cola Mariano</span>
+          <span style="font-size: 0.72rem; color: #66bb6a; font-weight: 800; text-transform: uppercase;">APROBAR & PRECIOS</span>
+        </div>
+
       </div>
     </section>
 
-    <!-- VENDOR CLIENT PORTFOLIO SECTION -->
-    <div id="vendor-portfolio-section" style="display: none; max-width: 1100px; margin: 30px auto; padding: 0 20px;">
-      <div style="background: var(--color-card-bg); border: 2px solid #ab47bc; border-radius: 20px; padding: 24px; box-shadow: var(--shadow-md); color: var(--color-text-main);">
+    <!-- SECTION: CARGA RÁPIDA POR FOTO (VENDEDOR) -->
+    <div id="vendor-fast-upload-section" style="display: none; max-width: 750px; margin: 30px auto; padding: 0 20px;">
+      <div style="background: var(--color-card-bg); border: 2px solid var(--color-accent-gold); border-radius: 20px; padding: 24px; box-shadow: var(--shadow-md); color: var(--color-text-main);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+          <div>
+            <span style="background: rgba(195,155,75,0.2); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 700; text-transform: uppercase;">ACCESO VENDEDOR</span>
+            <h2 style="font-family: var(--font-display); color: var(--color-accent-gold); font-size: 1.6rem; margin: 6px 0 0 0;">📸 Carga Rápida de Producto por Foto</h2>
+          </div>
+          <button type="button" onclick="switchVendorTab('catalog')" style="background: none; border: 1px solid var(--color-border-accent); color: var(--color-text-muted); padding: 6px 12px; border-radius: 10px; cursor: pointer; font-size: 0.85rem;">✕ Cerrar</button>
+        </div>
+
+        <form id="fast-upload-form" onsubmit="submitProductDraft(event)">
+          <!-- Captura / Selección de Foto -->
+          <div style="background: var(--color-card-bg-alt); border: 2px dashed var(--color-accent-gold); border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 20px; position: relative;">
+            <input type="file" id="fastupload-photo-input" accept="image/*" capture="environment" onchange="handleFastUploadPhotoChange(event)" style="display: none;" required>
+            
+            <div id="fastupload-photo-placeholder">
+              <div style="font-size: 3rem; margin-bottom: 8px;">📷</div>
+              <p style="margin: 0 0 12px 0; font-weight: 600; color: var(--color-text-main);">Sacá una foto o elegí un archivo de imagen</p>
+              <button type="button" onclick="document.getElementById('fastupload-photo-input').click()" style="background: var(--color-primary); color: #fff; border: 1.5px solid var(--color-accent-gold); padding: 10px 20px; border-radius: 12px; font-weight: 700; cursor: pointer; font-size: 0.95rem;">
+                📱 Abrir Cámara / Galería
+              </button>
+            </div>
+
+            <div id="fastupload-photo-preview-container" style="display: none; text-align: center;">
+              <img id="fastupload-photo-img" src="" alt="Vista previa" style="max-width: 100%; max-height: 280px; border-radius: 12px; border: 2px solid var(--color-accent-gold); object-fit: contain; margin-bottom: 12px;">
+              <div>
+                <button type="button" onclick="document.getElementById('fastupload-photo-input').click()" style="background: var(--color-card-bg); color: var(--color-text-main); border: 1px solid var(--color-border-accent); padding: 6px 14px; border-radius: 10px; cursor: pointer; font-size: 0.85rem;">
+                  🔄 Cambiar Foto
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Inputs de Vendedor -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--color-accent-gold); margin-bottom: 4px; text-transform: uppercase;">Stock Físico (≥ 0) *</label>
+              <input type="number" id="fastupload-stock-input" min="0" value="1" required class="b2b-form-input" style="width: 100%; padding: 10px; font-size: 1rem; font-weight: 700; border-radius: 10px;">
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--color-accent-gold); margin-bottom: 4px; text-transform: uppercase;">Ubicación en Local</label>
+              <input type="text" id="fastupload-location-input" placeholder="Ej: Estante B-2, Góndola 3" class="b2b-form-input" style="width: 100%; padding: 10px; font-size: 0.95rem; border-radius: 10px;">
+            </div>
+          </div>
+
+          <div style="margin-bottom: 24px;">
+            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--color-accent-gold); margin-bottom: 4px; text-transform: uppercase;">Observaciones / Detalle</label>
+            <textarea id="fastupload-obs-input" placeholder="Ej: Presentación 1L, cerrado en paquete original..." class="b2b-form-input" rows="3" style="width: 100%; padding: 10px; font-size: 0.9rem; border-radius: 10px;"></textarea>
+          </div>
+
+          <button type="submit" id="fastupload-submit-btn" style="width: 100%; padding: 14px; background: linear-gradient(135deg, #3E5F1F 0%, #253C13 100%); border: 2px solid var(--color-accent-gold); color: #F6F3E8; font-weight: 800; font-size: 1.05rem; border-radius: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            🚀 ENVIAR BORRADOR A MARIANO
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- SECTION: COLA DE BORRADORES Y APROBACIÓN (MARIANO / ADMIN) -->
+    <div id="vendor-drafts-review-section" style="display: none; max-width: 1100px; margin: 30px auto; padding: 0 20px;">
+      <div style="background: var(--color-card-bg); border: 2px solid #2e7d32; border-radius: 20px; padding: 24px; box-shadow: var(--shadow-md); color: var(--color-text-main);">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <span style="background: rgba(46,125,50,0.2); border: 1px solid #2e7d32; color: #66bb6a; padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 700; text-transform: uppercase;">CONTROL CENTRALIZADO ADMINISTRACIÓN</span>
+            <h2 style="font-family: var(--font-display); color: #66bb6a; font-size: 1.6rem; margin: 6px 0 0 0;">👑 Cola de Borradores Pendientes</h2>
+          </div>
+
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button type="button" onclick="loadPendingProductDrafts()" style="background: rgba(46,125,50,0.15); border: 1.5px solid #2e7d32; color: #66bb6a; font-weight: 700; padding: 8px 16px; border-radius: 12px; cursor: pointer; font-size: 0.88rem;">
+              🔄 Actualizar Cola
+            </button>
+            <button type="button" onclick="switchVendorTab('catalog')" style="background: none; border: 1px solid var(--color-border-accent); color: var(--color-text-muted); padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: 0.85rem;">✕ Cerrar</button>
+          </div>
+        </div>
+
+        <!-- Grid de Borradores Pendientes -->
+        <div id="pending-drafts-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px;">
+          <!-- Se renderizan vía JavaScript -->
+        </div>
+
+      </div>
+    </div>
+
         
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
           <div>
@@ -1236,47 +1388,47 @@
     </div>
 
     <!-- CASH REGISTER & SHIFT CLOSING MODULE -->
-    <div id="vendor-cash-section" style="display: none; max-width: 1000px; margin: 30px auto; padding: 0 20px;">
-      <div style="background: var(--color-card-bg); border: 2px solid var(--color-accent-gold); border-radius: 20px; padding: 24px; box-shadow: var(--shadow-md); color: var(--color-text-main);">
+    <div id="vendor-cash-section" style="display: none; max-width: 1000px; margin: 32px auto; padding: 0 20px;">
+      <div style="background: var(--color-card-bg); border: 1.5px solid var(--color-border-subtle); border-radius: 20px; padding: 32px; color: var(--color-text-main);">
         
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; flex-wrap: wrap; gap: 14px;">
           <div>
-            <span style="background: rgba(195,155,75,0.2); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 700;">GESTIÓN FINANCIERA & TURNO</span>
-            <h2 style="font-family: var(--font-display); color: var(--color-accent-gold); font-size: 1.6rem; margin: 6px 0 0 0;">💰 Caja & Arqueo Diario de Vendedor</h2>
+            <span style="background: rgba(195,155,75,0.15); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 4px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">GESTIÓN FINANCIERA & TURNO</span>
+            <h2 style="font-family: var(--font-display); color: var(--color-text-main); font-size: 1.75rem; margin: 8px 0 0 0; font-weight: 700;">💰 Caja & Arqueo Diario de Vendedor</h2>
           </div>
-          <div id="cash-shift-status-badge" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(102,187,106,0.5); padding: 8px 16px; border-radius: 12px; font-size: 0.85rem; font-weight: 700; color: #66bb6a;">
+          <div id="cash-shift-status-badge" style="background: var(--color-card-bg-alt); border: 1.5px solid var(--color-success); padding: 8px 18px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; color: var(--color-success);">
             🟢 TURNO EN CURSO
           </div>
         </div>
 
         <!-- Metric Summary Cards -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px;">
-          <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(195,155,75,0.3); border-radius: 14px; padding: 14px; text-align: center;">
-            <span style="font-size: 0.75rem; color: rgba(247,246,242,0.7); display: block;">VENTAS Y COBROS ARS</span>
-            <strong id="cash-sum-sales" style="font-size: 1.4rem; color: #66bb6a; font-family: var(--font-sans);">$0,00</strong>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px;">
+          <div class="vendor-kpi-card" style="background: var(--color-card-bg-alt); border: 1.5px solid rgba(46, 125, 50, 0.3); border-radius: 14px; padding: 18px 16px; text-align: center;">
+            <span style="font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted); display: block; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">VENTAS Y COBROS ARS</span>
+            <strong id="cash-sum-sales" style="font-size: 1.75rem; color: #2e7d32; font-family: var(--font-sans); font-weight: 800; display: block;">$0,00</strong>
           </div>
-          <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(195,155,75,0.3); border-radius: 14px; padding: 14px; text-align: center;">
-            <span style="font-size: 0.75rem; color: rgba(247,246,242,0.7); display: block;">MEMBRESÍAS / EXTRAS</span>
-            <strong id="cash-sum-income" style="font-size: 1.4rem; color: #42a5f5; font-family: var(--font-sans);">$0,00</strong>
+          <div class="vendor-kpi-card" style="background: var(--color-card-bg-alt); border: 1.5px solid rgba(25, 118, 210, 0.3); border-radius: 14px; padding: 18px 16px; text-align: center;">
+            <span style="font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted); display: block; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">MEMBRESÍAS / EXTRAS</span>
+            <strong id="cash-sum-income" style="font-size: 1.75rem; color: #1976d2; font-family: var(--font-sans); font-weight: 800; display: block;">$0,00</strong>
           </div>
-          <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(195,155,75,0.3); border-radius: 14px; padding: 14px; text-align: center;">
-            <span style="font-size: 0.75rem; color: rgba(247,246,242,0.7); display: block;">GASTOS Y RETIROS</span>
-            <strong id="cash-sum-expenses" style="font-size: 1.4rem; color: #ef5350; font-family: var(--font-sans);">$0,00</strong>
+          <div class="vendor-kpi-card" style="background: var(--color-card-bg-alt); border: 1.5px solid rgba(211, 47, 47, 0.3); border-radius: 14px; padding: 18px 16px; text-align: center;">
+            <span style="font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted); display: block; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">GASTOS Y RETIROS</span>
+            <strong id="cash-sum-expenses" style="font-size: 1.75rem; color: #d32f2f; font-family: var(--font-sans); font-weight: 800; display: block;">$0,00</strong>
           </div>
-          <div style="background: rgba(0,0,0,0.4); border: 1.5px solid var(--color-accent-gold); border-radius: 14px; padding: 14px; text-align: center;">
-            <span style="font-size: 0.75rem; color: var(--color-accent-gold); font-weight: 700; display: block;">SALDO NETO EN CAJA</span>
-            <strong id="cash-sum-net" style="font-size: 1.5rem; color: var(--color-accent-gold); font-family: var(--font-sans);">$0,00</strong>
+          <div class="vendor-kpi-card" style="background: var(--color-card-bg-alt); border: 2px solid var(--color-accent-gold); border-radius: 14px; padding: 18px 16px; text-align: center;">
+            <span style="font-size: 0.72rem; font-weight: 800; color: var(--color-accent-gold); display: block; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">SALDO NETO EN CAJA</span>
+            <strong id="cash-sum-net" style="font-size: 1.85rem; color: var(--color-accent-gold); font-family: var(--font-sans); font-weight: 800; display: block;">$0,00</strong>
           </div>
         </div>
 
         <!-- Formular de Carga de Movimiento -->
-        <div style="background: rgba(15,30,24,0.6); border: 1px solid rgba(195,155,75,0.3); border-radius: 16px; padding: 20px; margin-bottom: 24px;">
-          <h4 style="margin: 0 0 14px 0; color: #fff; font-size: 1.05rem;">➕ Cargar Nuevo Movimiento de Caja</h4>
+        <div style="background: var(--color-card-bg-alt); border: 1.5px solid var(--color-border-subtle); border-radius: 16px; padding: 24px; margin-bottom: 32px;">
+          <h4 style="margin: 0 0 16px 0; color: var(--color-text-main); font-size: 1.1rem; font-weight: 700;">➕ Cargar Nuevo Movimiento de Caja</h4>
           <form id="vendor-cash-entry-form" onsubmit="addCashMovement(event)">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 16px;">
               <div>
-                <label style="font-size: 0.8rem; color: rgba(247,246,242,0.8); display: block; margin-bottom: 4px;">Tipo de Movimiento</label>
-                <select id="cash-entry-type" class="b2b-form-input" style="width:100%; padding:10px; border-radius:8px; background: rgba(0,0,0,0.8); color:#fff;">
+                <label style="font-size: 0.8rem; font-weight: 600; color: var(--color-text-main); display: block; margin-bottom: 6px;">Tipo de Movimiento</label>
+                <select id="cash-entry-type" class="b2b-form-input">
                   <option value="venta_efectivo">💵 Venta en Efectivo</option>
                   <option value="venta_transf">📱 Venta por Transferencia</option>
                   <option value="membresia">⭐ Ingreso por Membresía</option>
@@ -1285,32 +1437,32 @@
                 </select>
               </div>
               <div>
-                <label style="font-size: 0.8rem; color: rgba(247,246,242,0.8); display: block; margin-bottom: 4px;">Monto ($ ARS) *</label>
-                <input type="number" step="0.01" id="cash-entry-amount" class="b2b-form-input" placeholder="Ej: 25000" required style="width:100%; padding:10px; border-radius:8px;">
+                <label style="font-size: 0.8rem; font-weight: 600; color: var(--color-text-main); display: block; margin-bottom: 6px;">Monto ($ ARS) *</label>
+                <input type="number" step="0.01" id="cash-entry-amount" class="b2b-form-input" placeholder="Ej: 25000" required>
               </div>
               <div>
-                <label style="font-size: 0.8rem; color: rgba(247,246,242,0.8); display: block; margin-bottom: 4px;">Detalle / Concepto *</label>
-                <input type="text" id="cash-entry-desc" class="b2b-form-input" placeholder="Ej: Venta Sustrato + Maceta / Membresía Plus Ultra" required style="width:100%; padding:10px; border-radius:8px;">
+                <label style="font-size: 0.8rem; font-weight: 600; color: var(--color-text-main); display: block; margin-bottom: 6px;">Detalle / Concepto *</label>
+                <input type="text" id="cash-entry-desc" class="b2b-form-input" placeholder="Ej: Venta Sustrato + Maceta / Membresía Plus Ultra" required>
               </div>
             </div>
-            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; font-size: 0.95rem; border-radius: 10px; background: var(--gold-gradient); border-color: var(--color-accent-gold); color: #070e0b;">
+            <button type="submit" class="btn btn-primary vendor-btn-cta" style="width: 100%; padding: 14px; font-weight: 800; font-size: 1rem; border-radius: 12px; background: var(--gold-gradient); border: 1px solid var(--color-accent-gold); color: #152d24; cursor: pointer;">
               ➕ REGISTRAR MOVIMIENTO EN CAJA
             </button>
           </form>
         </div>
 
         <!-- Tabla / Lista de Movimientos Cargados -->
-        <div style="margin-bottom: 24px;">
-          <h4 style="margin: 0 0 12px 0; color: var(--color-accent-gold); font-size: 1.05rem;">📜 Historial de Movimientos de Hoy</h4>
-          <div id="cash-movements-list" style="max-height: 250px; overflow-y: auto; background: rgba(0,0,0,0.3); border: 1px solid rgba(195,155,75,0.2); border-radius: 12px; padding: 12px;"></div>
+        <div style="margin-bottom: 32px;">
+          <h4 style="margin: 0 0 14px 0; color: var(--color-text-main); font-size: 1.1rem; font-weight: 700;">📜 Historial de Movimientos de Hoy</h4>
+          <div id="cash-movements-list" style="max-height: 280px; overflow-y: auto; background: var(--color-card-bg-alt); border: 1.5px solid var(--color-border-subtle); border-radius: 14px; padding: 16px;"></div>
         </div>
 
         <!-- Cierre de Caja & Validación Admin -->
-        <div style="border-top: 1.5px solid rgba(195,155,75,0.3); padding-top: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
-          <button type="button" class="btn btn-secondary" onclick="performShiftClosure()" id="btn-close-shift" style="border-color: #ef5350; color: #ef5350; font-weight: 800; padding: 12px 24px; border-radius: 12px; font-size: 0.95rem;">
+        <div style="border-top: 1.5px solid var(--color-border-subtle); padding-top: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+          <button type="button" class="btn btn-secondary vendor-btn-secondary-red" onclick="performShiftClosure()" id="btn-close-shift" style="border: 1.5px solid #d32f2f; color: #d32f2f; background: transparent; font-weight: 800; padding: 12px 24px; border-radius: 12px; font-size: 0.92rem; cursor: pointer;">
             🔒 REALIZAR CIERRE DE CAJA Y FIN DE TURNO
           </button>
-          <button type="button" class="btn btn-secondary" onclick="validateAdminClosurePrompt()" id="btn-admin-validate" style="border-color: var(--color-accent-gold); color: var(--color-accent-gold); font-weight: 800; padding: 12px 24px; border-radius: 12px; font-size: 0.95rem;">
+          <button type="button" class="btn btn-secondary vendor-btn-secondary-gold" onclick="validateAdminClosurePrompt()" id="btn-admin-validate" style="border: 1.5px solid var(--color-accent-gold); color: var(--color-accent-gold); background: transparent; font-weight: 800; padding: 12px 24px; border-radius: 12px; font-size: 0.92rem; cursor: pointer;">
             👑 VALIDACIÓN ADMIN / AUDITORÍA
           </button>
         </div>
@@ -1319,15 +1471,25 @@
     </div>
 
     <!-- Interactive Store Map Section -->
-    <div id="store-map-section" style="display: none; max-width: 1000px; margin: 30px auto; padding: 0 20px;">
-      <div style="margin-bottom: 20px; display: flex; gap: 10px; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-        <div>
-          <h2 style="font-family: var(--font-display); color: #42a5f5; font-size: 1.6rem; margin: 0;">Plano & Ubicación de Estantes en Local</h2>
-          <p style="font-size: 0.85rem; color: rgba(247,246,242,0.8); margin: 4px 0 0 0;">Buscá cualquier producto o seleccioná un estante para resaltarlo en el mapa físico del local.</p>
+    <div id="store-map-section" style="display: none; max-width: 1200px; margin: 30px auto; padding: 0 20px;">
+      <div style="margin-bottom: 24px; display: flex; gap: 16px; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: #1B4332; display: flex; align-items: center; justify-content: center; color: #FAF8F5; font-size: 1.5rem; box-shadow: 0 4px 12px rgba(27,67,50,0.15);">
+            🌿
+          </div>
+          <div>
+            <h2 style="font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #1B4332; font-size: 1.8rem; font-weight: 800; margin: 0; letter-spacing: -0.5px;">Plano & Ubicación de Estantes en Local</h2>
+            <p style="font-size: 0.9rem; color: #4A5568; margin: 4px 0 0 0; font-weight: 500;">Visualizá y gestioná la ubicación de tus estanterías por niveles.</p>
+          </div>
         </div>
-        <div style="display: flex; gap: 8px;">
-          <input type="text" id="map-search-input" placeholder="Buscar estante (ej: A-1, B-3)..." style="padding: 8px 12px; border-radius: 8px; border: 1px solid #42a5f5; background: rgba(0,0,0,0.3); color: #fff; font-size: 0.85rem;">
-          <button class="btn btn-secondary" onclick="searchShelfOnMap()" style="padding: 8px 14px; font-size: 0.85rem; border-color: #42a5f5; color: #42a5f5;">🔍 Ubicar</button>
+        <div style="display: flex; gap: 10px; align-items: center; background: #FFFFFF; padding: 6px 6px 6px 12px; border-radius: 50px; border: 1px solid #E2E8F0; box-shadow: 0 4px 14px rgba(0,0,0,0.04);">
+          <div style="position: relative; display: flex; align-items: center;">
+            <span style="position: absolute; left: 10px; color: #94A3B8; font-size: 1rem;">🔍</span>
+            <input type="text" id="map-search-input" placeholder="Buscar estante (ej: A-1 a Nivel 2)..." style="padding: 10px 16px 10px 36px; border-radius: 40px; border: 1px solid transparent; background: #F8FAFC; color: #1E293B; font-size: 0.88rem; width: 280px; outline: none;" onkeydown="if(event.key==='Enter') searchShelfOnMap()">
+          </div>
+          <button type="button" class="btn" onclick="searchShelfOnMap()" style="padding: 10px 22px; font-size: 0.88rem; font-weight: 700; border-radius: 40px; background: #1B4332; color: #FFFFFF; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(27,67,50,0.2); transition: transform 0.15s ease;">
+            📍 Ubicar
+          </button>
         </div>
       </div>
 
