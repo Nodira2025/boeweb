@@ -1865,7 +1865,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize Zen 420 Floating Leaves
   initZenLeaves();
+  checkReferralURL();
+  renderTeamShowcaseUI();
 });
+
+// --- TEAM SHOWCASE & REFERRAL LISTENER ---
+function checkReferralURL() {
+  const params = new URLSearchParams(window.location.search);
+  const ref = params.get('ref') || params.get('vendedor') || params.get('asesor');
+  if (ref) {
+    localStorage.setItem('boeweb_referred_by', ref);
+    if (window.showToast) window.showToast(`🌿 Asesor asignado por link: ${ref}`);
+  }
+}
+
+function renderTeamShowcaseUI() {
+  const container = document.getElementById('team-cards-grid');
+  if (!container) return;
+
+  const sellers = window.AUTHORIZED_VENDEDORES || [
+    { name: 'Raul', role: 'Especialista en Sustratos & Nutrición Orgánica', phone: '5493510001111', refCode: 'raul123' },
+    { name: 'Nacho Mina', role: 'Asesor Técnico en Cultivo Indoor & Iluminación LED', phone: '5493510002222', refCode: 'nachomina123' },
+    { name: 'Alexis', role: 'Especialista en Riego Automático & Hidroponía', phone: '5493510003333', refCode: 'alexis123' },
+    { name: 'Gino', role: 'Asesor en Extracciones & Parafernalia Premium', phone: '5493510004444', refCode: 'gino123' },
+    { name: 'Rodrigo', role: 'Especialista en Control de Plagas & Fitopatología', phone: '5493510005555', refCode: 'rodrigo123' },
+    { name: 'Felipe', role: 'Asesor de Membresías & Trámites REPROCANN', phone: '5493510006666', refCode: 'felipe123' },
+    { name: 'Mariano', role: 'Especialista en Semillas & Genética Cannabis', phone: '5493510007777', refCode: 'mariano123' }
+  ];
+
+  container.innerHTML = sellers.map(v => `
+    <div style="background: var(--color-card-bg); border: 1.5px solid var(--color-border-accent); border-radius: 18px; padding: 20px 16px; text-align: center; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 12px; transition: transform 0.2s ease;">
+      <div style="width: 72px; height: 72px; border-radius: 50%; border: 2px solid var(--color-accent-gold); padding: 3px; background: rgba(195,155,75,0.15);">
+        <img src="assets/logo.jpg" alt="${v.name}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+      </div>
+      <div>
+        <h4 style="margin: 0; font-family: var(--font-serif); font-size: 1.15rem; color: var(--color-text-main); font-weight: 700;">${v.name}</h4>
+        <span style="display: block; font-size: 0.78rem; color: var(--color-accent-gold); font-weight: 700; margin-top: 4px;">${v.role}</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+        <a href="https://wa.me/${v.phone}?text=${encodeURIComponent('Hola ' + v.name + '! Quisiera hacerte una consulta de cultivo.')}" target="_blank" class="btn btn-secondary" style="width: 100%; border-color: #25d366; color: #25d366; font-size: 0.82rem; font-weight: 700; padding: 8px 12px; border-radius: 10px;">
+          💬 Asesorarme por WhatsApp
+        </a>
+      </div>
+    </div>
+  `).join('');
+}
+
+window.renderTeamShowcaseUI = renderTeamShowcaseUI;
 
 // --- ZEN 420 FLOATING LEAVES EFFECT ---
 function initZenLeaves() {

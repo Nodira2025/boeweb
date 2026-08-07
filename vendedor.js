@@ -959,14 +959,16 @@ function formatPrice(value) {
 // --- VENDOR AUTHENTICATION & AI SALES ENGINE ---
 
 const AUTHORIZED_VENDEDORES = [
-  { name: 'Raul', pass: 'raul123' },
-  { name: 'Nacho Mina', pass: 'nacho mina123', altPass: 'nachomina123' },
-  { name: 'Alexis', pass: 'alexis123' },
-  { name: 'Gino', pass: 'gino123' },
-  { name: 'Rodrigo', pass: 'rodrigo123' },
-  { name: 'Felipe', pass: 'felipe123' },
-  { name: 'Mariano', pass: 'mariano123' }
+  { name: 'Raul', pass: 'raul123', refCode: 'raul123', phone: '5493510001111', role: 'Especialista en Sustratos & Nutrición Orgánica', avatar: 'assets/logo.jpg' },
+  { name: 'Nacho Mina', pass: 'nacho mina123', altPass: 'nachomina123', refCode: 'nachomina123', phone: '5493510002222', role: 'Asesor Técnico en Cultivo Indoor & Iluminación LED', avatar: 'assets/logo.jpg' },
+  { name: 'Alexis', pass: 'alexis123', refCode: 'alexis123', phone: '5493510003333', role: 'Especialista en Riego Automático & Hidroponía', avatar: 'assets/logo.jpg' },
+  { name: 'Gino', pass: 'gino123', refCode: 'gino123', phone: '5493510004444', role: 'Asesor en Extracciones & Parafernalia Premium', avatar: 'assets/logo.jpg' },
+  { name: 'Rodrigo', pass: 'rodrigo123', refCode: 'rodrigo123', phone: '5493510005555', role: 'Especialista en Control de Plagas & Fitopatología', avatar: 'assets/logo.jpg' },
+  { name: 'Felipe', pass: 'felipe123', refCode: 'felipe123', phone: '5493510006666', role: 'Asesor de Membresías & Trámites REPROCANN', avatar: 'assets/logo.jpg' },
+  { name: 'Mariano', pass: 'mariano123', refCode: 'mariano123', phone: '5493510007777', role: 'Especialista en Semillas & Genética Cannabis', avatar: 'assets/logo.jpg' }
 ];
+
+window.AUTHORIZED_VENDEDORES = AUTHORIZED_VENDEDORES;
 
 
 
@@ -1057,12 +1059,14 @@ function switchVendorTab(tab) {
   const mapSection = document.getElementById('store-map-section');
   const qrSection = document.getElementById('scan-customer-qr-section');
   const cashSection = document.getElementById('vendor-cash-section');
+  const portfolioSection = document.getElementById('vendor-portfolio-section');
 
   const btnCatalog = document.getElementById('tab-btn-catalog');
   const btnMap = document.getElementById('tab-btn-map');
   const btnScan = document.getElementById('tab-btn-scan');
 
   const vcardCatalog = document.getElementById('vcard-catalog');
+  const vcardPortfolio = document.getElementById('vcard-portfolio');
   const vcardCash = document.getElementById('vcard-cash');
   const vcardMap = document.getElementById('vcard-map');
   const vcardScan = document.getElementById('vcard-scan');
@@ -1070,7 +1074,7 @@ function switchVendorTab(tab) {
   const allBtns = [btnCatalog, btnMap, btnScan];
   allBtns.forEach(btn => { if (btn) btn.classList.remove('active'); });
 
-  const allCards = [vcardCatalog, vcardCash, vcardMap, vcardScan];
+  const allCards = [vcardCatalog, vcardPortfolio, vcardCash, vcardMap, vcardScan];
   allCards.forEach(card => {
     if (card) {
       card.style.borderColor = 'rgba(255,255,255,0.15)';
@@ -1082,6 +1086,7 @@ function switchVendorTab(tab) {
   if (mapSection) mapSection.style.display = 'none';
   if (qrSection) qrSection.style.display = 'none';
   if (cashSection) cashSection.style.display = 'none';
+  if (portfolioSection) portfolioSection.style.display = 'none';
 
   let targetSection = null;
 
@@ -1095,6 +1100,16 @@ function switchVendorTab(tab) {
       vcardCatalog.style.borderColor = 'var(--color-accent-gold)';
       vcardCatalog.style.transform = 'scale(1.02)';
     }
+  } else if (tab === 'portfolio') {
+    if (portfolioSection) {
+      portfolioSection.style.display = 'block';
+      targetSection = portfolioSection;
+    }
+    if (vcardPortfolio) {
+      vcardPortfolio.style.borderColor = '#ab47bc';
+      vcardPortfolio.style.transform = 'scale(1.02)';
+    }
+    renderVendorPortfolioUI();
   } else if (tab === 'cash') {
     if (cashSection) {
       cashSection.style.display = 'block';
@@ -1353,6 +1368,121 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// --- VENDOR PORTFOLIO & SOCIAL SELLING ENGINE ---
+const MOCK_VENDOR_CLIENTS = [
+  { id: 101, name: 'Franco P.', phone: '5493512345678', vendor: 'Nacho Mina', tier: '🌳 ÁRBOL ZEN', regDate: '2026-05-10', lastSoilDaysAgo: 65, totalSpent: 145000 },
+  { id: 102, name: 'Sofía Martínez', phone: '5493518765432', vendor: 'Nacho Mina', tier: '🌿 BROTE ZEN', regDate: '2026-06-02', lastSoilDaysAgo: 20, totalSpent: 48000 },
+  { id: 103, name: 'Lucas Gómez', phone: '5493519998877', vendor: 'Raul', tier: '🌱 SEMILLA ZEN', regDate: '2026-04-15', lastSoilDaysAgo: 70, totalSpent: 92000 },
+  { id: 104, name: 'Agustín Benítez', phone: '5493514443322', vendor: 'Alexis', tier: '🌳 ÁRBOL ZEN', regDate: '2026-03-20', lastSoilDaysAgo: 45, totalSpent: 210000 },
+  { id: 105, name: 'Camila Rodriguez', phone: '5493516665544', vendor: 'Gino', tier: '🌿 BROTE ZEN', regDate: '2026-06-18', lastSoilDaysAgo: 10, totalSpent: 35000 },
+  { id: 106, name: 'Valentín Silva', phone: '5493511112233', vendor: 'Rodrigo', tier: '🌱 SEMILLA ZEN', regDate: '2026-05-28', lastSoilDaysAgo: 85, totalSpent: 64000 },
+  { id: 107, name: 'Martina Lopez', phone: '5493517778899', vendor: 'Felipe', tier: '🌳 ÁRBOL ZEN', regDate: '2026-02-14', lastSoilDaysAgo: 90, totalSpent: 180000 }
+];
+
+function getVendorClients(vendorName) {
+  const customClients = JSON.parse(localStorage.getItem('boeweb_referred_clients') || '[]');
+  const combined = [...customClients, ...MOCK_VENDOR_CLIENTS];
+  if (!vendorName) return combined;
+  return combined.filter(c => c.vendor && c.vendor.toLowerCase() === vendorName.toLowerCase());
+}
+
+function renderVendorPortfolioUI() {
+  const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'Nacho Mina';
+  const clients = getVendorClients(activeVendor);
+  const searchInput = document.getElementById('portfolio-search-input');
+  const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  const filtered = clients.filter(c => 
+    c.name.toLowerCase().includes(query) || (c.phone && c.phone.includes(query))
+  );
+
+  const totalClientsEl = document.getElementById('portfolio-total-clients');
+  const vipClientsEl = document.getElementById('portfolio-vip-clients');
+  const soilAlertsEl = document.getElementById('portfolio-soil-alerts');
+
+  if (totalClientsEl) totalClientsEl.textContent = clients.length;
+  if (vipClientsEl) vipClientsEl.textContent = clients.filter(c => c.tier && c.tier.includes('ÁRBOL')).length;
+  if (soilAlertsEl) soilAlertsEl.textContent = clients.filter(c => (c.lastSoilDaysAgo || 0) >= 60).length;
+
+  const tableBody = document.getElementById('vendor-portfolio-table-body');
+  if (tableBody) {
+    if (filtered.length === 0) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="5" style="text-align: center; padding: 20px; color: var(--color-text-muted);">
+            No hay clientes registrados en tu cartera aún. ¡Compartí tu link de recomendación para empezar a sumar!
+          </td>
+        </tr>
+      `;
+    } else {
+      tableBody.innerHTML = filtered.map(c => {
+        const needsSoil = (c.lastSoilDaysAgo || 0) >= 60;
+        return `
+          <tr style="border-bottom: 1px solid var(--color-border-subtle);">
+            <td style="padding: 12px 10px;">
+              <strong style="color: var(--color-text-main); font-weight: 700;">${c.name}</strong>
+              <span style="display: block; font-size: 0.72rem; color: var(--color-text-muted);">Registrado/a: ${c.regDate || '2026-05-15'}</span>
+            </td>
+            <td style="padding: 12px 10px;">
+              <a href="https://wa.me/${c.phone}" target="_blank" style="color: #25d366; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                💬 ${c.phone}
+              </a>
+            </td>
+            <td style="padding: 12px 10px;">
+              <span style="background: rgba(195,155,75,0.15); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 3px 8px; border-radius: 8px; font-size: 0.75rem; font-weight: 700;">
+                ${c.tier || '🌱 SEMILLA ZEN'}
+              </span>
+            </td>
+            <td style="padding: 12px 10px;">
+              ${needsSoil ? `
+                <span style="background: rgba(239,83,80,0.15); border: 1px solid #ef5350; color: #ef5350; padding: 3px 8px; border-radius: 8px; font-size: 0.75rem; font-weight: 800;">
+                  ⚠️ Hace ${c.lastSoilDaysAgo} días (Reabastecer)
+                </span>
+              ` : `
+                <span style="background: rgba(102,187,106,0.15); border: 1px solid #66bb6a; color: #66bb6a; padding: 3px 8px; border-radius: 8px; font-size: 0.75rem; font-weight: 700;">
+                  🟢 al día (${c.lastSoilDaysAgo || 15} días)
+                </span>
+              `}
+            </td>
+            <td style="padding: 12px 10px; text-align: right;">
+              <button type="button" class="btn btn-secondary" onclick="sendVendorWhatsAppPromo('${c.phone}', '${c.name}', 'sustrato')" style="padding: 6px 12px; font-size: 0.78rem; border-color: #25d366; color: #25d366; border-radius: 8px; font-weight: 700;">
+                💬 Enviar Promo Sustrato
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+}
+
+function copyVendorRefLink() {
+  const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
+  const vendorObj = AUTHORIZED_VENDEDORES.find(v => v.name.toLowerCase() === activeVendor.toLowerCase());
+  const refCode = vendorObj ? vendorObj.refCode : activeVendor.toLowerCase().replace(/\s+/g, '');
+  const url = `${window.location.origin}${window.location.pathname.replace('vendedor.html', 'index.html')}?ref=${refCode}`;
+  
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url);
+    if (window.showToast) window.showToast(`📋 ¡Link copiado!: ${url}`);
+    else alert(`📋 ¡Tu Enlace Personal de Recomendación fue copiado al portapapeles!\n\n${url}`);
+  } else {
+    prompt('Copiá tu enlace de recomendación:', url);
+  }
+}
+
+function sendVendorWhatsAppPromo(phone, clientName, promoType) {
+  const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'Tu asesor BÔ';
+  let message = '';
+  if (promoType === 'sustrato') {
+    message = `Hola ${clientName}! 👋 Te saluda ${activeVendor} de BÔ GrowClub 🌿. Te contacto porque vi que ya pasaron un par de meses desde tu última compra de sustrato y tus plantas seguro están listas para un reabastecimiento o trasplante. ¡Esta semana tenemos una promo especial en sustrato orgánico + fertilizante con 15% OFF! ¿Te guardo una bolsa?`;
+  } else {
+    message = `Hola ${clientName}! 👋 Te habla ${activeVendor} de BÔ GrowClub 🌿. Quería contarte que ingresaron novedades exclusivas en cultivo indoor y nutrición orgánica para miembros VIP. ¿En qué etapa está tu cultivo actualmente?`;
+  }
+  const encodedMsg = encodeURIComponent(message);
+  window.open(`https://wa.me/${phone}?text=${encodedMsg}`, '_blank');
+}
+
 // Global exposure
 window.selectVendorCard = selectVendorCard;
 window.checkVendorAuth = checkVendorAuth;
@@ -1365,4 +1495,8 @@ window.simulateCustomerQRScan = simulateCustomerQRScan;
 window.addCashMovement = addCashMovement;
 window.performShiftClosure = performShiftClosure;
 window.validateAdminClosurePrompt = validateAdminClosurePrompt;
+window.renderVendorPortfolioUI = renderVendorPortfolioUI;
+window.copyVendorRefLink = copyVendorRefLink;
+window.sendVendorWhatsAppPromo = sendVendorWhatsAppPromo;
+
 
