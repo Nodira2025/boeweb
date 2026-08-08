@@ -93,7 +93,7 @@
       background-color: var(--color-b2b-bg);
     }
 
-    
+
 
     .b2b-header {
       background: var(--color-card-bg);
@@ -1024,6 +1024,7 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="vendedor-caja.css?v=legado_v1">
 </head>
 <body>
 
@@ -1190,11 +1191,11 @@
         </div>
 
         <!-- Card 3: Caja y Arqueo Diario -->
-        <div class="vendor-launchpad-card" id="vcard-cash" onclick="switchVendorTab('cash')" style="background: var(--color-card-bg); border: 1.5px solid #ffb74d; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
+        <button type="button" class="vendor-launchpad-card" id="vcard-cash" onclick="switchVendorTab('cash')" style="width: 100%; font: inherit; background: var(--color-card-bg); border: 1.5px solid #ffb74d; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
           <span style="font-size: 2rem; display: block; margin-bottom: 6px;">💰</span>
           <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Caja & Arqueo</span>
           <span style="font-size: 0.72rem; color: #ffb74d; font-weight: 800; text-transform: uppercase;">REGISTRO & CIERRE</span>
-        </div>
+        </button>
 
         <!-- Card 4: Mapa de Estantes -->
         <div class="vendor-launchpad-card" id="vcard-map" onclick="switchVendorTab('map')" style="background: var(--color-card-bg); border: 1.5px solid #42a5f5; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
@@ -1334,11 +1335,13 @@
       </div>
     </div>
 
-        
+    <!-- SECTION: CARTERA PERSONAL DEL VENDEDOR -->
+    <section id="vendor-portfolio-section" style="display: none; max-width: 1400px; margin: 30px auto; padding: 0 20px;" aria-labelledby="vendor-portfolio-title">
+      <div style="background: var(--color-card-bg); border: 1px solid var(--color-border-subtle); border-radius: 20px; padding: 24px; box-shadow: var(--shadow-md); color: var(--color-text-main);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
           <div>
             <span style="background: rgba(171,71,188,0.15); border: 1px solid #ab47bc; color: #ab47bc; padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 700;">GESTIÓN DE CLIENTES RECOMENDADOS</span>
-            <h2 style="font-family: var(--font-serif); color: var(--color-text-main); font-size: 1.6rem; margin: 6px 0 0 0;">👥 Mi Cartera Personal de Clientes</h2>
+            <h2 id="vendor-portfolio-title" style="font-family: var(--font-serif); color: var(--color-text-main); font-size: 1.6rem; margin: 6px 0 0 0;">👥 Mi Cartera Personal de Clientes</h2>
           </div>
           <button type="button" class="btn btn-secondary" onclick="copyVendorRefLink()" style="border-color: #ab47bc; color: #ab47bc; font-weight: 800; padding: 10px 18px; border-radius: 12px; font-size: 0.85rem;">
             📋 Copiar Mi Link de Recomendación
@@ -1385,90 +1388,151 @@
         </div>
 
       </div>
-    </div>
+    </section>
 
     <!-- CASH REGISTER & SHIFT CLOSING MODULE -->
-    <div id="vendor-cash-section" style="display: none; max-width: 1000px; margin: 32px auto; padding: 0 20px;">
-      <div style="background: var(--color-card-bg); border: 1.5px solid var(--color-border-subtle); border-radius: 20px; padding: 32px; color: var(--color-text-main);">
-        
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; flex-wrap: wrap; gap: 14px;">
-          <div>
-            <span style="background: rgba(195,155,75,0.15); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 4px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">GESTIÓN FINANCIERA & TURNO</span>
-            <h2 style="font-family: var(--font-display); color: var(--color-text-main); font-size: 1.75rem; margin: 8px 0 0 0; font-weight: 700;">💰 Caja & Arqueo Diario de Vendedor</h2>
-          </div>
-          <div id="cash-shift-status-badge" style="background: var(--color-card-bg-alt); border: 1.5px solid var(--color-success); padding: 8px 18px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; color: var(--color-success);">
-            🟢 TURNO EN CURSO
-          </div>
+    <section id="vendor-cash-section" class="cash-shell" style="display: none;" aria-labelledby="cash-title">
+      <header class="cash-hero">
+        <div>
+          <span class="cash-eyebrow">Gestión financiera · Turno diario</span>
+          <h2 id="cash-title">Caja BÔ</h2>
+          <p>Registrá cada movimiento, controlá el efectivo real y cerrá el turno con un respaldo verificable.</p>
         </div>
-
-        <!-- Metric Summary Cards -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px;">
-          <div class="vendor-kpi-card" style="background: var(--color-card-bg-alt); border: 1.5px solid rgba(46, 125, 50, 0.3); border-radius: 14px; padding: 18px 16px; text-align: center;">
-            <span style="font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted); display: block; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">VENTAS Y COBROS ARS</span>
-            <strong id="cash-sum-sales" style="font-size: 1.75rem; color: #2e7d32; font-family: var(--font-sans); font-weight: 800; display: block;">$0,00</strong>
-          </div>
-          <div class="vendor-kpi-card" style="background: var(--color-card-bg-alt); border: 1.5px solid rgba(25, 118, 210, 0.3); border-radius: 14px; padding: 18px 16px; text-align: center;">
-            <span style="font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted); display: block; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">MEMBRESÍAS / EXTRAS</span>
-            <strong id="cash-sum-income" style="font-size: 1.75rem; color: #1976d2; font-family: var(--font-sans); font-weight: 800; display: block;">$0,00</strong>
-          </div>
-          <div class="vendor-kpi-card" style="background: var(--color-card-bg-alt); border: 1.5px solid rgba(211, 47, 47, 0.3); border-radius: 14px; padding: 18px 16px; text-align: center;">
-            <span style="font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted); display: block; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">GASTOS Y RETIROS</span>
-            <strong id="cash-sum-expenses" style="font-size: 1.75rem; color: #d32f2f; font-family: var(--font-sans); font-weight: 800; display: block;">$0,00</strong>
-          </div>
-          <div class="vendor-kpi-card" style="background: var(--color-card-bg-alt); border: 2px solid var(--color-accent-gold); border-radius: 14px; padding: 18px 16px; text-align: center;">
-            <span style="font-size: 0.72rem; font-weight: 800; color: var(--color-accent-gold); display: block; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">SALDO NETO EN CAJA</span>
-            <strong id="cash-sum-net" style="font-size: 1.85rem; color: var(--color-accent-gold); font-family: var(--font-sans); font-weight: 800; display: block;">$0,00</strong>
-          </div>
+        <div class="cash-hero-actions">
+          <span id="cash-current-date" class="cash-date-pill">Hoy</span>
+          <div id="cash-shift-status-badge" class="cash-status-badge" data-status="open">Turno en curso</div>
+          <button type="button" class="cash-icon-btn" onclick="switchVendorTab('catalog')" aria-label="Volver al panel de vendedor">×</button>
         </div>
+      </header>
 
-        <!-- Formular de Carga de Movimiento -->
-        <div style="background: var(--color-card-bg-alt); border: 1.5px solid var(--color-border-subtle); border-radius: 16px; padding: 24px; margin-bottom: 32px;">
-          <h4 style="margin: 0 0 16px 0; color: var(--color-text-main); font-size: 1.1rem; font-weight: 700;">➕ Cargar Nuevo Movimiento de Caja</h4>
-          <form id="vendor-cash-entry-form" onsubmit="addCashMovement(event)">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 16px;">
-              <div>
-                <label style="font-size: 0.8rem; font-weight: 600; color: var(--color-text-main); display: block; margin-bottom: 6px;">Tipo de Movimiento</label>
-                <select id="cash-entry-type" class="b2b-form-input">
-                  <option value="venta_efectivo">💵 Venta en Efectivo</option>
-                  <option value="venta_transf">📱 Venta por Transferencia</option>
-                  <option value="membresia">⭐ Ingreso por Membresía</option>
-                  <option value="gasto">🔻 Gasto de Caja (Insumos/Servicios)</option>
-                  <option value="retiro">🚨 Retiro de Caja / Propietario</option>
-                </select>
-              </div>
-              <div>
-                <label style="font-size: 0.8rem; font-weight: 600; color: var(--color-text-main); display: block; margin-bottom: 6px;">Monto ($ ARS) *</label>
-                <input type="number" step="0.01" id="cash-entry-amount" class="b2b-form-input" placeholder="Ej: 25000" required>
-              </div>
-              <div>
-                <label style="font-size: 0.8rem; font-weight: 600; color: var(--color-text-main); display: block; margin-bottom: 6px;">Detalle / Concepto *</label>
-                <input type="text" id="cash-entry-desc" class="b2b-form-input" placeholder="Ej: Venta Sustrato + Maceta / Membresía Plus Ultra" required>
-              </div>
+      <div class="cash-dashboard-grid">
+        <div class="cash-main-column">
+          <section class="cash-kpi-grid" aria-label="Resumen de la caja">
+            <article class="cash-kpi cash-kpi-income">
+              <span>Ingresos registrados</span>
+              <strong id="cash-sum-sales">$0,00</strong>
+              <small id="cash-sum-count">0 movimientos activos</small>
+            </article>
+            <article class="cash-kpi cash-kpi-cash">
+              <span>Entradas en efectivo</span>
+              <strong id="cash-sum-cash">$0,00</strong>
+              <small>Ventas, apertura y membresías</small>
+            </article>
+            <article class="cash-kpi cash-kpi-transfer">
+              <span>Transferencias</span>
+              <strong id="cash-sum-income">$0,00</strong>
+              <small>No integran el efectivo físico</small>
+            </article>
+            <article class="cash-kpi cash-kpi-expense">
+              <span>Gastos y retiros</span>
+              <strong id="cash-sum-expenses">$0,00</strong>
+              <small>Salidas reales de la caja</small>
+            </article>
+          </section>
+
+          <section class="cash-balance-card" aria-label="Efectivo esperado">
+            <div>
+              <span>Efectivo que debería haber en caja</span>
+              <strong id="cash-sum-net">$0,00</strong>
             </div>
-            <button type="submit" class="btn btn-primary vendor-btn-cta" style="width: 100%; padding: 14px; font-weight: 800; font-size: 1rem; border-radius: 12px; background: var(--gold-gradient); border: 1px solid var(--color-accent-gold); color: #152d24; cursor: pointer;">
-              ➕ REGISTRAR MOVIMIENTO EN CAJA
-            </button>
-          </form>
+            <p>Fondo inicial + cobros en efectivo − gastos y retiros.</p>
+          </section>
+
+          <section class="cash-panel cash-entry-panel">
+            <div class="cash-panel-heading">
+              <div>
+                <span class="cash-panel-step">Paso 1</span>
+                <h3>Registrar movimiento</h3>
+              </div>
+              <span class="cash-panel-note">Los movimientos quedan guardados en este equipo.</span>
+            </div>
+            <form id="vendor-cash-entry-form" onsubmit="addCashMovement(event)">
+              <div class="cash-form-grid">
+                <div class="cash-field">
+                  <label for="cash-entry-type">Tipo de movimiento</label>
+                  <select id="cash-entry-type" class="b2b-form-input">
+                    <option value="apertura">🌱 Fondo inicial / Apertura</option>
+                    <option value="venta_efectivo" selected>💵 Venta en efectivo</option>
+                    <option value="venta_transf">📱 Venta por transferencia</option>
+                    <option value="membresia_efectivo">⭐ Membresía en efectivo</option>
+                    <option value="membresia_transf">⭐ Membresía por transferencia</option>
+                    <option value="gasto">↓ Gasto de caja</option>
+                    <option value="retiro">↓ Retiro de propietario</option>
+                  </select>
+                </div>
+                <div class="cash-field">
+                  <label for="cash-entry-amount">Monto en pesos *</label>
+                  <input type="number" min="0.01" step="0.01" inputmode="decimal" id="cash-entry-amount" class="b2b-form-input" placeholder="Ej: 25.000" required>
+                </div>
+                <div class="cash-field cash-field-wide">
+                  <label for="cash-entry-desc">Detalle o comprobante *</label>
+                  <input type="text" maxlength="140" id="cash-entry-desc" class="b2b-form-input" placeholder="Ej: Venta Sustrato + Maceta / Operación 128" required>
+                </div>
+              </div>
+              <button type="submit" class="cash-primary-btn" id="cash-entry-submit">
+                <span aria-hidden="true">+</span> Registrar movimiento
+              </button>
+            </form>
+          </section>
+
+          <section class="cash-panel cash-history-panel">
+            <div class="cash-panel-heading">
+              <div>
+                <span class="cash-panel-step">Auditoría</span>
+                <h3>Movimientos del día</h3>
+              </div>
+              <span id="cash-history-count" class="cash-count-pill">0 registros</span>
+            </div>
+            <div id="cash-movements-list" class="cash-movements-list" aria-live="polite"></div>
+          </section>
         </div>
 
-        <!-- Tabla / Lista de Movimientos Cargados -->
-        <div style="margin-bottom: 32px;">
-          <h4 style="margin: 0 0 14px 0; color: var(--color-text-main); font-size: 1.1rem; font-weight: 700;">📜 Historial de Movimientos de Hoy</h4>
-          <div id="cash-movements-list" style="max-height: 280px; overflow-y: auto; background: var(--color-card-bg-alt); border: 1.5px solid var(--color-border-subtle); border-radius: 14px; padding: 16px;"></div>
-        </div>
+        <aside class="cash-side-column">
+          <section class="cash-panel cash-backup-panel">
+            <span class="cash-panel-step">Respaldo</span>
+            <h3>Protegé el trabajo del día</h3>
+            <p>Descargá una copia legible. El archivo permite conservar los movimientos aunque cambies de navegador.</p>
+            <div class="cash-backup-actions">
+              <button type="button" class="cash-secondary-btn" onclick="downloadCashBackup('json')">Descargar respaldo</button>
+              <button type="button" class="cash-text-btn" onclick="downloadCashBackup('csv')">Exportar CSV</button>
+              <label class="cash-text-btn cash-import-btn" for="cash-backup-file">Recuperar respaldo</label>
+              <input type="file" id="cash-backup-file" accept="application/json,.json" onchange="importCashBackup(event)" hidden>
+            </div>
+            <small id="cash-last-saved">Guardado local pendiente</small>
+          </section>
 
-        <!-- Cierre de Caja & Validación Admin -->
-        <div style="border-top: 1.5px solid var(--color-border-subtle); padding-top: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-          <button type="button" class="btn btn-secondary vendor-btn-secondary-red" onclick="performShiftClosure()" id="btn-close-shift" style="border: 1.5px solid #d32f2f; color: #d32f2f; background: transparent; font-weight: 800; padding: 12px 24px; border-radius: 12px; font-size: 0.92rem; cursor: pointer;">
-            🔒 REALIZAR CIERRE DE CAJA Y FIN DE TURNO
-          </button>
-          <button type="button" class="btn btn-secondary vendor-btn-secondary-gold" onclick="validateAdminClosurePrompt()" id="btn-admin-validate" style="border: 1.5px solid var(--color-accent-gold); color: var(--color-accent-gold); background: transparent; font-weight: 800; padding: 12px 24px; border-radius: 12px; font-size: 0.92rem; cursor: pointer;">
-            👑 VALIDACIÓN ADMIN / AUDITORÍA
-          </button>
-        </div>
+          <section class="cash-panel cash-closure-panel">
+            <span class="cash-panel-step">Paso 2</span>
+            <h3>Cierre de turno</h3>
+            <div class="cash-expected-row">
+              <span>Efectivo esperado</span>
+              <strong id="cash-closure-expected">$0,00</strong>
+            </div>
+            <div class="cash-field">
+              <label for="cash-counted-amount">Efectivo contado *</label>
+              <input type="number" min="0" step="0.01" inputmode="decimal" id="cash-counted-amount" class="b2b-form-input" placeholder="Monto contado" oninput="updateCashDifferencePreview()">
+            </div>
+            <div class="cash-field">
+              <label for="cash-closure-notes">Observaciones del cierre</label>
+              <textarea id="cash-closure-notes" class="b2b-form-input" rows="3" maxlength="280" placeholder="Ej: diferencia por cambio, comprobante pendiente..."></textarea>
+            </div>
+            <div class="cash-difference-row" id="cash-difference-row" data-state="neutral">
+              <span>Diferencia</span>
+              <strong id="cash-difference-preview">$0,00</strong>
+            </div>
+            <button type="button" class="cash-close-btn" onclick="performShiftClosure()" id="btn-close-shift">Cerrar caja y finalizar turno</button>
 
+            <div id="cash-admin-validation" class="cash-admin-validation" hidden>
+              <div class="cash-field">
+                <label for="cash-admin-password">Validación del administrador</label>
+                <input type="password" id="cash-admin-password" class="b2b-form-input" placeholder="Contraseña de administración" autocomplete="current-password">
+              </div>
+              <button type="button" class="cash-secondary-btn" onclick="validateAdminClosurePrompt()" id="btn-admin-validate">Validar arqueo</button>
+            </div>
+          </section>
+        </aside>
       </div>
-    </div>
+    </section>
 
     <!-- Interactive Store Map Section -->
     <div id="store-map-section" style="display: none; max-width: 1200px; margin: 30px auto; padding: 0 20px;">

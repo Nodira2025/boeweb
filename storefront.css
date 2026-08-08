@@ -333,6 +333,11 @@ textarea:focus-visible {
   color: var(--bo-ink) !important;
 }
 
+.more-menu-team-access {
+  border: 1px dashed rgba(23, 74, 52, 0.28) !important;
+  background: rgba(244, 236, 218, 0.52) !important;
+}
+
 .desktop-primary-nav {
   border-top: 1px solid var(--bo-line);
   background: var(--bo-paper);
@@ -1531,6 +1536,31 @@ textarea:focus-visible {
 .footer-bottom,
 .footer-zen-quote {
   color: var(--bo-cream) !important;
+}
+
+.footer-team-access {
+  min-height: 44px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(244, 236, 218, 0.28);
+  border-radius: 999px;
+  color: var(--bo-cream) !important;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.footer-team-access:hover,
+.footer-team-access:focus-visible {
+  border-color: var(--bo-gold);
+  background: var(--bo-gold);
+  color: var(--bo-forest) !important;
+  outline: none;
 }
 
 @media (min-width: 1420px) {

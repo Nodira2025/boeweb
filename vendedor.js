@@ -1169,8 +1169,9 @@ function switchVendorTab(tab) {
     loadPendingProductDrafts();
   }
 
-  if (targetSection && window.innerWidth <= 768) {
-    targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (targetSection) {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    targetSection.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
   }
 }
 
@@ -1241,19 +1242,132 @@ function simulateCustomerQRScan() {
 }
 
 // --- CASH REGISTER & SHIFT CLOSING ENGINE ---
-function getTodayDateKey() {
-  return new Date().toISOString().slice(0, 10);
+const CASH_TIME_ZONE = 'America/Argentina/Buenos_Aires';
+const CASH_SCHEMA_VERSION = 2;
+const CASH_TYPE_CONFIG = {
+  apertura: { label: 'Fondo inicial', flow: 'in' },
+  venta_efectivo: { label: 'Venta en efectivo', flow: 'in' },
+  venta_transf: { label: 'Venta por transferencia', flow: 'transfer' },
+  membresia: { label: 'Membresía en efectivo', flow: 'in' },
+  membresia_efectivo: { label: 'Membresía en efectivo', flow: 'in' },
+  membresia_transf: { label: 'Membresía por transferencia', flow: 'transfer' },
+  gasto: { label: 'Gasto de caja', flow: 'out' },
+  retiro: { label: 'Retiro de propietario', flow: 'out' }
+};
+
+function getTodayDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: CASH_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
-function getVendorCashData() {
-  const today = getTodayDateKey();
-  const data = localStorage.getItem(`boeweb_cash_${today}`);
-  return data ? JSON.parse(data) : { movements: [], closed: false, validated: false, closedBy: null, validatedBy: null };
+function getEmptyCashData(dateKey = getTodayDateKey()) {
+  return {
+    schemaVersion: CASH_SCHEMA_VERSION,
+    date: dateKey,
+    movements: [],
+    closed: false,
+    validated: false,
+    closedBy: null,
+    validatedBy: null,
+    updatedAt: null
+  };
 }
 
-function saveVendorCashData(data) {
-  const today = getTodayDateKey();
-  localStorage.setItem(`boeweb_cash_${today}`, JSON.stringify(data));
+function normalizeCashData(value, dateKey = getTodayDateKey()) {
+  const base = value && typeof value === 'object' ? value : {};
+  const movements = Array.isArray(base.movements)
+    ? base.movements.filter(movement => movement && Number.isFinite(Number(movement.amount))).map(movement => ({
+        ...movement,
+        id: movement.id || `legacy_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+        amount: Number(movement.amount),
+        desc: String(movement.desc || 'Movimiento sin detalle'),
+        vendor: String(movement.vendor || 'Vendedor'),
+        type: CASH_TYPE_CONFIG[movement.type] ? movement.type : 'venta_efectivo',
+        voided: Boolean(movement.voided)
+      }))
+    : [];
+
+  return {
+    ...getEmptyCashData(dateKey),
+    ...base,
+    schemaVersion: CASH_SCHEMA_VERSION,
+    date: base.date || dateKey,
+    movements,
+    closed: Boolean(base.closed),
+    validated: Boolean(base.validated)
+  };
+}
+
+function getVendorCashData(dateKey = getTodayDateKey()) {
+  const storageKey = `boeweb_cash_${dateKey}`;
+  const storedValue = localStorage.getItem(storageKey);
+  if (!storedValue) return getEmptyCashData(dateKey);
+
+  try {
+    return normalizeCashData(JSON.parse(storedValue), dateKey);
+  } catch (error) {
+    console.error('No se pudo leer la caja guardada:', error);
+    localStorage.setItem(`${storageKey}_recovery_${Date.now()}`, storedValue);
+    return getEmptyCashData(dateKey);
+  }
+}
+
+function saveVendorCashData(data, dateKey = getTodayDateKey()) {
+  const normalized = normalizeCashData(data, dateKey);
+  normalized.updatedAt = new Date().toISOString();
+  localStorage.setItem(`boeweb_cash_${dateKey}`, JSON.stringify(normalized));
+  return normalized;
+}
+
+function formatCashCurrency(value) {
+  return Number(value || 0).toLocaleString('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function calculateCashTotals(cashData) {
+  const totals = {
+    recordedIncome: 0,
+    cashEntries: 0,
+    transfers: 0,
+    expenses: 0,
+    expectedCash: 0,
+    activeCount: 0
+  };
+
+  cashData.movements.forEach(movement => {
+    if (movement.voided) return;
+    const amount = Number(movement.amount) || 0;
+    const config = CASH_TYPE_CONFIG[movement.type] || CASH_TYPE_CONFIG.venta_efectivo;
+    totals.activeCount += 1;
+
+    if (movement.type !== 'apertura' && config.flow !== 'out') totals.recordedIncome += amount;
+    if (config.flow === 'in') totals.cashEntries += amount;
+    if (config.flow === 'transfer') totals.transfers += amount;
+    if (config.flow === 'out') totals.expenses += amount;
+  });
+
+  totals.expectedCash = totals.cashEntries - totals.expenses;
+  return totals;
+}
+
+function escapeCashHtml(value) {
+  return String(value).replace(/[&<>'"]/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    "'": '&#39;',
+    '"': '&quot;'
+  }[character]));
 }
 
 function addCashMovement(event) {
@@ -1262,149 +1376,321 @@ function addCashMovement(event) {
   const typeEl = document.getElementById('cash-entry-type');
   const amountEl = document.getElementById('cash-entry-amount');
   const descEl = document.getElementById('cash-entry-desc');
-
-  const type = typeEl ? typeEl.value : 'venta_efectivo';
-  const amount = parseFloat(amountEl ? amountEl.value : 0);
-  const desc = descEl ? descEl.value.trim() : '';
-
-  if (!amount || amount <= 0 || !desc) {
-    alert('⚠️ Por favor ingresá un monto mayor a $0 y una descripción válida.');
-    return;
-  }
-
+  const type = typeEl?.value || 'venta_efectivo';
+  const amount = Number.parseFloat(amountEl?.value || '0');
+  const desc = descEl?.value.trim() || '';
   const cashData = getVendorCashData();
+
+  if (!CASH_TYPE_CONFIG[type]) {
+    alert('El tipo de movimiento seleccionado no es válido.');
+    return;
+  }
+  if (!Number.isFinite(amount) || amount <= 0 || !desc) {
+    alert('Ingresá un monto mayor a $0 y un detalle válido.');
+    return;
+  }
   if (cashData.closed) {
-    alert('🔒 La caja de hoy ya fue cerrada por fin de turno. No se pueden agregar más movimientos.');
+    alert('La caja de hoy ya fue cerrada. No se pueden agregar movimientos.');
     return;
   }
 
-  const newMovement = {
-    id: Date.now(),
-    time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+  const now = new Date();
+  cashData.movements.unshift({
+    id: globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `cash_${Date.now()}`,
+    createdAt: now.toISOString(),
+    time: now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
     type,
     amount,
     desc,
-    vendor: activeVendor
-  };
-
-  cashData.movements.unshift(newMovement);
+    vendor: activeVendor,
+    voided: false
+  });
   saveVendorCashData(cashData);
 
   if (amountEl) amountEl.value = '';
-  if (descEl) descEl.value = '';
-
+  if (descEl) {
+    descEl.value = '';
+    descEl.focus();
+  }
   renderCashSectionUI();
-  if (window.showToast) window.showToast(`💰 Movimiento de $${amount.toLocaleString('es-AR')} registrado en caja.`);
+  if (window.showToast) window.showToast(`Movimiento de ${formatCashCurrency(amount)} registrado.`);
 }
 
-function renderCashSectionUI() {
+function toggleCashMovementVoid(movementId) {
   const cashData = getVendorCashData();
-  let totalSales = 0;
-  let totalIncome = 0;
-  let totalExpenses = 0;
-
-  cashData.movements.forEach(m => {
-    if (m.type === 'venta_efectivo' || m.type === 'venta_transf') {
-      totalSales += m.amount;
-    } else if (m.type === 'membresia') {
-      totalIncome += m.amount;
-    } else if (m.type === 'gasto' || m.type === 'retiro') {
-      totalExpenses += m.amount;
-    }
-  });
-
-  const netCash = (totalSales + totalIncome) - totalExpenses;
-
-  const salesEl = document.getElementById('cash-sum-sales');
-  const incomeEl = document.getElementById('cash-sum-income');
-  const expensesEl = document.getElementById('cash-sum-expenses');
-  const netEl = document.getElementById('cash-sum-net');
-  const statusBadge = document.getElementById('cash-shift-status-badge');
-
-  if (salesEl) salesEl.textContent = `$${totalSales.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
-  if (incomeEl) incomeEl.textContent = `$${totalIncome.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
-  if (expensesEl) expensesEl.textContent = `$${totalExpenses.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
-  if (netEl) netEl.textContent = `$${netCash.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
-
-  if (statusBadge) {
-    if (cashData.validated) {
-      statusBadge.innerHTML = '👑 CAJA VALIDADA POR ADMIN';
-      statusBadge.style.color = '#ffb74d';
-      statusBadge.style.borderColor = '#ffb74d';
-    } else if (cashData.closed) {
-      statusBadge.innerHTML = `🔒 CERRADA POR ${cashData.closedBy || 'VENDEDOR'} (PENDIENTE ADMIN)`;
-      statusBadge.style.color = '#ef5350';
-      statusBadge.style.borderColor = '#ef5350';
-    } else {
-      statusBadge.innerHTML = '🟢 TURNO EN CURSO';
-      statusBadge.style.color = '#66bb6a';
-      statusBadge.style.borderColor = 'rgba(102,187,106,0.5)';
-    }
-  }
-
-  const listEl = document.getElementById('cash-movements-list');
-  if (listEl) {
-    if (cashData.movements.length === 0) {
-      listEl.innerHTML = '<p style="color: rgba(247,246,242,0.5); font-size: 0.85rem; font-style: italic; text-align: center; margin: 10px 0;">No hay movimientos registrados en la caja de hoy.</p>';
-    } else {
-      const typeLabels = {
-        venta_efectivo: '💵 Venta Efectivo',
-        venta_transf: '📱 Venta Transferencia',
-        membresia: '⭐ Membresía',
-        gasto: '🔻 Gasto Caja',
-        retiro: '🚨 Retiro Propietario'
-      };
-      listEl.innerHTML = cashData.movements.map(m => `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 0.85rem;">
-          <div>
-            <strong style="color: var(--color-accent-gold);">${typeLabels[m.type] || m.type}</strong> - <span style="color: #fff;">${m.desc}</span>
-            <span style="display: block; font-size: 0.72rem; color: rgba(247,246,242,0.6);">⏰ ${m.time} | 🧑‍💼 Vendedor: ${m.vendor}</span>
-          </div>
-          <div style="font-weight: 800; font-size: 0.95rem; color: ${(m.type==='gasto'||m.type==='retiro')?'#ef5350':'#66bb6a'};">
-            ${(m.type==='gasto'||m.type==='retiro')?'-':'+'}$${m.amount.toLocaleString('es-AR')}
-          </div>
-        </div>
-      `).join('');
-    }
-  }
-}
-
-function performShiftClosure() {
-  const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
-  const cashData = getVendorCashData();
-
   if (cashData.closed) {
-    alert('🔒 La caja de hoy ya fue cerrada previamente.');
+    alert('La caja está cerrada y ya no admite correcciones.');
     return;
   }
 
-  const confirmClose = confirm(`🔒 ¿Confirmar Cierre de Caja del Turno para ${activeVendor}?\n\nUna vez cerrada la caja, se genera el arqueo oficial para que el Admin lo audite y valide.`);
-  if (!confirmClose) return;
-
-  cashData.closed = true;
-  cashData.closedBy = activeVendor;
+  const movement = cashData.movements.find(item => String(item.id) === String(movementId));
+  if (!movement) return;
+  movement.voided = !movement.voided;
+  movement.voidedAt = movement.voided ? new Date().toISOString() : null;
+  movement.voidedBy = movement.voided ? (localStorage.getItem('boeweb_vendor_name') || 'Vendedor') : null;
   saveVendorCashData(cashData);
-
   renderCashSectionUI();
-  alert(`✅ Cierre de Caja de ${activeVendor} guardado con éxito. Queda en estado Pendiente de Validación por el Admin.`);
+  if (window.showToast) window.showToast(movement.voided ? 'Movimiento anulado; permanece en la auditoría.' : 'Movimiento restaurado.');
+}
+
+function renderCashMovements(cashData) {
+  const listEl = document.getElementById('cash-movements-list');
+  const historyCount = document.getElementById('cash-history-count');
+  if (historyCount) historyCount.textContent = `${cashData.movements.length} ${cashData.movements.length === 1 ? 'registro' : 'registros'}`;
+  if (!listEl) return;
+
+  if (cashData.movements.length === 0) {
+    listEl.innerHTML = `
+      <div class="cash-empty-state">
+        <strong>La caja está lista para comenzar.</strong>
+        <p>Registrá primero el fondo inicial o la primera venta del turno.</p>
+      </div>`;
+    return;
+  }
+
+  listEl.innerHTML = cashData.movements.map(movement => {
+    const config = CASH_TYPE_CONFIG[movement.type] || CASH_TYPE_CONFIG.venta_efectivo;
+    const isOutflow = config.flow === 'out';
+    const sign = isOutflow ? '−' : '+';
+    return `
+      <article class="cash-movement" data-flow="${config.flow}" data-voided="${movement.voided}">
+        <div class="cash-movement-copy">
+          <span class="cash-movement-type">${escapeCashHtml(config.label)}${movement.voided ? ' · Anulado' : ''}</span>
+          <p class="cash-movement-desc">${escapeCashHtml(movement.desc)}</p>
+          <span class="cash-movement-meta">${escapeCashHtml(movement.time || '--:--')} · ${escapeCashHtml(movement.vendor || 'Vendedor')}</span>
+        </div>
+        <strong class="cash-movement-amount">${sign}${formatCashCurrency(movement.amount)}</strong>
+        <button type="button" class="cash-void-btn" data-movement-id="${escapeCashHtml(String(movement.id))}" ${cashData.closed ? 'disabled' : ''}>
+          ${movement.voided ? 'Restaurar' : 'Anular'}
+        </button>
+      </article>`;
+  }).join('');
+
+  listEl.querySelectorAll('.cash-void-btn').forEach(button => {
+    button.addEventListener('click', () => toggleCashMovementVoid(button.dataset.movementId));
+  });
+}
+
+function updateCashDifferencePreview() {
+  const cashData = getVendorCashData();
+  const totals = calculateCashTotals(cashData);
+  const countedEl = document.getElementById('cash-counted-amount');
+  const previewEl = document.getElementById('cash-difference-preview');
+  const rowEl = document.getElementById('cash-difference-row');
+  const expectedEl = document.getElementById('cash-closure-expected');
+  const hasValue = countedEl && countedEl.value !== '';
+  const counted = hasValue ? Number.parseFloat(countedEl.value) : totals.expectedCash;
+  const difference = Number.isFinite(counted) ? counted - totals.expectedCash : 0;
+
+  if (expectedEl) expectedEl.textContent = formatCashCurrency(totals.expectedCash);
+  if (previewEl) previewEl.textContent = `${difference > 0 ? '+' : ''}${formatCashCurrency(difference)}`;
+  if (rowEl) {
+    if (!hasValue) rowEl.dataset.state = 'neutral';
+    else if (Math.abs(difference) < 0.01) rowEl.dataset.state = 'ok';
+    else if (Math.abs(difference) <= 1000) rowEl.dataset.state = 'warning';
+    else rowEl.dataset.state = 'danger';
+  }
+}
+
+function renderCashSectionUI() {
+  const dateKey = getTodayDateKey();
+  const cashData = getVendorCashData(dateKey);
+  const totals = calculateCashTotals(cashData);
+  const setText = (id, value) => {
+    const element = document.getElementById(id);
+    if (element) element.textContent = value;
+  };
+
+  setText('cash-sum-sales', formatCashCurrency(totals.recordedIncome));
+  setText('cash-sum-cash', formatCashCurrency(totals.cashEntries));
+  setText('cash-sum-income', formatCashCurrency(totals.transfers));
+  setText('cash-sum-expenses', formatCashCurrency(totals.expenses));
+  setText('cash-sum-net', formatCashCurrency(totals.expectedCash));
+  setText('cash-sum-count', `${totals.activeCount} ${totals.activeCount === 1 ? 'movimiento activo' : 'movimientos activos'}`);
+  setText('cash-current-date', new Intl.DateTimeFormat('es-AR', { timeZone: CASH_TIME_ZONE, dateStyle: 'full' }).format(new Date()));
+  setText('cash-last-saved', cashData.updatedAt
+    ? `Último guardado: ${new Date(cashData.updatedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`
+    : 'Todavía no hay movimientos guardados');
+
+  const statusBadge = document.getElementById('cash-shift-status-badge');
+  if (statusBadge) {
+    if (cashData.validated) {
+      statusBadge.textContent = 'Arqueo validado';
+      statusBadge.dataset.status = 'validated';
+    } else if (cashData.closed) {
+      statusBadge.textContent = `Cerrada por ${cashData.closedBy || 'vendedor'}`;
+      statusBadge.dataset.status = 'closed';
+    } else {
+      statusBadge.textContent = 'Turno en curso';
+      statusBadge.dataset.status = 'open';
+    }
+  }
+
+  const entryForm = document.getElementById('vendor-cash-entry-form');
+  entryForm?.querySelectorAll('input, select, button').forEach(control => {
+    control.disabled = cashData.closed;
+  });
+
+  const closeButton = document.getElementById('btn-close-shift');
+  if (closeButton) {
+    closeButton.disabled = cashData.closed;
+    closeButton.textContent = cashData.closed ? 'Caja cerrada' : 'Cerrar caja y finalizar turno';
+  }
+
+  const countedEl = document.getElementById('cash-counted-amount');
+  const notesEl = document.getElementById('cash-closure-notes');
+  if (countedEl) {
+    countedEl.disabled = cashData.closed;
+    if (cashData.closed && Number.isFinite(Number(cashData.countedCash))) countedEl.value = cashData.countedCash;
+  }
+  if (notesEl) {
+    notesEl.disabled = cashData.closed;
+    if (cashData.closed) notesEl.value = cashData.closureNotes || '';
+  }
+
+  const adminValidation = document.getElementById('cash-admin-validation');
+  if (adminValidation) adminValidation.hidden = !cashData.closed || cashData.validated;
+  renderCashMovements(cashData);
+  updateCashDifferencePreview();
+}
+
+function performShiftClosure() {
+  const cashData = getVendorCashData();
+  if (cashData.closed) return;
+
+  const activeMovements = cashData.movements.filter(movement => !movement.voided);
+  const countedEl = document.getElementById('cash-counted-amount');
+  const notesEl = document.getElementById('cash-closure-notes');
+  const countedCash = Number.parseFloat(countedEl?.value || '');
+  if (activeMovements.length === 0) {
+    alert('Registrá al menos un movimiento antes de cerrar la caja.');
+    return;
+  }
+  if (!Number.isFinite(countedCash) || countedCash < 0) {
+    alert('Ingresá el efectivo contado antes de cerrar el turno.');
+    countedEl?.focus();
+    return;
+  }
+
+  const totals = calculateCashTotals(cashData);
+  cashData.closed = true;
+  cashData.closedBy = localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
+  cashData.closedAt = new Date().toISOString();
+  cashData.expectedCash = totals.expectedCash;
+  cashData.countedCash = countedCash;
+  cashData.difference = countedCash - totals.expectedCash;
+  cashData.closureNotes = notesEl?.value.trim() || '';
+  saveVendorCashData(cashData);
+  renderCashSectionUI();
+  downloadCashBackup('json');
+  if (window.showToast) window.showToast('Caja cerrada. Se descargó un respaldo automático del arqueo.');
 }
 
 function validateAdminClosurePrompt() {
   const cashData = getVendorCashData();
-  if (!cashData.closed) {
-    alert('⚠️ El vendedor debe realizar el Cierre de Caja del turno antes de proceder con la auditoría del Admin.');
-    return;
-  }
+  if (!cashData.closed || cashData.validated) return;
+  const passEl = document.getElementById('cash-admin-password');
+  const pass = passEl?.value.trim() || '';
 
-  const pass = prompt('👑 Ingrese la contraseña de Administrador para validar el Cierre de Caja:');
   if (pass === 'admin123' || pass === 'boeweb2025' || pass === '1234') {
     cashData.validated = true;
     cashData.validatedBy = 'Admin';
+    cashData.validatedAt = new Date().toISOString();
     saveVendorCashData(cashData);
+    if (passEl) passEl.value = '';
     renderCashSectionUI();
-    alert('🎉 ¡Cierre de Caja auditado y VALIDADO POR ADMIN exitosamente!');
-  } else if (pass !== null) {
-    alert('❌ Contraseña de Administrador incorrecta.');
+    downloadCashBackup('json');
+    if (window.showToast) window.showToast('Arqueo validado y respaldado correctamente.');
+  } else {
+    if (passEl) {
+      passEl.value = '';
+      passEl.focus();
+    }
+    alert('Contraseña de administración incorrecta.');
+  }
+}
+
+function downloadTextFile(filename, content, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function downloadCashBackup(format = 'json') {
+  const dateKey = getTodayDateKey();
+  const cashData = getVendorCashData(dateKey);
+  const totals = calculateCashTotals(cashData);
+  const exportData = {
+    brand: 'BÔ Grow Club',
+    module: 'Caja y arqueo diario',
+    exportedAt: new Date().toISOString(),
+    date: dateKey,
+    totals,
+    cash: cashData
+  };
+
+  if (format === 'csv') {
+    const escapeCsv = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const rows = [
+      ['Fecha', 'Hora', 'Tipo', 'Detalle', 'Vendedor', 'Monto', 'Estado'],
+      ...cashData.movements.map(movement => [
+        dateKey,
+        movement.time || '',
+        CASH_TYPE_CONFIG[movement.type]?.label || movement.type,
+        movement.desc,
+        movement.vendor,
+        movement.amount,
+        movement.voided ? 'ANULADO' : 'ACTIVO'
+      ])
+    ];
+    const csv = `\uFEFFsep=;\n${rows.map(row => row.map(escapeCsv).join(';')).join('\n')}`;
+    downloadTextFile(`caja-bo-${dateKey}.csv`, csv, 'text/csv;charset=utf-8');
+  } else {
+    downloadTextFile(`caja-bo-${dateKey}.json`, JSON.stringify(exportData, null, 2), 'application/json;charset=utf-8');
+  }
+}
+
+async function importCashBackup(event) {
+  const fileInput = event?.target;
+  const file = fileInput?.files?.[0];
+  if (!file) return;
+
+  try {
+    const parsed = JSON.parse(await file.text());
+    const importedCash = parsed.cash && typeof parsed.cash === 'object' ? parsed.cash : parsed;
+    if (!importedCash || typeof importedCash !== 'object' || !Array.isArray(importedCash.movements) || !/^\d{4}-\d{2}-\d{2}$/.test(importedCash.date || '')) {
+      throw new Error('El archivo no contiene una caja válida.');
+    }
+    const normalized = normalizeCashData(importedCash, importedCash.date || getTodayDateKey());
+
+    const existing = getVendorCashData(normalized.date);
+    localStorage.setItem(`boeweb_cash_${normalized.date}_before_restore_${Date.now()}`, JSON.stringify(existing));
+    const existingIds = new Set(existing.movements.map(movement => String(movement.id)));
+    const newMovements = normalized.movements.filter(movement => !existingIds.has(String(movement.id)));
+    const merged = normalizeCashData({
+      ...existing,
+      ...normalized,
+      movements: [...existing.movements, ...newMovements],
+      restoredAt: new Date().toISOString(),
+      restoredBy: localStorage.getItem('boeweb_vendor_name') || 'Vendedor'
+    }, normalized.date);
+    saveVendorCashData(merged, normalized.date);
+
+    if (fileInput) fileInput.value = '';
+    if (normalized.date === getTodayDateKey()) renderCashSectionUI();
+    if (window.showToast) {
+      window.showToast(`Respaldo del ${normalized.date} recuperado: ${newMovements.length} movimientos nuevos.`);
+    }
+  } catch (error) {
+    console.error('No se pudo recuperar el respaldo de caja:', error);
+    if (fileInput) fileInput.value = '';
+    alert('No se pudo recuperar el respaldo. Verificá que sea un archivo JSON generado por esta Caja.');
   }
 }
 
@@ -1413,8 +1699,8 @@ document.addEventListener('DOMContentLoaded', () => {
   checkVendorAuth();
   const urlParams = new URLSearchParams(window.location.search);
   const targetMember = urlParams.get('member');
-  if (targetMember) {
-    setTimeout(() => approvePlusUltraMember(targetMember), 500);
+  if (targetMember && typeof window.approvePlusUltraMember === 'function') {
+    setTimeout(() => window.approvePlusUltraMember(targetMember), 500);
   }
 });
 
@@ -1896,12 +2182,15 @@ window.checkVendorAuth = checkVendorAuth;
 window.handleVendorLogin = handleVendorLogin;
 window.vendorLogout = vendorLogout;
 window.switchVendorTab = switchVendorTab;
-window.approvePlusUltraMember = approvePlusUltraMember;
 window.searchShelfOnMap = searchShelfOnMap;
 window.simulateCustomerQRScan = simulateCustomerQRScan;
 window.addCashMovement = addCashMovement;
+window.toggleCashMovementVoid = toggleCashMovementVoid;
 window.performShiftClosure = performShiftClosure;
 window.validateAdminClosurePrompt = validateAdminClosurePrompt;
+window.updateCashDifferencePreview = updateCashDifferencePreview;
+window.downloadCashBackup = downloadCashBackup;
+window.importCashBackup = importCashBackup;
 window.renderVendorPortfolioUI = renderVendorPortfolioUI;
 window.copyVendorRefLink = copyVendorRefLink;
 window.sendVendorWhatsAppPromo = sendVendorWhatsAppPromo;
@@ -1910,6 +2199,3 @@ window.submitProductDraft = submitProductDraft;
 window.loadPendingProductDrafts = loadPendingProductDrafts;
 window.approveProductDraft = approveProductDraft;
 window.rejectProductDraft = rejectProductDraft;
-
-
-
