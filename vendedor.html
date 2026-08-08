@@ -1026,6 +1026,7 @@
   </style>
   <link rel="stylesheet" href="vendedor-caja.css?v=legado_v1">
   <link rel="stylesheet" href="vendedor-portal.css?v=desktop_v2_crema">
+  <link rel="stylesheet" href="vendedor-stock.css?v=stock_v1">
 </head>
 <body>
 
@@ -1139,7 +1140,7 @@
           <span class="vendor-side-nav-icon" aria-hidden="true">⌖</span><span>Estantes</span>
         </button>
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="fast-upload" onclick="switchVendorTab('fast-upload')">
-          <span class="vendor-side-nav-icon" aria-hidden="true">＋</span><span>Carga rápida</span>
+          <span class="vendor-side-nav-icon" aria-hidden="true">＋</span><span>Ingresar producto</span>
         </button>
       </nav>
 
@@ -1301,7 +1302,7 @@
               <span aria-hidden="true">⌖</span><span><strong>Ubicar producto</strong><small>Mapa de estantes</small></span><span aria-hidden="true">›</span>
             </button>
             <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('fast-upload')">
-              <span aria-hidden="true">＋</span><span><strong>Carga rápida</strong><small>Crear borrador por foto</small></span><span aria-hidden="true">›</span>
+              <span aria-hidden="true">＋</span><span><strong>Ingresar producto</strong><small>Foto, IA, stock y ubicación</small></span><span aria-hidden="true">›</span>
             </button>
           </div>
         </aside>
@@ -1373,11 +1374,11 @@
           <span style="font-size: 0.72rem; color: #d4a373; font-weight: 800; text-transform: uppercase;">CAFETERÍA & BAR</span>
         </a>
 
-        <!-- Card 9: Carga Rápida por Foto -->
+        <!-- Card 9: Ingreso de producto al stock -->
         <button type="button" class="vendor-launchpad-card" id="vcard-fastupload" onclick="switchVendorTab('fast-upload')" style="background: var(--color-card-bg); border: 2px solid var(--color-accent-gold); border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
           <span style="font-size: 2rem; display: block; margin-bottom: 4px;">📸</span>
-          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Carga Rápida Foto</span>
-          <span style="font-size: 0.72rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase;">SUBIR PRODUCTO</span>
+          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Ingresar producto</span>
+          <span style="font-size: 0.72rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase;">IA · STOCK · UBICACIÓN</span>
         </button>
 
         <!-- Card 10: Cola de Borradores (Mariano / Admin) -->
@@ -1391,64 +1392,192 @@
       </div>
     </section>
 
-    <!-- SECTION: CARGA RÁPIDA POR FOTO (VENDEDOR) -->
-    <div id="vendor-fast-upload-section" class="vendor-workspace-section" style="display: none; max-width: 750px; margin: 30px auto; padding: 0 20px;">
-      <div style="background: var(--color-card-bg); border: 2px solid var(--color-accent-gold); border-radius: 20px; padding: 24px; box-shadow: var(--shadow-md); color: var(--color-text-main);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
-          <div>
-            <span style="background: rgba(195,155,75,0.2); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 700; text-transform: uppercase;">ACCESO VENDEDOR</span>
-            <h2 style="font-family: var(--font-display); color: var(--color-accent-gold); font-size: 1.6rem; margin: 6px 0 0 0;">📸 Carga Rápida de Producto por Foto</h2>
-          </div>
-          <button type="button" onclick="switchVendorTab('catalog')" style="background: none; border: 1px solid var(--color-border-accent); color: var(--color-text-muted); padding: 6px 12px; border-radius: 10px; cursor: pointer; font-size: 0.85rem;">✕ Cerrar</button>
+    <!-- SECTION: INGRESAR PRODUCTO AL STOCK -->
+    <section id="vendor-fast-upload-section" class="vendor-workspace-section stock-entry-workspace" style="display: none;" aria-labelledby="stock-entry-title">
+      <header class="stock-entry-hero">
+        <div>
+          <span class="stock-entry-eyebrow">Ingreso asistido · Revisión humana</span>
+          <h2 id="stock-entry-title">Ingresar producto al stock</h2>
+          <p>Fotografiá el envase, dejá que la IA proponga los datos y confirmá la ubicación antes de enviarlo a revisión.</p>
         </div>
+        <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
+      </header>
 
-        <form id="fast-upload-form" onsubmit="submitProductDraft(event)">
-          <!-- Captura / Selección de Foto -->
-          <div style="background: var(--color-card-bg-alt); border: 2px dashed var(--color-accent-gold); border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 20px; position: relative;">
-            <input type="file" id="fastupload-photo-input" accept="image/*" capture="environment" onchange="handleFastUploadPhotoChange(event)" style="display: none;" required>
-            
-            <div id="fastupload-photo-placeholder">
-              <div style="font-size: 3rem; margin-bottom: 8px;">📷</div>
-              <p style="margin: 0 0 12px 0; font-weight: 600; color: var(--color-text-main);">Sacá una foto o elegí un archivo de imagen</p>
-              <button type="button" onclick="document.getElementById('fastupload-photo-input').click()" style="background: var(--color-primary); color: #fff; border: 1.5px solid var(--color-accent-gold); padding: 10px 20px; border-radius: 12px; font-weight: 700; cursor: pointer; font-size: 0.95rem;">
-                📱 Abrir Cámara / Galería
-              </button>
+      <ol class="stock-entry-progress" aria-label="Etapas para ingresar el producto">
+        <li class="active"><span>1</span><strong>Identificar</strong><small>Foto o código</small></li>
+        <li><span>2</span><strong>Completar</strong><small>Datos y precio</small></li>
+        <li><span>3</span><strong>Ubicar</strong><small>Estante y QR</small></li>
+      </ol>
+
+      <form id="fast-upload-form" class="stock-entry-form" onsubmit="submitProductDraft(event)">
+        <div class="stock-entry-primary-grid">
+          <section class="stock-entry-panel stock-photo-panel" aria-labelledby="stock-photo-title">
+            <div class="stock-entry-panel-heading">
+              <div>
+                <span class="stock-entry-step">Paso 1</span>
+                <h3 id="stock-photo-title">Foto del producto</h3>
+              </div>
+              <span class="stock-entry-optional">Obligatoria</span>
             </div>
 
-            <div id="fastupload-photo-preview-container" style="display: none; text-align: center;">
-              <img id="fastupload-photo-img" src="" alt="Vista previa" style="max-width: 100%; max-height: 280px; border-radius: 12px; border: 2px solid var(--color-accent-gold); object-fit: contain; margin-bottom: 12px;">
+            <input type="file" id="fastupload-photo-input" accept="image/jpeg,image/png,image/webp" capture="environment" onchange="handleFastUploadPhotoChange(event)" hidden required>
+            <button type="button" class="stock-photo-dropzone" id="fastupload-photo-trigger" onclick="document.getElementById('fastupload-photo-input').click()">
+              <span class="stock-photo-icon" aria-hidden="true">◎</span>
+              <strong>Sacar foto o elegir imagen</strong>
+              <small>Frente del envase, con marca y presentación visibles.</small>
+            </button>
+
+            <div id="fastupload-photo-preview-container" class="stock-photo-preview" hidden>
+              <img id="fastupload-photo-img" src="" alt="Vista previa del producto seleccionado">
+              <button type="button" class="stock-entry-secondary-btn" onclick="document.getElementById('fastupload-photo-input').click()">Cambiar foto</button>
+            </div>
+
+            <button type="button" id="fastupload-ai-btn" class="stock-ai-btn" onclick="analyzeFastUploadPhoto()" disabled>
+              <span aria-hidden="true">✦</span> Analizar foto con IA
+            </button>
+            <div id="fastupload-ai-status" class="stock-ai-status" role="status" aria-live="polite" hidden></div>
+          </section>
+
+          <section class="stock-entry-panel" aria-labelledby="stock-identity-title">
+            <div class="stock-entry-panel-heading">
               <div>
-                <button type="button" onclick="document.getElementById('fastupload-photo-input').click()" style="background: var(--color-card-bg); color: var(--color-text-main); border: 1px solid var(--color-border-accent); padding: 6px 14px; border-radius: 10px; cursor: pointer; font-size: 0.85rem;">
-                  🔄 Cambiar Foto
-                </button>
+                <span class="stock-entry-step">Paso 2</span>
+                <h3 id="stock-identity-title">Identidad y precio</h3>
+              </div>
+              <span id="fastupload-ai-confidence" class="stock-confidence" hidden></span>
+            </div>
+
+            <div class="stock-entry-fields">
+              <div class="stock-field stock-field-wide">
+                <label for="fastupload-name-input">Nombre del producto *</label>
+                <input type="text" id="fastupload-name-input" class="b2b-form-input" placeholder="Ej: BioBizz Bio Grow 1 L" required>
+              </div>
+              <div class="stock-field">
+                <label for="fastupload-brand-input">Marca</label>
+                <input type="text" id="fastupload-brand-input" class="b2b-form-input" placeholder="Ej: BioBizz">
+              </div>
+              <div class="stock-field">
+                <label for="fastupload-presentation-input">Presentación / Modelo</label>
+                <input type="text" id="fastupload-presentation-input" class="b2b-form-input" placeholder="Ej: Botella 1 L">
+              </div>
+              <div class="stock-field">
+                <label for="fastupload-category-input">Categoría *</label>
+                <select id="fastupload-category-input" class="b2b-form-input" required>
+                  <option value="">Seleccionar</option>
+                  <option value="Semillas">Semillas</option>
+                  <option value="Sustratos">Sustratos</option>
+                  <option value="Fertilizantes">Fertilizantes</option>
+                  <option value="Indoor">Indoor</option>
+                  <option value="Vaporizadores">Vaporizadores</option>
+                  <option value="Macetas">Macetas</option>
+                  <option value="Medición y Riego">Medición y Riego</option>
+                  <option value="Parafernalia">Parafernalia</option>
+                  <option value="Otros">Otros</option>
+                </select>
+              </div>
+              <div class="stock-field">
+                <label for="fastupload-stock-input">Unidades recibidas *</label>
+                <input type="number" id="fastupload-stock-input" min="0" value="1" required class="b2b-form-input" inputmode="numeric">
+              </div>
+              <div class="stock-field">
+                <label for="fastupload-market-price-input">Promedio Mercado Libre</label>
+                <input type="number" id="fastupload-market-price-input" class="b2b-form-input" placeholder="Se completa con IA" readonly>
+              </div>
+              <div class="stock-field">
+                <label for="fastupload-sale-price-input">Precio de venta sugerido</label>
+                <input type="number" id="fastupload-sale-price-input" min="0" step="0.01" class="b2b-form-input" placeholder="Confirmar manualmente">
+              </div>
+              <div class="stock-field stock-field-wide">
+                <label for="fastupload-description-input">Descripción</label>
+                <textarea id="fastupload-description-input" class="b2b-form-input" rows="3" placeholder="Descripción breve y verificable del producto"></textarea>
+              </div>
+              <div class="stock-field stock-field-wide">
+                <label for="fastupload-official-url-input">Página oficial encontrada</label>
+                <input type="url" id="fastupload-official-url-input" class="b2b-form-input" placeholder="https://marca.com/producto">
+                <div id="fastupload-source-links" class="stock-source-links" aria-live="polite"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section class="stock-entry-panel stock-location-panel" aria-labelledby="stock-location-title">
+          <div class="stock-entry-panel-heading">
+            <div>
+              <span class="stock-entry-step">Paso 3</span>
+              <h3 id="stock-location-title">Ubicación e identificación</h3>
+            </div>
+            <button type="button" class="stock-map-link" onclick="openMapForStockEntry()">Ver mapa de estantes</button>
+          </div>
+
+          <div class="stock-location-grid">
+            <div class="stock-location-fields">
+              <div class="stock-field">
+                <label for="fastupload-floor-input">Piso</label>
+                <select id="fastupload-floor-input" class="b2b-form-input" onchange="updateFastUploadLocationPreview()">
+                  <option value="1">Planta baja</option>
+                  <option value="2">Entrepiso</option>
+                  <option value="3">Depósito alto</option>
+                </select>
+              </div>
+              <div class="stock-field">
+                <label for="fastupload-shelf-input">Estante *</label>
+                <select id="fastupload-shelf-input" class="b2b-form-input" onchange="updateFastUploadLocationPreview()" required>
+                  <option value="">Elegir estante</option>
+                  <option value="A-1">A-1 · Vitrina principal</option>
+                  <option value="A-2">A-2 · Vitrina secundaria</option>
+                  <option value="B-1">B-1 · Pasillo botánico norte</option>
+                  <option value="B-2">B-2 · Pasillo botánico sur</option>
+                  <option value="C-1">C-1 · Módulo indoor superior</option>
+                  <option value="C-2">C-2 · Módulo indoor inferior</option>
+                  <option value="D-1">D-1 · Semillas VIP</option>
+                  <option value="D-2">D-2 · Depósito de insumos</option>
+                  <option value="E-1">E-1 · Coffee Lounge 1</option>
+                  <option value="E-2">E-2 · Coffee Lounge 2</option>
+                </select>
+              </div>
+              <div class="stock-field">
+                <label for="fastupload-level-input">Nivel del estante *</label>
+                <select id="fastupload-level-input" class="b2b-form-input" onchange="updateFastUploadLocationPreview()" required>
+                  <option value="1">Inferior</option>
+                  <option value="2" selected>Medio</option>
+                  <option value="3">Superior</option>
+                </select>
+              </div>
+              <input type="hidden" id="fastupload-location-input">
+              <div class="stock-location-preview" id="fastupload-location-preview">Ubicación pendiente</div>
+            </div>
+
+            <div class="stock-barcode-card">
+              <label for="fastupload-barcode-input">Código de barras <span>Opcional</span></label>
+              <div class="stock-barcode-row">
+                <input type="text" id="fastupload-barcode-input" class="b2b-form-input" placeholder="Escanear o escribir" inputmode="numeric" autocomplete="off">
+                <button type="button" onclick="focusFastUploadBarcode()">Usar lector</button>
+              </div>
+              <small>La máquina del local funciona como teclado: enfocá el campo y escaneá.</small>
+            </div>
+
+            <div class="stock-qr-card">
+              <div id="fastupload-qr-preview" class="stock-qr-preview" aria-label="Vista previa del QR del producto"></div>
+              <div>
+                <span>QR interno BÔ</span>
+                <strong id="fastupload-product-code">Generando código…</strong>
+                <button type="button" id="fastupload-print-qr-btn" onclick="printCurrentProductQr()">Imprimir etiqueta</button>
               </div>
             </div>
           </div>
 
-          <!-- Inputs de Vendedor -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
-            <div>
-              <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--color-accent-gold); margin-bottom: 4px; text-transform: uppercase;">Stock Físico (≥ 0) *</label>
-              <input type="number" id="fastupload-stock-input" min="0" value="1" required class="b2b-form-input" style="width: 100%; padding: 10px; font-size: 1rem; font-weight: 700; border-radius: 10px;">
-            </div>
-
-            <div>
-              <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--color-accent-gold); margin-bottom: 4px; text-transform: uppercase;">Ubicación en Local</label>
-              <input type="text" id="fastupload-location-input" placeholder="Ej: Estante B-2, Góndola 3" class="b2b-form-input" style="width: 100%; padding: 10px; font-size: 0.95rem; border-radius: 10px;">
-            </div>
+          <div class="stock-field stock-notes-field">
+            <label for="fastupload-obs-input">Observaciones del ingreso</label>
+            <textarea id="fastupload-obs-input" class="b2b-form-input" rows="2" placeholder="Estado del empaque, lote, vencimiento u otra aclaración"></textarea>
           </div>
+        </section>
 
-          <div style="margin-bottom: 24px;">
-            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--color-accent-gold); margin-bottom: 4px; text-transform: uppercase;">Observaciones / Detalle</label>
-            <textarea id="fastupload-obs-input" placeholder="Ej: Presentación 1L, cerrado en paquete original..." class="b2b-form-input" rows="3" style="width: 100%; padding: 10px; font-size: 0.9rem; border-radius: 10px;"></textarea>
-          </div>
-
-          <button type="submit" id="fastupload-submit-btn" style="width: 100%; padding: 14px; background: linear-gradient(135deg, #3E5F1F 0%, #253C13 100%); border: 2px solid var(--color-accent-gold); color: #F6F3E8; font-weight: 800; font-size: 1.05rem; border-radius: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
-            🚀 ENVIAR BORRADOR A MARIANO
-          </button>
-        </form>
-      </div>
-    </div>
+        <footer class="stock-entry-submit-row">
+          <p><strong>Antes de enviar:</strong> verificá nombre, presentación, precio y ubicación. La IA puede equivocarse.</p>
+          <button type="submit" id="fastupload-submit-btn">Enviar producto a revisión</button>
+        </footer>
+      </form>
+    </section>
 
     <!-- SECTION: COLA DE BORRADORES Y APROBACIÓN (MARIANO / ADMIN) -->
     <div id="vendor-drafts-review-section" class="vendor-workspace-section" style="display: none; max-width: 1100px; margin: 30px auto; padding: 0 20px;">
@@ -1676,30 +1805,27 @@
     </section>
 
     <!-- Interactive Store Map Section -->
-    <div id="store-map-section" class="vendor-workspace-section" style="display: none; max-width: 1200px; margin: 30px auto; padding: 0 20px;">
-      <div style="margin-bottom: 24px; display: flex; gap: 16px; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-        <div style="display: flex; align-items: center; gap: 14px;">
-          <div style="width: 48px; height: 48px; border-radius: 50%; background: #1B4332; display: flex; align-items: center; justify-content: center; color: #FAF8F5; font-size: 1.5rem; box-shadow: 0 4px 12px rgba(27,67,50,0.15);">
-            🌿
-          </div>
-          <div>
-            <h2 style="font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #1B4332; font-size: 1.8rem; font-weight: 800; margin: 0; letter-spacing: -0.5px;">Plano & Ubicación de Estantes en Local</h2>
-            <p style="font-size: 0.9rem; color: #4A5568; margin: 4px 0 0 0; font-weight: 500;">Visualizá y gestioná la ubicación de tus estanterías por niveles.</p>
-          </div>
+    <section id="store-map-section" class="vendor-workspace-section store-map-workspace" style="display: none;" aria-labelledby="store-map-title">
+      <header class="store-map-workspace-header">
+        <div>
+          <span class="stock-entry-eyebrow">Inventario físico · Ubicación real</span>
+          <h2 id="store-map-title">Mapa y ubicaciones del local</h2>
+          <p>Encontrá un producto por nombre, QR, código de barras o estante y mantené una foto actualizada de cada mueble.</p>
         </div>
-        <div style="display: flex; gap: 10px; align-items: center; background: #FFFFFF; padding: 6px 6px 6px 12px; border-radius: 50px; border: 1px solid #E2E8F0; box-shadow: 0 4px 14px rgba(0,0,0,0.04);">
-          <div style="position: relative; display: flex; align-items: center;">
-            <span style="position: absolute; left: 10px; color: #94A3B8; font-size: 1rem;">🔍</span>
-            <input type="text" id="map-search-input" placeholder="Buscar estante (ej: A-1 a Nivel 2)..." style="padding: 10px 16px 10px 36px; border-radius: 40px; border: 1px solid transparent; background: #F8FAFC; color: #1E293B; font-size: 0.88rem; width: 280px; outline: none;" onkeydown="if(event.key==='Enter') searchShelfOnMap()">
-          </div>
-          <button type="button" class="btn" onclick="searchShelfOnMap()" style="padding: 10px 22px; font-size: 0.88rem; font-weight: 700; border-radius: 40px; background: #1B4332; color: #FFFFFF; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(27,67,50,0.2); transition: transform 0.15s ease;">
-            📍 Ubicar
-          </button>
+        <button type="button" class="store-map-add-product" onclick="switchVendorTab('fast-upload')">+ Ingresar producto</button>
+      </header>
+
+      <div class="store-map-searchbar" role="search">
+        <label for="map-search-input">Buscar producto o ubicación</label>
+        <div>
+          <span aria-hidden="true">⌕</span>
+          <input type="search" id="map-search-input" placeholder="Nombre, QR, código de barras o estante (ej: B-2 medio)" onkeydown="if(event.key==='Enter') searchShelfOnMap()">
+          <button type="button" onclick="searchShelfOnMap()">Ubicar</button>
         </div>
       </div>
 
-      <div id="store-map-render-container"></div>
-    </div>
+      <div id="store-map-render-container" aria-live="polite"></div>
+    </section>
 
     <!-- Customer QR Scanner Section -->
     <div id="scan-customer-qr-section" class="vendor-workspace-section" style="display: none; max-width: 800px; margin: 30px auto; padding: 0 20px;">
@@ -1890,7 +2016,8 @@
     </div>
   </div>
 
-  <script src="mapa-local.js?v=2.5"></script>
-  <script src="vendedor.js?v=2.5"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="mapa-local.js?v=stock_map_v1"></script>
+  <script src="vendedor.js?v=stock_entry_v1"></script>
 </body>
 </html>

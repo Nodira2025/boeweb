@@ -75,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderCart();
   updateCategoryCounts();
   loadPendingProductDrafts();
+  initializeFastUploadForm();
 });
 
 // --- EVENT LISTENERS ---
@@ -1014,7 +1015,12 @@ function checkVendorAuth() {
     if (vendorCheckoutInput) vendorCheckoutInput.value = activeVendor;
     if (sidebarName) sidebarName.textContent = activeVendor;
     if (sidebarAvatar) sidebarAvatar.textContent = activeVendor.charAt(0).toUpperCase();
-    switchVendorTab('home');
+    const requestedProductCode = new URLSearchParams(window.location.search).get('product');
+    if (requestedProductCode) {
+      handleProductLocationDeepLink();
+    } else {
+      switchVendorTab('home');
+    }
   } else {
     if (loginScreen) loginScreen.style.display = 'flex';
     if (portalApp) portalApp.style.display = 'none';
@@ -1153,7 +1159,7 @@ function switchVendorTab(tab) {
       vcardMap.style.borderColor = '#42a5f5';
       vcardMap.style.transform = 'scale(1.02)';
     }
-    renderStoreMapUI();
+    renderStoreMapUI(null, null, null, true);
   } else if (tab === 'scan' || tab === 'qr') {
     if (qrSection) {
       qrSection.style.display = 'block';
@@ -1173,6 +1179,7 @@ function switchVendorTab(tab) {
       vcardFastUpload.style.borderColor = 'var(--color-accent-gold)';
       vcardFastUpload.style.transform = 'scale(1.02)';
     }
+    initializeFastUploadForm();
   } else if (tab === 'drafts-review') {
     if (draftsReviewSection) {
       draftsReviewSection.style.display = 'block';
@@ -1274,10 +1281,63 @@ function openCashWithType(type) {
   if (amountField && !amountField.disabled) amountField.focus();
 }
 
-function renderStoreMapUI(activeZone = null, activeShelf = null, targetLevel = null) {
+let storeMapDataLoaded = false;
+let storeMapDataLoading = false;
+const LOCAL_PRODUCT_LOCATIONS_KEY = 'boeweb_product_locations_v1';
+
+function readLocalProductLocations() {
+  try {
+    const rows = JSON.parse(localStorage.getItem(LOCAL_PRODUCT_LOCATIONS_KEY) || '[]');
+    return Array.isArray(rows) ? rows : [];
+  } catch (error) {
+    console.warn('No se pudieron leer las ubicaciones locales:', error);
+    return [];
+  }
+}
+
+function saveLocalProductLocation(location) {
+  const rows = readLocalProductLocations().filter(item => item.product_code !== location.product_code);
+  rows.unshift(location);
+  localStorage.setItem(LOCAL_PRODUCT_LOCATIONS_KEY, JSON.stringify(rows.slice(0, 500)));
+}
+
+async function loadStoreMapData(forceReload = false) {
+  if (!supabaseClient || storeMapDataLoading || (storeMapDataLoaded && !forceReload)) return;
+  storeMapDataLoading = true;
+  try {
+    const [shelvesResult, locationsResult] = await Promise.all([
+      supabaseClient.from('store_shelves').select('*').order('code', { ascending: true }),
+      supabaseClient.from('product_locations').select('*').order('updated_at', { ascending: false })
+    ]);
+    const localLocations = readLocalProductLocations();
+    const remoteLocations = locationsResult.error ? [] : (locationsResult.data || []);
+    const mergedByCode = new Map(localLocations.map(item => [item.product_code, item]));
+    remoteLocations.forEach(item => mergedByCode.set(item.product_code, item));
+    const syncLabel = shelvesResult.error || locationsResult.error
+      ? 'Modo local · ejecutá la migración para sincronizar'
+      : 'Inventario sincronizado';
+    if (window.setStoreMapData) {
+      window.setStoreMapData(shelvesResult.error ? [] : (shelvesResult.data || []), [...mergedByCode.values()], syncLabel);
+    }
+    storeMapDataLoaded = true;
+  } catch (error) {
+    console.error('Error al sincronizar el mapa:', error);
+    if (window.setStoreMapData) window.setStoreMapData([], readLocalProductLocations(), 'Modo local');
+  } finally {
+    storeMapDataLoading = false;
+  }
+}
+
+async function renderStoreMapUI(activeZone = null, activeShelf = null, targetLevel = null, forceReload = false) {
   const container = document.getElementById('store-map-render-container');
   if (container && window.renderStoreMapHTML) {
     container.innerHTML = window.renderStoreMapHTML(activeZone, activeShelf, targetLevel);
+  }
+  if (!storeMapDataLoaded || forceReload) {
+    await loadStoreMapData(forceReload);
+    if (container && window.renderStoreMapHTML) {
+      container.innerHTML = window.renderStoreMapHTML(activeZone, activeShelf, targetLevel);
+    }
   }
 }
 
@@ -1291,6 +1351,15 @@ function searchShelfOnMap() {
   }
   
   const upperVal = rawVal.toUpperCase();
+
+  if (window.findStoreMapProduct) {
+    const productMatch = window.findStoreMapProduct(rawVal);
+    if (productMatch) {
+      renderStoreMapUI(null, productMatch.shelfCode, productMatch.level);
+      showToast(`Producto encontrado: ${productMatch.product.name} · ${productMatch.shelfCode} · nivel ${productMatch.level}.`);
+      return;
+    }
+  }
   
   // Check for shelf pattern e.g. "A-1", "A-1 NIVEL 2", "B-2"
   const shelfMatch = upperVal.match(/([A-E])[-_]?([1-4])/);
@@ -1315,9 +1384,7 @@ function searchShelfOnMap() {
       renderStoreMapUI(firstChar, `${firstChar}-1`, targetLevel);
       showToast(`📍 Zona ${firstChar} encontrada en Planta Baja.`);
     } else {
-      // Default fallback search by keyword
-      renderStoreMapUI('A', 'A-1', targetLevel);
-      showToast(`🔍 Buscando "${rawVal}" en el plano del local...`);
+      showToast(`No encontramos "${rawVal}" entre los productos o ubicaciones registradas.`);
     }
   }
 }
@@ -1920,27 +1987,137 @@ function sendVendorWhatsAppPromo(phone, clientName, promoType) {
 }
 
 // ==========================================
-// MÓDULO DE CARGA RÁPIDA POR FOTO & APROBACIÓN MARIANO
+// MÓDULO DE INGRESO DE PRODUCTOS, IA, QR Y APROBACIÓN
 // ==========================================
 
 let fastUploadSelectedFile = null;
+let fastUploadProductCode = '';
+let fastUploadQrPayload = '';
+let fastUploadAiResult = null;
+const pendingDraftCache = new Map();
+
+function escapeStockHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function createProductCode() {
+  const date = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+  const randomPart = crypto.randomUUID().replace(/-/g, '').slice(0, 7).toUpperCase();
+  return `BO-${date}-${randomPart}`;
+}
+
+function buildProductQrPayload(productCode) {
+  const url = new URL('vendedor.html', window.location.href);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set('product', productCode);
+  return url.toString();
+}
+
+function renderFastUploadQr() {
+  const preview = document.getElementById('fastupload-qr-preview');
+  const codeElement = document.getElementById('fastupload-product-code');
+  if (!preview || !fastUploadProductCode) return;
+  fastUploadQrPayload = buildProductQrPayload(fastUploadProductCode);
+  if (codeElement) codeElement.textContent = fastUploadProductCode;
+  preview.innerHTML = '';
+  if (window.QRCode) {
+    new window.QRCode(preview, {
+      text: fastUploadQrPayload,
+      width: 90,
+      height: 90,
+      colorDark: '#152d24',
+      colorLight: '#ffffff',
+      correctLevel: window.QRCode.CorrectLevel.M
+    });
+  } else {
+    preview.textContent = 'QR';
+    preview.title = fastUploadQrPayload;
+  }
+}
+
+function initializeFastUploadForm() {
+  if (!fastUploadProductCode) fastUploadProductCode = createProductCode();
+  updateFastUploadLocationPreview();
+  renderFastUploadQr();
+  const barcodeInput = document.getElementById('fastupload-barcode-input');
+  if (barcodeInput && !barcodeInput.dataset.scannerReady) {
+    barcodeInput.dataset.scannerReady = 'true';
+    barcodeInput.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        showToast(`Código de barras registrado: ${barcodeInput.value.trim() || 'vacío'}.`);
+      }
+    });
+  }
+}
+
+function updateFastUploadLocationPreview() {
+  const floor = Number(document.getElementById('fastupload-floor-input')?.value || 1);
+  const shelf = document.getElementById('fastupload-shelf-input')?.value || '';
+  const level = Number(document.getElementById('fastupload-level-input')?.value || 2);
+  const floorNames = { 1: 'Planta baja', 2: 'Entrepiso', 3: 'Depósito alto' };
+  const levelNames = { 1: 'Inferior', 2: 'Medio', 3: 'Superior' };
+  const label = shelf ? `${floorNames[floor]} · Estante ${shelf} · Nivel ${levelNames[level]}` : 'Ubicación pendiente';
+  const preview = document.getElementById('fastupload-location-preview');
+  const legacyInput = document.getElementById('fastupload-location-input');
+  if (preview) preview.textContent = label;
+  if (legacyInput) legacyInput.value = shelf ? label : '';
+}
+
+function focusFastUploadBarcode() {
+  const input = document.getElementById('fastupload-barcode-input');
+  if (!input) return;
+  input.focus();
+  input.select();
+  showToast('Lector listo: escaneá ahora o escribí el código.');
+}
+
+function openMapForStockEntry() {
+  const shelf = document.getElementById('fastupload-shelf-input')?.value;
+  const level = Number(document.getElementById('fastupload-level-input')?.value || 2);
+  switchVendorTab('map');
+  if (shelf) renderStoreMapUI(null, shelf, level);
+}
 
 function handleFastUploadPhotoChange(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
 
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    showToast('La foto debe ser JPG, PNG o WebP.');
+    event.target.value = '';
+    return;
+  }
+  if (file.size > 12 * 1024 * 1024) {
+    showToast('La imagen supera 12 MB. Elegí una foto más liviana.');
+    event.target.value = '';
+    return;
+  }
+
   fastUploadSelectedFile = file;
+  fastUploadAiResult = null;
 
   const reader = new FileReader();
   reader.onload = function(e) {
     const previewImg = document.getElementById('fastupload-photo-img');
-    const placeholder = document.getElementById('fastupload-photo-placeholder');
+    const trigger = document.getElementById('fastupload-photo-trigger');
     const previewContainer = document.getElementById('fastupload-photo-preview-container');
+    const analyzeButton = document.getElementById('fastupload-ai-btn');
+    const status = document.getElementById('fastupload-ai-status');
 
     if (previewImg) previewImg.src = e.target.result;
-    if (placeholder) placeholder.style.display = 'none';
-    if (previewContainer) previewContainer.style.display = 'block';
+    if (trigger) trigger.hidden = true;
+    if (previewContainer) previewContainer.hidden = false;
+    if (analyzeButton) analyzeButton.disabled = false;
+    if (status) status.hidden = true;
   };
+  reader.onerror = () => showToast('No pudimos leer la imagen seleccionada.');
   reader.readAsDataURL(file);
 }
 
@@ -1987,6 +2164,108 @@ function compressImageFile(file, maxWidth = 1000, maxHeight = 1000, quality = 0.
   });
 }
 
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('No se pudo preparar la imagen.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function setStockFieldValue(id, value, overwrite = false) {
+  const field = document.getElementById(id);
+  if (!field || value === null || value === undefined || value === '') return;
+  if (overwrite || !field.value.trim()) field.value = String(value);
+}
+
+function renderAiSourceLinks(result) {
+  const container = document.getElementById('fastupload-source-links');
+  if (!container) return;
+  container.innerHTML = '';
+  const candidates = [];
+  if (result.product?.official_url) candidates.push({ label: 'Página oficial', url: result.product.official_url });
+  (result.sources || []).forEach(source => candidates.push({ label: source.title || 'Fuente consultada', url: source.url }));
+  (result.market?.results || []).slice(0, 3).forEach(item => candidates.push({ label: 'Ver referencia en Mercado Libre', url: item.permalink }));
+  const valid = candidates.filter(item => {
+    try {
+      const url = new URL(item.url);
+      return ['https:', 'http:'].includes(url.protocol);
+    } catch (error) {
+      return false;
+    }
+  });
+  valid.slice(0, 5).forEach(item => {
+    const link = document.createElement('a');
+    link.href = item.url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = item.label;
+    container.appendChild(link);
+  });
+}
+
+async function analyzeFastUploadPhoto() {
+  const button = document.getElementById('fastupload-ai-btn');
+  const status = document.getElementById('fastupload-ai-status');
+  if (!fastUploadSelectedFile || !button || !status) return;
+  button.disabled = true;
+  button.innerHTML = '<span aria-hidden="true">✦</span> Analizando envase y mercado…';
+  status.hidden = false;
+  status.dataset.state = 'loading';
+  status.textContent = 'Leyendo marca, presentación y datos visibles. Después contrastamos fuentes públicas.';
+
+  try {
+    const compressed = await compressImageFile(fastUploadSelectedFile, 1400, 1400, 0.82);
+    const imageDataUrl = await blobToDataUrl(compressed);
+    const response = await fetch('/.netlify/functions/analyze-product', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageDataUrl,
+        barcode: document.getElementById('fastupload-barcode-input')?.value.trim() || null,
+        hints: {
+          name: document.getElementById('fastupload-name-input')?.value.trim() || null,
+          brand: document.getElementById('fastupload-brand-input')?.value.trim() || null
+        }
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.message || 'El análisis no está disponible en este momento.');
+    fastUploadAiResult = result;
+    const product = result.product || {};
+    setStockFieldValue('fastupload-name-input', product.name);
+    setStockFieldValue('fastupload-brand-input', product.brand);
+    setStockFieldValue('fastupload-presentation-input', product.presentation);
+    setStockFieldValue('fastupload-category-input', product.category);
+    setStockFieldValue('fastupload-description-input', product.description);
+    setStockFieldValue('fastupload-official-url-input', product.official_url);
+    setStockFieldValue('fastupload-barcode-input', product.barcode);
+    if (result.market?.average_price) {
+      setStockFieldValue('fastupload-market-price-input', Math.round(result.market.average_price), true);
+      setStockFieldValue('fastupload-sale-price-input', Math.round(result.market.median_price || result.market.average_price));
+    }
+    const confidence = document.getElementById('fastupload-ai-confidence');
+    if (confidence && Number.isFinite(Number(product.confidence))) {
+      confidence.textContent = `Confianza IA ${Math.round(Number(product.confidence) * 100)}%`;
+      confidence.hidden = false;
+    }
+    renderAiSourceLinks(result);
+    const marketCopy = result.market?.sample_size
+      ? ` Precio de referencia calculado con ${result.market.sample_size} publicaciones en ARS.`
+      : ' No encontramos una muestra suficiente de precios; completalo manualmente.';
+    status.dataset.state = 'success';
+    status.textContent = `Sugerencias completadas. Revisá los datos antes de enviar.${marketCopy}`;
+  } catch (error) {
+    console.error('Error al analizar el producto:', error);
+    status.dataset.state = 'error';
+    status.textContent = `${error.message} Podés completar todo manualmente y continuar.`;
+  } finally {
+    button.disabled = false;
+    button.innerHTML = '<span aria-hidden="true">✦</span> Volver a analizar con IA';
+  }
+}
+
 // Submit Fast Upload Draft (Vendedor)
 async function submitProductDraft(event) {
   event.preventDefault();
@@ -1998,30 +2277,39 @@ async function submitProductDraft(event) {
       return;
     }
 
-    const stockVal = parseInt(document.getElementById('fastupload-stock-input').value, 10);
-    if (isNaN(stockVal) || stockVal < 0) {
+    const stockVal = Number.parseInt(document.getElementById('fastupload-stock-input').value, 10);
+    if (!Number.isFinite(stockVal) || stockVal < 0) {
       showToast('⚠️ El stock debe ser mayor o igual a 0.');
       return;
     }
 
+    const nameVal = document.getElementById('fastupload-name-input').value.trim();
+    const categoryVal = document.getElementById('fastupload-category-input').value;
+    const floorVal = Number(document.getElementById('fastupload-floor-input').value || 1);
+    const shelfVal = document.getElementById('fastupload-shelf-input').value;
+    const shelfLevelVal = Number(document.getElementById('fastupload-level-input').value || 2);
     const locationVal = document.getElementById('fastupload-location-input').value.trim();
     const obsVal = document.getElementById('fastupload-obs-input').value.trim();
     const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'Vendedor Local';
+
+    if (!nameVal || !categoryVal) {
+      showToast('Completá el nombre y la categoría del producto.');
+      return;
+    }
+    if (!shelfVal) {
+      showToast('Elegí el estante donde se guardarán las unidades.');
+      document.getElementById('fastupload-shelf-input').focus();
+      return;
+    }
 
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.innerHTML = '⏳ Comprimiendo y subiendo foto...';
     }
 
-    // 1. Comprimir en cliente con Canvas
     const compressedBlob = await compressImageFile(fastUploadSelectedFile, 1000, 1000, 0.75);
-
-    // 2. Generar nombre de archivo único con crypto.randomUUID()
-    const uniqueFileName = `draft_${crypto.randomUUID()}_${Date.now()}.jpg`;
-    const filePath = `drafts/${uniqueFileName}`;
-
-    // 3. Subir a Supabase Storage usando anon key
-    const { data: uploadData, error: uploadError } = await supabaseClient
+    const filePath = `drafts/${fastUploadProductCode}_${Date.now()}.jpg`;
+    const { error: uploadError } = await supabaseClient
       .storage
       .from('product-images')
       .upload(filePath, compressedBlob, { contentType: 'image/jpeg', upsert: false });
@@ -2030,42 +2318,81 @@ async function submitProductDraft(event) {
       throw new Error(`Error al subir imagen a Supabase Storage: ${uploadError.message}`);
     }
 
-    // 4. Obtener URL pública
     const { data: urlData } = supabaseClient
       .storage
       .from('product-images')
       .getPublicUrl(filePath);
 
     const imageUrl = urlData ? urlData.publicUrl : '';
-
-    // 5. Insertar en product_drafts guardando tanto image_path como image_url
-    const { error: insertError } = await supabaseClient
+    const marketResult = fastUploadAiResult?.market || {};
+    const metadata = {
+      product_code: fastUploadProductCode,
+      name: nameVal,
+      brand: document.getElementById('fastupload-brand-input').value.trim() || null,
+      presentation: document.getElementById('fastupload-presentation-input').value.trim() || null,
+      category: categoryVal,
+      description: document.getElementById('fastupload-description-input').value.trim() || null,
+      barcode: document.getElementById('fastupload-barcode-input').value.trim() || null,
+      official_url: document.getElementById('fastupload-official-url-input').value.trim() || null,
+      market_reference_url: marketResult.search_url || null,
+      market_average_price: Number(document.getElementById('fastupload-market-price-input').value) || null,
+      sale_price: Number(document.getElementById('fastupload-sale-price-input').value) || null,
+      floor_level: floorVal,
+      shelf_code: shelfVal,
+      shelf_level: shelfLevelVal,
+      ai_confidence: Number(fastUploadAiResult?.product?.confidence) || null,
+      ai_payload: fastUploadAiResult || null,
+      qr_payload: fastUploadQrPayload
+    };
+    const fullDraft = {
+      image_url: imageUrl,
+      image_path: filePath,
+      stock: stockVal,
+      location: locationVal,
+      observations: obsVal || null,
+      seller_name: activeVendor,
+      status: 'PENDING_REVIEW',
+      ...metadata
+    };
+    let { error: insertError } = await supabaseClient
       .from('product_drafts')
-      .insert([{
+      .insert([fullDraft]);
+
+    // Compatibilidad temporal con la tabla anterior hasta ejecutar la migración nueva.
+    if (insertError && /column|schema cache/i.test(insertError.message || '')) {
+      const legacyObservations = `[BÔ_META]${JSON.stringify(metadata)}\n${obsVal}`;
+      const legacyResult = await supabaseClient.from('product_drafts').insert([{
         image_url: imageUrl,
         image_path: filePath,
         stock: stockVal,
-        location: locationVal || null,
-        observations: obsVal || null,
+        location: locationVal,
+        observations: legacyObservations,
         seller_name: activeVendor,
         status: 'PENDING_REVIEW'
       }]);
+      insertError = legacyResult.error;
+    }
 
     if (insertError) {
       throw new Error(`Error al guardar borrador en Supabase DB: ${insertError.message}`);
     }
 
-    showToast('🚀 ¡Borrador guardado con éxito! Enviado a la cola de Mariano.');
+    showToast(`Producto ${fastUploadProductCode} enviado a revisión con ubicación ${shelfVal}.`);
 
-    // Limpiar formulario
     fastUploadSelectedFile = null;
+    fastUploadAiResult = null;
+    fastUploadProductCode = createProductCode();
     document.getElementById('fast-upload-form').reset();
-    document.getElementById('fastupload-photo-placeholder').style.display = 'block';
-    document.getElementById('fastupload-photo-preview-container').style.display = 'none';
+    document.getElementById('fastupload-photo-trigger').hidden = false;
+    document.getElementById('fastupload-photo-preview-container').hidden = true;
+    document.getElementById('fastupload-ai-btn').disabled = true;
+    document.getElementById('fastupload-ai-status').hidden = true;
+    document.getElementById('fastupload-ai-confidence').hidden = true;
+    document.getElementById('fastupload-source-links').innerHTML = '';
+    initializeFastUploadForm();
 
-    // Actualizar cola y volver al catálogo
     loadPendingProductDrafts();
-    switchVendorTab('catalog');
+    switchVendorTab('drafts-review');
 
   } catch (err) {
     console.error('Error en submitProductDraft:', err);
@@ -2073,12 +2400,32 @@ async function submitProductDraft(event) {
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
-      submitBtn.innerHTML = '🚀 ENVIAR BORRADOR A MARIANO';
+      submitBtn.textContent = 'Enviar producto a revisión';
     }
   }
 }
 
-// Cargar y mostrar Borradores Pendientes (Mariano / Admin)
+function hydrateProductDraft(rawDraft) {
+  let metadata = {};
+  let cleanObservations = rawDraft.observations || '';
+  if (cleanObservations.startsWith('[BÔ_META]')) {
+    const separatorIndex = cleanObservations.indexOf('\n');
+    const jsonText = cleanObservations.slice(9, separatorIndex === -1 ? undefined : separatorIndex);
+    try {
+      metadata = JSON.parse(jsonText);
+      cleanObservations = separatorIndex === -1 ? '' : cleanObservations.slice(separatorIndex + 1);
+    } catch (error) {
+      console.warn('No se pudo leer la metadata del borrador anterior:', error);
+    }
+  }
+  const merged = { ...metadata, ...rawDraft, observations: cleanObservations };
+  Object.keys(metadata).forEach(key => {
+    if (rawDraft[key] === null || rawDraft[key] === undefined || rawDraft[key] === '') merged[key] = metadata[key];
+  });
+  return merged;
+}
+
+// Cargar y mostrar borradores pendientes de revisión.
 async function loadPendingProductDrafts() {
   const container = document.getElementById('pending-drafts-grid');
   const badge = document.getElementById('drafts-pending-count-badge');
@@ -2093,7 +2440,10 @@ async function loadPendingProductDrafts() {
 
     if (error) throw error;
 
-    const pendingCount = (drafts || []).length;
+    const normalizedDrafts = (drafts || []).map(hydrateProductDraft);
+    pendingDraftCache.clear();
+    normalizedDrafts.forEach(draft => pendingDraftCache.set(draft.id, draft));
+    const pendingCount = normalizedDrafts.length;
     if (badge) {
       badge.textContent = pendingCount;
       badge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
@@ -2112,34 +2462,37 @@ async function loadPendingProductDrafts() {
 
     const categoriesList = ['Semillas', 'Sustratos', 'Fertilizantes', 'Indoor', 'Vaporizadores', 'Macetas', 'Medición y Riego', 'Parafernalia', 'Otros'];
 
-    container.innerHTML = drafts.map(draft => {
+    container.innerHTML = normalizedDrafts.map(draft => {
       const dateStr = new Date(draft.created_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
       return `
         <div style="background: var(--color-card-bg-alt); border: 1.5px solid var(--color-border-accent); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-sm);">
           <div style="aspect-ratio: 1/1; max-height: 200px; background: #000; position: relative; overflow: hidden;">
-            <img src="${draft.image_url}" alt="Foto producto" style="width: 100%; height: 100%; object-fit: contain;">
+            <img src="${escapeStockHtml(draft.image_url)}" alt="${escapeStockHtml(draft.name || 'Foto del producto')}" style="width: 100%; height: 100%; object-fit: contain;">
             <span style="position: absolute; top: 8px; left: 8px; background: rgba(21,45,36,0.9); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 8px;">
-              🧑‍💼 ${draft.seller_name || 'Vendedor'} • ${dateStr}
+              ${escapeStockHtml(draft.seller_name || 'Vendedor')} · ${escapeStockHtml(dateStr)}
             </span>
           </div>
 
           <div style="padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 10px;">
             <div style="background: rgba(195,155,75,0.1); border: 1px solid rgba(195,155,75,0.3); border-radius: 10px; padding: 8px 12px; font-size: 0.8rem;">
               <p style="margin: 0 0 4px 0; color: #fff;"><strong>📦 Stock Cargado:</strong> ${draft.stock} unidades</p>
-              <p style="margin: 0 0 4px 0; color: #fff;"><strong>📍 Ubicación:</strong> ${draft.location || 'No especificada'}</p>
-              ${draft.observations ? `<p style="margin: 0; color: rgba(247,246,242,0.8); font-style: italic;">" ${draft.observations} "</p>` : ''}
+              <p style="margin: 0 0 4px 0; color: #fff;"><strong>📍 Ubicación:</strong> ${escapeStockHtml(draft.location || 'No especificada')}</p>
+              ${draft.product_code ? `<p style="margin: 0 0 4px; color: #fff;"><strong>QR BÔ:</strong> ${escapeStockHtml(draft.product_code)}</p>` : ''}
+              ${draft.barcode ? `<p style="margin: 0 0 4px; color: #fff;"><strong>Barra:</strong> ${escapeStockHtml(draft.barcode)}</p>` : ''}
+              ${draft.market_average_price ? `<p style="margin: 0 0 4px; color: #fff;"><strong>Promedio ML:</strong> $${Number(draft.market_average_price).toLocaleString('es-AR')}</p>` : ''}
+              ${draft.observations ? `<p style="margin: 0; color: rgba(247,246,242,0.8); font-style: italic;">${escapeStockHtml(draft.observations)}</p>` : ''}
             </div>
 
             <div>
               <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--color-accent-gold); margin-bottom: 2px;">Nombre del Producto (Requerido) *</label>
-              <input type="text" id="draft-name-${draft.id}" placeholder="Ej: Sustrato Klasmann 50L" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.9rem; border-radius: 8px;">
+              <input type="text" id="draft-name-${draft.id}" value="${escapeStockHtml(draft.name || '')}" placeholder="Ej: Sustrato Klasmann 50L" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.9rem; border-radius: 8px;">
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
               <div>
                 <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--color-accent-gold); margin-bottom: 2px;">Categoría *</label>
                 <select id="draft-cat-${draft.id}" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.85rem; border-radius: 8px;">
-                  ${categoriesList.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
+                  ${categoriesList.map(cat => `<option value="${cat}" ${draft.category === cat ? 'selected' : ''}>${cat}</option>`).join('')}
                 </select>
               </div>
 
@@ -2151,11 +2504,11 @@ async function loadPendingProductDrafts() {
 
             <div>
               <label style="display: block; font-size: 0.78rem; font-weight: 800; color: #66bb6a; margin-bottom: 2px;">PRECIO FINAL AL PÚBLICO ($ ARS) *</label>
-              <input type="number" step="0.01" id="draft-price-${draft.id}" placeholder="Ej: 22500" required class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 1rem; font-weight: 800; border-radius: 8px; border-color: #66bb6a;">
+              <input type="number" step="0.01" id="draft-price-${draft.id}" value="${Number(draft.sale_price) || ''}" placeholder="Ej: 22500" required class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 1rem; font-weight: 800; border-radius: 8px; border-color: #66bb6a;">
             </div>
 
             <div style="display: flex; gap: 8px; margin-top: 6px;">
-              <button type="button" onclick="approveProductDraft('${draft.id}', ${draft.stock}, '${draft.image_url.replace(/'/g, "\\'")}')" style="flex: 1; background: #2e7d32; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 0.88rem;">
+              <button type="button" onclick="approveProductDraft('${draft.id}')" style="flex: 1; background: #2e7d32; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 0.88rem;">
                 ✅ Aprobar y Publicar
               </button>
               <button type="button" onclick="rejectProductDraft('${draft.id}')" style="background: rgba(239,83,80,0.2); color: #ef5350; border: 1px solid #ef5350; padding: 10px 14px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 0.85rem;">
@@ -2174,9 +2527,11 @@ async function loadPendingProductDrafts() {
   }
 }
 
-// Aprobar Borrador y Publicar en Catálogo Activo (Mariano)
-async function approveProductDraft(draftId, stock, imageUrl) {
+// Aprobar el borrador, publicar y vincularlo a su ubicación física.
+async function approveProductDraft(draftId) {
   try {
+    const draft = pendingDraftCache.get(draftId);
+    if (!draft) throw new Error('El borrador ya no está disponible. Actualizá la lista.');
     const nameInput = document.getElementById(`draft-name-${draftId}`);
     const catInput = document.getElementById(`draft-cat-${draftId}`);
     const costInput = document.getElementById(`draft-cost-${draftId}`);
@@ -2199,9 +2554,10 @@ async function approveProductDraft(draftId, stock, imageUrl) {
       return;
     }
 
-    const productId = `prod_${crypto.randomUUID()}`;
+    const productId = draft.product_code || `BO-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+    const stock = Math.max(0, Number(draft.stock) || 0);
+    const imageUrl = draft.image_url;
 
-    // 1. Insertar en tabla products
     const { error: prodErr } = await supabaseClient
       .from('products')
       .insert([{
@@ -2209,12 +2565,11 @@ async function approveProductDraft(draftId, stock, imageUrl) {
         name: nameVal,
         category: catVal,
         image: imageUrl,
-        description: `Costo: $${costVal} ARS. Ingresado por Mariano.`
+        description: draft.description || `${draft.brand || ''} ${draft.presentation || ''}`.trim() || `Costo de referencia: $${costVal} ARS.`
       }]);
 
     if (prodErr) throw new Error(`Error al crear producto: ${prodErr.message}`);
 
-    // 2. Insertar en supplier_products para disponibilizar en catálogo B2B local
     const { error: spErr } = await supabaseClient
       .from('supplier_products')
       .insert([{
@@ -2230,7 +2585,27 @@ async function approveProductDraft(draftId, stock, imageUrl) {
 
     if (spErr) console.warn('Aviso supplier_products:', spErr.message);
 
-    // 3. Marcar borrador como APPROVED
+    const productLocation = {
+      product_id: productId,
+      product_code: productId,
+      name: nameVal,
+      image_url: imageUrl,
+      barcode: draft.barcode || null,
+      floor_level: Number(draft.floor_level) || 1,
+      shelf_code: draft.shelf_code || String(draft.location || '').match(/[A-E]-\d/i)?.[0]?.toUpperCase() || 'A-1',
+      shelf_level: Number(draft.shelf_level) || 2,
+      stock,
+      qr_payload: draft.qr_payload || buildProductQrPayload(productId),
+      updated_at: new Date().toISOString()
+    };
+    const { error: locationError } = await supabaseClient
+      .from('product_locations')
+      .upsert([productLocation], { onConflict: 'product_code' });
+    if (locationError) {
+      console.warn('Ubicación guardada localmente hasta aplicar la migración:', locationError.message);
+      saveLocalProductLocation(productLocation);
+    }
+
     const { error: updateErr } = await supabaseClient
       .from('product_drafts')
       .update({
@@ -2241,7 +2616,8 @@ async function approveProductDraft(draftId, stock, imageUrl) {
 
     if (updateErr) throw new Error(`Error al actualizar estado del borrador: ${updateErr.message}`);
 
-    showToast(`🎉 ¡Producto "${nameVal}" APROBADO y publicado en el catálogo por $${priceVal}!`);
+    storeMapDataLoaded = false;
+    showToast(`Producto "${nameVal}" publicado y ubicado en ${productLocation.shelf_code}, nivel ${productLocation.shelf_level}.`);
 
     // Recargar cola y catálogo B2B
     loadPendingProductDrafts();
@@ -2251,6 +2627,103 @@ async function approveProductDraft(draftId, stock, imageUrl) {
     console.error('Error al aprobar borrador:', err);
     showToast(`❌ Error al aprobar: ${err.message}`);
   }
+}
+
+async function handleShelfPhotoChange(event, shelfCode) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  try {
+    showToast(`Preparando foto del estante ${shelfCode}…`);
+    const compressed = await compressImageFile(file, 1100, 800, 0.72);
+    const localDataUrl = await blobToDataUrl(compressed);
+    let photoUrl = localDataUrl;
+    let photoPath = null;
+    if (supabaseClient) {
+      photoPath = `shelves/${shelfCode.toLowerCase()}_${Date.now()}.jpg`;
+      const { error: uploadError } = await supabaseClient.storage
+        .from('product-images')
+        .upload(photoPath, compressed, { contentType: 'image/jpeg', upsert: false });
+      if (!uploadError) {
+        const { data: urlData } = supabaseClient.storage.from('product-images').getPublicUrl(photoPath);
+        photoUrl = urlData?.publicUrl || photoUrl;
+        const { error: shelfError } = await supabaseClient.from('store_shelves').upsert([{
+          code: shelfCode,
+          photo_url: photoUrl,
+          photo_path: photoPath,
+          updated_at: new Date().toISOString()
+        }], { onConflict: 'code' });
+        if (shelfError) console.warn('La foto quedó local hasta aplicar la migración:', shelfError.message);
+      } else {
+        console.warn('La foto quedó guardada solo en este equipo:', uploadError.message);
+      }
+    }
+    const photos = JSON.parse(localStorage.getItem('boeweb_store_shelf_photos_v1') || '{}');
+    photos[shelfCode] = photoUrl;
+    localStorage.setItem('boeweb_store_shelf_photos_v1', JSON.stringify(photos));
+    storeMapDataLoaded = false;
+    await renderStoreMapUI(null, shelfCode, null, true);
+    showToast(`Foto del estante ${shelfCode} guardada.`);
+  } catch (error) {
+    console.error('Error al guardar la foto del estante:', error);
+    showToast(`No pudimos guardar la foto: ${error.message}`);
+  }
+}
+
+function getQrImageFromElement(element) {
+  const canvas = element?.querySelector('canvas');
+  if (canvas) return canvas.toDataURL('image/png');
+  return element?.querySelector('img')?.src || '';
+}
+
+function openQrPrintWindow(productCode, productName, qrPayload, existingElement = null) {
+  const printWindow = window.open('', '_blank', 'width=480,height=620');
+  if (!printWindow) {
+    showToast('El navegador bloqueó la ventana de impresión. Habilitá ventanas emergentes.');
+    return;
+  }
+  const temp = document.createElement('div');
+  temp.style.position = 'fixed';
+  temp.style.left = '-9999px';
+  document.body.appendChild(temp);
+  if (existingElement) {
+    const imageUrl = getQrImageFromElement(existingElement);
+    if (imageUrl) temp.innerHTML = `<img src="${escapeStockHtml(imageUrl)}" alt="QR">`;
+  } else if (window.QRCode) {
+    new window.QRCode(temp, { text: qrPayload, width: 220, height: 220, correctLevel: window.QRCode.CorrectLevel.M });
+  }
+  window.setTimeout(() => {
+    const qrImage = getQrImageFromElement(temp) || getQrImageFromElement(existingElement);
+    printWindow.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>QR ${escapeStockHtml(productCode)}</title><style>body{font-family:Arial,sans-serif;text-align:center;padding:34px;color:#152d24}.label{width:300px;margin:auto;border:2px solid #152d24;border-radius:18px;padding:22px}img{width:220px;height:220px}.brand{font-weight:900;letter-spacing:.16em}.name{font-size:18px;font-weight:800;margin:14px 0 4px}.code{font:14px monospace;overflow-wrap:anywhere}</style></head><body><div class="label"><div class="brand">BÔ GROW CLUB</div>${qrImage ? `<img src="${escapeStockHtml(qrImage)}" alt="Código QR">` : ''}<div class="name">${escapeStockHtml(productName || 'Producto')}</div><div class="code">${escapeStockHtml(productCode)}</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);
+    printWindow.document.close();
+    temp.remove();
+  }, 120);
+}
+
+function printCurrentProductQr() {
+  initializeFastUploadForm();
+  const productName = document.getElementById('fastupload-name-input')?.value.trim() || 'Producto nuevo';
+  openQrPrintWindow(fastUploadProductCode, productName, fastUploadQrPayload, document.getElementById('fastupload-qr-preview'));
+}
+
+function printProductQrByCode(productCode) {
+  const mapMatch = window.findStoreMapProduct ? window.findStoreMapProduct(productCode) : null;
+  const product = mapMatch?.product
+    || readLocalProductLocations().find(item => item.product_code === productCode)
+    || { product_code: productCode, name: productCode, qr_payload: buildProductQrPayload(productCode) };
+  openQrPrintWindow(productCode, product.name, product.qr_payload || buildProductQrPayload(productCode));
+}
+
+function handleProductLocationDeepLink() {
+  const productCode = new URLSearchParams(window.location.search).get('product');
+  if (!productCode) return;
+  window.setTimeout(async () => {
+    switchVendorTab('map');
+    await renderStoreMapUI(null, null, null, true);
+    const found = window.focusStoreMapProduct && window.focusStoreMapProduct(productCode);
+    const search = document.getElementById('map-search-input');
+    if (search) search.value = productCode;
+    if (!found) showToast(`El QR ${productCode} todavía no tiene una ubicación aprobada.`);
+  }, 300);
 }
 
 // Rechazar Borrador
@@ -2297,6 +2770,14 @@ window.renderVendorPortfolioUI = renderVendorPortfolioUI;
 window.copyVendorRefLink = copyVendorRefLink;
 window.sendVendorWhatsAppPromo = sendVendorWhatsAppPromo;
 window.handleFastUploadPhotoChange = handleFastUploadPhotoChange;
+window.analyzeFastUploadPhoto = analyzeFastUploadPhoto;
+window.initializeFastUploadForm = initializeFastUploadForm;
+window.updateFastUploadLocationPreview = updateFastUploadLocationPreview;
+window.focusFastUploadBarcode = focusFastUploadBarcode;
+window.openMapForStockEntry = openMapForStockEntry;
+window.printCurrentProductQr = printCurrentProductQr;
+window.printProductQrByCode = printProductQrByCode;
+window.handleShelfPhotoChange = handleShelfPhotoChange;
 window.submitProductDraft = submitProductDraft;
 window.loadPendingProductDrafts = loadPendingProductDrafts;
 window.approveProductDraft = approveProductDraft;

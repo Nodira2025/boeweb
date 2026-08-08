@@ -1,395 +1,343 @@
-// BÔ Growclub - Motor de Mapa Interactivo del Local Físico & Ubicación de Estantes (v3.0)
-// Architectural Blueprint Renderer & Visual Layout Builder with Vertical Shelf Levels
+// BÔ Grow Club — mapa físico conectado al inventario.
 
-// Floor Elements Definition (Zones & Furniture)
-const defaultStoreElements = [
-  { id: 'shelf-A1', code: 'A-1', zoneCode: 'A', name: 'Vitrina Entrada / VIP', icon: '🪟', color: '#D97706', x: 18, y: 12, width: 18, height: 14, floor: 1, productsCount: 24, codeRange: 'A-1 a A-4' },
-  { id: 'shelf-A2', code: 'A-2', zoneCode: 'A', name: 'Vitrina Entrada Secundaria', icon: '🪟', color: '#D97706', x: 18, y: 38, width: 18, height: 14, floor: 1, productsCount: 18, codeRange: 'A-1 a A-4' },
-  { id: 'shelf-B1', code: 'B-1', zoneCode: 'B', name: 'Pasillo Botánico Norte', icon: '🌿', color: '#4E8752', x: 45, y: 12, width: 18, height: 14, floor: 1, productsCount: 32, codeRange: 'B-1 a B-4' },
-  { id: 'shelf-B2', code: 'B-2', zoneCode: 'B', name: 'Pasillo Botánico Sur', icon: '🌿', color: '#4E8752', x: 66, y: 12, width: 18, height: 14, floor: 1, productsCount: 28, codeRange: 'B-1 a B-4' },
-  { id: 'shelf-C1', code: 'C-1', zoneCode: 'C', name: 'Módulo Indoor Superior', icon: '🏠', color: '#2563EB', x: 80, y: 32, width: 12, height: 16, floor: 1, productsCount: 15, codeRange: 'C-1 a C-4' },
-  { id: 'shelf-C2', code: 'C-2', zoneCode: 'C', name: 'Módulo Indoor Inferior', icon: '🏠', color: '#2563EB', x: 80, y: 52, width: 12, height: 16, floor: 1, productsCount: 12, codeRange: 'C-1 a C-4' },
-  { id: 'shelf-D1', code: 'D-1', zoneCode: 'D', name: 'Estante Semillas VIP', icon: '📦', color: '#9333EA', x: 32, y: 76, width: 18, height: 14, floor: 1, productsCount: 40, codeRange: 'D-1 a D-4' },
-  { id: 'shelf-D2', code: 'D-2', zoneCode: 'D', name: 'Depósito Insumos', icon: '📦', color: '#9333EA', x: 54, y: 76, width: 18, height: 14, floor: 1, productsCount: 35, codeRange: 'D-1 a D-4' },
-  { id: 'shelf-E1', code: 'E-1', zoneCode: 'E', name: 'Barra BÔ Coffee Lounge 1', icon: '☕', color: '#B45309', x: 42, y: 36, width: 10, height: 26, floor: 1, productsCount: 10, codeRange: 'E-1 a E-4' },
-  { id: 'shelf-E2', code: 'E-2', zoneCode: 'E', name: 'Barra BÔ Coffee Lounge 2', icon: '☕', color: '#B45309', x: 56, y: 36, width: 10, height: 26, floor: 1, productsCount: 14, codeRange: 'E-1 a E-4' }
+const DEFAULT_STORE_SHELVES = [
+  { id: 'shelf-A1', code: 'A-1', zone_code: 'A', name: 'Vitrina principal', floor_level: 1, x: 16, y: 12, width: 18, height: 14 },
+  { id: 'shelf-A2', code: 'A-2', zone_code: 'A', name: 'Vitrina secundaria', floor_level: 1, x: 16, y: 37, width: 18, height: 14 },
+  { id: 'shelf-B1', code: 'B-1', zone_code: 'B', name: 'Pasillo botánico norte', floor_level: 1, x: 43, y: 12, width: 18, height: 14 },
+  { id: 'shelf-B2', code: 'B-2', zone_code: 'B', name: 'Pasillo botánico sur', floor_level: 1, x: 65, y: 12, width: 18, height: 14 },
+  { id: 'shelf-C1', code: 'C-1', zone_code: 'C', name: 'Módulo indoor superior', floor_level: 1, x: 79, y: 32, width: 12, height: 16 },
+  { id: 'shelf-C2', code: 'C-2', zone_code: 'C', name: 'Módulo indoor inferior', floor_level: 1, x: 79, y: 53, width: 12, height: 16 },
+  { id: 'shelf-D1', code: 'D-1', zone_code: 'D', name: 'Semillas y productos reservados', floor_level: 1, x: 31, y: 76, width: 18, height: 14 },
+  { id: 'shelf-D2', code: 'D-2', zone_code: 'D', name: 'Depósito de insumos', floor_level: 1, x: 53, y: 76, width: 18, height: 14 },
+  { id: 'shelf-E1', code: 'E-1', zone_code: 'E', name: 'Coffee Lounge 1', floor_level: 1, x: 41, y: 36, width: 10, height: 26 },
+  { id: 'shelf-E2', code: 'E-2', zone_code: 'E', name: 'Coffee Lounge 2', floor_level: 1, x: 55, y: 36, width: 10, height: 26 }
 ];
 
-let customStoreLayout = JSON.parse(localStorage.getItem('boeweb_custom_store_layout')) || defaultStoreElements;
-let isEditMode = false;
-let selectedFloorLevel = 1; // 1: Planta Baja, 2: Entrepiso, 3: Depósito Alto
+const FLOOR_NAMES = { 1: 'Planta baja', 2: 'Entrepiso', 3: 'Depósito alto' };
+const LEVEL_NAMES = { 1: 'Inferior', 2: 'Medio', 3: 'Superior' };
+const MAP_LAYOUT_KEY = 'boeweb_custom_store_layout_v4';
+const MAP_PHOTOS_KEY = 'boeweb_store_shelf_photos_v1';
+
+let storeShelves = loadSavedStoreLayout();
+let storeLocationProducts = [];
+let selectedFloorLevel = 1;
 let selectedShelfCode = 'A-1';
-let selectedInternalLevel = 2; // 1: Inferior, 2: Medio, 3: Superior
+let selectedInternalLevel = 2;
 let currentViewMode = '2D';
 let mapZoomLevel = 100;
+let isEditMode = false;
+let storeMapSyncLabel = 'Datos locales listos';
+
+function escapeMapHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function loadSavedStoreLayout() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(MAP_LAYOUT_KEY) || 'null');
+    return Array.isArray(saved) && saved.length ? saved : structuredClone(DEFAULT_STORE_SHELVES);
+  } catch (error) {
+    console.warn('No se pudo leer el plano guardado:', error);
+    return structuredClone(DEFAULT_STORE_SHELVES);
+  }
+}
+
+function getLocalShelfPhotos() {
+  try {
+    return JSON.parse(localStorage.getItem(MAP_PHOTOS_KEY) || '{}');
+  } catch (error) {
+    console.warn('No se pudieron leer las fotos locales de estantes:', error);
+    return {};
+  }
+}
 
 function saveStoreLayout() {
-  localStorage.setItem('boeweb_custom_store_layout', JSON.stringify(customStoreLayout));
+  try {
+    localStorage.setItem(MAP_LAYOUT_KEY, JSON.stringify(storeShelves));
+  } catch (error) {
+    console.error('No se pudo guardar el plano:', error);
+  }
+}
+
+function normalizeShelf(shelf) {
+  const fallback = DEFAULT_STORE_SHELVES.find(item => item.code === shelf.code) || {};
+  return {
+    ...fallback,
+    ...shelf,
+    zone_code: shelf.zone_code || shelf.zoneCode || fallback.zone_code || String(shelf.code || '').charAt(0),
+    floor_level: Number(shelf.floor_level || shelf.floor || fallback.floor_level || 1),
+    x: Number(shelf.x ?? fallback.x ?? 10),
+    y: Number(shelf.y ?? fallback.y ?? 10),
+    width: Number(shelf.width ?? fallback.width ?? 16),
+    height: Number(shelf.height ?? fallback.height ?? 12)
+  };
+}
+
+function setStoreMapData(shelves = [], products = [], syncLabel = 'Inventario sincronizado') {
+  const localPhotos = getLocalShelfPhotos();
+  const remoteByCode = new Map((shelves || []).map(item => [item.code, item]));
+  storeShelves = storeShelves.map(localShelf => {
+    const merged = normalizeShelf({ ...localShelf, ...(remoteByCode.get(localShelf.code) || {}) });
+    merged.photo_url = merged.photo_url || localPhotos[merged.code] || null;
+    return merged;
+  });
+  shelves.forEach(remoteShelf => {
+    if (!storeShelves.some(item => item.code === remoteShelf.code)) {
+      const normalized = normalizeShelf(remoteShelf);
+      normalized.photo_url = normalized.photo_url || localPhotos[normalized.code] || null;
+      storeShelves.push(normalized);
+    }
+  });
+  storeLocationProducts = Array.isArray(products) ? products : [];
+  storeMapSyncLabel = syncLabel;
+  saveStoreLayout();
 }
 
 function setFloorLevel(level) {
-  selectedFloorLevel = level;
-  if (window.renderStoreMapUI) window.renderStoreMapUI();
+  selectedFloorLevel = Number(level) || 1;
+  const firstShelf = storeShelves.find(item => item.floor_level === selectedFloorLevel);
+  if (firstShelf) selectedShelfCode = firstShelf.code;
+  rerenderStoreMap();
 }
 
 function selectShelf(code, internalLevel = null) {
-  selectedShelfCode = code;
-  if (internalLevel) {
-    selectedInternalLevel = internalLevel;
-  }
-  if (window.renderStoreMapUI) window.renderStoreMapUI();
+  const shelf = storeShelves.find(item => item.code === code);
+  if (!shelf) return;
+  selectedShelfCode = shelf.code;
+  selectedFloorLevel = shelf.floor_level;
+  if (internalLevel) selectedInternalLevel = Number(internalLevel);
+  rerenderStoreMap();
 }
 
 function setInternalLevel(level) {
-  selectedInternalLevel = level;
-  if (window.renderStoreMapUI) window.renderStoreMapUI();
+  selectedInternalLevel = Number(level) || 1;
+  rerenderStoreMap();
 }
 
 function setViewMode(mode) {
-  currentViewMode = mode;
-  if (window.renderStoreMapUI) window.renderStoreMapUI();
+  currentViewMode = mode === '3D' ? '3D' : '2D';
+  rerenderStoreMap();
 }
 
 function adjustZoom(delta) {
-  mapZoomLevel = Math.max(70, Math.min(150, mapZoomLevel + delta));
+  mapZoomLevel = Math.max(70, Math.min(140, mapZoomLevel + Number(delta || 0)));
   const canvas = document.getElementById('architectural-map-canvas');
-  if (canvas) {
-    canvas.style.transform = `scale(${mapZoomLevel / 100})`;
-    canvas.style.transformOrigin = 'center center';
-  }
+  if (canvas) canvas.style.transform = getCanvasTransform();
 }
 
-function showShelfDetailsModal(code) {
-  const item = customStoreLayout.find(el => el.code === code) || customStoreLayout[0];
-  const levelNames = { 1: 'Nivel 1 (Inferior)', 2: 'Nivel 2 (Medio)', 3: 'Nivel 3 (Superior)' };
-  const floorNames = { 1: 'Planta Baja', 2: 'Entrepiso', 3: 'Depósito Alto' };
-  
-  if (window.showToast) {
-    window.showToast(`📍 Estante ${item.code} [${levelNames[selectedInternalLevel]}] en ${floorNames[selectedFloorLevel]}`);
-  } else {
-    alert(`📍 Ubicación Completa:\nSucursal Centro → ${floorNames[selectedFloorLevel]} → Zona ${item.zoneCode} → Estante ${item.code} → ${levelNames[selectedInternalLevel]}\n\nTotal Productos: ${item.productsCount}`);
-  }
+function getCanvasTransform() {
+  const scale = `scale(${mapZoomLevel / 100})`;
+  return currentViewMode === '3D' ? `perspective(900px) rotateX(11deg) ${scale}` : scale;
 }
 
-// Render Interactive Store Map HTML
-function renderStoreMapHTML(activeZone = null, activeShelf = null, targetLevel = null) {
-  if (activeShelf) {
-    selectedShelfCode = activeShelf;
-    const found = customStoreLayout.find(el => el.code === activeShelf || activeShelf.startsWith(el.code));
-    if (found) {
-      selectedShelfCode = found.code;
-    }
-  }
-  if (targetLevel) {
-    selectedInternalLevel = targetLevel;
-  }
+function rerenderStoreMap() {
+  if (window.renderStoreMapUI) window.renderStoreMapUI(null, null, null, false);
+}
 
-  const currentShelfInfo = customStoreLayout.find(el => el.code === selectedShelfCode) || customStoreLayout[0];
-  const activeZoneCode = activeZone || currentShelfInfo.zoneCode;
+function getShelfProducts(code, internalLevel = null) {
+  return storeLocationProducts.filter(product => {
+    const sameShelf = String(product.shelf_code || '').toUpperCase() === String(code || '').toUpperCase();
+    return sameShelf && (!internalLevel || Number(product.shelf_level) === Number(internalLevel));
+  });
+}
 
-  return `
-    <div class="store-map-dashboard" style="background: #FDFBF7; border: 1px solid #EBE6DF; border-radius: 24px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.03); font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #2D3748;">
-      
-      <!-- Top Action Sub-header -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
-        <div>
-          <span style="font-size: 0.72rem; color: #4E8752; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; display: flex; align-items: center; gap: 6px;">
-            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #4E8752;"></span>
-            PLANO DE PLANTA ARQUITECTÓNICO 2D BÔ
-          </span>
-          <h3 style="color: #1B4332; margin: 4px 0 0 0; font-size: 1.45rem; font-weight: 800; letter-spacing: -0.5px;">Mapa de Estanterías y Ubicación en Local</h3>
-        </div>
-        <div style="display: flex; gap: 10px; align-items: center;">
-          <button type="button" onclick="toggleStoreLayoutEditMode()" style="padding: 10px 18px; font-size: 0.88rem; font-weight: 700; border-radius: 30px; border: 1.5px solid ${isEditMode ? '#DC2626' : '#1B4332'}; color: ${isEditMode ? '#DC2626' : '#1B4332'}; background: #FFFFFF; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s ease; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
-            ✏️ ${isEditMode ? 'Guardar Plano' : 'Diseñar / Mover Muebles'}
-          </button>
-        </div>
-      </div>
+function getShelfUnitCount(code) {
+  return getShelfProducts(code).reduce((sum, product) => sum + Math.max(0, Number(product.stock) || 0), 0);
+}
 
-      ${isEditMode ? `
-        <div style="background: #FEF3C7; border: 1px solid #F59E0B; padding: 12px 16px; border-radius: 14px; margin-bottom: 20px; font-size: 0.88rem; color: #92400E; display: flex; justify-content: space-between; align-items: center;">
-          <span>🛠️ <strong>MODO EDITOR ACTIVO:</strong> Arrastrá los muebles o usá los controles para ajustar su ubicación en el plano.</span>
-          <button type="button" onclick="resetStoreLayoutToDefault()" style="background: #FFFFFF; border: 1px solid #F59E0B; padding: 4px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; color: #92400E; cursor: pointer;">Restablecer Predeterminado</button>
-        </div>
-      ` : ''}
+function findStoreMapProduct(query) {
+  const normalized = String(query || '').trim().toLocaleLowerCase('es-AR');
+  if (!normalized) return null;
+  const product = storeLocationProducts.find(item => [item.name, item.product_code, item.barcode]
+    .some(value => String(value || '').toLocaleLowerCase('es-AR').includes(normalized)));
+  if (!product) return null;
+  return {
+    product,
+    shelfCode: product.shelf_code,
+    level: Number(product.shelf_level) || 1,
+    floor: Number(product.floor_level) || 1
+  };
+}
 
-      <!-- Main Layout Grid (Left levels sidebar, Center map canvas, Right details panel) -->
-      <div style="display: grid; grid-template-columns: 210px 1fr 310px; gap: 20px; align-items: start;">
-        
-        <!-- LEFT COLUMN: PHYSICAL STORE FLOORS -->
-        <div style="display: flex; flex-direction: column; gap: 12px;">
-          <div style="font-size: 0.75rem; font-weight: 800; color: #718096; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
-            <span>NIVELES</span>
-            <span style="font-size: 0.9rem;">🥞</span>
-          </div>
+function focusStoreMapProduct(productCode) {
+  const match = findStoreMapProduct(productCode);
+  if (!match) return false;
+  selectedShelfCode = match.shelfCode;
+  selectedInternalLevel = match.level;
+  selectedFloorLevel = match.floor;
+  rerenderStoreMap();
+  return true;
+}
 
-          <!-- Nivel 1 Card -->
-          <div onclick="setFloorLevel(1)" style="background: ${selectedFloorLevel === 1 ? '#FFFFFF' : '#F7F4EF'}; border: 2px solid ${selectedFloorLevel === 1 ? '#2D6A4F' : '#E2E8F0'}; border-radius: 16px; padding: 14px 16px; cursor: pointer; display: flex; align-items: center; gap: 14px; transition: all 0.2s ease; box-shadow: ${selectedFloorLevel === 1 ? '0 8px 20px rgba(45,106,79,0.12)' : 'none'};">
-            <div style="width: 42px; height: 42px; border-radius: 12px; background: ${selectedFloorLevel === 1 ? '#E8F5E9' : '#EDF2F7'}; color: ${selectedFloorLevel === 1 ? '#2D6A4F' : '#718096'}; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
-              📚
-            </div>
-            <div>
-              <div style="font-weight: 800; font-size: 0.95rem; color: ${selectedFloorLevel === 1 ? '#1B4332' : '#2D3748'};">Nivel 1</div>
-              <div style="font-size: 0.78rem; color: #718096; font-weight: 500;">Planta Baja</div>
-            </div>
-          </div>
-
-          <!-- Nivel 2 Card -->
-          <div onclick="setFloorLevel(2)" style="background: ${selectedFloorLevel === 2 ? '#FFFFFF' : '#F7F4EF'}; border: 2px solid ${selectedFloorLevel === 2 ? '#2D6A4F' : '#E2E8F0'}; border-radius: 16px; padding: 14px 16px; cursor: pointer; display: flex; align-items: center; gap: 14px; transition: all 0.2s ease; box-shadow: ${selectedFloorLevel === 2 ? '0 8px 20px rgba(45,106,79,0.12)' : 'none'};">
-            <div style="width: 42px; height: 42px; border-radius: 12px; background: ${selectedFloorLevel === 2 ? '#E8F5E9' : '#EDF2F7'}; color: ${selectedFloorLevel === 2 ? '#2D6A4F' : '#718096'}; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
-              📚
-            </div>
-            <div>
-              <div style="font-weight: 800; font-size: 0.95rem; color: ${selectedFloorLevel === 2 ? '#1B4332' : '#2D3748'};">Nivel 2</div>
-              <div style="font-size: 0.78rem; color: #718096; font-weight: 500;">Entrepiso</div>
-            </div>
-          </div>
-
-          <!-- Nivel 3 Card -->
-          <div onclick="setFloorLevel(3)" style="background: ${selectedFloorLevel === 3 ? '#FFFFFF' : '#F7F4EF'}; border: 2px solid ${selectedFloorLevel === 3 ? '#2D6A4F' : '#E2E8F0'}; border-radius: 16px; padding: 14px 16px; cursor: pointer; display: flex; align-items: center; gap: 14px; transition: all 0.2s ease; box-shadow: ${selectedFloorLevel === 3 ? '0 8px 20px rgba(45,106,79,0.12)' : 'none'};">
-            <div style="width: 42px; height: 42px; border-radius: 12px; background: ${selectedFloorLevel === 3 ? '#E8F5E9' : '#EDF2F7'}; color: ${selectedFloorLevel === 3 ? '#2D6A4F' : '#718096'}; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
-              📚
-            </div>
-            <div>
-              <div style="font-weight: 800; font-size: 0.95rem; color: ${selectedFloorLevel === 3 ? '#1B4332' : '#2D3748'};">Nivel 3</div>
-              <div style="font-size: 0.78rem; color: #718096; font-weight: 500;">Depósito Alto</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- CENTER COLUMN: MAP CANVAS TOP DOWN VIEW -->
-        <div style="position: relative; background: #EAE6DF; border: 2px solid #D8D2C9; border-radius: 20px; padding: 16px; min-height: 480px; box-shadow: inset 0 2px 8px rgba(0,0,0,0.06); display: flex; flex-direction: column; overflow: hidden;">
-          
-          <!-- Outer Architectural Floor Box -->
-          <div id="architectural-map-canvas" style="position: relative; flex: 1; min-height: 440px; background: #F4F0E8; border: 8px solid #8C8275; border-radius: 12px; overflow: hidden; background-image: radial-gradient(#D6CFCE 1.5px, transparent 1.5px); background-size: 18px 18px; transition: transform 0.3s ease; ${currentViewMode === '3D' ? 'transform: perspective(600px) rotateX(15deg);' : ''}">
-            
-            <!-- Entrance Gap Marker -->
-            <div style="position: absolute; left: 0; top: 40%; transform: translateY(-50%); background: #F4F0E8; width: 10px; height: 60px; z-index: 4;"></div>
-            <div style="position: absolute; left: 12px; top: 40%; transform: translateY(-50%); color: #1B4332; font-weight: 900; font-size: 0.75rem; letter-spacing: 1px; z-index: 5; display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.85); padding: 4px 10px; border-radius: 8px; border: 1px solid #C39B4B;">
-              ENTRADA <span style="color: #2D6A4F; font-size: 0.9rem;">▶</span>
-            </div>
-
-            <!-- Room Wall: Depósito Room (Bottom Right) -->
-            <div style="position: absolute; right: 0; bottom: 0; width: 140px; height: 110px; border-top: 6px solid #8C8275; border-left: 6px solid #8C8275; background: #E8E2D8; border-top-left-radius: 8px; display: flex; align-items: center; justify-content: center; z-index: 2;">
-              <div style="text-align: center; color: #786D5F; font-weight: 800; font-size: 0.78rem; letter-spacing: 0.5px;">
-                <div style="font-size: 1.2rem; margin-bottom: 2px;">📦</div>
-                DEPÓSITO
-              </div>
-            </div>
-
-            <!-- Plants 🪴 Decorative Elements -->
-            <div style="position: absolute; top: 12px; right: 12px; font-size: 1.4rem; z-index: 3;">🪴</div>
-            <div style="position: absolute; bottom: 120px; left: 20px; font-size: 1.2rem; z-index: 3;">🪴</div>
-
-            <!-- Render Store Furniture Blocks -->
-            ${customStoreLayout.map(item => {
-              const isSelected = selectedShelfCode === item.code;
-              const isZoneActive = activeZoneCode === item.zoneCode;
-
-              return `
-                <div class="furniture-block ${isSelected ? 'selected-shelf-active' : ''}"
-                     onclick="selectShelf('${item.code}')"
-                     style="position: absolute; left: ${item.x}%; top: ${item.y}%; width: ${item.width}%; height: ${item.height}%; background: ${isSelected ? item.color : item.color + 'DD'}; border: 2.5px solid ${isSelected ? '#1B4332' : 'rgba(0,0,0,0.15)'}; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; z-index: ${isSelected ? '10' : '5'}; box-shadow: ${isSelected ? '0 0 0 4px rgba(45,106,79,0.3), 0 8px 16px rgba(0,0,0,0.2)' : '0 2px 6px rgba(0,0,0,0.1)'}; transform: ${isSelected ? 'scale(1.04)' : 'scale(1)'};">
-                  
-                  <div style="text-align: center; color: #FFFFFF; font-weight: 900; font-size: 0.85rem; text-shadow: 0 1px 3px rgba(0,0,0,0.5); user-select: none;">
-                    ${item.code}
-                  </div>
-
-                  ${isEditMode ? `
-                    <div style="position: absolute; top: -10px; right: -10px; display: flex; gap: 2px; background: #FFFFFF; padding: 2px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
-                      <button onclick="event.stopPropagation(); moveStoreItem('${item.id}', -4, 0)" style="font-size:0.6rem; padding:1px 3px;">⬅️</button>
-                      <button onclick="event.stopPropagation(); moveStoreItem('${item.id}', 4, 0)" style="font-size:0.6rem; padding:1px 3px;">➡️</button>
-                    </div>
-                  ` : ''}
-
-                </div>
-              `;
-            }).join('')}
-
-          </div>
-        </div>
-
-        <!-- RIGHT COLUMN: DETALLE DEL ESTANTE + VISTA FRONTAL + LEYENDA -->
-        <div style="display: flex; flex-direction: column; gap: 16px;">
-          
-          <!-- DETALLE DEL ESTANTE CARD -->
-          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 18px; padding: 18px; box-shadow: 0 4px 14px rgba(0,0,0,0.03);">
-            <div style="font-size: 0.72rem; font-weight: 800; color: #718096; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">DETALLE DEL ESTANTE</div>
-            
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-              <span style="background: ${currentShelfInfo.color}; color: #FFFFFF; font-weight: 900; font-size: 0.9rem; padding: 4px 12px; border-radius: 10px; letter-spacing: 0.5px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">${currentShelfInfo.code}</span>
-              <h4 style="margin: 0; color: #1A202C; font-size: 1rem; font-weight: 800; flex: 1; line-height: 1.2;">${currentShelfInfo.name}</h4>
-            </div>
-
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 0.8rem; color: #4A5568;">
-              <span style="background: #E8F5E9; color: #2D6A4F; font-weight: 700; padding: 2px 10px; border-radius: 12px;">Nivel ${selectedFloorLevel}</span>
-              <span>Código: ${currentShelfInfo.codeRange}</span>
-            </div>
-
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-size: 0.85rem; background: #F8FAFC; padding: 10px 14px; border-radius: 12px; border: 1px solid #EDF2F7;">
-              <div style="display: flex; align-items: center; gap: 6px; color: #4A5568; font-weight: 600;">
-                <span>📦 Productos:</span>
-                <strong style="color: #1A202C; font-size: 0.95rem;">${currentShelfInfo.productsCount}</strong>
-              </div>
-              <div style="display: flex; align-items: center; gap: 6px; color: #2D6A4F; font-weight: 700;">
-                <span style="width: 8px; height: 8px; border-radius: 50%; background: #22C55E;"></span>
-                Disponible
-              </div>
-            </div>
-
-            <button type="button" onclick="showShelfDetailsModal('${selectedShelfCode}')" style="width: 100%; padding: 9px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #334155; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.2s ease;">
-              👁️ Ver detalles
-            </button>
-          </div>
-
-          <!-- VISTA DEL ESTANTE CARD (Representación Frontal) -->
-          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 18px; padding: 18px; box-shadow: 0 4px 14px rgba(0,0,0,0.03);">
-            <div style="font-size: 0.72rem; font-weight: 800; color: #718096; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">VISTA DEL ESTANTE</div>
-            
-            <!-- Interactive Wooden Shelf Front View -->
-            <div style="position: relative; background: #FAF8F5; border: 1px solid #E5DFD5; border-radius: 14px; padding: 12px; display: flex; gap: 14px; align-items: center;">
-              
-              <!-- Wooden Frame Graphic -->
-              <div style="position: relative; width: 130px; height: 150px; background: url('assets/botanical_shelf_preview.jpg') center center / contain no-repeat; border-radius: 8px; flex-shrink: 0;"></div>
-              
-              <!-- Shelf Levels Selection -->
-              <div style="display: flex; flex-direction: column; gap: 8px; flex: 1;">
-                
-                <!-- Nivel 3 -->
-                <div onclick="setInternalLevel(3)" style="padding: 8px 10px; border-radius: 10px; border: 1.5px solid ${selectedInternalLevel === 3 ? '#2D6A4F' : '#E2E8F0'}; background: ${selectedInternalLevel === 3 ? '#E8F5E9' : '#FFFFFF'}; cursor: pointer; transition: all 0.2s ease; box-shadow: ${selectedInternalLevel === 3 ? '0 2px 6px rgba(45,106,79,0.1)' : 'none'};">
-                  <div style="font-size: 0.82rem; font-weight: 800; color: ${selectedInternalLevel === 3 ? '#1B4332' : '#2D3748'};">Nivel 3</div>
-                  <div style="font-size: 0.72rem; color: #718096;">Superior</div>
-                </div>
-
-                <!-- Nivel 2 -->
-                <div onclick="setInternalLevel(2)" style="padding: 8px 10px; border-radius: 10px; border: 1.5px solid ${selectedInternalLevel === 2 ? '#2D6A4F' : '#E2E8F0'}; background: ${selectedInternalLevel === 2 ? '#E8F5E9' : '#FFFFFF'}; cursor: pointer; transition: all 0.2s ease; box-shadow: ${selectedInternalLevel === 2 ? '0 2px 6px rgba(45,106,79,0.1)' : 'none'};">
-                  <div style="font-size: 0.82rem; font-weight: 800; color: ${selectedInternalLevel === 2 ? '#1B4332' : '#2D3748'};">Nivel 2</div>
-                  <div style="font-size: 0.72rem; color: #718096;">Medio</div>
-                </div>
-
-                <!-- Nivel 1 -->
-                <div onclick="setInternalLevel(1)" style="padding: 8px 10px; border-radius: 10px; border: 1.5px solid ${selectedInternalLevel === 1 ? '#2D6A4F' : '#E2E8F0'}; background: ${selectedInternalLevel === 1 ? '#E8F5E9' : '#FFFFFF'}; cursor: pointer; transition: all 0.2s ease; box-shadow: ${selectedInternalLevel === 1 ? '0 2px 6px rgba(45,106,79,0.1)' : 'none'};">
-                  <div style="font-size: 0.82rem; font-weight: 800; color: ${selectedInternalLevel === 1 ? '#1B4332' : '#2D3748'};">Nivel 1</div>
-                  <div style="font-size: 0.72rem; color: #718096;">Inferior</div>
-                </div>
-
-              </div>
-
-            </div>
-          </div>
-
-          <!-- LEYENDA DE ZONAS CARD -->
-          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 18px; padding: 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.03); font-size: 0.78rem;">
-            <div style="font-size: 0.72rem; font-weight: 800; color: #718096; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">LEYENDA DE ZONAS</div>
-            
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="width: 12px; height: 12px; border-radius: 4px; background: #D97706; display: inline-block;"></span>
-                <span style="color: #4A5568;"><strong style="color: #1A202C;">Zona A:</strong> Vitrina Entrada / VIP</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="width: 12px; height: 12px; border-radius: 4px; background: #4E8752; display: inline-block;"></span>
-                <span style="color: #4A5568;"><strong style="color: #1A202C;">Zona B:</strong> Pasillo Botánico Central</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="width: 12px; height: 12px; border-radius: 4px; background: #2563EB; display: inline-block;"></span>
-                <span style="color: #4A5568;"><strong style="color: #1A202C;">Zona C:</strong> Módulo Indoor Fondo</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="width: 12px; height: 12px; border-radius: 4px; background: #9333EA; display: inline-block;"></span>
-                <span style="color: #4A5568;"><strong style="color: #1A202C;">Zona D:</strong> Depósito & Semillas</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="width: 12px; height: 12px; border-radius: 4px; background: #B45309; display: inline-block;"></span>
-                <span style="color: #4A5568;"><strong style="color: #1A202C;">Zona E:</strong> Barra BÔ Coffee & Lounge</span>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-      </div>
-
-      <!-- BOTTOM BAR: KPI STATS & CONTROLS -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; flex-wrap: wrap; gap: 14px; padding-top: 16px; border-top: 1px solid #EBE6DF;">
-        
-        <!-- KPIs -->
-        <div style="display: flex; gap: 14px; flex-wrap: wrap;">
-          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
-            <span style="font-size: 1.4rem;">🗄️</span>
-            <div>
-              <div style="font-size: 0.72rem; color: #718096; font-weight: 600;">Total Estantes</div>
-              <div style="font-size: 1.05rem; font-weight: 800; color: #1A202C;">12 <span style="font-size: 0.75rem; font-weight: 500; color: #718096;">activos</span></div>
-            </div>
-          </div>
-
-          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
-            <span style="font-size: 1.4rem;">📚</span>
-            <div>
-              <div style="font-size: 0.72rem; color: #718096; font-weight: 600;">Niveles</div>
-              <div style="font-size: 1.05rem; font-weight: 800; color: #1A202C;">3 <span style="font-size: 0.75rem; font-weight: 500; color: #718096;">disponibles</span></div>
-            </div>
-          </div>
-
-          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
-            <span style="font-size: 1.4rem;">📦</span>
-            <div>
-              <div style="font-size: 0.72rem; color: #718096; font-weight: 600;">Productos</div>
-              <div style="font-size: 1.05rem; font-weight: 800; color: #1A202C;">128 <span style="font-size: 0.75rem; font-weight: 500; color: #718096;">registrados</span></div>
-            </div>
-          </div>
-
-          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
-            <span style="font-size: 1.4rem;">🕒</span>
-            <div>
-              <div style="font-size: 0.72rem; color: #718096; font-weight: 600;">Última actualización</div>
-              <div style="font-size: 0.95rem; font-weight: 800; color: #1A202C;">Hoy 14:32 <span style="font-size: 0.7rem; font-weight: 500; color: #718096;">08/08/2025</span></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- View Controls (2D, 3D, Zoom -, Zoom +) -->
-        <div style="display: flex; gap: 6px; align-items: center; background: #FFFFFF; padding: 4px 8px; border-radius: 12px; border: 1px solid #E2E8F0;">
-          <button type="button" onclick="setViewMode('2D')" style="padding: 6px 12px; border-radius: 8px; border: none; background: ${currentViewMode === '2D' ? '#E8F5E9' : 'transparent'}; color: ${currentViewMode === '2D' ? '#2D6A4F' : '#718096'}; font-weight: 800; font-size: 0.82rem; cursor: pointer;">2D</button>
-          <button type="button" onclick="setViewMode('3D')" style="padding: 6px 12px; border-radius: 8px; border: none; background: ${currentViewMode === '3D' ? '#E8F5E9' : 'transparent'}; color: ${currentViewMode === '3D' ? '#2D6A4F' : '#718096'}; font-weight: 800; font-size: 0.82rem; cursor: pointer;">3D</button>
-          <div style="width: 1px; height: 16px; background: #CBD5E1; margin: 0 4px;"></div>
-          <button type="button" onclick="adjustZoom(-10)" style="padding: 6px 10px; border-radius: 8px; border: none; background: transparent; color: #4A5568; font-weight: 800; font-size: 0.9rem; cursor: pointer;">—</button>
-          <button type="button" onclick="adjustZoom(10)" style="padding: 6px 10px; border-radius: 8px; border: none; background: transparent; color: #4A5568; font-weight: 800; font-size: 0.9rem; cursor: pointer;">+</button>
-        </div>
-
-      </div>
-
-    </div>
-  `;
+function moveStoreItem(id, dx, dy) {
+  const shelf = storeShelves.find(item => item.id === id);
+  if (!shelf) return;
+  shelf.x = Math.max(2, Math.min(88, shelf.x + Number(dx || 0)));
+  shelf.y = Math.max(2, Math.min(84, shelf.y + Number(dy || 0)));
+  saveStoreLayout();
+  rerenderStoreMap();
 }
 
 function toggleStoreLayoutEditMode() {
   isEditMode = !isEditMode;
-  if (!isEditMode) {
-    saveStoreLayout();
-    if (window.showToast) window.showToast('💾 ¡Diseño de Plano del Local Guardado!');
-  }
-  if (window.renderStoreMapUI) window.renderStoreMapUI();
-}
-
-function moveStoreItem(id, dx, dy) {
-  const item = customStoreLayout.find(el => el.id === id);
-  if (item) {
-    item.x = Math.max(5, Math.min(80, item.x + dx));
-    item.y = Math.max(5, Math.min(80, item.y + dy));
-    saveStoreLayout();
-    if (window.renderStoreMapUI) window.renderStoreMapUI();
-  }
+  saveStoreLayout();
+  if (!isEditMode && window.showToast) window.showToast('Plano guardado en este equipo.');
+  rerenderStoreMap();
 }
 
 function resetStoreLayoutToDefault() {
-  customStoreLayout = JSON.parse(JSON.stringify(defaultStoreElements));
+  storeShelves = structuredClone(DEFAULT_STORE_SHELVES);
   saveStoreLayout();
-  if (window.renderStoreMapUI) window.renderStoreMapUI();
+  selectedFloorLevel = 1;
+  selectedShelfCode = 'A-1';
+  rerenderStoreMap();
 }
 
-// Expose globally
+function showShelfDetailsModal(code) {
+  const shelf = storeShelves.find(item => item.code === code);
+  if (!shelf) return;
+  const unitCount = getShelfUnitCount(code);
+  const message = `${FLOOR_NAMES[shelf.floor_level]} · Estante ${shelf.code} · ${LEVEL_NAMES[selectedInternalLevel]} · ${unitCount} unidades registradas`;
+  if (window.showToast) window.showToast(message);
+}
+
+function renderFloorTabs() {
+  return Object.entries(FLOOR_NAMES).map(([level, label]) => `
+    <button type="button" class="store-map-floor-btn ${selectedFloorLevel === Number(level) ? 'active' : ''}"
+      onclick="setFloorLevel(${level})" aria-pressed="${selectedFloorLevel === Number(level)}">
+      ${escapeMapHtml(label)}
+    </button>`).join('');
+}
+
+function renderShelfBlocks() {
+  const floorShelves = storeShelves.filter(item => item.floor_level === selectedFloorLevel);
+  if (!floorShelves.length) {
+    return `<div class="map-empty-floor"><div><strong>Este nivel todavía no tiene estantes.</strong><br>Podés asignarlos cuando definas el plano físico.</div></div>`;
+  }
+  return floorShelves.map(shelf => {
+    const count = getShelfUnitCount(shelf.code);
+    const selected = shelf.code === selectedShelfCode;
+    return `
+      <div class="map-shelf-position" style="left:${shelf.x}%;top:${shelf.y}%;width:${shelf.width}%;height:${shelf.height}%;">
+        <button type="button" class="map-shelf-block ${selected ? 'selected' : ''}" data-zone="${escapeMapHtml(shelf.zone_code)}"
+          onclick="selectShelf('${escapeMapHtml(shelf.code)}')" aria-label="Estante ${escapeMapHtml(shelf.code)}, ${count} unidades">
+          <span>${escapeMapHtml(shelf.code)}</span><small>${count} u.</small>
+        </button>
+        ${isEditMode ? `<div class="map-editor-controls" aria-label="Mover estante ${escapeMapHtml(shelf.code)}">
+          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',-3,0)" aria-label="Mover a la izquierda">←</button>
+          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',3,0)" aria-label="Mover a la derecha">→</button>
+        </div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function renderProductRows(products) {
+  if (!products.length) {
+    return `<div class="map-products-empty">No hay productos asignados a este nivel del estante.</div>`;
+  }
+  return products.map(product => `
+    <article class="map-product-row" data-product-code="${escapeMapHtml(product.product_code)}">
+      ${product.image_url ? `<img src="${escapeMapHtml(product.image_url)}" alt="${escapeMapHtml(product.name || 'Producto')}">` : '<span class="map-product-placeholder" aria-hidden="true">□</span>'}
+      <div>
+        <strong>${escapeMapHtml(product.name || 'Producto sin nombre')}</strong>
+        <small>${escapeMapHtml(product.product_code || 'Sin código')} · ${Number(product.stock) || 0} unidades${product.barcode ? ` · Barra ${escapeMapHtml(product.barcode)}` : ''}</small>
+      </div>
+      <button type="button" class="map-product-action" onclick="printProductQrByCode('${escapeMapHtml(product.product_code)}')" aria-label="Imprimir QR de ${escapeMapHtml(product.name)}">QR</button>
+    </article>`).join('');
+}
+
+function renderSelectedShelfPanel() {
+  const shelf = storeShelves.find(item => item.code === selectedShelfCode)
+    || storeShelves.find(item => item.floor_level === selectedFloorLevel)
+    || storeShelves[0];
+  if (!shelf) return '';
+  selectedShelfCode = shelf.code;
+  const allProducts = getShelfProducts(shelf.code);
+  const visibleProducts = getShelfProducts(shelf.code, selectedInternalLevel);
+  const unitCount = allProducts.reduce((sum, product) => sum + (Number(product.stock) || 0), 0);
+  const levels = [1, 2, 3].map(level => `
+    <button type="button" class="map-shelf-level ${selectedInternalLevel === level ? 'active' : ''}" onclick="setInternalLevel(${level})">
+      ${LEVEL_NAMES[level]} · ${getShelfProducts(shelf.code, level).reduce((sum, item) => sum + (Number(item.stock) || 0), 0)} u.
+    </button>`).join('');
+  return `
+    <aside class="store-map-side">
+      <section class="map-detail-card" aria-labelledby="map-selected-shelf-title">
+        <span class="stock-entry-step">Estante seleccionado</span>
+        <h3 id="map-selected-shelf-title">${escapeMapHtml(shelf.code)} · ${escapeMapHtml(shelf.name)}</h3>
+        <div class="map-detail-meta">${escapeMapHtml(FLOOR_NAMES[shelf.floor_level])} · Zona ${escapeMapHtml(shelf.zone_code)} · ${unitCount} unidades</div>
+        <div class="map-shelf-photo">
+          ${shelf.photo_url ? `<img src="${escapeMapHtml(shelf.photo_url)}" alt="Foto del estante ${escapeMapHtml(shelf.code)}">` : '<span>Agregá una foto real para reconocer el estante más rápido.</span>'}
+        </div>
+        <div class="map-photo-actions">
+          <label class="map-photo-button">${shelf.photo_url ? 'Cambiar foto' : 'Cargar foto'}
+            <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden onchange="handleShelfPhotoChange(event,'${escapeMapHtml(shelf.code)}')">
+          </label>
+          <button type="button" class="map-editor-button" onclick="showShelfDetailsModal('${escapeMapHtml(shelf.code)}')">Ver resumen</button>
+        </div>
+        <div class="map-level-actions">${levels}</div>
+      </section>
+      <section class="map-products-card" aria-labelledby="map-products-title">
+        <span class="stock-entry-step">${escapeMapHtml(LEVEL_NAMES[selectedInternalLevel])}</span>
+        <h3 id="map-products-title">Productos ubicados</h3>
+        <div class="map-products-list">${renderProductRows(visibleProducts)}</div>
+      </section>
+    </aside>`;
+}
+
+function renderStoreMapHTML(activeZone = null, activeShelf = null, targetLevel = null) {
+  if (activeShelf) {
+    const shelf = storeShelves.find(item => item.code === activeShelf);
+    if (shelf) {
+      selectedShelfCode = shelf.code;
+      selectedFloorLevel = shelf.floor_level;
+    }
+  }
+  if (targetLevel) selectedInternalLevel = Number(targetLevel);
+  const floorShelfCount = storeShelves.filter(item => item.floor_level === selectedFloorLevel).length;
+  const totalUnits = storeLocationProducts.reduce((sum, item) => sum + Math.max(0, Number(item.stock) || 0), 0);
+  const updatedAt = new Intl.DateTimeFormat('es-AR', { hour: '2-digit', minute: '2-digit' }).format(new Date());
+
+  return `
+    <div class="store-map-dashboard">
+      <div class="store-map-toolbar">
+        <div class="store-map-floor-tabs" aria-label="Pisos del local">${renderFloorTabs()}</div>
+        <div class="store-map-map-actions">
+          <button type="button" class="store-map-action-btn" onclick="toggleStoreLayoutEditMode()">${isEditMode ? 'Guardar plano' : 'Ajustar plano'}</button>
+          ${isEditMode ? '<button type="button" class="store-map-action-btn" onclick="resetStoreLayoutToDefault()">Restablecer</button>' : ''}
+          <button type="button" class="store-map-action-btn" onclick="setViewMode('2D')">2D</button>
+          <button type="button" class="store-map-action-btn" onclick="setViewMode('3D')">3D</button>
+          <button type="button" class="store-map-action-btn" onclick="adjustZoom(-10)" aria-label="Alejar">−</button>
+          <button type="button" class="store-map-action-btn" onclick="adjustZoom(10)" aria-label="Acercar">+</button>
+        </div>
+        <span class="store-map-sync">${escapeMapHtml(storeMapSyncLabel)} · ${updatedAt}</span>
+      </div>
+      <div class="store-map-main-grid">
+        <div class="store-map-canvas-wrap">
+          <div id="architectural-map-canvas" class="architectural-map-canvas" style="transform:${getCanvasTransform()}">
+            <span class="map-entrance">Entrada →</span>
+            <span class="map-depot-label">Depósito</span>
+            ${renderShelfBlocks()}
+          </div>
+        </div>
+        ${renderSelectedShelfPanel()}
+      </div>
+      <div class="store-map-kpis">
+        <div class="map-kpi"><span>Estantes en este piso</span><strong>${floorShelfCount}</strong></div>
+        <div class="map-kpi"><span>Productos ubicados</span><strong>${storeLocationProducts.length}</strong></div>
+        <div class="map-kpi"><span>Unidades registradas</span><strong>${totalUnits}</strong></div>
+      </div>
+    </div>`;
+}
+
 window.renderStoreMapHTML = renderStoreMapHTML;
+window.setStoreMapData = setStoreMapData;
+window.findStoreMapProduct = findStoreMapProduct;
+window.focusStoreMapProduct = focusStoreMapProduct;
 window.toggleStoreLayoutEditMode = toggleStoreLayoutEditMode;
 window.moveStoreItem = moveStoreItem;
 window.resetStoreLayoutToDefault = resetStoreLayoutToDefault;

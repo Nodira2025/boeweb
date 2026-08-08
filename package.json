@@ -4,7 +4,9 @@
   "description": "Sitio web autogestionable y premium para **BO growclub**, un espacio zen para cultivo premium. Combina catálogo de e-commerce, una Rueda Zen de descuentos interactiva y una sección completa de Guías de Cultivo (Blog).",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node local-server.js",
+    "check": "node --check vendedor.js && node --check mapa-local.js && node --check local-server.js && node --check netlify/functions/analyze-product.mjs",
+    "test": "npm run check"
   },
   "repository": {
     "type": "git",

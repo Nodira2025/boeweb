@@ -30,7 +30,7 @@ echo.
 
 if "%TEST_MODE%"=="0" start "" /b powershell -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Milliseconds 900; Start-Process 'http://127.0.0.1:%PORT%/'" >nul 2>&1
 
-node -e "const http=require('http'),fs=require('fs'),path=require('path');const root=process.cwd(),port=Number(process.env.PORT||4173),types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.gif':'image/gif','.svg':'image/svg+xml','.webp':'image/webp','.ico':'image/x-icon','.woff':'font/woff','.woff2':'font/woff2','.xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'};http.createServer((req,res)=>{try{const urlPath=decodeURIComponent(new URL(req.url,'http://localhost').pathname),relative=urlPath==='/'?'index.html':urlPath.replace(/^\/+/,''),file=path.resolve(root,relative);if(file!==root&&!file.startsWith(root+path.sep)){res.writeHead(403);res.end('Acceso denegado');return;}fs.stat(file,(error,stat)=>{if(error||!stat.isFile()){res.writeHead(404);res.end('No encontrado');return;}res.writeHead(200,{'Content-Type':types[path.extname(file).toLowerCase()]||'application/octet-stream','Cache-Control':'no-cache'});fs.createReadStream(file).pipe(res);});}catch(error){res.writeHead(500);res.end('Error del servidor local');}}).on('error',error=>{console.error('\nNo se pudo iniciar el servidor: '+error.message);process.exit(1);}).listen(port,'127.0.0.1',()=>console.log('Servidor iniciado correctamente.'));"
+node local-server.js
 
 echo.
 echo El servidor se detuvo.
