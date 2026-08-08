@@ -1025,6 +1025,7 @@
     }
   </style>
   <link rel="stylesheet" href="vendedor-caja.css?v=legado_v1">
+  <link rel="stylesheet" href="vendedor-portal.css?v=desktop_v1">
 </head>
 <body>
 
@@ -1104,6 +1105,52 @@
 
   <!-- 2. MAIN VENDOR PORTAL CONTAINER -->
   <div id="vendedor-portal-app" style="display: none;">
+    <aside class="vendor-desktop-sidebar" aria-label="Navegación del portal de vendedores">
+      <a href="index.html" class="vendor-sidebar-brand">
+        <img src="assets/logo.jpg" alt="BÔ Grow Club">
+        <span>
+          <strong>BÔ Grow Club</strong>
+          <small>Portal vendedores</small>
+        </span>
+      </a>
+
+      <div class="vendor-sidebar-profile">
+        <span class="vendor-sidebar-avatar" id="vendor-sidebar-avatar" aria-hidden="true">V</span>
+        <span>
+          <strong id="vendor-sidebar-name">Vendedor</strong>
+          <small id="vendor-sidebar-shift-copy">Turno activo</small>
+        </span>
+      </div>
+
+      <nav class="vendor-side-nav" aria-label="Secciones de trabajo">
+        <button type="button" class="vendor-side-nav-item active" data-vendor-tab="home" onclick="switchVendorTab('home')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">⌂</span><span>Inicio</span>
+        </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="catalog" onclick="switchVendorTab('catalog')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">▦</span><span>Catálogo B2B</span>
+        </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="cash" onclick="switchVendorTab('cash')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">$</span><span>Caja & Arqueo</span>
+        </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="portfolio" onclick="switchVendorTab('portfolio')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">♙</span><span>Clientes</span>
+        </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="map" onclick="switchVendorTab('map')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">⌖</span><span>Estantes</span>
+        </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="fast-upload" onclick="switchVendorTab('fast-upload')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">＋</span><span>Carga rápida</span>
+        </button>
+      </nav>
+
+      <div class="vendor-sidebar-tools" aria-label="Herramientas externas">
+        <a href="tablet.html" class="vendor-sidebar-tool-link" target="_blank" rel="noopener">Tablet</a>
+        <a href="tv.html" class="vendor-sidebar-tool-link" target="_blank" rel="noopener">TV</a>
+        <a href="coffee.html" class="vendor-sidebar-tool-link" target="_blank" rel="noopener">Coffee</a>
+      </div>
+      <p class="vendor-sidebar-version">BÔ · Centro operativo</p>
+    </aside>
+
     <header class="b2b-header">
       <div class="b2b-header-container">
         <div class="b2b-logo-area">
@@ -1122,6 +1169,17 @@
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
           <input type="text" id="b2b-search-input" class="b2b-search-input" placeholder="Buscar por título, SKU, marca o categoría...">
+        </div>
+
+        <div class="vendor-header-context no-mobile" aria-label="Estado del turno">
+          <div class="vendor-header-date">
+            <span>Fecha</span>
+            <strong id="vendor-header-date">Hoy</strong>
+          </div>
+          <div class="vendor-header-shift">
+            <span>Estado de caja</span>
+            <strong id="vendor-header-shift">Turno en curso</strong>
+          </div>
         </div>
 
         <!-- Logged-in Seller Status & Cart -->
@@ -1153,42 +1211,125 @@
       </div>
     </header>
 
-    <!-- VENDOR LAUNCHPAD / ACCESOS RÁPIDOS DE FUNCIONES EN 2 COLUMNAS -->
-    <section style="max-width: 1400px; margin: 20px auto 10px auto; padding: 0 16px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
-        <h3 style="font-family: var(--font-sans); color: var(--color-accent-gold); margin: 0; font-size: 1.15rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">🚀 Funciones del Vendedor</h3>
-        <span style="font-size: 0.78rem; color: rgba(247,246,242,0.7); font-weight: 600;">Seleccioná un acceso directo</span>
+    <!-- VENDOR HOME / CENTRO OPERATIVO -->
+    <section id="vendor-dashboard-home" class="vendor-dashboard-home" aria-labelledby="vendor-welcome-title">
+      <header class="vendor-home-hero">
+        <div class="vendor-home-copy">
+          <span class="vendor-home-eyebrow">Centro operativo · BÔ Grow Club</span>
+          <h2 id="vendor-welcome-title">Buenas tardes, vendedor</h2>
+          <p>Todo lo importante del turno, en un solo lugar. Registrá, controlá y resolvé sin perder tiempo.</p>
+        </div>
+        <div class="vendor-home-hero-actions">
+          <button type="button" class="vendor-home-primary-action" onclick="switchVendorTab('cash')">Abrir Caja BÔ</button>
+          <button type="button" class="vendor-home-secondary-action" onclick="switchVendorTab('catalog')">Nueva venta</button>
+        </div>
+      </header>
+
+      <section class="vendor-home-kpis" aria-label="Resumen operativo del turno">
+        <article class="vendor-home-kpi">
+          <span class="vendor-home-kpi-icon" aria-hidden="true">↗</span>
+          <div class="vendor-home-kpi-copy">
+            <span>Ingresos del día</span>
+            <strong id="vendor-kpi-income">$0,00</strong>
+            <small id="vendor-kpi-movement-count">Sin movimientos todavía</small>
+          </div>
+        </article>
+        <article class="vendor-home-kpi">
+          <span class="vendor-home-kpi-icon" aria-hidden="true">$</span>
+          <div class="vendor-home-kpi-copy">
+            <span>Efectivo esperado</span>
+            <strong id="vendor-kpi-expected-cash">$0,00</strong>
+            <small>Calculado para el cierre</small>
+          </div>
+        </article>
+        <article class="vendor-home-kpi">
+          <span class="vendor-home-kpi-icon" aria-hidden="true">▤</span>
+          <div class="vendor-home-kpi-copy">
+            <span>Pedido actual</span>
+            <strong id="vendor-kpi-cart-count">0 artículos</strong>
+            <small id="vendor-kpi-cart-total">Listo para comenzar</small>
+          </div>
+        </article>
+        <article class="vendor-home-kpi">
+          <span class="vendor-home-kpi-icon" aria-hidden="true">!</span>
+          <div class="vendor-home-kpi-copy">
+            <span>Stock a revisar</span>
+            <strong id="vendor-kpi-stock-alerts">0 alertas</strong>
+            <small>Dentro del catálogo cargado</small>
+          </div>
+        </article>
+      </section>
+
+      <div class="vendor-home-operational-grid">
+        <section class="vendor-home-panel vendor-home-cash-card" aria-labelledby="vendor-home-cash-title">
+          <div class="vendor-home-panel-heading">
+            <div>
+              <span class="vendor-section-eyebrow">Caja del turno</span>
+              <h3 id="vendor-home-cash-title">Caja BÔ</h3>
+            </div>
+            <span class="vendor-shift-pill" id="vendor-home-shift-pill" data-status="open">En curso</span>
+          </div>
+          <div class="vendor-home-cash-balance">
+            <span>Efectivo que debería haber</span>
+            <strong id="vendor-home-cash-balance">$0,00</strong>
+          </div>
+          <div class="vendor-home-cash-actions">
+            <button type="button" onclick="openCashWithType('venta_efectivo')">+ Ingreso efectivo</button>
+            <button type="button" onclick="openCashWithType('gasto')">− Registrar gasto</button>
+            <button type="button" onclick="switchVendorTab('cash')">Ver arqueo completo</button>
+          </div>
+          <div class="vendor-home-movement-list" id="vendor-home-movement-list" aria-live="polite">
+            <div class="vendor-home-empty-movements">La caja está lista para comenzar.</div>
+          </div>
+        </section>
+
+        <aside class="vendor-home-panel" aria-labelledby="vendor-quick-actions-title">
+          <div class="vendor-home-panel-heading">
+            <div>
+              <span class="vendor-section-eyebrow">Atajos útiles</span>
+              <h3 id="vendor-quick-actions-title">Acciones rápidas</h3>
+            </div>
+          </div>
+          <div class="vendor-home-quick-actions">
+            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('catalog')">
+              <span aria-hidden="true">▦</span><span><strong>Nueva venta</strong><small>Buscar y agregar productos</small></span><span aria-hidden="true">›</span>
+            </button>
+            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('portfolio')">
+              <span aria-hidden="true">♙</span><span><strong>Consultar cliente</strong><small>Cartera y WhatsApp</small></span><span aria-hidden="true">›</span>
+            </button>
+            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('map')">
+              <span aria-hidden="true">⌖</span><span><strong>Ubicar producto</strong><small>Mapa de estantes</small></span><span aria-hidden="true">›</span>
+            </button>
+            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('fast-upload')">
+              <span aria-hidden="true">＋</span><span><strong>Carga rápida</strong><small>Crear borrador por foto</small></span><span aria-hidden="true">›</span>
+            </button>
+          </div>
+        </aside>
       </div>
 
-      <style>
-        .vendor-2col-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 12px;
-        }
-        @media (min-width: 900px) {
-          .vendor-2col-grid {
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-          }
-        }
-      </style>
+      <div class="vendor-section-heading" id="vendor-tools-title">
+        <div>
+          <span class="vendor-section-eyebrow">Ecosistema BÔ</span>
+          <h3>Herramientas del vendedor</h3>
+        </div>
+        <p>Accesos complementarios para el trabajo diario.</p>
+      </div>
 
       <div class="vendor-2col-grid">
         
         <!-- Card 1: Catálogo B2B -->
-        <div class="vendor-launchpad-card" id="vcard-catalog" onclick="switchVendorTab('catalog')" style="background: var(--color-card-bg); border: 1.5px solid var(--color-accent-gold); border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
+        <button type="button" class="vendor-launchpad-card" id="vcard-catalog" onclick="switchVendorTab('catalog')" style="background: var(--color-card-bg); border: 1.5px solid var(--color-accent-gold); border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
           <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📦</span>
           <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Catálogo B2B</span>
           <span style="font-size: 0.72rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase;">PROCESAR VENTA</span>
-        </div>
+        </button>
 
         <!-- Card 2: Mi Cartera de Clientes -->
-        <div class="vendor-launchpad-card" id="vcard-portfolio" onclick="switchVendorTab('portfolio')" style="background: var(--color-card-bg); border: 1.5px solid #ab47bc; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
+        <button type="button" class="vendor-launchpad-card" id="vcard-portfolio" onclick="switchVendorTab('portfolio')" style="background: var(--color-card-bg); border: 1.5px solid #ab47bc; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
           <span style="font-size: 2rem; display: block; margin-bottom: 6px;">👥</span>
           <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Mi Cartera</span>
           <span style="font-size: 0.72rem; color: #ab47bc; font-weight: 800; text-transform: uppercase;">FIDELIZACIÓN & WHATSAPP</span>
-        </div>
+        </button>
 
         <!-- Card 3: Caja y Arqueo Diario -->
         <button type="button" class="vendor-launchpad-card" id="vcard-cash" onclick="switchVendorTab('cash')" style="width: 100%; font: inherit; background: var(--color-card-bg); border: 1.5px solid #ffb74d; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
@@ -1198,60 +1339,60 @@
         </button>
 
         <!-- Card 4: Mapa de Estantes -->
-        <div class="vendor-launchpad-card" id="vcard-map" onclick="switchVendorTab('map')" style="background: var(--color-card-bg); border: 1.5px solid #42a5f5; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
+        <button type="button" class="vendor-launchpad-card" id="vcard-map" onclick="switchVendorTab('map')" style="background: var(--color-card-bg); border: 1.5px solid #42a5f5; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
           <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📍</span>
           <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Mapa Estantes</span>
           <span style="font-size: 0.72rem; color: #42a5f5; font-weight: 800; text-transform: uppercase;">UBICACIÓN LOCAL</span>
-        </div>
+        </button>
 
         <!-- Card 5: Escanear QR Cliente -->
-        <div class="vendor-launchpad-card" id="vcard-scan" onclick="switchVendorTab('scan')" style="background: var(--color-card-bg); border: 1.5px solid #66bb6a; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
+        <button type="button" class="vendor-launchpad-card" id="vcard-scan" onclick="switchVendorTab('scan')" style="background: var(--color-card-bg); border: 1.5px solid #66bb6a; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
           <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📷</span>
           <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">QR Cliente VIP</span>
           <span style="font-size: 0.72rem; color: #66bb6a; font-weight: 800; text-transform: uppercase;">VALIDAR CLIENTE</span>
-        </div>
+        </button>
 
         <!-- Card 6: Modo Tablet Local -->
-        <div class="vendor-launchpad-card" onclick="window.open('tablet.html', '_blank')" style="background: var(--color-card-bg); border: 1.5px solid #ba68c8; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
+        <a href="tablet.html" target="_blank" rel="noopener" class="vendor-launchpad-card" style="background: var(--color-card-bg); border: 1.5px solid #ba68c8; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
           <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📱</span>
           <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Tablet Kiosco</span>
           <span style="font-size: 0.72rem; color: #ba68c8; font-weight: 800; text-transform: uppercase;">MODO INTERACTIVO</span>
-        </div>
+        </a>
 
         <!-- Card 7: Pantalla TV Promos -->
-        <div class="vendor-launchpad-card" onclick="window.open('tv.html', '_blank')" style="background: var(--color-card-bg); border: 1.5px solid #ff7043; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
+        <a href="tv.html" target="_blank" rel="noopener" class="vendor-launchpad-card" style="background: var(--color-card-bg); border: 1.5px solid #ff7043; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
           <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📺</span>
           <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">TV Promos</span>
           <span style="font-size: 0.72rem; color: #ff7043; font-weight: 800; text-transform: uppercase;">PANTALLA LOCAL</span>
-        </div>
+        </a>
 
         <!-- Card 8: Coffee Club -->
-        <div class="vendor-launchpad-card" onclick="window.open('coffee.html', '_blank')" style="background: var(--color-card-bg); border: 1.5px solid #d4a373; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
+        <a href="coffee.html" target="_blank" rel="noopener" class="vendor-launchpad-card" style="background: var(--color-card-bg); border: 1.5px solid #d4a373; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
           <span style="font-size: 2rem; display: block; margin-bottom: 4px;">☕</span>
           <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">BO Coffee Club</span>
           <span style="font-size: 0.72rem; color: #d4a373; font-weight: 800; text-transform: uppercase;">CAFETERÍA & BAR</span>
-        </div>
+        </a>
 
         <!-- Card 9: Carga Rápida por Foto -->
-        <div class="vendor-launchpad-card" id="vcard-fastupload" onclick="switchVendorTab('fast-upload')" style="background: var(--color-card-bg); border: 2px solid var(--color-accent-gold); border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
+        <button type="button" class="vendor-launchpad-card" id="vcard-fastupload" onclick="switchVendorTab('fast-upload')" style="background: var(--color-card-bg); border: 2px solid var(--color-accent-gold); border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
           <span style="font-size: 2rem; display: block; margin-bottom: 4px;">📸</span>
           <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Carga Rápida Foto</span>
           <span style="font-size: 0.72rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase;">SUBIR PRODUCTO</span>
-        </div>
+        </button>
 
         <!-- Card 10: Cola de Borradores (Mariano / Admin) -->
-        <div class="vendor-launchpad-card" id="vcard-draftsreview" onclick="switchVendorTab('drafts-review')" style="background: var(--color-card-bg); border: 2px solid #2e7d32; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm); position: relative;">
+        <button type="button" class="vendor-launchpad-card" id="vcard-draftsreview" onclick="switchVendorTab('drafts-review')" style="background: var(--color-card-bg); border: 2px solid #2e7d32; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm); position: relative;">
           <span id="drafts-pending-count-badge" style="position: absolute; top: -8px; right: -8px; background: #2e7d32; color: #fff; font-size: 0.75rem; font-weight: 800; padding: 3px 8px; border-radius: 12px; border: 1px solid var(--color-accent-gold); display: none;">0</span>
           <span style="font-size: 2rem; display: block; margin-bottom: 4px;">👑</span>
           <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Cola Mariano</span>
           <span style="font-size: 0.72rem; color: #66bb6a; font-weight: 800; text-transform: uppercase;">APROBAR & PRECIOS</span>
-        </div>
+        </button>
 
       </div>
     </section>
 
     <!-- SECTION: CARGA RÁPIDA POR FOTO (VENDEDOR) -->
-    <div id="vendor-fast-upload-section" style="display: none; max-width: 750px; margin: 30px auto; padding: 0 20px;">
+    <div id="vendor-fast-upload-section" class="vendor-workspace-section" style="display: none; max-width: 750px; margin: 30px auto; padding: 0 20px;">
       <div style="background: var(--color-card-bg); border: 2px solid var(--color-accent-gold); border-radius: 20px; padding: 24px; box-shadow: var(--shadow-md); color: var(--color-text-main);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
           <div>
@@ -1310,7 +1451,7 @@
     </div>
 
     <!-- SECTION: COLA DE BORRADORES Y APROBACIÓN (MARIANO / ADMIN) -->
-    <div id="vendor-drafts-review-section" style="display: none; max-width: 1100px; margin: 30px auto; padding: 0 20px;">
+    <div id="vendor-drafts-review-section" class="vendor-workspace-section" style="display: none; max-width: 1100px; margin: 30px auto; padding: 0 20px;">
       <div style="background: var(--color-card-bg); border: 2px solid #2e7d32; border-radius: 20px; padding: 24px; box-shadow: var(--shadow-md); color: var(--color-text-main);">
         
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
@@ -1336,7 +1477,7 @@
     </div>
 
     <!-- SECTION: CARTERA PERSONAL DEL VENDEDOR -->
-    <section id="vendor-portfolio-section" style="display: none; max-width: 1400px; margin: 30px auto; padding: 0 20px;" aria-labelledby="vendor-portfolio-title">
+    <section id="vendor-portfolio-section" class="vendor-workspace-section" style="display: none; max-width: 1400px; margin: 30px auto; padding: 0 20px;" aria-labelledby="vendor-portfolio-title">
       <div style="background: var(--color-card-bg); border: 1px solid var(--color-border-subtle); border-radius: 20px; padding: 24px; box-shadow: var(--shadow-md); color: var(--color-text-main);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
           <div>
@@ -1391,7 +1532,7 @@
     </section>
 
     <!-- CASH REGISTER & SHIFT CLOSING MODULE -->
-    <section id="vendor-cash-section" class="cash-shell" style="display: none;" aria-labelledby="cash-title">
+    <section id="vendor-cash-section" class="cash-shell vendor-workspace-section" style="display: none;" aria-labelledby="cash-title">
       <header class="cash-hero">
         <div>
           <span class="cash-eyebrow">Gestión financiera · Turno diario</span>
@@ -1401,7 +1542,7 @@
         <div class="cash-hero-actions">
           <span id="cash-current-date" class="cash-date-pill">Hoy</span>
           <div id="cash-shift-status-badge" class="cash-status-badge" data-status="open">Turno en curso</div>
-          <button type="button" class="cash-icon-btn" onclick="switchVendorTab('catalog')" aria-label="Volver al panel de vendedor">×</button>
+          <button type="button" class="cash-icon-btn" onclick="switchVendorTab('home')" aria-label="Volver al inicio del portal">×</button>
         </div>
       </header>
 
@@ -1535,7 +1676,7 @@
     </section>
 
     <!-- Interactive Store Map Section -->
-    <div id="store-map-section" style="display: none; max-width: 1200px; margin: 30px auto; padding: 0 20px;">
+    <div id="store-map-section" class="vendor-workspace-section" style="display: none; max-width: 1200px; margin: 30px auto; padding: 0 20px;">
       <div style="margin-bottom: 24px; display: flex; gap: 16px; justify-content: space-between; align-items: center; flex-wrap: wrap;">
         <div style="display: flex; align-items: center; gap: 14px;">
           <div style="width: 48px; height: 48px; border-radius: 50%; background: #1B4332; display: flex; align-items: center; justify-content: center; color: #FAF8F5; font-size: 1.5rem; box-shadow: 0 4px 12px rgba(27,67,50,0.15);">
@@ -1561,7 +1702,7 @@
     </div>
 
     <!-- Customer QR Scanner Section -->
-    <div id="scan-customer-qr-section" style="display: none; max-width: 800px; margin: 30px auto; padding: 0 20px;">
+    <div id="scan-customer-qr-section" class="vendor-workspace-section" style="display: none; max-width: 800px; margin: 30px auto; padding: 0 20px;">
       <div style="background: rgba(21, 45, 36, 0.95); border: 2px solid #66bb6a; border-radius: 20px; padding: 30px; color: #fff; text-align: center;">
         <span style="background: rgba(102,187,106,0.2); border: 1px solid #66bb6a; color: #66bb6a; padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 700;">RECONOCIMIENTO PRESENCIAL DE CLIENTE</span>
         <h2 style="font-family: var(--font-display); color: #66bb6a; font-size: 1.8rem; margin: 8px 0 4px 0;">Escanear Credencial VIP del Cliente</h2>
@@ -1728,7 +1869,7 @@
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
           <polyline points="9 22 9 12 15 12 15 22"></polyline>
         </svg>
-        <span>Catálogo</span>
+        <span>Inicio</span>
       </button>
       <button type="button" class="b2b-mobile-nav-btn" id="b2b-mobile-cart-btn">
         <div style="position: relative; display: inline-block;">

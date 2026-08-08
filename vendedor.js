@@ -157,6 +157,7 @@ function setupEventListeners() {
     mobileHomeBtn.addEventListener('click', () => {
       closeFilters();
       closeCart();
+      switchVendorTab('home');
       updateMobileNavActive(mobileHomeBtn);
     });
   }
@@ -271,6 +272,7 @@ async function fetchB2BProducts(clearGrid = true) {
     baseProducts = baseProducts.concat(fetchedProducts);
 
     renderProductsList(fetchedProducts, clearGrid);
+    renderVendorHomeUI();
 
     // Show/hide Load More button
     if ((data || []).length === itemsPerPage) {
@@ -520,6 +522,7 @@ function updateCartBadge() {
   if (mobileCartCountEl) {
     mobileCartCountEl.textContent = count;
   }
+  renderVendorHomeUI();
 }
 
 // --- CART RENDER & EDITING ---
@@ -1001,12 +1004,17 @@ function checkVendorAuth() {
   const portalApp = document.getElementById('vendedor-portal-app');
   const vendorNameHeader = document.getElementById('active-vendor-display-name');
   const vendorCheckoutInput = document.getElementById('b2b-vendedor-name');
+  const sidebarName = document.getElementById('vendor-sidebar-name');
+  const sidebarAvatar = document.getElementById('vendor-sidebar-avatar');
 
   if (activeVendor) {
     if (loginScreen) loginScreen.style.display = 'none';
     if (portalApp) portalApp.style.display = 'block';
     if (vendorNameHeader) vendorNameHeader.textContent = `🧑‍💼 Vendedor: ${activeVendor}`;
     if (vendorCheckoutInput) vendorCheckoutInput.value = activeVendor;
+    if (sidebarName) sidebarName.textContent = activeVendor;
+    if (sidebarAvatar) sidebarAvatar.textContent = activeVendor.charAt(0).toUpperCase();
+    switchVendorTab('home');
   } else {
     if (loginScreen) loginScreen.style.display = 'flex';
     if (portalApp) portalApp.style.display = 'none';
@@ -1056,6 +1064,7 @@ function vendorLogout() {
 }
 
 function switchVendorTab(tab) {
+  const dashboardHome = document.getElementById('vendor-dashboard-home');
   const mainLayout = document.querySelector('.b2b-main-layout');
   const mapSection = document.getElementById('store-map-section');
   const qrSection = document.getElementById('scan-customer-qr-section');
@@ -1088,6 +1097,7 @@ function switchVendorTab(tab) {
   });
 
   if (mainLayout) mainLayout.style.display = 'none';
+  if (dashboardHome) dashboardHome.style.display = 'none';
   if (mapSection) mapSection.style.display = 'none';
   if (qrSection) qrSection.style.display = 'none';
   if (cashSection) cashSection.style.display = 'none';
@@ -1097,7 +1107,13 @@ function switchVendorTab(tab) {
 
   let targetSection = null;
 
-  if (tab === 'catalog' || tab === 'reposicion') {
+  if (tab === 'home') {
+    if (dashboardHome) {
+      dashboardHome.style.display = 'block';
+      targetSection = dashboardHome;
+    }
+    renderVendorHomeUI();
+  } else if (tab === 'catalog' || tab === 'reposicion') {
     if (mainLayout) {
       mainLayout.style.display = 'grid';
       targetSection = mainLayout;
@@ -1169,10 +1185,93 @@ function switchVendorTab(tab) {
     loadPendingProductDrafts();
   }
 
+  const activeSidebarTab = tab === 'reposicion' ? 'catalog' : tab;
+  document.querySelectorAll('.vendor-side-nav-item').forEach(button => {
+    button.classList.toggle('active', button.dataset.vendorTab === activeSidebarTab);
+  });
+
   if (targetSection) {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    targetSection.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
+    const scrollBehavior = reducedMotion ? 'auto' : 'smooth';
+    if (tab === 'home') {
+      window.scrollTo({ top: 0, behavior: scrollBehavior });
+    } else {
+      targetSection.scrollIntoView({ behavior: scrollBehavior, block: 'start' });
+    }
   }
+}
+
+function renderVendorHomeUI() {
+  const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'vendedor';
+  const cashData = getVendorCashData();
+  const totals = calculateCashTotals(cashData);
+  const cartCount = cart.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+  const cartTotal = cart.reduce((sum, item) => sum + ((Number(item.price) || 0) * (Number(item.quantity) || 0)), 0);
+  const stockAlerts = baseProducts.filter(product => (product.supplier_products || []).some(supplier => {
+    const stock = Number(supplier.stock);
+    return supplier.available && supplier.stock !== null && Number.isFinite(stock) && stock <= 5;
+  })).length;
+  const localHour = Number(new Intl.DateTimeFormat('es-AR', {
+    timeZone: CASH_TIME_ZONE,
+    hour: '2-digit',
+    hour12: false
+  }).format(new Date()));
+  const greeting = localHour < 12 ? 'Buen día' : localHour < 20 ? 'Buenas tardes' : 'Buenas noches';
+  const formattedDate = new Intl.DateTimeFormat('es-AR', {
+    timeZone: CASH_TIME_ZONE,
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }).format(new Date());
+
+  const setText = (id, value) => {
+    const element = document.getElementById(id);
+    if (element) element.textContent = value;
+  };
+
+  setText('vendor-welcome-title', `${greeting}, ${activeVendor}`);
+  setText('vendor-kpi-income', formatCashCurrency(totals.recordedIncome));
+  setText('vendor-kpi-expected-cash', formatCashCurrency(totals.expectedCash));
+  setText('vendor-kpi-movement-count', `${totals.activeCount} ${totals.activeCount === 1 ? 'movimiento activo' : 'movimientos activos'}`);
+  setText('vendor-kpi-cart-count', `${cartCount} ${cartCount === 1 ? 'artículo' : 'artículos'}`);
+  setText('vendor-kpi-cart-total', cartCount ? formatCashCurrency(cartTotal) : 'Listo para comenzar');
+  setText('vendor-kpi-stock-alerts', `${stockAlerts} ${stockAlerts === 1 ? 'alerta' : 'alertas'}`);
+  setText('vendor-home-cash-balance', formatCashCurrency(totals.expectedCash));
+  setText('vendor-header-date', formattedDate);
+  setText('vendor-header-shift', cashData.closed ? 'Caja cerrada' : 'Turno en curso');
+  setText('vendor-sidebar-shift-copy', cashData.closed ? 'Caja cerrada' : 'Turno activo');
+
+  const shiftPill = document.getElementById('vendor-home-shift-pill');
+  if (shiftPill) {
+    shiftPill.textContent = cashData.closed ? 'Cerrada' : 'En curso';
+    shiftPill.dataset.status = cashData.closed ? 'closed' : 'open';
+  }
+
+  const movementList = document.getElementById('vendor-home-movement-list');
+  if (!movementList) return;
+  const activeMovements = cashData.movements.filter(movement => !movement.voided).slice(0, 4);
+  if (activeMovements.length === 0) {
+    movementList.innerHTML = '<div class="vendor-home-empty-movements">La caja está lista para comenzar.</div>';
+    return;
+  }
+
+  movementList.innerHTML = activeMovements.map(movement => {
+    const config = CASH_TYPE_CONFIG[movement.type] || CASH_TYPE_CONFIG.venta_efectivo;
+    const sign = config.flow === 'out' ? '−' : '+';
+    return `
+      <div class="vendor-home-movement" data-flow="${config.flow}">
+        <span>${escapeCashHtml(config.label)} · ${escapeCashHtml(movement.time || '--:--')}</span>
+        <strong>${sign}${formatCashCurrency(movement.amount)}</strong>
+      </div>`;
+  }).join('');
+}
+
+function openCashWithType(type) {
+  switchVendorTab('cash');
+  const typeField = document.getElementById('cash-entry-type');
+  const amountField = document.getElementById('cash-entry-amount');
+  if (typeField && CASH_TYPE_CONFIG[type]) typeField.value = type;
+  if (amountField && !amountField.disabled) amountField.focus();
 }
 
 function renderStoreMapUI(activeZone = null, activeShelf = null, targetLevel = null) {
@@ -1322,6 +1421,7 @@ function saveVendorCashData(data, dateKey = getTodayDateKey()) {
   const normalized = normalizeCashData(data, dateKey);
   normalized.updatedAt = new Date().toISOString();
   localStorage.setItem(`boeweb_cash_${dateKey}`, JSON.stringify(normalized));
+  renderVendorHomeUI();
   return normalized;
 }
 
@@ -2182,6 +2282,8 @@ window.checkVendorAuth = checkVendorAuth;
 window.handleVendorLogin = handleVendorLogin;
 window.vendorLogout = vendorLogout;
 window.switchVendorTab = switchVendorTab;
+window.renderVendorHomeUI = renderVendorHomeUI;
+window.openCashWithType = openCashWithType;
 window.searchShelfOnMap = searchShelfOnMap;
 window.simulateCustomerQRScan = simulateCustomerQRScan;
 window.addCashMovement = addCashMovement;
