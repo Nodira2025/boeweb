@@ -103,5 +103,6 @@ server.on('error', error => {
 
 server.listen(port, '127.0.0.1', () => {
   console.log(`Servidor iniciado correctamente en http://127.0.0.1:${port}/`);
-  console.log(process.env.OPENAI_API_KEY ? 'Análisis con IA: configurado.' : 'Análisis con IA: falta OPENAI_API_KEY en .env.');
+  const aiConfigured = Boolean(process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY);
+  console.log(aiConfigured ? 'Análisis con IA: configurado.' : 'Análisis con IA: falta OPENROUTER_API_KEY u OPENAI_API_KEY en .env.');
 });

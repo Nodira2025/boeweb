@@ -29,8 +29,8 @@ Las claves son privadas y nunca deben escribirse en `vendedor.js` ni subirse a G
 1. Agregar al archivo `.env`:
 
    ```env
-   OPENAI_API_KEY=tu_clave_privada
-   OPENAI_PRODUCT_MODEL=gpt-5.6
+   OPENROUTER_API_KEY=tu_clave_privada_sk_or
+   OPENROUTER_PRODUCT_MODEL=openai/gpt-5.6-luna
    ```
 
 2. Opcionalmente agregar un token de Mercado Libre para mejorar la disponibilidad de la búsqueda:
@@ -43,13 +43,13 @@ Las claves son privadas y nunca deben escribirse en `vendedor.js` ni subirse a G
 
 ### En Netlify
 
-Configurar las mismas variables en **Site configuration → Environment variables** y volver a desplegar el sitio. También conviene fijar:
+Configurar las mismas variables en **Site configuration → Environment variables** y volver a desplegar el sitio. La clave de OpenRouter debe guardarse como `OPENROUTER_API_KEY`; nunca dentro del código. También conviene fijar:
 
 ```env
 PRODUCT_ANALYSIS_ALLOWED_ORIGIN=https://boeweb.netlify.app
 ```
 
-Si `OPENAI_API_KEY` no está configurada, el formulario sigue funcionando manualmente y explica qué falta.
+Si no está configurada `OPENROUTER_API_KEY` ni `OPENAI_API_KEY`, el formulario sigue funcionando manualmente y explica qué falta.
 
 ## Uso diario recomendado
 

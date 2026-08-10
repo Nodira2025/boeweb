@@ -1,4 +1,5 @@
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
+const OPENROUTER_RESPONSES_URL = 'https://openrouter.ai/api/v1/responses';
 const MERCADOLIBRE_SEARCH_URL = 'https://api.mercadolibre.com/sites/MLA/search';
 const REQUEST_WINDOW_MS = 60_000;
 const REQUEST_LIMIT_PER_WINDOW = 12;
@@ -82,11 +83,44 @@ function extractWebSources(openAiResponse) {
         byUrl.set(source.url, { title: source.title || 'Fuente consultada', url: source.url });
       }
     }
+    for (const content of item?.content || []) {
+      for (const annotation of content?.annotations || []) {
+        const citation = annotation?.url_citation || annotation;
+        if (annotation?.type === 'url_citation' && citation?.url && /^https?:\/\//i.test(citation.url)) {
+          byUrl.set(citation.url, { title: citation.title || 'Fuente consultada', url: citation.url });
+        }
+      }
+    }
   }
   return [...byUrl.values()].slice(0, 8);
 }
 
-async function analyzeWithOpenAI(imageDataUrl, barcode, hints) {
+function getAiProviderConfig() {
+  if (process.env.OPENROUTER_API_KEY) {
+    return {
+      name: 'OpenRouter',
+      apiKey: process.env.OPENROUTER_API_KEY,
+      endpoint: OPENROUTER_RESPONSES_URL,
+      model: process.env.OPENROUTER_PRODUCT_MODEL || 'openai/gpt-5.6-luna',
+      tools: [{
+        type: 'openrouter:web_search',
+        parameters: { engine: 'auto', max_total_results: 5, search_context_size: 'low' }
+      }]
+    };
+  }
+  if (process.env.OPENAI_API_KEY) {
+    return {
+      name: 'OpenAI',
+      apiKey: process.env.OPENAI_API_KEY,
+      endpoint: OPENAI_RESPONSES_URL,
+      model: process.env.OPENAI_PRODUCT_MODEL || 'gpt-5.6',
+      tools: [{ type: 'web_search' }]
+    };
+  }
+  return null;
+}
+
+async function analyzeWithAI(imageDataUrl, barcode, hints, provider) {
   const prompt = [
     'Analizá la foto de este producto para ayudar a un vendedor de Argentina a ingresarlo al stock.',
     'Extraé únicamente datos visibles o que puedas verificar con una fuente pública confiable.',
@@ -98,7 +132,7 @@ async function analyzeWithOpenAI(imageDataUrl, barcode, hints) {
     `Pistas manuales: ${JSON.stringify(hints || {})}.`
   ].join('\n');
   const requestBody = {
-    model: process.env.OPENAI_PRODUCT_MODEL || 'gpt-5.6',
+    model: provider.model,
     store: false,
     reasoning: { effort: 'low' },
     input: [{
@@ -108,8 +142,7 @@ async function analyzeWithOpenAI(imageDataUrl, barcode, hints) {
         { type: 'input_image', image_url: imageDataUrl, detail: 'high' }
       ]
     }],
-    tools: [{ type: 'web_search' }],
-    include: ['web_search_call.action.sources'],
+    tools: provider.tools,
     text: {
       format: {
         type: 'json_schema',
@@ -120,17 +153,22 @@ async function analyzeWithOpenAI(imageDataUrl, barcode, hints) {
     },
     max_output_tokens: 1400
   };
-  const response = await fetch(OPENAI_RESPONSES_URL, {
+  const headers = {
+    Authorization: `Bearer ${provider.apiKey}`,
+    'Content-Type': 'application/json'
+  };
+  if (provider.name === 'OpenRouter') {
+    headers['HTTP-Referer'] = process.env.URL || process.env.DEPLOY_PRIME_URL || 'https://boeweb.netlify.app';
+    headers['X-Title'] = 'BÔ Grow Club · Ingreso de stock';
+  }
+  const response = await fetch(provider.endpoint, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
+    headers,
     body: JSON.stringify(requestBody)
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const message = payload?.error?.message || `OpenAI respondió con estado ${response.status}`;
+    const message = payload?.error?.message || `${provider.name} respondió con estado ${response.status}`;
     throw new Error(message);
   }
   const outputText = extractResponseText(payload);
@@ -181,10 +219,11 @@ export default async function handler(request, context) {
   if (request.method !== 'POST') return jsonResponse(405, { message: 'Método no permitido.' });
   if (!isAllowedOrigin(request)) return jsonResponse(403, { message: 'Origen no autorizado.' });
   if (isRateLimited(request, context)) return jsonResponse(429, { message: 'Demasiados análisis. Esperá un minuto y volvé a intentar.' });
-  if (!process.env.OPENAI_API_KEY) {
+  const aiProvider = getAiProviderConfig();
+  if (!aiProvider) {
     return jsonResponse(503, {
       code: 'IA_NOT_CONFIGURED',
-      message: 'La IA todavía no tiene configurada OPENAI_API_KEY en el servidor.'
+      message: 'La IA todavía no tiene configurada OPENROUTER_API_KEY u OPENAI_API_KEY en el servidor.'
     });
   }
   try {
@@ -192,14 +231,14 @@ export default async function handler(request, context) {
     if (!validateImageDataUrl(body.imageDataUrl)) {
       return jsonResponse(400, { message: 'La imagen no es válida o es demasiado grande.' });
     }
-    const analysis = await analyzeWithOpenAI(body.imageDataUrl, body.barcode, body.hints);
+    const analysis = await analyzeWithAI(body.imageDataUrl, body.barcode, body.hints, aiProvider);
     let market = null;
     try {
       market = await searchMercadoLibre(analysis.product.market_query || analysis.product.name);
     } catch (marketError) {
       console.warn('No se pudo consultar Mercado Libre:', marketError.message);
     }
-    return jsonResponse(200, { ...analysis, market });
+    return jsonResponse(200, { ...analysis, market, provider: aiProvider.name });
   } catch (error) {
     console.error('Error al analizar producto:', error.message);
     return jsonResponse(502, { message: `No se pudo completar el análisis: ${error.message}` });
