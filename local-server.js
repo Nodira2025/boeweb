@@ -38,7 +38,7 @@ async function readRequestBody(request, maxBytes = 9_000_000) {
   return Buffer.concat(chunks);
 }
 
-async function handleProductAnalysis(request, response) {
+async function handleNetlifyFunction(request, response, modulePath, errorLabel) {
   try {
     const body = await readRequestBody(request);
     const origin = `http://${request.headers.host || `127.0.0.1:${port}`}`;
@@ -47,14 +47,14 @@ async function handleProductAnalysis(request, response) {
       headers: request.headers,
       body: ['GET', 'HEAD'].includes(request.method) ? undefined : body
     });
-    const module = await import('./netlify/functions/analyze-product.mjs');
+    const module = await import(modulePath);
     const functionResponse = await module.default(webRequest, {
       ip: request.socket.remoteAddress || 'local'
     });
     response.writeHead(functionResponse.status, Object.fromEntries(functionResponse.headers.entries()));
     response.end(Buffer.from(await functionResponse.arrayBuffer()));
   } catch (error) {
-    console.error('Error en análisis local:', error.message);
+    console.error(`${errorLabel}:`, error.message);
     sendText(response, 500, 'Error del servidor local.');
   }
 }
@@ -90,7 +90,11 @@ function handleStaticFile(request, response) {
 
 const server = http.createServer(async (request, response) => {
   if (request.url?.startsWith('/.netlify/functions/analyze-product')) {
-    await handleProductAnalysis(request, response);
+    await handleNetlifyFunction(request, response, './netlify/functions/analyze-product.mjs', 'Error en análisis local');
+    return;
+  }
+  if (request.url?.startsWith('/.netlify/functions/lookup-product')) {
+    await handleNetlifyFunction(request, response, './netlify/functions/lookup-product.mjs', 'Error en búsqueda local');
     return;
   }
   handleStaticFile(request, response);
@@ -105,4 +109,5 @@ server.listen(port, '127.0.0.1', () => {
   console.log(`Servidor iniciado correctamente en http://127.0.0.1:${port}/`);
   const aiConfigured = Boolean(process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY);
   console.log(aiConfigured ? 'Análisis con IA: configurado.' : 'Análisis con IA: falta OPENROUTER_API_KEY u OPENAI_API_KEY en .env.');
+  console.log('Búsqueda sin IA: disponible.');
 });

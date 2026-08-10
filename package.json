@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node local-server.js",
-    "check": "node --check vendedor.js && node --check mapa-local.js && node --check local-server.js && node --check netlify/functions/analyze-product.mjs",
+    "check": "node --check vendedor.js && node --check mapa-local.js && node --check local-server.js && node --check netlify/functions/analyze-product.mjs && node --check netlify/functions/lookup-product.mjs",
     "test": "npm run check"
   },
   "repository": {

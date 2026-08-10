@@ -1026,7 +1026,7 @@
   </style>
   <link rel="stylesheet" href="vendedor-caja.css?v=legado_v1">
   <link rel="stylesheet" href="vendedor-portal.css?v=desktop_v2_crema">
-  <link rel="stylesheet" href="vendedor-stock.css?v=stock_mobile_v2">
+  <link rel="stylesheet" href="vendedor-stock.css?v=stock_noai_v1">
   <link rel="stylesheet" href="vendedor-login.css?v=login_editorial_v1">
 </head>
 <body>
@@ -1396,7 +1396,7 @@
         <div>
           <span class="stock-entry-eyebrow">Ingreso asistido · Revisión humana</span>
           <h2 id="stock-entry-title">Ingresar producto al stock</h2>
-          <p>Fotografiá el envase, dejá que la IA proponga los datos y confirmá la ubicación antes de enviarlo a revisión.</p>
+          <p>Identificá el producto por código o nombre. BÔ busca primero en su catálogo y en fuentes públicas; la foto con IA queda como ayuda opcional.</p>
         </div>
         <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
       </header>
@@ -1416,6 +1416,32 @@
                 <h3 id="stock-photo-title">Foto del producto</h3>
               </div>
               <span class="stock-entry-optional">Obligatoria</span>
+            </div>
+
+            <div class="stock-noai-card" aria-labelledby="stock-noai-title">
+              <div class="stock-noai-heading">
+                <div>
+                  <span class="stock-noai-badge">Sin IA · Sin costo</span>
+                  <h4 id="stock-noai-title">Buscar datos del producto</h4>
+                </div>
+                <span class="stock-noai-source">BÔ + fuentes públicas</span>
+              </div>
+
+              <label for="fastupload-barcode-input">Código de barras</label>
+              <div class="stock-noai-action-row">
+                <input type="text" id="fastupload-barcode-input" class="b2b-form-input" placeholder="Escanear o escribir" inputmode="numeric" autocomplete="off">
+                <button type="button" class="stock-entry-secondary-btn" onclick="focusFastUploadBarcode()">Usar lector</button>
+                <button type="button" class="stock-lookup-btn" data-stock-lookup-button onclick="lookupFastUploadProductWithoutAi('barcode')">Buscar datos</button>
+              </div>
+              <small>La lectora del local funciona como teclado. Al escanear, la búsqueda comienza automáticamente.</small>
+
+              <div class="stock-noai-divider"><span>Si no tiene código</span></div>
+              <label for="fastupload-manual-query-input">Nombre, marca o SKU</label>
+              <div class="stock-noai-action-row stock-noai-manual-row">
+                <input type="search" id="fastupload-manual-query-input" class="b2b-form-input" placeholder="Ej: BioBizz Bio Grow 1 L" autocomplete="off">
+                <button type="button" class="stock-lookup-btn" data-stock-lookup-button onclick="lookupFastUploadProductWithoutAi('manual')">Buscar por nombre</button>
+              </div>
+              <div id="fastupload-lookup-status" class="stock-lookup-status" role="status" aria-live="polite" hidden></div>
             </div>
 
             <input type="file" id="fastupload-camera-input" accept="image/*" capture="environment" aria-label="Sacar una foto del producto" onchange="handleFastUploadPhotoChange(event)" hidden>
@@ -1491,7 +1517,7 @@
               </div>
               <div class="stock-field">
                 <label for="fastupload-market-price-input">Promedio Mercado Libre</label>
-                <input type="number" id="fastupload-market-price-input" class="b2b-form-input" placeholder="Se completa con IA" readonly>
+                <input type="number" id="fastupload-market-price-input" class="b2b-form-input" placeholder="Se completa al buscar" readonly>
               </div>
               <div class="stock-field">
                 <label for="fastupload-sale-price-input">Precio de venta sugerido</label>
@@ -1557,15 +1583,6 @@
               <div class="stock-location-preview" id="fastupload-location-preview">Ubicación pendiente</div>
             </div>
 
-            <div class="stock-barcode-card">
-              <label for="fastupload-barcode-input">Código de barras <span>Opcional</span></label>
-              <div class="stock-barcode-row">
-                <input type="text" id="fastupload-barcode-input" class="b2b-form-input" placeholder="Escanear o escribir" inputmode="numeric" autocomplete="off">
-                <button type="button" onclick="focusFastUploadBarcode()">Usar lector</button>
-              </div>
-              <small>La máquina del local funciona como teclado: enfocá el campo y escaneá.</small>
-            </div>
-
             <div class="stock-qr-card">
               <div id="fastupload-qr-preview" class="stock-qr-preview" aria-label="Vista previa del QR del producto"></div>
               <div>
@@ -1583,7 +1600,7 @@
         </section>
 
         <footer class="stock-entry-submit-row">
-          <p><strong>Antes de enviar:</strong> verificá nombre, presentación, precio y ubicación. La IA puede equivocarse.</p>
+          <p><strong>Antes de enviar:</strong> verificá nombre, presentación, precio y ubicación. Las fuentes automáticas pueden tener datos incompletos.</p>
           <button type="submit" id="fastupload-submit-btn">Enviar producto a revisión</button>
         </footer>
       </form>
@@ -2028,6 +2045,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="mapa-local.js?v=stock_map_v1"></script>
-  <script src="vendedor.js?v=stock_mobile_v2"></script>
+  <script src="vendedor.js?v=stock_noai_v1"></script>
 </body>
 </html>

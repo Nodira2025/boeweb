@@ -2025,6 +2025,7 @@ let fastUploadPreviewUrl = '';
 let fastUploadProductCode = '';
 let fastUploadQrPayload = '';
 let fastUploadAiResult = null;
+let fastUploadLookupResult = null;
 const pendingDraftCache = new Map();
 const FAST_UPLOAD_MAX_FILE_SIZE = 25 * 1024 * 1024;
 const FAST_UPLOAD_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif']);
@@ -2084,7 +2085,17 @@ function initializeFastUploadForm() {
     barcodeInput.addEventListener('keydown', event => {
       if (event.key === 'Enter') {
         event.preventDefault();
-        showToast(`Código de barras registrado: ${barcodeInput.value.trim() || 'vacío'}.`);
+        lookupFastUploadProductWithoutAi('barcode');
+      }
+    });
+  }
+  const manualQueryInput = document.getElementById('fastupload-manual-query-input');
+  if (manualQueryInput && !manualQueryInput.dataset.lookupReady) {
+    manualQueryInput.dataset.lookupReady = 'true';
+    manualQueryInput.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        lookupFastUploadProductWithoutAi('manual');
       }
     });
   }
@@ -2186,7 +2197,7 @@ function handleFastUploadPhotoChange(event) {
   if (status) {
     status.hidden = false;
     status.dataset.state = 'ready';
-    status.textContent = 'Foto lista. Tocá “Analizar foto con IA” para completar la ficha.';
+    status.textContent = 'Foto lista para adjuntar. Podés usar la búsqueda sin IA o analizar el envase como ayuda opcional.';
   }
 }
 
@@ -2253,13 +2264,275 @@ function setStockFieldValue(id, value, overwrite = false) {
   if (overwrite || !field.value.trim()) field.value = String(value);
 }
 
+async function readStockLookupRows(query, sourceName) {
+  const { data, error } = await query;
+  if (error) throw new Error(`${sourceName}: ${error.message}`);
+  return data || [];
+}
+
+function catalogDescriptionToPlainText(value) {
+  if (!value) return null;
+  const source = String(value)
+    .replace(/<br\s*\/?\s*>/gi, '\n')
+    .replace(/<\/(p|div|li)>/gi, '\n');
+  const documentFragment = new DOMParser().parseFromString(source, 'text/html');
+  return (documentFragment.body.textContent || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s*\n+/g, '\n')
+    .trim() || null;
+}
+
+function normalizeCatalogLookup(product, fallback = {}) {
+  if (!product && !fallback.name) return null;
+  const suppliers = product?.supplier_products || [];
+  const localSupplier = suppliers.find(item => item.supplier_id === 'local_store');
+  const linkedSupplier = suppliers.find(item => item.link);
+  const sources = [];
+  if (fallback.official_url) sources.push({ label: 'Página oficial guardada en BÔ', url: fallback.official_url });
+  if (linkedSupplier?.link) sources.push({ label: 'Ficha del proveedor', url: linkedSupplier.link });
+  return {
+    found: true,
+    product: {
+      name: fallback.name || product?.name || null,
+      brand: fallback.brand || null,
+      presentation: fallback.presentation || null,
+      category: fallback.category || product?.category || null,
+      description: catalogDescriptionToPlainText(fallback.description || product?.description),
+      barcode: fallback.barcode || null,
+      official_url: fallback.official_url || null,
+      market_query: fallback.name || product?.name || null,
+      image_url: fallback.image_url || product?.image || null
+    },
+    sale_price: Number(fallback.sale_price) || Number(localSupplier?.price) || null,
+    sources,
+    providers: ['Catálogo BÔ'],
+    warnings: []
+  };
+}
+
+async function fetchCatalogProductById(productId) {
+  if (!productId) return null;
+  const rows = await readStockLookupRows(
+    supabaseClient
+      .from('products')
+      .select('id, name, image, category, description, supplier_products(supplier_id, name, price, stock, available, link)')
+      .eq('id', productId)
+      .limit(1),
+    'Catálogo BÔ'
+  );
+  return rows[0] || null;
+}
+
+async function findLocalStockProduct(barcode, query) {
+  if (!supabaseClient) return null;
+  if (barcode) {
+    const locationRows = await readStockLookupRows(
+      supabaseClient
+        .from('product_locations')
+        .select('*')
+        .eq('barcode', barcode)
+        .limit(1),
+      'Ubicaciones BÔ'
+    );
+    const location = locationRows[0];
+    if (location) {
+      const product = await fetchCatalogProductById(location.product_id);
+      return normalizeCatalogLookup(product, {
+        name: location.name,
+        barcode: location.barcode,
+        image_url: location.image_url
+      });
+    }
+
+    const draftRows = await readStockLookupRows(
+      supabaseClient
+        .from('product_drafts')
+        .select('*')
+        .eq('barcode', barcode)
+        .neq('status', 'REJECTED')
+        .order('updated_at', { ascending: false })
+        .limit(1),
+      'Ingresos anteriores de BÔ'
+    );
+    const draft = draftRows[0] ? hydrateProductDraft(draftRows[0]) : null;
+    if (draft) return normalizeCatalogLookup(null, draft);
+  }
+
+  const safeQuery = String(query || '')
+    .replace(/[%_,]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+  if (safeQuery.length < 2) return null;
+
+  let catalogRows = await readStockLookupRows(
+    supabaseClient
+      .from('products')
+      .select('id, name, image, category, description, supplier_products(supplier_id, name, price, stock, available, link)')
+      .ilike('name', `%${safeQuery}%`)
+      .limit(3),
+    'Catálogo BÔ'
+  );
+  if (!catalogRows.length) {
+    const firstUsefulTerm = safeQuery.split(' ').find(term => term.length >= 4);
+    if (firstUsefulTerm && firstUsefulTerm !== safeQuery) {
+      catalogRows = await readStockLookupRows(
+        supabaseClient
+          .from('products')
+          .select('id, name, image, category, description, supplier_products(supplier_id, name, price, stock, available, link)')
+          .ilike('name', `%${firstUsefulTerm}%`)
+          .limit(3),
+        'Catálogo BÔ'
+      );
+    }
+  }
+  return catalogRows[0] ? normalizeCatalogLookup(catalogRows[0]) : null;
+}
+
+async function fetchExternalStockLookup(barcode, query) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 30_000);
+  try {
+    const response = await fetch('/.netlify/functions/lookup-product', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({ barcode: barcode || null, query: query || null })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.message || 'Las fuentes externas no respondieron.');
+    return result;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function mergeStockLookupResults(localResult, externalResult) {
+  const localProduct = localResult?.product || {};
+  const externalProduct = externalResult?.product || {};
+  const fields = [
+    'name', 'brand', 'presentation', 'category', 'description', 'barcode',
+    'official_url', 'market_query', 'image_url'
+  ];
+  const product = {};
+  fields.forEach(field => {
+    product[field] = localProduct[field] || externalProduct[field] || null;
+  });
+
+  const sourcesByUrl = new Map();
+  [...(localResult?.sources || []), ...(externalResult?.sources || [])].forEach(source => {
+    if (source?.url) sourcesByUrl.set(source.url, source);
+  });
+  return {
+    mode: 'lookup_without_ai',
+    found: Boolean(localResult?.found || externalResult?.found),
+    product,
+    sale_price: localResult?.sale_price || null,
+    market: externalResult?.market || null,
+    sources: [...sourcesByUrl.values()],
+    providers: [...new Set([...(localResult?.providers || []), ...(externalResult?.providers || [])])],
+    warnings: [...(localResult?.warnings || []), ...(externalResult?.warnings || [])]
+  };
+}
+
+function setStockLookupLoading(isLoading) {
+  document.querySelectorAll('[data-stock-lookup-button]').forEach(button => {
+    button.disabled = isLoading;
+  });
+}
+
+function applyStockLookupResult(result) {
+  const product = result.product || {};
+  setStockFieldValue('fastupload-name-input', product.name);
+  setStockFieldValue('fastupload-brand-input', product.brand);
+  setStockFieldValue('fastupload-presentation-input', product.presentation);
+  setStockFieldValue('fastupload-category-input', product.category);
+  setStockFieldValue('fastupload-description-input', product.description);
+  setStockFieldValue('fastupload-official-url-input', product.official_url);
+  setStockFieldValue('fastupload-barcode-input', product.barcode);
+  if (result.market?.average_price) {
+    setStockFieldValue('fastupload-market-price-input', Math.round(result.market.average_price), true);
+  }
+  const suggestedPrice = result.sale_price || result.market?.median_price || result.market?.average_price;
+  setStockFieldValue('fastupload-sale-price-input', suggestedPrice ? Math.round(suggestedPrice) : null);
+  renderAiSourceLinks(result);
+}
+
+async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
+  const status = document.getElementById('fastupload-lookup-status');
+  if (!status) return;
+  const barcode = document.getElementById('fastupload-barcode-input')?.value.replace(/[\s-]+/g, '') || '';
+  const manualQuery = document.getElementById('fastupload-manual-query-input')?.value.trim() || '';
+  const identityQuery = [
+    manualQuery,
+    document.getElementById('fastupload-brand-input')?.value.trim(),
+    document.getElementById('fastupload-name-input')?.value.trim(),
+    document.getElementById('fastupload-presentation-input')?.value.trim()
+  ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+
+  if (mode === 'barcode' && barcode && !/^\d{6,18}$/.test(barcode)) {
+    status.hidden = false;
+    status.dataset.state = 'error';
+    status.textContent = 'Revisá el código: debe contener entre 6 y 18 números.';
+    return;
+  }
+  if (!barcode && identityQuery.length < 2) {
+    status.hidden = false;
+    status.dataset.state = 'error';
+    status.textContent = 'Escaneá un código o escribí el nombre, la marca o el SKU.';
+    return;
+  }
+
+  setStockLookupLoading(true);
+  status.hidden = false;
+  status.dataset.state = 'loading';
+  status.textContent = 'Buscando primero en BÔ y después en fuentes públicas, sin usar IA…';
+
+  try {
+    const [localAttempt, externalAttempt] = await Promise.allSettled([
+      findLocalStockProduct(barcode, identityQuery),
+      fetchExternalStockLookup(barcode, identityQuery)
+    ]);
+    const localResult = localAttempt.status === 'fulfilled' ? localAttempt.value : null;
+    const externalResult = externalAttempt.status === 'fulfilled' ? externalAttempt.value : null;
+    if (!localResult && !externalResult) {
+      const reason = externalAttempt.status === 'rejected' ? externalAttempt.reason : localAttempt.reason;
+      throw reason || new Error('No se pudo completar la búsqueda.');
+    }
+
+    const result = mergeStockLookupResults(localResult, externalResult);
+    fastUploadLookupResult = result;
+    if (!result.found) {
+      status.dataset.state = 'error';
+      status.textContent = 'No encontramos una coincidencia confiable. Podés completar los campos manualmente y BÔ la recordará para la próxima.';
+      return;
+    }
+
+    applyStockLookupResult(result);
+    const providers = result.providers.length ? result.providers.join(', ') : 'fuentes disponibles';
+    const marketCopy = result.market?.sample_size
+      ? ` Precio estimado con ${result.market.sample_size} publicaciones comparables.`
+      : (result.warnings.length ? '' : ' El precio puede completarse manualmente.');
+    const warningCopy = result.warnings.length ? ` ${result.warnings.join(' ')}` : '';
+    status.dataset.state = 'success';
+    status.textContent = `Datos encontrados en ${providers}.${marketCopy}${warningCopy} Revisalos antes de enviar.`;
+  } catch (error) {
+    console.error('Error en búsqueda de producto sin IA:', error);
+    status.dataset.state = 'error';
+    status.textContent = `${error.name === 'AbortError' ? 'La búsqueda tardó demasiado.' : error.message} Podés continuar manualmente o usar la foto con IA.`;
+  } finally {
+    setStockLookupLoading(false);
+  }
+}
+
 function renderAiSourceLinks(result) {
   const container = document.getElementById('fastupload-source-links');
   if (!container) return;
   container.innerHTML = '';
   const candidates = [];
   if (result.product?.official_url) candidates.push({ label: 'Página oficial', url: result.product.official_url });
-  (result.sources || []).forEach(source => candidates.push({ label: source.title || 'Fuente consultada', url: source.url }));
+  (result.sources || []).forEach(source => candidates.push({ label: source.title || source.label || 'Fuente consultada', url: source.url }));
   (result.market?.results || []).slice(0, 3).forEach(item => candidates.push({ label: 'Ver referencia en Mercado Libre', url: item.permalink }));
   const valid = candidates.filter(item => {
     try {
@@ -2414,7 +2687,7 @@ async function submitProductDraft(event) {
       .getPublicUrl(filePath);
 
     const imageUrl = urlData ? urlData.publicUrl : '';
-    const marketResult = fastUploadAiResult?.market || {};
+    const marketResult = fastUploadAiResult?.market || fastUploadLookupResult?.market || {};
     const metadata = {
       product_code: fastUploadProductCode,
       name: nameVal,
@@ -2431,7 +2704,10 @@ async function submitProductDraft(event) {
       shelf_code: shelfVal,
       shelf_level: shelfLevelVal,
       ai_confidence: Number(fastUploadAiResult?.product?.confidence) || null,
-      ai_payload: fastUploadAiResult || null,
+      ai_payload: (fastUploadAiResult || fastUploadLookupResult) ? {
+        ai: fastUploadAiResult,
+        lookup_without_ai: fastUploadLookupResult
+      } : null,
       qr_payload: fastUploadQrPayload
     };
     const fullDraft = {
@@ -2471,6 +2747,7 @@ async function submitProductDraft(event) {
 
     fastUploadSelectedFile = null;
     fastUploadAiResult = null;
+    fastUploadLookupResult = null;
     revokeFastUploadPreviewUrl();
     fastUploadProductCode = createProductCode();
     document.getElementById('fast-upload-form').reset();
@@ -2478,6 +2755,7 @@ async function submitProductDraft(event) {
     document.getElementById('fastupload-photo-preview-container').hidden = true;
     document.getElementById('fastupload-ai-btn').disabled = true;
     document.getElementById('fastupload-ai-status').hidden = true;
+    document.getElementById('fastupload-lookup-status').hidden = true;
     document.getElementById('fastupload-ai-confidence').hidden = true;
     document.getElementById('fastupload-source-links').innerHTML = '';
     initializeFastUploadForm();
