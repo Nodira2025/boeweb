@@ -2149,7 +2149,7 @@ function isSupportedFastUploadImage(file) {
 
 function revokeFastUploadPreviewUrl() {
   if (!fastUploadPreviewUrl) return;
-  URL.revokeObjectURL(fastUploadPreviewUrl);
+  if (fastUploadPreviewUrl.startsWith('blob:')) URL.revokeObjectURL(fastUploadPreviewUrl);
   fastUploadPreviewUrl = '';
 }
 
@@ -2287,12 +2287,12 @@ async function handleFastUploadPhotoChange(event) {
     const preparedFile = isHeic ? await convertHeicToJpeg(file) : file;
     const decoded = await decodeFastUploadImage(preparedFile);
     if (selectionId !== fastUploadPhotoSelectionId) {
-      URL.revokeObjectURL(decoded.objectUrl);
+      if (decoded.objectUrl) URL.revokeObjectURL(decoded.objectUrl);
       return;
     }
 
     revokeFastUploadPreviewUrl();
-    fastUploadPreviewUrl = decoded.objectUrl;
+    fastUploadPreviewUrl = decoded.previewUrl;
     fastUploadSelectedFile = preparedFile;
     if (elements.previewImg) {
       elements.previewImg.onerror = () => {
@@ -2325,17 +2325,33 @@ async function handleFastUploadPhotoChange(event) {
   }
 }
 
-function decodeFastUploadImage(file) {
-  const objectUrl = URL.createObjectURL(file);
+function loadFastUploadImageSource(source) {
   return new Promise((resolve, reject) => {
     const image = new Image();
-    image.onload = () => resolve({ image, objectUrl });
-    image.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error('El navegador no pudo procesar esta foto. Probá con una imagen JPG o PNG.'));
-    };
-    image.src = objectUrl;
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('El navegador no pudo decodificar la imagen.'));
+    image.src = source;
   });
+}
+
+async function decodeFastUploadImage(file) {
+  let objectUrl = '';
+  try {
+    objectUrl = URL.createObjectURL(file);
+    const image = await loadFastUploadImageSource(objectUrl);
+    return { image, objectUrl, previewUrl: objectUrl };
+  } catch (objectUrlError) {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    try {
+      // Algunos navegadores Android fallan con blob:, pero sí leen el mismo archivo como Data URL.
+      const dataUrl = await blobToDataUrl(file);
+      const image = await loadFastUploadImageSource(dataUrl);
+      return { image, objectUrl: '', previewUrl: dataUrl };
+    } catch (dataUrlError) {
+      console.warn('Fallaron las dos formas de lectura de la foto:', { objectUrlError, dataUrlError });
+      throw new Error('El navegador no pudo leer esta foto aunque el formato sea compatible.');
+    }
+  }
 }
 
 function calculateCompressedImageSize(image, maxWidth, maxHeight) {
@@ -2370,7 +2386,7 @@ async function compressImageFile(file, maxWidth = 1000, maxHeight = 1000, qualit
     context.drawImage(decoded.image, 0, 0, width, height);
     return await canvasToJpegBlob(canvas, quality);
   } finally {
-    URL.revokeObjectURL(decoded.objectUrl);
+    if (decoded.objectUrl) URL.revokeObjectURL(decoded.objectUrl);
   }
 }
 
