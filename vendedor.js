@@ -2026,9 +2026,13 @@ let fastUploadProductCode = '';
 let fastUploadQrPayload = '';
 let fastUploadAiResult = null;
 let fastUploadLookupResult = null;
+let fastUploadPhotoSelectionId = 0;
+let heicConverterPromise = null;
 const pendingDraftCache = new Map();
 const FAST_UPLOAD_MAX_FILE_SIZE = 25 * 1024 * 1024;
 const FAST_UPLOAD_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif']);
+const HEIC_CONVERTER_URL = 'https://cdn.jsdelivr.net/npm/heic-to@1.5.2/dist/iife/heic-to.js';
+const HEIC_BRANDS = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1']);
 
 function escapeStockHtml(value) {
   return String(value ?? '')
@@ -2149,7 +2153,111 @@ function revokeFastUploadPreviewUrl() {
   fastUploadPreviewUrl = '';
 }
 
-function handleFastUploadPhotoChange(event) {
+function getFastUploadPhotoElements() {
+  return {
+    previewImg: document.getElementById('fastupload-photo-img'),
+    trigger: document.getElementById('fastupload-photo-trigger'),
+    previewContainer: document.getElementById('fastupload-photo-preview-container'),
+    analyzeButton: document.getElementById('fastupload-ai-btn'),
+    status: document.getElementById('fastupload-ai-status')
+  };
+}
+
+function setFastUploadPhotoError(message, elements = getFastUploadPhotoElements()) {
+  fastUploadSelectedFile = null;
+  revokeFastUploadPreviewUrl();
+  if (elements.previewImg) {
+    elements.previewImg.removeAttribute('src');
+    elements.previewImg.onerror = null;
+    elements.previewImg.onload = null;
+  }
+  if (elements.trigger) elements.trigger.hidden = false;
+  if (elements.previewContainer) elements.previewContainer.hidden = true;
+  if (elements.analyzeButton) elements.analyzeButton.disabled = true;
+  if (elements.status) {
+    elements.status.hidden = false;
+    elements.status.dataset.state = 'error';
+    elements.status.textContent = message;
+  }
+}
+
+async function hasHeicContainerSignature(file) {
+  const mimeType = String(file.type || '').toLowerCase();
+  const extension = file.name?.split('.').pop()?.toLowerCase();
+  if (mimeType.includes('heic') || mimeType.includes('heif') || extension === 'heic' || extension === 'heif') {
+    return true;
+  }
+
+  try {
+    const header = new Uint8Array(await file.slice(0, 32).arrayBuffer());
+    if (header.length < 12) return false;
+    const boxType = String.fromCharCode(...header.slice(4, 8));
+    if (boxType !== 'ftyp') return false;
+    const majorBrand = String.fromCharCode(...header.slice(8, 12)).toLowerCase();
+    if (majorBrand === 'avif' || majorBrand === 'avis') return false;
+    // HEIC puede llegar desde Android con nombre .jpg; las marcas del contenedor son más confiables.
+    for (let offset = 8; offset + 4 <= header.length; offset += 4) {
+      const brand = String.fromCharCode(...header.slice(offset, offset + 4)).toLowerCase();
+      if (HEIC_BRANDS.has(brand)) return true;
+    }
+  } catch (error) {
+    console.warn('No se pudo inspeccionar el formato interno de la foto:', error);
+  }
+  return false;
+}
+
+function loadHeicConverter() {
+  if (typeof window.HeicTo === 'function') return Promise.resolve(window.HeicTo);
+  if (heicConverterPromise) return heicConverterPromise;
+
+  heicConverterPromise = new Promise((resolve, reject) => {
+    const existingScript = document.querySelector(`script[src="${HEIC_CONVERTER_URL}"]`);
+    const script = existingScript || document.createElement('script');
+    const handleLoad = () => {
+      if (typeof window.HeicTo === 'function') resolve(window.HeicTo);
+      else reject(new Error('El conversor de fotos no quedó disponible.'));
+    };
+    const handleError = () => reject(new Error('No se pudo cargar el conversor de fotos HEIC.'));
+    script.addEventListener('load', handleLoad, { once: true });
+    script.addEventListener('error', handleError, { once: true });
+    if (!existingScript) {
+      script.src = HEIC_CONVERTER_URL;
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+      document.head.appendChild(script);
+    }
+  }).catch(error => {
+    document.querySelector(`script[src="${HEIC_CONVERTER_URL}"]`)?.remove();
+    heicConverterPromise = null;
+    throw error;
+  });
+  return heicConverterPromise;
+}
+
+async function convertHeicToJpeg(file) {
+  const converter = await loadHeicConverter();
+  const result = await converter({
+    blob: file,
+    type: 'image/jpeg',
+    quality: 0.86
+  });
+  const jpegBlob = Array.isArray(result) ? result[0] : result;
+  if (!(jpegBlob instanceof Blob) || !jpegBlob.size) {
+    throw new Error('La foto HEIC no pudo convertirse a JPG.');
+  }
+  const baseName = String(file.name || 'foto-producto').replace(/\.(heic|heif)$/i, '');
+  return new File([jpegBlob], `${baseName}.jpg`, {
+    type: 'image/jpeg',
+    lastModified: file.lastModified || Date.now()
+  });
+}
+
+async function prepareFastUploadImage(file) {
+  const isHeic = await hasHeicContainerSignature(file);
+  return isHeic ? await convertHeicToJpeg(file) : file;
+}
+
+async function handleFastUploadPhotoChange(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
 
@@ -2164,40 +2272,56 @@ function handleFastUploadPhotoChange(event) {
     return;
   }
 
-  fastUploadSelectedFile = file;
+  const selectionId = ++fastUploadPhotoSelectionId;
   fastUploadAiResult = null;
-
-  const previewImg = document.getElementById('fastupload-photo-img');
-  const trigger = document.getElementById('fastupload-photo-trigger');
-  const previewContainer = document.getElementById('fastupload-photo-preview-container');
-  const analyzeButton = document.getElementById('fastupload-ai-btn');
-  const status = document.getElementById('fastupload-ai-status');
-
-  revokeFastUploadPreviewUrl();
-  fastUploadPreviewUrl = URL.createObjectURL(file);
-  if (previewImg) {
-    previewImg.onerror = () => {
-      fastUploadSelectedFile = null;
-      if (analyzeButton) analyzeButton.disabled = true;
-      if (status) {
-        status.hidden = false;
-        status.dataset.state = 'error';
-        status.textContent = 'El teléfono no pudo abrir esta imagen. Probá compartirla o guardarla como JPG y elegila nuevamente.';
-      }
-    };
-    previewImg.onload = () => {
-      previewImg.onerror = null;
-      previewImg.onload = null;
-    };
-    previewImg.src = fastUploadPreviewUrl;
+  const elements = getFastUploadPhotoElements();
+  if (elements.analyzeButton) elements.analyzeButton.disabled = true;
+  if (elements.status) {
+    elements.status.hidden = false;
+    elements.status.dataset.state = 'loading';
+    elements.status.textContent = 'Preparando la foto para este teléfono…';
   }
-  if (trigger) trigger.hidden = true;
-  if (previewContainer) previewContainer.hidden = false;
-  if (analyzeButton) analyzeButton.disabled = false;
-  if (status) {
-    status.hidden = false;
-    status.dataset.state = 'ready';
-    status.textContent = 'Foto lista para adjuntar. Podés usar la búsqueda sin IA o analizar el envase como ayuda opcional.';
+
+  try {
+    const isHeic = await hasHeicContainerSignature(file);
+    const preparedFile = isHeic ? await convertHeicToJpeg(file) : file;
+    const decoded = await decodeFastUploadImage(preparedFile);
+    if (selectionId !== fastUploadPhotoSelectionId) {
+      URL.revokeObjectURL(decoded.objectUrl);
+      return;
+    }
+
+    revokeFastUploadPreviewUrl();
+    fastUploadPreviewUrl = decoded.objectUrl;
+    fastUploadSelectedFile = preparedFile;
+    if (elements.previewImg) {
+      elements.previewImg.onerror = () => {
+        setFastUploadPhotoError('No pudimos mostrar esta foto. Elegí otra imagen o volvé a sacarla.', elements);
+      };
+      elements.previewImg.onload = () => {
+        elements.previewImg.onerror = null;
+        elements.previewImg.onload = null;
+      };
+      elements.previewImg.src = fastUploadPreviewUrl;
+    }
+    if (elements.trigger) elements.trigger.hidden = true;
+    if (elements.previewContainer) elements.previewContainer.hidden = false;
+    if (elements.analyzeButton) elements.analyzeButton.disabled = false;
+    if (elements.status) {
+      elements.status.hidden = false;
+      elements.status.dataset.state = 'ready';
+      elements.status.textContent = isHeic
+        ? 'Foto HEIC convertida a JPG y lista. Ya podés analizarla o adjuntarla.'
+        : 'Foto lista para adjuntar. Podés usar la búsqueda sin IA o analizar el envase como ayuda opcional.';
+    }
+  } catch (error) {
+    console.error('Error al preparar la foto seleccionada:', error);
+    if (selectionId !== fastUploadPhotoSelectionId) return;
+    setFastUploadPhotoError(
+      'No pudimos preparar esta foto. Revisá tu conexión y volvé a elegirla; también podés sacar una nueva.',
+      elements
+    );
+    event.target.value = '';
   }
 }
 
@@ -2232,7 +2356,8 @@ function canvasToJpegBlob(canvas, quality) {
 }
 
 async function compressImageFile(file, maxWidth = 1000, maxHeight = 1000, quality = 0.75) {
-  const decoded = await decodeFastUploadImage(file);
+  const compatibleFile = await prepareFastUploadImage(file);
+  const decoded = await decodeFastUploadImage(compatibleFile);
   try {
     const { width, height } = calculateCompressedImageSize(decoded.image, maxWidth, maxHeight);
     const canvas = document.createElement('canvas');
