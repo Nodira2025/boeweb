@@ -101,7 +101,7 @@ function getAiProviderConfig() {
       name: 'OpenRouter',
       apiKey: process.env.OPENROUTER_API_KEY,
       endpoint: OPENROUTER_RESPONSES_URL,
-      model: process.env.OPENROUTER_PRODUCT_MODEL || 'openai/gpt-5.6-luna',
+      model: process.env.OPENROUTER_PRODUCT_MODEL || 'openrouter/free',
       tools: [{
         type: 'openrouter:web_search',
         parameters: { engine: 'auto', max_total_results: 5, search_context_size: 'low' }

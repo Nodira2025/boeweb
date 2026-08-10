@@ -30,7 +30,7 @@ Las claves son privadas y nunca deben escribirse en `vendedor.js` ni subirse a G
 
    ```env
    OPENROUTER_API_KEY=tu_clave_privada_sk_or
-   OPENROUTER_PRODUCT_MODEL=openai/gpt-5.6-luna
+   OPENROUTER_PRODUCT_MODEL=openrouter/free
    ```
 
 2. Opcionalmente agregar un token de Mercado Libre para mejorar la disponibilidad de la búsqueda:
