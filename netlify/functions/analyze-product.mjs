@@ -97,11 +97,15 @@ function extractWebSources(openAiResponse) {
 
 function getAiProviderConfig() {
   if (process.env.OPENROUTER_API_KEY) {
+    const models = [
+      process.env.OPENROUTER_PRODUCT_MODEL || 'openrouter/free',
+      process.env.OPENROUTER_FALLBACK_MODEL || 'openai/gpt-5-nano'
+    ];
     return {
       name: 'OpenRouter',
       apiKey: process.env.OPENROUTER_API_KEY,
       endpoint: OPENROUTER_RESPONSES_URL,
-      model: process.env.OPENROUTER_PRODUCT_MODEL || 'openrouter/free',
+      models: [...new Set(models.filter(Boolean))],
       tools: [{
         type: 'openrouter:web_search',
         parameters: { engine: 'auto', max_total_results: 5, search_context_size: 'low' }
@@ -113,14 +117,14 @@ function getAiProviderConfig() {
       name: 'OpenAI',
       apiKey: process.env.OPENAI_API_KEY,
       endpoint: OPENAI_RESPONSES_URL,
-      model: process.env.OPENAI_PRODUCT_MODEL || 'gpt-5.6',
+      models: [process.env.OPENAI_PRODUCT_MODEL || 'gpt-5.6'],
       tools: [{ type: 'web_search' }]
     };
   }
   return null;
 }
 
-async function analyzeWithAI(imageDataUrl, barcode, hints, provider) {
+function buildAiRequestBody(imageDataUrl, barcode, hints, provider, model) {
   const prompt = [
     'Analizá la foto de este producto para ayudar a un vendedor de Argentina a ingresarlo al stock.',
     'Extraé únicamente datos visibles o que puedas verificar con una fuente pública confiable.',
@@ -132,9 +136,8 @@ async function analyzeWithAI(imageDataUrl, barcode, hints, provider) {
     `Pistas manuales: ${JSON.stringify(hints || {})}.`
   ].join('\n');
   const requestBody = {
-    model: provider.model,
+    model,
     store: false,
-    reasoning: { effort: 'low' },
     input: [{
       role: 'user',
       content: [
@@ -153,6 +156,12 @@ async function analyzeWithAI(imageDataUrl, barcode, hints, provider) {
     },
     max_output_tokens: 1400
   };
+  if (model !== 'openrouter/free') requestBody.reasoning = { effort: 'low' };
+  return requestBody;
+}
+
+async function analyzeWithModel(imageDataUrl, barcode, hints, provider, model) {
+  const requestBody = buildAiRequestBody(imageDataUrl, barcode, hints, provider, model);
   const headers = {
     Authorization: `Bearer ${provider.apiKey}`,
     'Content-Type': 'application/json'
@@ -173,7 +182,21 @@ async function analyzeWithAI(imageDataUrl, barcode, hints, provider) {
   }
   const outputText = extractResponseText(payload);
   if (!outputText) throw new Error('El modelo no devolvió datos estructurados.');
-  return { product: JSON.parse(outputText), sources: extractWebSources(payload) };
+  return { product: JSON.parse(outputText), sources: extractWebSources(payload), model };
+}
+
+async function analyzeWithAI(imageDataUrl, barcode, hints, provider) {
+  const errors = [];
+  for (const model of provider.models) {
+    try {
+      return await analyzeWithModel(imageDataUrl, barcode, hints, provider, model);
+    } catch (error) {
+      errors.push(`${model}: ${error.message}`);
+      console.warn(`Falló el análisis con ${model}:`, error.message);
+    }
+  }
+  console.error('Todos los modelos de análisis fallaron:', errors.join(' | '));
+  throw new Error('La IA no pudo procesar la foto. Reintentá en unos segundos.');
 }
 
 function calculateMarketStats(items) {

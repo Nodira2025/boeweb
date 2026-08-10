@@ -1026,7 +1026,7 @@
   </style>
   <link rel="stylesheet" href="vendedor-caja.css?v=legado_v1">
   <link rel="stylesheet" href="vendedor-portal.css?v=desktop_v2_crema">
-  <link rel="stylesheet" href="vendedor-stock.css?v=stock_v1">
+  <link rel="stylesheet" href="vendedor-stock.css?v=stock_mobile_v2">
   <link rel="stylesheet" href="vendedor-login.css?v=login_editorial_v1">
 </head>
 <body>
@@ -1418,16 +1418,28 @@
               <span class="stock-entry-optional">Obligatoria</span>
             </div>
 
-            <input type="file" id="fastupload-photo-input" accept="image/jpeg,image/png,image/webp" capture="environment" onchange="handleFastUploadPhotoChange(event)" hidden required>
-            <button type="button" class="stock-photo-dropzone" id="fastupload-photo-trigger" onclick="document.getElementById('fastupload-photo-input').click()">
+            <input type="file" id="fastupload-camera-input" accept="image/*" capture="environment" aria-label="Sacar una foto del producto" onchange="handleFastUploadPhotoChange(event)" hidden>
+            <input type="file" id="fastupload-gallery-input" accept="image/*,.heic,.heif" aria-label="Elegir una foto del producto desde la galería" onchange="handleFastUploadPhotoChange(event)" hidden>
+            <div class="stock-photo-dropzone" id="fastupload-photo-trigger" role="group" aria-labelledby="stock-photo-choice-title" aria-describedby="stock-photo-choice-help">
               <span class="stock-photo-icon" aria-hidden="true">◎</span>
-              <strong>Sacar foto o elegir imagen</strong>
-              <small>Frente del envase, con marca y presentación visibles.</small>
-            </button>
+              <strong id="stock-photo-choice-title">Elegí cómo cargar la foto</strong>
+              <small id="stock-photo-choice-help">Usá el frente del envase, con marca y presentación visibles.</small>
+              <div class="stock-photo-actions">
+                <button type="button" class="stock-photo-choice stock-photo-choice-primary" onclick="openFastUploadPhotoPicker('fastupload-camera-input')">
+                  <span aria-hidden="true">◉</span> Sacar foto
+                </button>
+                <button type="button" class="stock-photo-choice" onclick="openFastUploadPhotoPicker('fastupload-gallery-input')">
+                  <span aria-hidden="true">▣</span> Elegir de galería
+                </button>
+              </div>
+            </div>
 
             <div id="fastupload-photo-preview-container" class="stock-photo-preview" hidden>
               <img id="fastupload-photo-img" src="" alt="Vista previa del producto seleccionado">
-              <button type="button" class="stock-entry-secondary-btn" onclick="document.getElementById('fastupload-photo-input').click()">Cambiar foto</button>
+              <div class="stock-photo-actions stock-photo-change-actions" role="group" aria-label="Cambiar foto del producto">
+                <button type="button" class="stock-entry-secondary-btn" onclick="openFastUploadPhotoPicker('fastupload-camera-input')">Sacar otra</button>
+                <button type="button" class="stock-entry-secondary-btn" onclick="openFastUploadPhotoPicker('fastupload-gallery-input')">Elegir de galería</button>
+              </div>
             </div>
 
             <button type="button" id="fastupload-ai-btn" class="stock-ai-btn" onclick="analyzeFastUploadPhoto()" disabled>
@@ -2016,6 +2028,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="mapa-local.js?v=stock_map_v1"></script>
-  <script src="vendedor.js?v=stock_entry_v1"></script>
+  <script src="vendedor.js?v=stock_mobile_v2"></script>
 </body>
 </html>

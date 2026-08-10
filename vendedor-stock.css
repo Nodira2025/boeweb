@@ -221,6 +221,48 @@
   font-size: 0.72rem;
 }
 
+.stock-photo-actions {
+  width: 100%;
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stock-photo-choice {
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid rgba(62, 95, 31, 0.28);
+  border-radius: 14px;
+  background: var(--vendor-paper);
+  color: var(--vendor-forest);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.stock-photo-choice-primary {
+  border-color: var(--vendor-forest);
+  background: var(--vendor-forest);
+  color: #f6f3e8;
+}
+
+.stock-photo-choice:hover,
+.stock-photo-choice:focus-visible {
+  border-color: var(--vendor-gold);
+  outline: 3px solid rgba(194, 162, 70, 0.18);
+  outline-offset: 2px;
+}
+
+.stock-photo-change-actions {
+  margin-top: 0;
+}
+
+.stock-photo-change-actions .stock-entry-secondary-btn {
+  width: 100%;
+}
+
 .stock-photo-preview[hidden],
 .stock-photo-dropzone[hidden],
 .stock-ai-status[hidden],
@@ -1033,6 +1075,15 @@
 
   .stock-entry-panel {
     padding: 20px 15px;
+  }
+
+  .stock-photo-dropzone {
+    min-height: 250px;
+    padding: 22px 16px;
+  }
+
+  .stock-photo-actions {
+    grid-template-columns: 1fr;
   }
 
   .stock-entry-submit-row,

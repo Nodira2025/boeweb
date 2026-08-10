@@ -2021,10 +2021,13 @@ function sendVendorWhatsAppPromo(phone, clientName, promoType) {
 // ==========================================
 
 let fastUploadSelectedFile = null;
+let fastUploadPreviewUrl = '';
 let fastUploadProductCode = '';
 let fastUploadQrPayload = '';
 let fastUploadAiResult = null;
 const pendingDraftCache = new Map();
+const FAST_UPLOAD_MAX_FILE_SIZE = 25 * 1024 * 1024;
+const FAST_UPLOAD_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif']);
 
 function escapeStockHtml(value) {
   return String(value ?? '')
@@ -2115,17 +2118,37 @@ function openMapForStockEntry() {
   if (shelf) renderStoreMapUI(null, shelf, level);
 }
 
+function openFastUploadPhotoPicker(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  // Limpiar el valor permite volver a seleccionar la misma foto en Android e iOS.
+  input.value = '';
+  input.click();
+}
+
+function isSupportedFastUploadImage(file) {
+  if (file.type && file.type.startsWith('image/')) return true;
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  return FAST_UPLOAD_IMAGE_EXTENSIONS.has(extension);
+}
+
+function revokeFastUploadPreviewUrl() {
+  if (!fastUploadPreviewUrl) return;
+  URL.revokeObjectURL(fastUploadPreviewUrl);
+  fastUploadPreviewUrl = '';
+}
+
 function handleFastUploadPhotoChange(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
 
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-    showToast('La foto debe ser JPG, PNG o WebP.');
+  if (!isSupportedFastUploadImage(file)) {
+    showToast('Elegí una foto JPG, PNG, WebP, HEIC o HEIF.');
     event.target.value = '';
     return;
   }
-  if (file.size > 12 * 1024 * 1024) {
-    showToast('La imagen supera 12 MB. Elegí una foto más liviana.');
+  if (file.size > FAST_UPLOAD_MAX_FILE_SIZE) {
+    showToast('La imagen supera 25 MB. Elegí una foto más liviana.');
     event.target.value = '';
     return;
   }
@@ -2133,65 +2156,86 @@ function handleFastUploadPhotoChange(event) {
   fastUploadSelectedFile = file;
   fastUploadAiResult = null;
 
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const previewImg = document.getElementById('fastupload-photo-img');
-    const trigger = document.getElementById('fastupload-photo-trigger');
-    const previewContainer = document.getElementById('fastupload-photo-preview-container');
-    const analyzeButton = document.getElementById('fastupload-ai-btn');
-    const status = document.getElementById('fastupload-ai-status');
+  const previewImg = document.getElementById('fastupload-photo-img');
+  const trigger = document.getElementById('fastupload-photo-trigger');
+  const previewContainer = document.getElementById('fastupload-photo-preview-container');
+  const analyzeButton = document.getElementById('fastupload-ai-btn');
+  const status = document.getElementById('fastupload-ai-status');
 
-    if (previewImg) previewImg.src = e.target.result;
-    if (trigger) trigger.hidden = true;
-    if (previewContainer) previewContainer.hidden = false;
-    if (analyzeButton) analyzeButton.disabled = false;
-    if (status) status.hidden = true;
-  };
-  reader.onerror = () => showToast('No pudimos leer la imagen seleccionada.');
-  reader.readAsDataURL(file);
+  revokeFastUploadPreviewUrl();
+  fastUploadPreviewUrl = URL.createObjectURL(file);
+  if (previewImg) {
+    previewImg.onerror = () => {
+      fastUploadSelectedFile = null;
+      if (analyzeButton) analyzeButton.disabled = true;
+      if (status) {
+        status.hidden = false;
+        status.dataset.state = 'error';
+        status.textContent = 'El teléfono no pudo abrir esta imagen. Probá compartirla o guardarla como JPG y elegila nuevamente.';
+      }
+    };
+    previewImg.onload = () => {
+      previewImg.onerror = null;
+      previewImg.onload = null;
+    };
+    previewImg.src = fastUploadPreviewUrl;
+  }
+  if (trigger) trigger.hidden = true;
+  if (previewContainer) previewContainer.hidden = false;
+  if (analyzeButton) analyzeButton.disabled = false;
+  if (status) {
+    status.hidden = false;
+    status.dataset.state = 'ready';
+    status.textContent = 'Foto lista. Tocá “Analizar foto con IA” para completar la ficha.';
+  }
 }
 
-// Canvas Compression Helper
-function compressImageFile(file, maxWidth = 1000, maxHeight = 1000, quality = 0.75) {
+function decodeFastUploadImage(file) {
+  const objectUrl = URL.createObjectURL(file);
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const img = new Image();
-      img.onload = function() {
-        let width = img.width;
-        let height = img.height;
-
-        if (width > maxWidth || height > maxHeight) {
-          if (width > height) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          } else {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('Error al comprimir la imagen en Canvas.'));
-          }
-        }, 'image/jpeg', quality);
-      };
-      img.onerror = (err) => reject(err);
-      img.src = e.target.result;
+    const image = new Image();
+    image.onload = () => resolve({ image, objectUrl });
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('El navegador no pudo procesar esta foto. Probá con una imagen JPG o PNG.'));
     };
-    reader.onerror = (err) => reject(err);
-    reader.readAsDataURL(file);
+    image.src = objectUrl;
   });
+}
+
+function calculateCompressedImageSize(image, maxWidth, maxHeight) {
+  const scale = Math.min(1, maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+  return {
+    width: Math.max(1, Math.round(image.naturalWidth * scale)),
+    height: Math.max(1, Math.round(image.naturalHeight * scale))
+  };
+}
+
+function canvasToJpegBlob(canvas, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (blob) resolve(blob);
+      else reject(new Error('No se pudo reducir el tamaño de la imagen.'));
+    }, 'image/jpeg', quality);
+  });
+}
+
+async function compressImageFile(file, maxWidth = 1000, maxHeight = 1000, quality = 0.75) {
+  const decoded = await decodeFastUploadImage(file);
+  try {
+    const { width, height } = calculateCompressedImageSize(decoded.image, maxWidth, maxHeight);
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d', { alpha: false });
+    if (!context) throw new Error('El navegador no permite preparar esta imagen.');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, width, height);
+    context.drawImage(decoded.image, 0, 0, width, height);
+    return await canvasToJpegBlob(canvas, quality);
+  } finally {
+    URL.revokeObjectURL(decoded.objectUrl);
+  }
 }
 
 function blobToDataUrl(blob) {
@@ -2246,22 +2290,35 @@ async function analyzeFastUploadPhoto() {
   status.textContent = 'Leyendo marca, presentación y datos visibles. Después contrastamos fuentes públicas.';
 
   try {
-    const compressed = await compressImageFile(fastUploadSelectedFile, 1400, 1400, 0.82);
+    const compressed = await compressImageFile(fastUploadSelectedFile, 1280, 1280, 0.78);
     const imageDataUrl = await blobToDataUrl(compressed);
-    const response = await fetch('/.netlify/functions/analyze-product', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        imageDataUrl,
-        barcode: document.getElementById('fastupload-barcode-input')?.value.trim() || null,
-        hints: {
-          name: document.getElementById('fastupload-name-input')?.value.trim() || null,
-          brand: document.getElementById('fastupload-brand-input')?.value.trim() || null
-        }
-      })
-    });
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 65_000);
+    let response;
+    try {
+      response = await fetch('/.netlify/functions/analyze-product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          imageDataUrl,
+          barcode: document.getElementById('fastupload-barcode-input')?.value.trim() || null,
+          hints: {
+            name: document.getElementById('fastupload-name-input')?.value.trim() || null,
+            brand: document.getElementById('fastupload-brand-input')?.value.trim() || null
+          }
+        })
+      });
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.message || 'El análisis no está disponible en este momento.');
+    if (!response.ok) {
+      const message = response.status === 429
+        ? 'Hay muchos análisis en curso. Esperá un minuto y volvé a intentar.'
+        : result.message || 'La IA está ocupada. Tocá “Volver a analizar” para reintentar.';
+      throw new Error(message);
+    }
     fastUploadAiResult = result;
     const product = result.product || {};
     setStockFieldValue('fastupload-name-input', product.name);
@@ -2289,7 +2346,10 @@ async function analyzeFastUploadPhoto() {
   } catch (error) {
     console.error('Error al analizar el producto:', error);
     status.dataset.state = 'error';
-    status.textContent = `${error.message} Podés completar todo manualmente y continuar.`;
+    const errorMessage = error.name === 'AbortError'
+      ? 'La conexión tardó demasiado. Revisá la señal del teléfono y volvé a intentar.'
+      : error.message;
+    status.textContent = `${errorMessage} También podés completar los campos manualmente.`;
   } finally {
     button.disabled = false;
     button.innerHTML = '<span aria-hidden="true">✦</span> Volver a analizar con IA';
@@ -2411,6 +2471,7 @@ async function submitProductDraft(event) {
 
     fastUploadSelectedFile = null;
     fastUploadAiResult = null;
+    revokeFastUploadPreviewUrl();
     fastUploadProductCode = createProductCode();
     document.getElementById('fast-upload-form').reset();
     document.getElementById('fastupload-photo-trigger').hidden = false;
@@ -2800,6 +2861,7 @@ window.importCashBackup = importCashBackup;
 window.renderVendorPortfolioUI = renderVendorPortfolioUI;
 window.copyVendorRefLink = copyVendorRefLink;
 window.sendVendorWhatsAppPromo = sendVendorWhatsAppPromo;
+window.openFastUploadPhotoPicker = openFastUploadPhotoPicker;
 window.handleFastUploadPhotoChange = handleFastUploadPhotoChange;
 window.analyzeFastUploadPhoto = analyzeFastUploadPhoto;
 window.initializeFastUploadForm = initializeFastUploadForm;
