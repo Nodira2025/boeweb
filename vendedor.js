@@ -982,21 +982,42 @@ function selectVendorCard(name) {
   const selectEl = document.getElementById('auth-vendor-select');
   if (selectEl) selectEl.value = name;
 
-  document.querySelectorAll('.vendor-select-card').forEach(card => {
-    card.style.background = 'rgba(255,255,255,0.06)';
-    card.style.borderColor = 'rgba(195,155,75,0.3)';
-    card.style.transform = 'none';
-  });
-
-  const activeCard = document.getElementById(`vcard-${name}`);
-  if (activeCard) {
-    activeCard.style.background = 'rgba(195,155,75,0.3)';
-    activeCard.style.borderColor = 'var(--color-accent-gold)';
-    activeCard.style.transform = 'translateY(-2px)';
+  const vendor = AUTHORIZED_VENDEDORES.find(item => item.name === name);
+  const profile = document.getElementById('vendor-login-profile');
+  const profileInitial = document.getElementById('vendor-login-profile-initial');
+  const profileName = document.getElementById('vendor-login-profile-name');
+  const profileRole = document.getElementById('vendor-login-profile-role');
+  if (profile) profile.hidden = !vendor;
+  if (vendor) {
+    if (profileInitial) profileInitial.textContent = vendor.name.charAt(0).toUpperCase();
+    if (profileName) profileName.textContent = vendor.name;
+    if (profileRole) profileRole.textContent = vendor.role;
   }
+
+  setVendorLoginMessage('');
 
   const passEl = document.getElementById('auth-vendor-password');
   if (passEl) passEl.focus();
+}
+
+function setVendorLoginMessage(message, state = 'error') {
+  const messageElement = document.getElementById('vendor-login-message');
+  if (!messageElement) return;
+  messageElement.textContent = message;
+  messageElement.dataset.state = state;
+  messageElement.hidden = !message;
+}
+
+function toggleVendorPasswordVisibility() {
+  const passwordInput = document.getElementById('auth-vendor-password');
+  const toggleButton = document.getElementById('vendor-password-toggle');
+  if (!passwordInput || !toggleButton) return;
+  const showPassword = passwordInput.type === 'password';
+  passwordInput.type = showPassword ? 'text' : 'password';
+  toggleButton.textContent = showPassword ? 'Ocultar' : 'Ver';
+  toggleButton.setAttribute('aria-label', showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
+  toggleButton.setAttribute('aria-pressed', String(showPassword));
+  passwordInput.focus();
 }
 
 function checkVendorAuth() {
@@ -1038,7 +1059,14 @@ function handleVendorLogin(e) {
   const typedPass = passEl.value.trim().toLowerCase();
 
   if (!selectedName) {
-    alert('Por favor seleccioná tu nombre de la lista de vendedores.');
+    setVendorLoginMessage('Seleccioná tu identidad para continuar.', 'info');
+    selectEl.focus();
+    return;
+  }
+
+  if (!typedPass) {
+    setVendorLoginMessage('Ingresá tu contraseña para continuar.', 'info');
+    passEl.focus();
     return;
   }
 
@@ -1054,11 +1082,13 @@ function handleVendorLogin(e) {
       checkVendorAuth();
       showToast(`👋 ¡Bienvenido/a, ${vendorData.name}! Sesión de vendedor activa.`);
       passEl.value = '';
+      setVendorLoginMessage('');
     } else {
-      alert(`❌ Contraseña incorrecta para ${selectedName}.\nRecordá que tu contraseña es tu nombre en minúsculas seguido de 123 (Ej. raul123 o nachomina123).`);
+      setVendorLoginMessage('Los datos de acceso no coinciden. Revisá la contraseña e intentá nuevamente.');
+      passEl.select();
     }
   } else {
-    alert('Vendedor no autorizado.');
+    setVendorLoginMessage('No pudimos validar esta identidad. Contactá al responsable del local.');
   }
 }
 
@@ -2751,6 +2781,7 @@ async function rejectProductDraft(draftId) {
 
 // Global exposure
 window.selectVendorCard = selectVendorCard;
+window.toggleVendorPasswordVisibility = toggleVendorPasswordVisibility;
 window.checkVendorAuth = checkVendorAuth;
 window.handleVendorLogin = handleVendorLogin;
 window.vendorLogout = vendorLogout;

@@ -1027,82 +1027,80 @@
   <link rel="stylesheet" href="vendedor-caja.css?v=legado_v1">
   <link rel="stylesheet" href="vendedor-portal.css?v=desktop_v2_crema">
   <link rel="stylesheet" href="vendedor-stock.css?v=stock_v1">
+  <link rel="stylesheet" href="vendedor-login.css?v=login_editorial_v1">
 </head>
 <body>
 
-  <!-- 1. INLINE STABLE VENDOR LOGIN SCREEN (No Popups, No Backdrop Shifts) -->
-  <div id="vendedor-login-screen" style="display: flex; min-height: 100vh; align-items: center; justify-content: center; background: linear-gradient(135deg, #152d24 0%, #0f1e18 100%); padding: 30px 20px; box-sizing: border-box;">
-    <div style="max-width: 540px; width: 100%; background: rgba(21, 45, 36, 0.95); border: 2px solid var(--color-accent-gold); box-shadow: 0 20px 50px rgba(0,0,0,0.6); padding: 35px 28px; border-radius: 24px; text-align: center; color: #fff;">
-      
-      <div style="display: inline-block; background: rgba(195,155,75,0.2); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 4px 14px; border-radius: 12px; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; margin-bottom: 14px;">
-        ACCESO EXCLUSIVO STAFF BÔ GROW CLUB
+  <!-- 1. ACCESO INLINE DEL EQUIPO (sin modal ni selector infantil) -->
+  <main id="vendedor-login-screen" class="vendor-login-screen">
+    <section class="vendor-login-shell" aria-labelledby="vendor-login-title">
+      <div class="vendor-login-form-panel">
+        <a class="vendor-login-brand" href="index.html" aria-label="Volver al inicio de BÔ Grow Club">
+          <img src="assets/logo.jpg" alt="BÔ Grow Club" width="56" height="56">
+          <span><strong>BÔ Grow Club</strong><small>Centro operativo</small></span>
+        </a>
+
+        <div class="vendor-login-heading">
+          <span>Acceso interno · Equipo BÔ</span>
+          <h1 id="vendor-login-title">Portal de vendedores</h1>
+          <p>Ingresá a las herramientas de venta, caja, clientes e inventario del local.</p>
+        </div>
+
+        <form id="vendor-login-form" class="vendor-login-form" onsubmit="handleVendorLogin(event)" novalidate>
+          <div class="vendor-login-field">
+            <label for="auth-vendor-select">Identidad</label>
+            <div class="vendor-login-select-wrap">
+              <select id="auth-vendor-select" required onchange="selectVendorCard(this.value)" autocomplete="username">
+                <option value="" disabled selected>Seleccioná tu nombre</option>
+                <option value="Raul">Raul</option>
+                <option value="Nacho Mina">Nacho Mina</option>
+                <option value="Alexis">Alexis</option>
+                <option value="Gino">Gino</option>
+                <option value="Rodrigo">Rodrigo</option>
+                <option value="Felipe">Felipe</option>
+                <option value="Mariano">Mariano</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="vendor-login-profile" class="vendor-login-profile" hidden aria-live="polite">
+            <span id="vendor-login-profile-initial" aria-hidden="true">B</span>
+            <div><strong id="vendor-login-profile-name">Equipo BÔ</strong><small id="vendor-login-profile-role">Acceso al centro operativo</small></div>
+          </div>
+
+          <div class="vendor-login-field">
+            <label for="auth-vendor-password">Contraseña</label>
+            <div class="vendor-login-password-wrap">
+              <input type="password" id="auth-vendor-password" placeholder="Ingresá tu contraseña" required autocomplete="current-password">
+              <button type="button" id="vendor-password-toggle" onclick="toggleVendorPasswordVisibility()" aria-label="Mostrar contraseña" aria-pressed="false">Ver</button>
+            </div>
+          </div>
+
+          <div id="vendor-login-message" class="vendor-login-message" role="status" aria-live="polite" hidden></div>
+
+          <button type="submit" class="vendor-login-submit">
+            <span>Ingresar al portal</span><span aria-hidden="true">→</span>
+          </button>
+        </form>
+
+        <footer class="vendor-login-footer">
+          <span aria-hidden="true"></span>
+          Uso interno · Si no podés ingresar, contactá al responsable del local.
+        </footer>
       </div>
-      
-      <h2 style="font-family: var(--font-display); color: var(--color-accent-gold); font-size: 2rem; margin: 0 0 8px 0;">Portal de Vendedores</h2>
-      <p style="font-size: 0.9rem; color: rgba(247,246,242,0.8); margin-bottom: 24px; line-height: 1.4;">Hacé clic en tu perfil e ingresá tu contraseña asignada (`nombre123`) para iniciar sesión.</p>
 
-      <form id="vendor-login-form" onsubmit="handleVendorLogin(event)">
-        
-        <label style="font-size: 0.88rem; color: var(--color-accent-gold); font-weight: 700; display: block; text-align: left; margin-bottom: 10px;">
-          1. Seleccioná tu perfil de vendedor:
-        </label>
-        
-        <!-- Interactive Vendor Cards (Zero Dropdown Jumps) -->
-        <div id="vendor-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin-bottom: 22px;">
-          <div class="vendor-select-card" onclick="selectVendorCard('Raul')" id="vcard-Raul" style="background: rgba(255,255,255,0.06); border: 1.5px solid rgba(195,155,75,0.3); border-radius: 14px; padding: 12px 8px; cursor: pointer; transition: all 0.2s ease;">
-            <div style="font-size: 1.8rem; margin-bottom: 4px;">🧑‍💼</div>
-            <strong style="font-size: 0.85rem; color: #fff; display: block;">Raul</strong>
-          </div>
-          <div class="vendor-select-card" onclick="selectVendorCard('Nacho Mina')" id="vcard-Nacho Mina" style="background: rgba(255,255,255,0.06); border: 1.5px solid rgba(195,155,75,0.3); border-radius: 14px; padding: 12px 8px; cursor: pointer; transition: all 0.2s ease;">
-            <div style="font-size: 1.8rem; margin-bottom: 4px;">🧑‍🌾</div>
-            <strong style="font-size: 0.85rem; color: #fff; display: block;">Nacho Mina</strong>
-          </div>
-          <div class="vendor-select-card" onclick="selectVendorCard('Alexis')" id="vcard-Alexis" style="background: rgba(255,255,255,0.06); border: 1.5px solid rgba(195,155,75,0.3); border-radius: 14px; padding: 12px 8px; cursor: pointer; transition: all 0.2s ease;">
-            <div style="font-size: 1.8rem; margin-bottom: 4px;">🧑‍💻</div>
-            <strong style="font-size: 0.85rem; color: #fff; display: block;">Alexis</strong>
-          </div>
-          <div class="vendor-select-card" onclick="selectVendorCard('Gino')" id="vcard-Gino" style="background: rgba(255,255,255,0.06); border: 1.5px solid rgba(195,155,75,0.3); border-radius: 14px; padding: 12px 8px; cursor: pointer; transition: all 0.2s ease;">
-            <div style="font-size: 1.8rem; margin-bottom: 4px;">👨‍🌾</div>
-            <strong style="font-size: 0.85rem; color: #fff; display: block;">Gino</strong>
-          </div>
-          <div class="vendor-select-card" onclick="selectVendorCard('Rodrigo')" id="vcard-Rodrigo" style="background: rgba(255,255,255,0.06); border: 1.5px solid rgba(195,155,75,0.3); border-radius: 14px; padding: 12px 8px; cursor: pointer; transition: all 0.2s ease;">
-            <div style="font-size: 1.8rem; margin-bottom: 4px;">🙋‍♂️</div>
-            <strong style="font-size: 0.85rem; color: #fff; display: block;">Rodrigo</strong>
-          </div>
-          <div class="vendor-select-card" onclick="selectVendorCard('Felipe')" id="vcard-Felipe" style="background: rgba(255,255,255,0.06); border: 1.5px solid rgba(195,155,75,0.3); border-radius: 14px; padding: 12px 8px; cursor: pointer; transition: all 0.2s ease;">
-            <div style="font-size: 1.8rem; margin-bottom: 4px;">👨‍💻</div>
-            <strong style="font-size: 0.85rem; color: #fff; display: block;">Felipe</strong>
-          </div>
-          <div class="vendor-select-card" onclick="selectVendorCard('Mariano')" id="vcard-Mariano" style="background: rgba(255,255,255,0.06); border: 1.5px solid rgba(195,155,75,0.3); border-radius: 14px; padding: 12px 8px; cursor: pointer; transition: all 0.2s ease;">
-            <div style="font-size: 1.8rem; margin-bottom: 4px;">🧘‍♂️</div>
-            <strong style="font-size: 0.85rem; color: #fff; display: block;">Mariano</strong>
-          </div>
-        </div>
-
-        <select id="auth-vendor-select" required style="display: none;">
-          <option value="" disabled selected>-- Seleccioná tu nombre --</option>
-          <option value="Raul">Raul</option>
-          <option value="Nacho Mina">Nacho Mina</option>
-          <option value="Alexis">Alexis</option>
-          <option value="Gino">Gino</option>
-          <option value="Rodrigo">Rodrigo</option>
-          <option value="Felipe">Felipe</option>
-          <option value="Mariano">Mariano</option>
-        </select>
-
-        <div style="text-align: left; margin-bottom: 24px;">
-          <label style="font-size: 0.88rem; color: var(--color-accent-gold); font-weight: 700; display: block; margin-bottom: 6px;">
-            2. Ingresá tu Contraseña (`nombre123`):
-          </label>
-          <input type="password" id="auth-vendor-password" class="b2b-form-input" placeholder="Ej: raul123 / nachomina123" required style="width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.1); border: 1.5px solid var(--color-accent-gold); color: #fff; padding: 14px 16px; border-radius: 12px; font-size: 1.1rem; text-align: center; letter-spacing: 2px;">
-        </div>
-
-        <button type="submit" class="b2b-checkout-btn" style="width: 100%; font-size: 1.1rem; padding: 14px; background: linear-gradient(135deg, #3E5F1F 0%, #253C13 100%); border: 2px solid var(--color-accent-gold); color: #F6F3E8; font-weight: 800; border-radius: 14px; cursor: pointer;">
-          🚀 INGRESAR AL PORTAL DE VENDEDORES
-        </button>
-      </form>
-    </div>
-  </div>
+      <figure class="vendor-login-visual" aria-label="Interior de BÔ Grow Club">
+        <img src="assets/vendor-login-hero.png" alt="Interior botánico premium del espacio BÔ Grow Club" width="1124" height="1406" fetchpriority="high">
+        <div class="vendor-login-visual-shade"></div>
+        <figcaption>
+          <span>Operación BÔ</span>
+          <h2>Todo el local,<br>en un solo lugar.</h2>
+          <p>Ventas, caja, clientes e inventario conectados para trabajar con claridad.</p>
+        </figcaption>
+        <div class="vendor-login-visual-status"><i aria-hidden="true"></i> Centro operativo disponible</div>
+      </figure>
+    </section>
+  </main>
 
   <!-- 2. MAIN VENDOR PORTAL CONTAINER -->
   <div id="vendedor-portal-app" style="display: none;">
