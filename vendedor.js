@@ -1347,24 +1347,58 @@ function saveLocalProductLocation(location) {
   localStorage.setItem(LOCAL_PRODUCT_LOCATIONS_KEY, JSON.stringify(rows.slice(0, 500)));
 }
 
+function mapLocatedDraftToProductLocation(rawDraft) {
+  const draft = hydrateProductDraft(rawDraft);
+  const shelfCode = String(draft.shelf_code || '').trim();
+  if (draft.status !== 'APPROVED' || !shelfCode) return null;
+  const productCode = draft.product_code || draft.id;
+  return {
+    product_id: productCode,
+    product_code: productCode,
+    name: draft.name || productCode,
+    image_url: draft.image_url || '',
+    barcode: draft.barcode || null,
+    floor_level: Number(draft.floor_level) || 1,
+    shelf_code: shelfCode,
+    shelf_level: Number(draft.shelf_level) || 2,
+    stock: Math.max(0, Number(draft.stock) || 0),
+    qr_payload: draft.qr_payload || buildProductQrPayload(productCode),
+    area_name: draft.location_area || null,
+    wall_side: draft.location_wall || null,
+    shelf_position: draft.shelf_position || null,
+    placement_photo_url: draft.placement_photo_url || null,
+    placement_photo_path: draft.placement_photo_path || null,
+    location_label: draft.location_label || draft.location || null,
+    updated_at: draft.updated_at || draft.created_at || new Date().toISOString()
+  };
+}
+
 async function loadStoreMapData(forceReload = false) {
   if (!supabaseClient || storeMapDataLoading || (storeMapDataLoaded && !forceReload)) return;
   storeMapDataLoading = true;
   try {
-    const [shelvesResult, locationsResult] = await Promise.all([
+    const [shelvesResult, locationsResult, draftsResult] = await Promise.all([
       supabaseClient.from('store_shelves').select('*').order('code', { ascending: true }),
-      supabaseClient.from('product_locations').select('*').order('updated_at', { ascending: false })
+      supabaseClient.from('product_locations').select('*').order('updated_at', { ascending: false }),
+      supabaseClient.from('product_drafts').select('*').eq('status', 'APPROVED').order('updated_at', { ascending: false })
     ]);
     const localLocations = readLocalProductLocations();
     const remoteLocations = locationsResult.error ? [] : (locationsResult.data || []);
+    const draftLocations = draftsResult.error
+      ? []
+      : (draftsResult.data || []).map(mapLocatedDraftToProductLocation).filter(Boolean);
     const localByCode = new Map(localLocations.map(item => [item.product_code, item]));
     const mergedByCode = new Map(localByCode);
-    remoteLocations.forEach(item => {
-      const localDetails = localByCode.get(item.product_code) || {};
-      mergedByCode.set(item.product_code, { ...localDetails, ...item });
+    draftLocations.forEach(item => {
+      const knownDetails = mergedByCode.get(item.product_code) || {};
+      mergedByCode.set(item.product_code, { ...knownDetails, ...item });
     });
-    const syncLabel = shelvesResult.error || locationsResult.error
-      ? 'Modo local · ejecutá la migración para sincronizar'
+    remoteLocations.forEach(item => {
+      const knownDetails = mergedByCode.get(item.product_code) || {};
+      mergedByCode.set(item.product_code, { ...knownDetails, ...item });
+    });
+    const syncLabel = draftsResult.error && locationsResult.error
+      ? 'Modo local · sin conexión al inventario'
       : 'Inventario sincronizado';
     if (window.setStoreMapData) {
       window.setStoreMapData(shelvesResult.error ? [] : (shelvesResult.data || []), [...mergedByCode.values()], syncLabel);
