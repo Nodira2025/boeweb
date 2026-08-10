@@ -240,15 +240,18 @@ function renderProductRows(products) {
   if (!products.length) {
     return `<div class="map-products-empty">No hay productos asignados a este nivel del estante.</div>`;
   }
-  return products.map(product => `
-    <article class="map-product-row" data-product-code="${escapeMapHtml(product.product_code)}">
-      ${product.image_url ? `<img src="${escapeMapHtml(product.image_url)}" alt="${escapeMapHtml(product.name || 'Producto')}">` : '<span class="map-product-placeholder" aria-hidden="true">□</span>'}
-      <div>
-        <strong>${escapeMapHtml(product.name || 'Producto sin nombre')}</strong>
-        <small>${escapeMapHtml(product.product_code || 'Sin código')} · ${Number(product.stock) || 0} unidades${product.barcode ? ` · Barra ${escapeMapHtml(product.barcode)}` : ''}</small>
-      </div>
-      <button type="button" class="map-product-action" onclick="printProductQrByCode('${escapeMapHtml(product.product_code)}')" aria-label="Imprimir QR de ${escapeMapHtml(product.name)}">QR</button>
-    </article>`).join('');
+  return products.map(product => {
+    const exactPosition = product.shelf_position ? ` · ${escapeMapHtml(product.shelf_position)}` : '';
+    return `
+      <article class="map-product-row" data-product-code="${escapeMapHtml(product.product_code)}">
+        ${product.image_url ? `<img src="${escapeMapHtml(product.image_url)}" alt="${escapeMapHtml(product.name || 'Producto')}">` : '<span class="map-product-placeholder" aria-hidden="true">□</span>'}
+        <div>
+          <strong>${escapeMapHtml(product.name || 'Producto sin nombre')}</strong>
+          <small>${escapeMapHtml(product.product_code || 'Sin código')} · ${Number(product.stock) || 0} unidades${exactPosition}${product.barcode ? ` · Barra ${escapeMapHtml(product.barcode)}` : ''}</small>
+        </div>
+        <button type="button" class="map-product-action" onclick="printProductQrByCode('${escapeMapHtml(product.product_code)}')" aria-label="Imprimir QR de ${escapeMapHtml(product.name)}">QR</button>
+      </article>`;
+  }).join('');
 }
 
 function renderSelectedShelfPanel() {

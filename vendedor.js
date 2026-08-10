@@ -76,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateCategoryCounts();
   loadPendingProductDrafts();
   initializeFastUploadForm();
+  refreshPendingLocationBadge();
 });
 
 // --- EVENT LISTENERS ---
@@ -1107,6 +1108,7 @@ function switchVendorTab(tab) {
   const cashSection = document.getElementById('vendor-cash-section');
   const portfolioSection = document.getElementById('vendor-portfolio-section');
   const fastUploadSection = document.getElementById('vendor-fast-upload-section');
+  const locationAssistantSection = document.getElementById('vendor-location-assistant-section');
   const draftsReviewSection = document.getElementById('vendor-drafts-review-section');
 
   const btnCatalog = document.getElementById('tab-btn-catalog');
@@ -1119,12 +1121,13 @@ function switchVendorTab(tab) {
   const vcardMap = document.getElementById('vcard-map');
   const vcardScan = document.getElementById('vcard-scan');
   const vcardFastUpload = document.getElementById('vcard-fastupload');
+  const vcardLocationAssistant = document.getElementById('vcard-locationassistant');
   const vcardDraftsReview = document.getElementById('vcard-draftsreview');
 
   const allBtns = [btnCatalog, btnMap, btnScan];
   allBtns.forEach(btn => { if (btn) btn.classList.remove('active'); });
 
-  const allCards = [vcardCatalog, vcardPortfolio, vcardCash, vcardMap, vcardScan, vcardFastUpload, vcardDraftsReview];
+  const allCards = [vcardCatalog, vcardPortfolio, vcardCash, vcardMap, vcardScan, vcardFastUpload, vcardLocationAssistant, vcardDraftsReview];
   allCards.forEach(card => {
     if (card) {
       card.style.borderColor = 'rgba(255,255,255,0.15)';
@@ -1139,6 +1142,7 @@ function switchVendorTab(tab) {
   if (cashSection) cashSection.style.display = 'none';
   if (portfolioSection) portfolioSection.style.display = 'none';
   if (fastUploadSection) fastUploadSection.style.display = 'none';
+  if (locationAssistantSection) locationAssistantSection.style.display = 'none';
   if (draftsReviewSection) draftsReviewSection.style.display = 'none';
 
   let targetSection = null;
@@ -1210,6 +1214,17 @@ function switchVendorTab(tab) {
       vcardFastUpload.style.transform = 'scale(1.02)';
     }
     initializeFastUploadForm();
+    startMobileProductAssistant();
+  } else if (tab === 'location-assistant') {
+    if (locationAssistantSection) {
+      locationAssistantSection.style.display = 'block';
+      targetSection = locationAssistantSection;
+    }
+    if (vcardLocationAssistant) {
+      vcardLocationAssistant.style.borderColor = 'var(--vendor-gold)';
+      vcardLocationAssistant.style.transform = 'scale(1.02)';
+    }
+    loadPendingLocationProducts();
   } else if (tab === 'drafts-review') {
     if (draftsReviewSection) {
       draftsReviewSection.style.display = 'block';
@@ -1248,6 +1263,7 @@ function renderVendorHomeUI() {
     const stock = Number(supplier.stock);
     return supplier.available && supplier.stock !== null && Number.isFinite(stock) && stock <= 5;
   })).length;
+  refreshPendingLocationBadge();
   const localHour = Number(new Intl.DateTimeFormat('es-AR', {
     timeZone: CASH_TIME_ZONE,
     hour: '2-digit',
@@ -1341,8 +1357,12 @@ async function loadStoreMapData(forceReload = false) {
     ]);
     const localLocations = readLocalProductLocations();
     const remoteLocations = locationsResult.error ? [] : (locationsResult.data || []);
-    const mergedByCode = new Map(localLocations.map(item => [item.product_code, item]));
-    remoteLocations.forEach(item => mergedByCode.set(item.product_code, item));
+    const localByCode = new Map(localLocations.map(item => [item.product_code, item]));
+    const mergedByCode = new Map(localByCode);
+    remoteLocations.forEach(item => {
+      const localDetails = localByCode.get(item.product_code) || {};
+      mergedByCode.set(item.product_code, { ...localDetails, ...item });
+    });
     const syncLabel = shelvesResult.error || locationsResult.error
       ? 'Modo local · ejecutá la migración para sincronizar'
       : 'Inventario sincronizado';
@@ -2033,6 +2053,56 @@ const FAST_UPLOAD_MAX_FILE_SIZE = 25 * 1024 * 1024;
 const FAST_UPLOAD_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif']);
 const HEIC_CONVERTER_URL = 'https://cdn.jsdelivr.net/npm/heic-to@1.5.2/dist/iife/heic-to.js';
 const HEIC_BRANDS = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1']);
+const MOBILE_PRODUCT_ASSISTANT_STEPS = ['method', 'identify', 'details', 'review'];
+const LOCATION_ASSISTANT_STEP_ORDER = ['list', 'area', 'wall', 'shelf', 'level', 'position', 'photo', 'review'];
+const LOCATION_AREA_OPTIONS = [
+  { id: 'reception', label: 'Recepción', help: 'Vitrinas y mostrador de entrada', shelves: ['A-1', 'A-2'] },
+  { id: 'sales-floor', label: 'Salón', help: 'Pasillos y módulos de venta', shelves: ['B-1', 'B-2', 'C-1', 'C-2'] },
+  { id: 'storage', label: 'Depósito', help: 'Reserva y guardado de insumos', shelves: ['D-1', 'D-2'] },
+  { id: 'coffee', label: 'Coffee', help: 'Muebles del Coffee Lounge', shelves: ['E-1', 'E-2'] }
+];
+const LOCATION_WALL_OPTIONS = [
+  { id: 'left', label: 'Pared izquierda', help: 'Mirando desde la entrada' },
+  { id: 'right', label: 'Pared derecha', help: 'Mirando desde la entrada' },
+  { id: 'center', label: 'Sector central', help: 'Isla o mueble del centro' }
+];
+const LOCATION_LEVEL_OPTIONS = [
+  { id: 1, label: 'Inferior', help: 'Nivel bajo del estante' },
+  { id: 2, label: 'Medio', help: 'A la altura de las manos' },
+  { id: 3, label: 'Superior', help: 'Nivel alto del estante' }
+];
+const LOCATION_POSITION_OPTIONS = [
+  { id: 'left', label: 'Izquierda', help: 'Lado izquierdo del nivel' },
+  { id: 'middle', label: 'Medio', help: 'Centro del nivel' },
+  { id: 'right', label: 'Derecha', help: 'Lado derecho del nivel' }
+];
+const LOCATION_SHELF_LABELS = {
+  'A-1': 'Vitrina principal', 'A-2': 'Vitrina secundaria',
+  'B-1': 'Pasillo botánico norte', 'B-2': 'Pasillo botánico sur',
+  'C-1': 'Módulo indoor superior', 'C-2': 'Módulo indoor inferior',
+  'D-1': 'Semillas y reservados', 'D-2': 'Depósito de insumos',
+  'E-1': 'Coffee Lounge 1', 'E-2': 'Coffee Lounge 2'
+};
+
+let mobileProductAssistantStep = 'method';
+let mobileProductEntryMethod = '';
+let pendingLocationProducts = [];
+let locationAssistantState = createEmptyLocationAssistantState();
+
+function createEmptyLocationAssistantState() {
+  return {
+    step: 'list',
+    product: null,
+    area: null,
+    wall: null,
+    shelfCode: '',
+    level: null,
+    position: null,
+    photoBlob: null,
+    photoPreviewUrl: '',
+    photoPath: null
+  };
+}
 
 function escapeStockHtml(value) {
   return String(value ?? '')
@@ -2103,6 +2173,163 @@ function initializeFastUploadForm() {
       }
     });
   }
+}
+
+function isMobileVendorAssistantView() {
+  return window.matchMedia('(max-width: 720px)').matches;
+}
+
+function startMobileProductAssistant() {
+  const assistant = document.getElementById('mobile-product-assistant');
+  const form = document.getElementById('fast-upload-form');
+  if (!assistant || !form) return;
+  if (!isMobileVendorAssistantView()) {
+    assistant.hidden = true;
+    form.classList.remove('mobile-guided');
+    form.removeAttribute('data-mobile-step');
+    return;
+  }
+  mobileProductAssistantStep = 'method';
+  mobileProductEntryMethod = '';
+  assistant.hidden = false;
+  form.classList.add('mobile-guided');
+  renderMobileProductAssistant();
+}
+
+function setMobileProductAssistantStep(step) {
+  if (!MOBILE_PRODUCT_ASSISTANT_STEPS.includes(step)) return;
+  mobileProductAssistantStep = step;
+  renderMobileProductAssistant();
+  document.getElementById('mobile-product-assistant')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderMobileProductMethodChoices() {
+  const choices = [
+    { id: 'barcode', icon: '▥', title: 'Código de barras', help: 'Escanear con la lectora o escribirlo' },
+    { id: 'camera', icon: '◉', title: 'Sacar una foto', help: 'Usar la cámara del teléfono' },
+    { id: 'gallery', icon: '▣', title: 'Elegir de galería', help: 'Seleccionar una imagen guardada' },
+    { id: 'name', icon: '⌕', title: 'Buscar por nombre', help: 'Consultar el catálogo BÔ' },
+    { id: 'manual', icon: '✎', title: 'Ingreso manual', help: 'Completar la ficha personalmente' }
+  ];
+  return `
+    <p class="assistant-question">¿Cómo querés ingresar el producto?</p>
+    <p class="assistant-help">Elegí una opción. El asistente te mostrará solamente lo necesario.</p>
+    <div class="assistant-choice-grid">
+      ${choices.map(choice => `
+        <button type="button" class="assistant-choice-card" onclick="chooseMobileProductEntryMethod('${choice.id}')">
+          <span class="assistant-choice-icon" aria-hidden="true">${choice.icon}</span>
+          <strong>${choice.title}</strong>
+          <small>${choice.help}</small>
+        </button>`).join('')}
+    </div>`;
+}
+
+function getMobileProductIdentifyCopy() {
+  const copyByMethod = {
+    barcode: ['Escaneá o escribí el código', 'Después agregá una foto para documentar el ingreso.'],
+    camera: ['Sacá una foto clara del frente', 'La cámara se abrirá automáticamente.'],
+    gallery: ['Elegí la foto del producto', 'Usá una imagen donde se lean marca y presentación.'],
+    name: ['Buscá el producto por nombre', 'Después agregá una foto para confirmar el ingreso.'],
+    manual: ['Agregá una foto del producto', 'Luego completarás los datos manualmente.']
+  };
+  return copyByMethod[mobileProductEntryMethod] || ['Identificá el producto', 'Podés usar foto, código o búsqueda por nombre.'];
+}
+
+function renderMobileProductAssistantReview() {
+  const name = document.getElementById('fastupload-name-input')?.value.trim() || 'Sin nombre';
+  const category = document.getElementById('fastupload-category-input')?.value || 'Sin categoría';
+  const stock = document.getElementById('fastupload-stock-input')?.value || '0';
+  const barcode = document.getElementById('fastupload-barcode-input')?.value.trim() || 'No informado';
+  return `
+    <p class="assistant-question">Revisá antes de finalizar</p>
+    <p class="assistant-help">La ubicación queda para el asistente de ubicación y no frena este ingreso.</p>
+    <div class="assistant-review-card">
+      <div class="assistant-review-row"><span>Producto</span><strong>${escapeStockHtml(name)}</strong></div>
+      <div class="assistant-review-row"><span>Categoría</span><strong>${escapeStockHtml(category)}</strong></div>
+      <div class="assistant-review-row"><span>Unidades</span><strong>${escapeStockHtml(stock)}</strong></div>
+      <div class="assistant-review-row"><span>Código</span><strong>${escapeStockHtml(barcode)}</strong></div>
+      <div class="assistant-review-row"><span>Ubicación</span><strong>Pendiente de ubicar</strong></div>
+    </div>`;
+}
+
+function renderMobileProductAssistant() {
+  const assistant = document.getElementById('mobile-product-assistant');
+  const content = document.getElementById('mobile-product-assistant-content');
+  const progress = document.getElementById('mobile-product-assistant-progress');
+  const backButton = document.getElementById('mobile-product-assistant-back');
+  const nextButton = document.getElementById('mobile-product-assistant-next');
+  const navigation = backButton?.closest('.mobile-task-assistant-nav');
+  const form = document.getElementById('fast-upload-form');
+  if (!assistant || !content || !form) return;
+
+  const stepIndex = MOBILE_PRODUCT_ASSISTANT_STEPS.indexOf(mobileProductAssistantStep);
+  form.dataset.mobileStep = mobileProductAssistantStep;
+  if (progress) progress.textContent = `${stepIndex + 1} de ${MOBILE_PRODUCT_ASSISTANT_STEPS.length}`;
+  if (navigation) navigation.hidden = mobileProductAssistantStep === 'method';
+  if (backButton) backButton.hidden = mobileProductAssistantStep === 'method';
+  if (nextButton) nextButton.hidden = mobileProductAssistantStep === 'method' || mobileProductAssistantStep === 'review';
+
+  if (mobileProductAssistantStep === 'method') {
+    content.innerHTML = renderMobileProductMethodChoices();
+    return;
+  }
+  if (mobileProductAssistantStep === 'identify') {
+    const [question, help] = getMobileProductIdentifyCopy();
+    content.innerHTML = `<p class="assistant-question">${escapeStockHtml(question)}</p><p class="assistant-help">${escapeStockHtml(help)}</p>`;
+    if (nextButton) nextButton.textContent = 'Datos del producto';
+    return;
+  }
+  if (mobileProductAssistantStep === 'details') {
+    content.innerHTML = '<p class="assistant-question">Confirmá los datos y la cantidad</p><p class="assistant-help">Corregí cualquier sugerencia automática antes de continuar.</p>';
+    if (nextButton) nextButton.textContent = 'Revisar ingreso';
+    return;
+  }
+  content.innerHTML = renderMobileProductAssistantReview();
+  const submitButton = document.getElementById('fastupload-submit-btn');
+  if (submitButton) submitButton.textContent = 'Ingresar y ubicar después';
+}
+
+function focusMobileProductMethod(method) {
+  window.setTimeout(() => {
+    if (method === 'barcode') focusFastUploadBarcode();
+    else if (method === 'camera') openFastUploadPhotoPicker('fastupload-camera-input');
+    else if (method === 'gallery') openFastUploadPhotoPicker('fastupload-gallery-input');
+    else if (method === 'name') document.getElementById('fastupload-manual-query-input')?.focus();
+  }, 120);
+}
+
+function chooseMobileProductEntryMethod(method) {
+  const validMethods = new Set(['barcode', 'camera', 'gallery', 'name', 'manual']);
+  if (!validMethods.has(method)) return;
+  mobileProductEntryMethod = method;
+  setMobileProductAssistantStep('identify');
+  focusMobileProductMethod(method);
+}
+
+function continueMobileProductAssistant() {
+  if (mobileProductAssistantStep === 'identify') {
+    if (!fastUploadSelectedFile) {
+      showToast('Agregá una foto del producto para continuar.');
+      return;
+    }
+    setMobileProductAssistantStep('details');
+    return;
+  }
+  if (mobileProductAssistantStep === 'details') {
+    const name = document.getElementById('fastupload-name-input')?.value.trim();
+    const category = document.getElementById('fastupload-category-input')?.value;
+    const stock = Number.parseInt(document.getElementById('fastupload-stock-input')?.value || '', 10);
+    if (!name || !category || !Number.isFinite(stock) || stock < 0) {
+      showToast('Completá nombre, categoría y unidades recibidas.');
+      return;
+    }
+    setMobileProductAssistantStep('review');
+  }
+}
+
+function goBackMobileProductAssistant() {
+  const index = MOBILE_PRODUCT_ASSISTANT_STEPS.indexOf(mobileProductAssistantStep);
+  setMobileProductAssistantStep(MOBILE_PRODUCT_ASSISTANT_STEPS[Math.max(0, index - 1)]);
 }
 
 function updateFastUploadLocationPreview() {
@@ -2789,9 +3016,9 @@ async function submitProductDraft(event) {
 
     const nameVal = document.getElementById('fastupload-name-input').value.trim();
     const categoryVal = document.getElementById('fastupload-category-input').value;
-    const floorVal = Number(document.getElementById('fastupload-floor-input').value || 1);
     const shelfVal = document.getElementById('fastupload-shelf-input').value;
-    const shelfLevelVal = Number(document.getElementById('fastupload-level-input').value || 2);
+    const floorVal = shelfVal ? Number(document.getElementById('fastupload-floor-input').value || 1) : null;
+    const shelfLevelVal = shelfVal ? Number(document.getElementById('fastupload-level-input').value || 2) : null;
     const locationVal = document.getElementById('fastupload-location-input').value.trim();
     const obsVal = document.getElementById('fastupload-obs-input').value.trim();
     const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'Vendedor Local';
@@ -2800,12 +3027,6 @@ async function submitProductDraft(event) {
       showToast('Completá el nombre y la categoría del producto.');
       return;
     }
-    if (!shelfVal) {
-      showToast('Elegí el estante donde se guardarán las unidades.');
-      document.getElementById('fastupload-shelf-input').focus();
-      return;
-    }
-
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.innerHTML = '⏳ Comprimiendo y subiendo foto...';
@@ -2842,7 +3063,7 @@ async function submitProductDraft(event) {
       market_average_price: Number(document.getElementById('fastupload-market-price-input').value) || null,
       sale_price: Number(document.getElementById('fastupload-sale-price-input').value) || null,
       floor_level: floorVal,
-      shelf_code: shelfVal,
+      shelf_code: shelfVal || null,
       shelf_level: shelfLevelVal,
       ai_confidence: Number(fastUploadAiResult?.product?.confidence) || null,
       ai_payload: (fastUploadAiResult || fastUploadLookupResult) ? {
@@ -2855,7 +3076,7 @@ async function submitProductDraft(event) {
       image_url: imageUrl,
       image_path: filePath,
       stock: stockVal,
-      location: locationVal,
+      location: shelfVal ? locationVal : null,
       observations: obsVal || null,
       seller_name: activeVendor,
       status: 'PENDING_REVIEW',
@@ -2884,7 +3105,9 @@ async function submitProductDraft(event) {
       throw new Error(`Error al guardar borrador en Supabase DB: ${insertError.message}`);
     }
 
-    showToast(`Producto ${fastUploadProductCode} enviado a revisión con ubicación ${shelfVal}.`);
+    showToast(shelfVal
+      ? `Producto ${fastUploadProductCode} enviado a revisión con ubicación ${shelfVal}.`
+      : `Producto ${fastUploadProductCode} ingresado y agregado a pendientes de ubicación.`);
 
     fastUploadSelectedFile = null;
     fastUploadAiResult = null;
@@ -2902,7 +3125,9 @@ async function submitProductDraft(event) {
     initializeFastUploadForm();
 
     loadPendingProductDrafts();
-    switchVendorTab('drafts-review');
+    await refreshPendingLocationBadge();
+    if (isMobileVendorAssistantView()) switchVendorTab('home');
+    else switchVendorTab('drafts-review');
 
   } catch (err) {
     console.error('Error en submitProductDraft:', err);
@@ -2910,7 +3135,9 @@ async function submitProductDraft(event) {
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Enviar producto a revisión';
+      submitBtn.textContent = isMobileVendorAssistantView() && mobileProductAssistantStep === 'review'
+        ? 'Ingresar y ubicar después'
+        : 'Enviar producto a revisión';
     }
   }
 }
@@ -2933,6 +3160,492 @@ function hydrateProductDraft(rawDraft) {
     if (rawDraft[key] === null || rawDraft[key] === undefined || rawDraft[key] === '') merged[key] = metadata[key];
   });
   return merged;
+}
+
+function isPendingLocationProduct(draft) {
+  return draft && draft.status !== 'REJECTED' && !String(draft.shelf_code || '').trim();
+}
+
+function updatePendingLocationIndicators(count) {
+  document.querySelectorAll('[data-pending-location-count]').forEach(element => {
+    element.textContent = String(count);
+    element.hidden = count === 0;
+  });
+  const quickCopy = document.getElementById('vendor-location-quick-copy');
+  if (quickCopy) quickCopy.textContent = count ? `${count} producto${count === 1 ? '' : 's'} esperando ubicación` : 'No hay productos pendientes';
+}
+
+async function fetchPendingLocationProducts() {
+  if (!supabaseClient) return [];
+  const { data, error } = await supabaseClient
+    .from('product_drafts')
+    .select('*')
+    .neq('status', 'REJECTED')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`No se pudo consultar la cola de ubicación: ${error.message}`);
+  return (data || []).map(hydrateProductDraft).filter(isPendingLocationProduct);
+}
+
+async function refreshPendingLocationBadge() {
+  try {
+    const products = await fetchPendingLocationProducts();
+    updatePendingLocationIndicators(products.length);
+  } catch (error) {
+    console.warn('No se pudo actualizar el contador de ubicación:', error.message);
+  }
+}
+
+function renderPendingLocationList() {
+  if (!pendingLocationProducts.length) {
+    return `
+      <div class="location-empty-state">
+        <strong>Todo está ubicado</strong>
+        <span>Cuando ingreses un producto sin estante aparecerá en esta lista.</span>
+      </div>`;
+  }
+  return `
+    <p class="assistant-question">¿Qué producto vas a ubicar?</p>
+    <p class="assistant-help">Podés recorrer el local y completar uno detrás de otro.</p>
+    <div class="location-pending-list">
+      ${pendingLocationProducts.map(product => `
+        <button type="button" class="location-pending-card" onclick="selectPendingLocationProduct('${escapeStockHtml(product.id)}')">
+          ${product.image_url
+            ? `<img src="${escapeStockHtml(product.image_url)}" alt="${escapeStockHtml(product.name || 'Producto pendiente')}">`
+            : '<span class="location-pending-placeholder" aria-hidden="true">□</span>'}
+          <span>
+            <strong>${escapeStockHtml(product.name || product.product_code || 'Producto sin nombre')}</strong>
+            <small>${Number(product.stock) || 0} unidades · ${product.status === 'APPROVED' ? 'Aprobado' : 'En revisión'}</small>
+          </span>
+          <span aria-hidden="true">›</span>
+        </button>`).join('')}
+    </div>`;
+}
+
+function renderLocationAssistantProductHeader() {
+  const product = locationAssistantState.product;
+  if (!product) return '';
+  return `
+    <div class="location-assistant-product">
+      ${product.image_url ? `<img src="${escapeStockHtml(product.image_url)}" alt="${escapeStockHtml(product.name || 'Producto')}">` : ''}
+      <span><strong>${escapeStockHtml(product.name || product.product_code || 'Producto')}</strong><small>${Number(product.stock) || 0} unidades · ${escapeStockHtml(product.product_code || '')}</small></span>
+    </div>`;
+}
+
+function renderLocationChoiceCards(question, help, choices, handlerName) {
+  return `
+    ${renderLocationAssistantProductHeader()}
+    <p class="assistant-question">${escapeStockHtml(question)}</p>
+    <p class="assistant-help">${escapeStockHtml(help)}</p>
+    <div class="assistant-choice-grid">
+      ${choices.map(choice => `
+        <button type="button" class="assistant-choice-card" onclick="${handlerName}('${escapeStockHtml(choice.id)}')">
+          <strong>${escapeStockHtml(choice.label)}</strong>
+          <small>${escapeStockHtml(choice.help || '')}</small>
+        </button>`).join('')}
+    </div>`;
+}
+
+function getLocationAreaById(areaId) {
+  return LOCATION_AREA_OPTIONS.find(option => option.id === areaId) || null;
+}
+
+function getLocationShelfChoices() {
+  const area = locationAssistantState.area;
+  if (!area) return [];
+  return area.shelves.map((shelfCode, index) => ({
+    id: shelfCode,
+    label: `Estante ${index + 1} · ${shelfCode}`,
+    help: LOCATION_SHELF_LABELS[shelfCode] || 'Estante del sector'
+  }));
+}
+
+function getLocationRouteLabels() {
+  const state = locationAssistantState;
+  return [
+    state.area?.label,
+    state.wall?.label,
+    state.shelfCode ? `${state.shelfCode} · ${LOCATION_SHELF_LABELS[state.shelfCode] || 'Estante'}` : null,
+    state.level?.label ? `Nivel ${state.level.label.toLowerCase()}` : null,
+    state.position?.label
+  ].filter(Boolean);
+}
+
+function renderLocationPhotoStep() {
+  const state = locationAssistantState;
+  return `
+    ${renderLocationAssistantProductHeader()}
+    <p class="assistant-question">Agregá una foto de cómo quedó ubicado</p>
+    <p class="assistant-help">Mostrá el producto y parte del estante. La imagen se comprime automáticamente.</p>
+    ${state.photoPreviewUrl ? `<img class="location-photo-preview" src="${escapeStockHtml(state.photoPreviewUrl)}" alt="Vista previa de la ubicación">` : ''}
+    <div class="assistant-choice-grid">
+      <button type="button" class="assistant-choice-card" onclick="openLocationAssistantPhotoPicker('location-assistant-camera-input')">
+        <span class="assistant-choice-icon" aria-hidden="true">◉</span><strong>Sacar foto</strong><small>Usar la cámara del teléfono</small>
+      </button>
+      <button type="button" class="assistant-choice-card" onclick="openLocationAssistantPhotoPicker('location-assistant-gallery-input')">
+        <span class="assistant-choice-icon" aria-hidden="true">▣</span><strong>Elegir de galería</strong><small>Seleccionar una imagen guardada</small>
+      </button>
+      ${state.product?.image_url ? `<button type="button" class="assistant-choice-card" onclick="useExistingProductPhotoForLocation()"><span class="assistant-choice-icon" aria-hidden="true">↺</span><strong>Usar foto actual</strong><small>No sacar una imagen nueva</small></button>` : ''}
+    </div>`;
+}
+
+function renderLocationReviewStep() {
+  const state = locationAssistantState;
+  const route = getLocationRouteLabels();
+  return `
+    ${renderLocationAssistantProductHeader()}
+    <p class="assistant-question">Confirmá la ubicación</p>
+    <p class="assistant-help">Al guardar, desaparecerá de pendientes y quedará disponible en el mapa.</p>
+    ${state.photoPreviewUrl ? `<img class="location-photo-preview" src="${escapeStockHtml(state.photoPreviewUrl)}" alt="Foto elegida para la ubicación">` : ''}
+    <div class="assistant-route-card">
+      ${route.map((label, index) => `<div class="assistant-review-row"><span>Paso ${index + 1}</span><strong>${escapeStockHtml(label)}</strong></div>`).join('')}
+    </div>`;
+}
+
+function renderLocationAssistant() {
+  const content = document.getElementById('location-assistant-content');
+  const title = document.getElementById('location-assistant-step-title');
+  const count = document.getElementById('location-assistant-count');
+  const nav = document.getElementById('location-assistant-nav');
+  if (!content) return;
+  const step = locationAssistantState.step;
+  const choiceSteps = ['area', 'wall', 'shelf', 'level', 'position'];
+  const primaryButton = nav?.querySelector('.mobile-assistant-primary');
+  if (count) count.textContent = `${pendingLocationProducts.length} pendiente${pendingLocationProducts.length === 1 ? '' : 's'}`;
+  if (nav) nav.hidden = step === 'list';
+  if (primaryButton) {
+    primaryButton.hidden = choiceSteps.includes(step);
+    primaryButton.textContent = step === 'review' ? 'Guardar ubicación' : 'Continuar';
+  }
+
+  if (step === 'list') {
+    if (title) title.textContent = 'Elegí un producto';
+    content.innerHTML = renderPendingLocationList();
+  } else if (step === 'area') {
+    if (title) title.textContent = 'Sector del local';
+    content.innerHTML = renderLocationChoiceCards('¿En qué sector estás?', 'Elegí el sector donde vas a guardar el producto.', LOCATION_AREA_OPTIONS, 'chooseLocationAssistantArea');
+  } else if (step === 'wall') {
+    if (title) title.textContent = 'Pared o sector';
+    content.innerHTML = renderLocationChoiceCards('¿De qué lado está el mueble?', 'Tomá como referencia la entrada principal.', LOCATION_WALL_OPTIONS, 'chooseLocationAssistantWall');
+  } else if (step === 'shelf') {
+    if (title) title.textContent = 'Elegir estante';
+    content.innerHTML = renderLocationChoiceCards('¿En qué estante?', 'Los códigos coinciden con el mapa del local.', getLocationShelfChoices(), 'chooseLocationAssistantShelf');
+  } else if (step === 'level') {
+    if (title) title.textContent = 'Nivel del estante';
+    content.innerHTML = renderLocationChoiceCards('¿En qué nivel?', 'Elegí la altura donde queda el producto.', LOCATION_LEVEL_OPTIONS, 'chooseLocationAssistantLevel');
+  } else if (step === 'position') {
+    if (title) title.textContent = 'Posición exacta';
+    content.innerHTML = renderLocationChoiceCards('¿En qué parte del nivel?', 'Esto ayuda a encontrarlo sin revisar todo el estante.', LOCATION_POSITION_OPTIONS, 'chooseLocationAssistantPosition');
+  } else if (step === 'photo') {
+    if (title) title.textContent = 'Foto de referencia';
+    content.innerHTML = renderLocationPhotoStep();
+  } else {
+    if (title) title.textContent = 'Revisar y guardar';
+    content.innerHTML = renderLocationReviewStep();
+  }
+}
+
+async function loadPendingLocationProducts() {
+  const status = document.getElementById('location-assistant-status');
+  try {
+    if (status) {
+      status.hidden = false;
+      status.dataset.state = 'loading';
+      status.textContent = 'Buscando productos pendientes de ubicación…';
+    }
+    pendingLocationProducts = await fetchPendingLocationProducts();
+    updatePendingLocationIndicators(pendingLocationProducts.length);
+    locationAssistantState = createEmptyLocationAssistantState();
+    renderLocationAssistant();
+    if (status) status.hidden = true;
+  } catch (error) {
+    console.error('Error al cargar pendientes de ubicación:', error);
+    if (status) {
+      status.hidden = false;
+      status.dataset.state = 'error';
+      status.textContent = error.message;
+    }
+  }
+}
+
+function selectPendingLocationProduct(draftId) {
+  const product = pendingLocationProducts.find(item => String(item.id) === String(draftId));
+  if (!product) {
+    showToast('Ese producto ya no está pendiente. Actualizá la lista.');
+    return;
+  }
+  locationAssistantState = { ...createEmptyLocationAssistantState(), step: 'area', product };
+  renderLocationAssistant();
+}
+
+function chooseLocationAssistantArea(areaId) {
+  const area = getLocationAreaById(areaId);
+  if (!area) return;
+  locationAssistantState.area = area;
+  locationAssistantState.step = 'wall';
+  renderLocationAssistant();
+}
+
+function chooseLocationAssistantWall(wallId) {
+  const wall = LOCATION_WALL_OPTIONS.find(option => option.id === wallId);
+  if (!wall) return;
+  locationAssistantState.wall = wall;
+  locationAssistantState.step = 'shelf';
+  renderLocationAssistant();
+}
+
+function chooseLocationAssistantShelf(shelfCode) {
+  if (!getLocationShelfChoices().some(option => option.id === shelfCode)) return;
+  locationAssistantState.shelfCode = shelfCode;
+  locationAssistantState.step = 'level';
+  renderLocationAssistant();
+}
+
+function chooseLocationAssistantLevel(levelId) {
+  const level = LOCATION_LEVEL_OPTIONS.find(option => String(option.id) === String(levelId));
+  if (!level) return;
+  locationAssistantState.level = level;
+  locationAssistantState.step = 'position';
+  renderLocationAssistant();
+}
+
+function chooseLocationAssistantPosition(positionId) {
+  const position = LOCATION_POSITION_OPTIONS.find(option => option.id === positionId);
+  if (!position) return;
+  locationAssistantState.position = position;
+  locationAssistantState.step = 'photo';
+  renderLocationAssistant();
+}
+
+function openLocationAssistantPhotoPicker(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+async function handleLocationAssistantPhotoChange(event) {
+  const file = event.target.files && event.target.files[0];
+  const status = document.getElementById('location-assistant-status');
+  if (!file) return;
+  if (!isSupportedFastUploadImage(file) || file.size > FAST_UPLOAD_MAX_FILE_SIZE) {
+    showToast('Elegí una foto JPG, PNG, WebP, HEIC o HEIF de hasta 25 MB.');
+    event.target.value = '';
+    return;
+  }
+  try {
+    if (status) {
+      status.hidden = false;
+      status.dataset.state = 'loading';
+      status.textContent = 'Comprimiendo la foto para que ocupe menos espacio…';
+    }
+    const compressed = await compressImageFile(file, 1200, 900, 0.72);
+    const previewUrl = await blobToDataUrl(compressed);
+    locationAssistantState.photoBlob = compressed;
+    locationAssistantState.photoPreviewUrl = previewUrl;
+    locationAssistantState.photoPath = null;
+    renderLocationAssistant();
+    if (status) {
+      status.hidden = false;
+      status.dataset.state = 'ready';
+      status.textContent = `Foto comprimida y lista · ${Math.max(1, Math.round(compressed.size / 1024))} KB.`;
+    }
+  } catch (error) {
+    console.error('Error al preparar foto de ubicación:', error);
+    if (status) {
+      status.hidden = false;
+      status.dataset.state = 'error';
+      status.textContent = `No pudimos preparar la foto: ${error.message}`;
+    }
+  }
+}
+
+function useExistingProductPhotoForLocation() {
+  const imageUrl = locationAssistantState.product?.image_url;
+  if (!imageUrl) return;
+  locationAssistantState.photoBlob = null;
+  locationAssistantState.photoPreviewUrl = imageUrl;
+  locationAssistantState.photoPath = null;
+  locationAssistantState.step = 'review';
+  renderLocationAssistant();
+}
+
+function buildLocationAssistantMetadata(draft, overrides) {
+  const fields = [
+    'product_code', 'name', 'brand', 'presentation', 'category', 'description', 'barcode',
+    'official_url', 'market_reference_url', 'market_average_price', 'sale_price', 'floor_level',
+    'shelf_code', 'shelf_level', 'ai_confidence', 'ai_payload', 'qr_payload'
+  ];
+  const metadata = {};
+  fields.forEach(field => {
+    if (draft[field] !== undefined) metadata[field] = draft[field];
+  });
+  return { ...metadata, ...overrides };
+}
+
+function serializeLocationDraftObservations(draft, metadata) {
+  return `[BÔ_META]${JSON.stringify(metadata)}\n${draft.observations || ''}`;
+}
+
+async function uploadLocationAssistantPhoto(productCode) {
+  if (!locationAssistantState.photoBlob) {
+    return { url: locationAssistantState.photoPreviewUrl || locationAssistantState.product?.image_url || '', path: null };
+  }
+  const photoPath = `placements/${String(productCode).toLowerCase()}_${Date.now()}.jpg`;
+  const { error: uploadError } = await supabaseClient.storage
+    .from('product-images')
+    .upload(photoPath, locationAssistantState.photoBlob, { contentType: 'image/jpeg', upsert: false });
+  if (uploadError) throw new Error(`No se pudo subir la foto de ubicación: ${uploadError.message}`);
+  const { data } = supabaseClient.storage.from('product-images').getPublicUrl(photoPath);
+  return { url: data?.publicUrl || '', path: photoPath };
+}
+
+function getBaseProductLocation(location) {
+  const allowedFields = [
+    'product_id', 'product_code', 'name', 'image_url', 'barcode', 'floor_level',
+    'shelf_code', 'shelf_level', 'stock', 'qr_payload', 'updated_at'
+  ];
+  return Object.fromEntries(allowedFields.map(field => [field, location[field]]));
+}
+
+async function upsertProductLocationWithFallback(location) {
+  let { error } = await supabaseClient
+    .from('product_locations')
+    .upsert([location], { onConflict: 'product_code' });
+  if (error && /column|schema cache/i.test(error.message || '')) {
+    const fallbackResult = await supabaseClient
+      .from('product_locations')
+      .upsert([getBaseProductLocation(location)], { onConflict: 'product_code' });
+    error = fallbackResult.error;
+  }
+  saveLocalProductLocation(location);
+  return error;
+}
+
+async function updateDraftLocationWithFallback(draft, updatePayload, legacyObservations) {
+  let { error } = await supabaseClient
+    .from('product_drafts')
+    .update(updatePayload)
+    .eq('id', draft.id);
+  if (error && /column|schema cache/i.test(error.message || '')) {
+    const fallbackResult = await supabaseClient
+      .from('product_drafts')
+      .update({
+        location: updatePayload.location,
+        observations: legacyObservations,
+        updated_at: updatePayload.updated_at
+      })
+      .eq('id', draft.id);
+    error = fallbackResult.error;
+  }
+  if (error) throw new Error(`No se pudo guardar la ubicación: ${error.message}`);
+}
+
+async function persistLocationAssistant() {
+  const state = locationAssistantState;
+  const draft = state.product;
+  const status = document.getElementById('location-assistant-status');
+  if (!draft || !state.area || !state.wall || !state.shelfCode || !state.level || !state.position || !state.photoPreviewUrl) {
+    showToast('Completá todos los pasos antes de guardar.');
+    return;
+  }
+  try {
+    if (status) {
+      status.hidden = false;
+      status.dataset.state = 'loading';
+      status.textContent = 'Guardando la ubicación y actualizando el mapa…';
+    }
+    const productCode = draft.product_code || draft.id;
+    const photo = await uploadLocationAssistantPhoto(productCode);
+    const routeLabels = getLocationRouteLabels();
+    const locationLabel = routeLabels.join(' → ');
+    const updatedAt = new Date().toISOString();
+    const overrides = {
+      floor_level: 1,
+      shelf_code: state.shelfCode,
+      shelf_level: Number(state.level.id),
+      location_area: state.area.label,
+      location_wall: state.wall.label,
+      shelf_position: state.position.label,
+      placement_photo_url: photo.url,
+      placement_photo_path: photo.path,
+      location_label: locationLabel,
+      location_status: 'LOCATED'
+    };
+    const metadata = buildLocationAssistantMetadata(draft, overrides);
+    const observations = serializeLocationDraftObservations(draft, metadata);
+    const draftUpdate = {
+      location: locationLabel,
+      floor_level: 1,
+      shelf_code: state.shelfCode,
+      shelf_level: Number(state.level.id),
+      observations,
+      updated_at: updatedAt
+    };
+    await updateDraftLocationWithFallback(draft, draftUpdate, observations);
+
+    if (draft.status === 'APPROVED') {
+      const productLocation = {
+        product_id: productCode,
+        product_code: productCode,
+        name: draft.name || productCode,
+        image_url: draft.image_url || photo.url,
+        barcode: draft.barcode || null,
+        floor_level: 1,
+        shelf_code: state.shelfCode,
+        shelf_level: Number(state.level.id),
+        stock: Math.max(0, Number(draft.stock) || 0),
+        qr_payload: draft.qr_payload || buildProductQrPayload(productCode),
+        area_name: state.area.label,
+        wall_side: state.wall.label,
+        shelf_position: state.position.label,
+        placement_photo_url: photo.url,
+        placement_photo_path: photo.path,
+        location_label: locationLabel,
+        updated_at: updatedAt
+      };
+      const locationError = await upsertProductLocationWithFallback(productLocation);
+      if (locationError) console.warn('La ubicación quedó local hasta sincronizar la tabla:', locationError.message);
+    }
+
+    storeMapDataLoaded = false;
+    showToast(`Ubicación guardada: ${locationLabel}.`);
+    if (status) {
+      status.hidden = false;
+      status.dataset.state = 'success';
+      status.textContent = 'Producto ubicado correctamente. Cargando el siguiente pendiente…';
+    }
+    await loadPendingLocationProducts();
+  } catch (error) {
+    console.error('Error al guardar ubicación asistida:', error);
+    if (status) {
+      status.hidden = false;
+      status.dataset.state = 'error';
+      status.textContent = error.message;
+    }
+  }
+}
+
+function continueLocationAssistant() {
+  if (locationAssistantState.step === 'photo') {
+    if (!locationAssistantState.photoPreviewUrl) {
+      showToast('Sacá, elegí o reutilizá una foto antes de continuar.');
+      return;
+    }
+    locationAssistantState.step = 'review';
+    renderLocationAssistant();
+  } else if (locationAssistantState.step === 'review') {
+    persistLocationAssistant();
+  }
+}
+
+function goBackLocationAssistant() {
+  const currentIndex = LOCATION_ASSISTANT_STEP_ORDER.indexOf(locationAssistantState.step);
+  if (currentIndex <= 1) {
+    locationAssistantState = createEmptyLocationAssistantState();
+  } else {
+    locationAssistantState.step = LOCATION_ASSISTANT_STEP_ORDER[currentIndex - 1];
+  }
+  renderLocationAssistant();
 }
 
 // Cargar y mostrar borradores pendientes de revisión.
@@ -3095,25 +3808,30 @@ async function approveProductDraft(draftId) {
 
     if (spErr) console.warn('Aviso supplier_products:', spErr.message);
 
-    const productLocation = {
-      product_id: productId,
-      product_code: productId,
-      name: nameVal,
-      image_url: imageUrl,
-      barcode: draft.barcode || null,
-      floor_level: Number(draft.floor_level) || 1,
-      shelf_code: draft.shelf_code || String(draft.location || '').match(/[A-E]-\d/i)?.[0]?.toUpperCase() || 'A-1',
-      shelf_level: Number(draft.shelf_level) || 2,
-      stock,
-      qr_payload: draft.qr_payload || buildProductQrPayload(productId),
-      updated_at: new Date().toISOString()
-    };
-    const { error: locationError } = await supabaseClient
-      .from('product_locations')
-      .upsert([productLocation], { onConflict: 'product_code' });
-    if (locationError) {
-      console.warn('Ubicación guardada localmente hasta aplicar la migración:', locationError.message);
-      saveLocalProductLocation(productLocation);
+    const resolvedShelfCode = draft.shelf_code || String(draft.location || '').match(/[A-E]-\d/i)?.[0]?.toUpperCase() || '';
+    let productLocation = null;
+    if (resolvedShelfCode) {
+      productLocation = {
+        product_id: productId,
+        product_code: productId,
+        name: nameVal,
+        image_url: imageUrl,
+        barcode: draft.barcode || null,
+        floor_level: Number(draft.floor_level) || 1,
+        shelf_code: resolvedShelfCode,
+        shelf_level: Number(draft.shelf_level) || 2,
+        stock,
+        qr_payload: draft.qr_payload || buildProductQrPayload(productId),
+        area_name: draft.location_area || null,
+        wall_side: draft.location_wall || null,
+        shelf_position: draft.shelf_position || null,
+        placement_photo_url: draft.placement_photo_url || null,
+        placement_photo_path: draft.placement_photo_path || null,
+        location_label: draft.location_label || draft.location || null,
+        updated_at: new Date().toISOString()
+      };
+      const locationError = await upsertProductLocationWithFallback(productLocation);
+      if (locationError) console.warn('Ubicación guardada localmente hasta aplicar la migración:', locationError.message);
     }
 
     const { error: updateErr } = await supabaseClient
@@ -3127,10 +3845,13 @@ async function approveProductDraft(draftId) {
     if (updateErr) throw new Error(`Error al actualizar estado del borrador: ${updateErr.message}`);
 
     storeMapDataLoaded = false;
-    showToast(`Producto "${nameVal}" publicado y ubicado en ${productLocation.shelf_code}, nivel ${productLocation.shelf_level}.`);
+    showToast(productLocation
+      ? `Producto "${nameVal}" publicado y ubicado en ${productLocation.shelf_code}, nivel ${productLocation.shelf_level}.`
+      : `Producto "${nameVal}" publicado y agregado a pendientes de ubicación.`);
 
     // Recargar cola y catálogo B2B
     loadPendingProductDrafts();
+    refreshPendingLocationBadge();
     if (window.fetchB2BProducts) window.fetchB2BProducts(true);
 
   } catch (err) {
@@ -3284,12 +4005,28 @@ window.openFastUploadPhotoPicker = openFastUploadPhotoPicker;
 window.handleFastUploadPhotoChange = handleFastUploadPhotoChange;
 window.analyzeFastUploadPhoto = analyzeFastUploadPhoto;
 window.initializeFastUploadForm = initializeFastUploadForm;
+window.startMobileProductAssistant = startMobileProductAssistant;
+window.chooseMobileProductEntryMethod = chooseMobileProductEntryMethod;
+window.continueMobileProductAssistant = continueMobileProductAssistant;
+window.goBackMobileProductAssistant = goBackMobileProductAssistant;
 window.updateFastUploadLocationPreview = updateFastUploadLocationPreview;
 window.focusFastUploadBarcode = focusFastUploadBarcode;
 window.openMapForStockEntry = openMapForStockEntry;
 window.printCurrentProductQr = printCurrentProductQr;
 window.printProductQrByCode = printProductQrByCode;
 window.handleShelfPhotoChange = handleShelfPhotoChange;
+window.loadPendingLocationProducts = loadPendingLocationProducts;
+window.selectPendingLocationProduct = selectPendingLocationProduct;
+window.chooseLocationAssistantArea = chooseLocationAssistantArea;
+window.chooseLocationAssistantWall = chooseLocationAssistantWall;
+window.chooseLocationAssistantShelf = chooseLocationAssistantShelf;
+window.chooseLocationAssistantLevel = chooseLocationAssistantLevel;
+window.chooseLocationAssistantPosition = chooseLocationAssistantPosition;
+window.openLocationAssistantPhotoPicker = openLocationAssistantPhotoPicker;
+window.handleLocationAssistantPhotoChange = handleLocationAssistantPhotoChange;
+window.useExistingProductPhotoForLocation = useExistingProductPhotoForLocation;
+window.continueLocationAssistant = continueLocationAssistant;
+window.goBackLocationAssistant = goBackLocationAssistant;
 window.submitProductDraft = submitProductDraft;
 window.loadPendingProductDrafts = loadPendingProductDrafts;
 window.approveProductDraft = approveProductDraft;

@@ -1140,6 +1140,9 @@
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="fast-upload" onclick="switchVendorTab('fast-upload')">
           <span class="vendor-side-nav-icon" aria-hidden="true">＋</span><span>Ingresar producto</span>
         </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="location-assistant" onclick="switchVendorTab('location-assistant')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">⌖</span><span>Ubicar pendientes</span>
+        </button>
       </nav>
 
       <div class="vendor-sidebar-tools" aria-label="Herramientas externas">
@@ -1296,11 +1299,11 @@
             <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('portfolio')">
               <span aria-hidden="true">♙</span><span><strong>Consultar cliente</strong><small>Cartera y WhatsApp</small></span><span aria-hidden="true">›</span>
             </button>
-            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('map')">
-              <span aria-hidden="true">⌖</span><span><strong>Ubicar producto</strong><small>Mapa de estantes</small></span><span aria-hidden="true">›</span>
+            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('location-assistant')">
+              <span aria-hidden="true">⌖</span><span><strong>Ubicar pendientes</strong><small id="vendor-location-quick-copy">Asistente de ubicación</small></span><span class="vendor-pending-location-count" data-pending-location-count hidden>0</span><span aria-hidden="true">›</span>
             </button>
             <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('fast-upload')">
-              <span aria-hidden="true">＋</span><span><strong>Ingresar producto</strong><small>Foto, IA, stock y ubicación</small></span><span aria-hidden="true">›</span>
+              <span aria-hidden="true">＋</span><span><strong>Ingresar producto</strong><small>Foto, datos y stock guiados</small></span><span aria-hidden="true">›</span>
             </button>
           </div>
         </aside>
@@ -1379,7 +1382,15 @@
           <span style="font-size: 0.72rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase;">IA · STOCK · UBICACIÓN</span>
         </button>
 
-        <!-- Card 10: Cola de Borradores (Mariano / Admin) -->
+        <!-- Card 10: Asistente para productos pendientes de ubicación -->
+        <button type="button" class="vendor-launchpad-card vendor-location-launcher" id="vcard-locationassistant" onclick="switchVendorTab('location-assistant')">
+          <span class="vendor-location-launcher-badge" data-pending-location-count hidden>0</span>
+          <span class="vendor-location-launcher-icon" aria-hidden="true">⌖</span>
+          <span class="vendor-location-launcher-title">Ubicar pendientes</span>
+          <span class="vendor-location-launcher-copy">ASISTENTE PASO A PASO</span>
+        </button>
+
+        <!-- Card 11: Cola de Borradores (Mariano / Admin) -->
         <button type="button" class="vendor-launchpad-card" id="vcard-draftsreview" onclick="switchVendorTab('drafts-review')" style="background: var(--color-card-bg); border: 2px solid #2e7d32; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm); position: relative;">
           <span id="drafts-pending-count-badge" style="position: absolute; top: -8px; right: -8px; background: #2e7d32; color: #fff; font-size: 0.75rem; font-weight: 800; padding: 3px 8px; border-radius: 12px; border: 1px solid var(--color-accent-gold); display: none;">0</span>
           <span style="font-size: 2rem; display: block; margin-bottom: 4px;">👑</span>
@@ -1404,10 +1415,25 @@
       <ol class="stock-entry-progress" aria-label="Etapas para ingresar el producto">
         <li class="active"><span>1</span><strong>Identificar</strong><small>Foto o código</small></li>
         <li><span>2</span><strong>Completar</strong><small>Datos y precio</small></li>
-        <li><span>3</span><strong>Ubicar</strong><small>Estante y QR</small></li>
+        <li><span>3</span><strong>Finalizar</strong><small>Ubicar ahora o después</small></li>
       </ol>
 
       <form id="fast-upload-form" class="stock-entry-form" onsubmit="submitProductDraft(event)">
+        <section id="mobile-product-assistant" class="mobile-task-assistant" aria-labelledby="mobile-product-assistant-title" hidden>
+          <header class="mobile-task-assistant-header">
+            <div>
+              <span class="mobile-task-assistant-kicker">Asistente de ingreso</span>
+              <h3 id="mobile-product-assistant-title">Vamos paso a paso</h3>
+            </div>
+            <span id="mobile-product-assistant-progress" class="mobile-task-assistant-progress">1 de 4</span>
+          </header>
+          <div id="mobile-product-assistant-content" class="mobile-task-assistant-content" aria-live="polite"></div>
+          <nav class="mobile-task-assistant-nav" aria-label="Controles del asistente">
+            <button type="button" id="mobile-product-assistant-back" class="mobile-assistant-secondary" onclick="goBackMobileProductAssistant()">Atrás</button>
+            <button type="button" id="mobile-product-assistant-next" class="mobile-assistant-primary" onclick="continueMobileProductAssistant()">Continuar</button>
+          </nav>
+        </section>
+
         <div class="stock-entry-primary-grid">
           <section class="stock-entry-panel stock-photo-panel" aria-labelledby="stock-photo-title">
             <div class="stock-entry-panel-heading">
@@ -1474,7 +1500,7 @@
             <div id="fastupload-ai-status" class="stock-ai-status" role="status" aria-live="polite" hidden></div>
           </section>
 
-          <section class="stock-entry-panel" aria-labelledby="stock-identity-title">
+          <section class="stock-entry-panel stock-entry-details-panel" aria-labelledby="stock-identity-title">
             <div class="stock-entry-panel-heading">
               <div>
                 <span class="stock-entry-step">Paso 2</span>
@@ -1540,7 +1566,7 @@
           <div class="stock-entry-panel-heading">
             <div>
               <span class="stock-entry-step">Paso 3</span>
-              <h3 id="stock-location-title">Ubicación e identificación</h3>
+              <h3 id="stock-location-title">Ubicación opcional</h3>
             </div>
             <button type="button" class="stock-map-link" onclick="openMapForStockEntry()">Ver mapa de estantes</button>
           </div>
@@ -1556,9 +1582,9 @@
                 </select>
               </div>
               <div class="stock-field">
-                <label for="fastupload-shelf-input">Estante *</label>
-                <select id="fastupload-shelf-input" class="b2b-form-input" onchange="updateFastUploadLocationPreview()" required>
-                  <option value="">Elegir estante</option>
+                <label for="fastupload-shelf-input">Estante</label>
+                <select id="fastupload-shelf-input" class="b2b-form-input" onchange="updateFastUploadLocationPreview()">
+                  <option value="">Ubicar después</option>
                   <option value="A-1">A-1 · Vitrina principal</option>
                   <option value="A-2">A-2 · Vitrina secundaria</option>
                   <option value="B-1">B-1 · Pasillo botánico norte</option>
@@ -1572,8 +1598,8 @@
                 </select>
               </div>
               <div class="stock-field">
-                <label for="fastupload-level-input">Nivel del estante *</label>
-                <select id="fastupload-level-input" class="b2b-form-input" onchange="updateFastUploadLocationPreview()" required>
+                <label for="fastupload-level-input">Nivel del estante</label>
+                <select id="fastupload-level-input" class="b2b-form-input" onchange="updateFastUploadLocationPreview()">
                   <option value="1">Inferior</option>
                   <option value="2" selected>Medio</option>
                   <option value="3">Superior</option>
@@ -1600,10 +1626,41 @@
         </section>
 
         <footer class="stock-entry-submit-row">
-          <p><strong>Antes de enviar:</strong> verificá nombre, presentación, precio y ubicación. Las fuentes automáticas pueden tener datos incompletos.</p>
+          <p><strong>Antes de enviar:</strong> verificá nombre, presentación y cantidad. Si no elegís un estante, quedará pendiente de ubicar.</p>
           <button type="submit" id="fastupload-submit-btn">Enviar producto a revisión</button>
         </footer>
       </form>
+    </section>
+
+    <!-- SECTION: ASISTENTE DE UBICACIÓN -->
+    <section id="vendor-location-assistant-section" class="vendor-workspace-section location-assistant-workspace" style="display: none;" aria-labelledby="location-assistant-title">
+      <header class="stock-entry-hero location-assistant-hero">
+        <div>
+          <span class="stock-entry-eyebrow">Recorrido físico · Guardado guiado</span>
+          <h2 id="location-assistant-title">Asistente de ubicación</h2>
+          <p>Elegí un producto pendiente y respondé dónde lo estás guardando. BÔ construirá la ubicación y actualizará el mapa.</p>
+        </div>
+        <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
+      </header>
+
+      <div class="location-assistant-shell">
+        <header class="location-assistant-shell-header">
+          <div>
+            <span class="mobile-task-assistant-kicker">Pendientes de ubicar</span>
+            <h3 id="location-assistant-step-title">Elegí un producto</h3>
+          </div>
+          <span id="location-assistant-count" class="location-assistant-count">0 pendientes</span>
+        </header>
+        <div id="location-assistant-content" class="location-assistant-content" aria-live="polite"></div>
+        <div id="location-assistant-status" class="stock-ai-status" role="status" aria-live="polite" hidden></div>
+        <nav id="location-assistant-nav" class="mobile-task-assistant-nav location-assistant-nav" aria-label="Controles del asistente" hidden>
+          <button type="button" class="mobile-assistant-secondary" onclick="goBackLocationAssistant()">Atrás</button>
+          <button type="button" class="mobile-assistant-primary" onclick="continueLocationAssistant()">Continuar</button>
+        </nav>
+      </div>
+
+      <input type="file" id="location-assistant-camera-input" accept="image/*" capture="environment" aria-label="Sacar foto para documentar la ubicación" onchange="handleLocationAssistantPhotoChange(event)" hidden>
+      <input type="file" id="location-assistant-gallery-input" accept="image/*,.heic,.heif" aria-label="Elegir foto para documentar la ubicación" onchange="handleLocationAssistantPhotoChange(event)" hidden>
     </section>
 
     <!-- SECTION: COLA DE BORRADORES Y APROBACIÓN (MARIANO / ADMIN) -->
@@ -2044,7 +2101,7 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="mapa-local.js?v=stock_map_v1"></script>
-  <script src="vendedor.js?v=stock_android_v4"></script>
+  <script src="mapa-local.js?v=stock_assistants_v1"></script>
+  <script src="vendedor.js?v=stock_assistants_v1"></script>
 </body>
 </html>

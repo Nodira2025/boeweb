@@ -69,6 +69,15 @@ CREATE TABLE IF NOT EXISTS public.product_locations (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- Detalle humano de ubicación para el asistente móvil. Las columnas son opcionales
+-- para mantener compatibilidad con instalaciones anteriores.
+ALTER TABLE public.product_locations ADD COLUMN IF NOT EXISTS area_name TEXT;
+ALTER TABLE public.product_locations ADD COLUMN IF NOT EXISTS wall_side TEXT;
+ALTER TABLE public.product_locations ADD COLUMN IF NOT EXISTS shelf_position TEXT;
+ALTER TABLE public.product_locations ADD COLUMN IF NOT EXISTS placement_photo_url TEXT;
+ALTER TABLE public.product_locations ADD COLUMN IF NOT EXISTS placement_photo_path TEXT;
+ALTER TABLE public.product_locations ADD COLUMN IF NOT EXISTS location_label TEXT;
+
 CREATE INDEX IF NOT EXISTS product_locations_shelf_idx
 ON public.product_locations (floor_level, shelf_code, shelf_level);
 CREATE INDEX IF NOT EXISTS product_locations_barcode_idx
