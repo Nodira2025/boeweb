@@ -1026,7 +1026,7 @@
   </style>
   <link rel="stylesheet" href="vendedor-caja.css?v=legado_v1">
   <link rel="stylesheet" href="vendedor-portal.css?v=desktop_v2_crema">
-  <link rel="stylesheet" href="vendedor-stock.css?v=stock_noai_v1">
+  <link rel="stylesheet" href="vendedor-stock.css?v=barcode_scanner_v2">
   <link rel="stylesheet" href="vendedor-login.css?v=login_editorial_v1">
 </head>
 <body>
@@ -1439,9 +1439,9 @@
             <div class="stock-entry-panel-heading">
               <div>
                 <span class="stock-entry-step">Paso 1</span>
-                <h3 id="stock-photo-title">Foto del producto</h3>
+                <h3 id="stock-photo-title">Identificar producto</h3>
               </div>
-              <span class="stock-entry-optional">Obligatoria</span>
+              <span id="fastupload-photo-requirement" class="stock-entry-optional">Foto opcional con código</span>
             </div>
 
             <div class="stock-noai-card" aria-labelledby="stock-noai-title">
@@ -1455,16 +1455,19 @@
 
               <label for="fastupload-barcode-input">Código de barras</label>
               <div class="stock-noai-action-row">
-                <input type="text" id="fastupload-barcode-input" class="b2b-form-input" placeholder="Escanear o escribir" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupFastUploadProductWithoutAi('barcode');}">
+                <input type="text" id="fastupload-barcode-input" class="b2b-form-input" placeholder="Escanear o escribir" inputmode="numeric" enterkeyhint="search" autocomplete="off" aria-describedby="fastupload-scanner-help fastupload-scanner-state">
                 <button type="button" class="stock-entry-secondary-btn" onclick="focusFastUploadBarcode()">Usar lector</button>
                 <button type="button" class="stock-lookup-btn" data-stock-lookup-button onclick="lookupFastUploadProductWithoutAi('barcode')">Buscar datos</button>
               </div>
-              <small>La lectora del local funciona como teclado. Al escanear, la búsqueda comienza automáticamente.</small>
+              <small id="fastupload-scanner-help">Acepta Enter, Tab o lectura sin tecla final. La búsqueda comienza automáticamente.</small>
+              <div id="fastupload-scanner-state" class="stock-scanner-state" data-state="ready" role="status" aria-live="polite">
+                <span aria-hidden="true"></span> Lector listo para escanear
+              </div>
 
               <div class="stock-noai-divider"><span>Si no tiene código</span></div>
               <label for="fastupload-manual-query-input">Nombre, marca o SKU</label>
               <div class="stock-noai-action-row stock-noai-manual-row">
-                <input type="search" id="fastupload-manual-query-input" class="b2b-form-input" placeholder="Ej: BioBizz Bio Grow 1 L" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupFastUploadProductWithoutAi('manual');}">
+                <input type="search" id="fastupload-manual-query-input" class="b2b-form-input" placeholder="Ej: BioBizz Bio Grow 1 L" enterkeyhint="search" autocomplete="off">
                 <button type="button" class="stock-lookup-btn" data-stock-lookup-button onclick="lookupFastUploadProductWithoutAi('manual')">Buscar por nombre</button>
               </div>
               <div id="fastupload-lookup-status" class="stock-lookup-status" role="status" aria-live="polite" hidden></div>
@@ -1475,7 +1478,7 @@
             <div class="stock-photo-dropzone" id="fastupload-photo-trigger" role="group" aria-labelledby="stock-photo-choice-title" aria-describedby="stock-photo-choice-help">
               <span class="stock-photo-icon" aria-hidden="true">◎</span>
               <strong id="stock-photo-choice-title">Elegí cómo cargar la foto</strong>
-              <small id="stock-photo-choice-help">Usá el frente del envase, con marca y presentación visibles.</small>
+              <small id="stock-photo-choice-help">Solo hace falta si el código no trae imagen o querés documentar el envase.</small>
               <div class="stock-photo-actions">
                 <button type="button" class="stock-photo-choice stock-photo-choice-primary" onclick="openFastUploadPhotoPicker('fastupload-camera-input')">
                   <span aria-hidden="true">◉</span> Sacar foto
@@ -1504,25 +1507,35 @@
             <div class="stock-entry-panel-heading">
               <div>
                 <span class="stock-entry-step">Paso 2</span>
-                <h3 id="stock-identity-title">Identidad y precio</h3>
+                <h3 id="stock-identity-title">Cantidad y precio</h3>
               </div>
               <span id="fastupload-ai-confidence" class="stock-confidence" hidden></span>
             </div>
 
-            <div class="stock-entry-fields">
-              <div class="stock-field stock-field-wide">
+            <div id="fastupload-found-summary" class="stock-lookup-result-summary" hidden>
+              <img id="fastupload-found-image" src="" alt="" hidden>
+              <div>
+                <span>Producto identificado</span>
+                <strong id="fastupload-found-name">Datos encontrados</strong>
+                <small id="fastupload-found-meta"></small>
+              </div>
+              <button type="button" onclick="toggleFastUploadLookupDetails()" aria-controls="fastupload-autofilled-fields">Revisar datos</button>
+            </div>
+
+            <div id="fastupload-autofilled-fields" class="stock-entry-fields">
+              <div class="stock-field stock-field-wide stock-autofilled-field">
                 <label for="fastupload-name-input">Nombre del producto *</label>
                 <input type="text" id="fastupload-name-input" class="b2b-form-input" placeholder="Ej: BioBizz Bio Grow 1 L" required>
               </div>
-              <div class="stock-field">
+              <div class="stock-field stock-autofilled-field">
                 <label for="fastupload-brand-input">Marca</label>
                 <input type="text" id="fastupload-brand-input" class="b2b-form-input" placeholder="Ej: BioBizz">
               </div>
-              <div class="stock-field">
+              <div class="stock-field stock-autofilled-field">
                 <label for="fastupload-presentation-input">Presentación / Modelo</label>
                 <input type="text" id="fastupload-presentation-input" class="b2b-form-input" placeholder="Ej: Botella 1 L">
               </div>
-              <div class="stock-field">
+              <div class="stock-field stock-autofilled-field">
                 <label for="fastupload-category-input">Categoría *</label>
                 <select id="fastupload-category-input" class="b2b-form-input" required>
                   <option value="">Seleccionar</option>
@@ -1537,23 +1550,23 @@
                   <option value="Otros">Otros</option>
                 </select>
               </div>
-              <div class="stock-field">
+              <div class="stock-field stock-seller-field">
                 <label for="fastupload-stock-input">Unidades recibidas *</label>
                 <input type="number" id="fastupload-stock-input" min="0" value="1" required class="b2b-form-input" inputmode="numeric">
               </div>
-              <div class="stock-field">
+              <div class="stock-field stock-autofilled-field">
                 <label for="fastupload-market-price-input">Promedio Mercado Libre</label>
                 <input type="number" id="fastupload-market-price-input" class="b2b-form-input" placeholder="Se completa al buscar" readonly>
               </div>
-              <div class="stock-field">
-                <label for="fastupload-sale-price-input">Precio de venta sugerido</label>
-                <input type="number" id="fastupload-sale-price-input" min="0" step="0.01" class="b2b-form-input" placeholder="Confirmar manualmente">
+              <div class="stock-field stock-seller-field">
+                <label for="fastupload-sale-price-input">Precio de venta *</label>
+                <input type="number" id="fastupload-sale-price-input" min="0.01" step="0.01" class="b2b-form-input" placeholder="Confirmar precio" inputmode="decimal" required>
               </div>
-              <div class="stock-field stock-field-wide">
+              <div class="stock-field stock-field-wide stock-autofilled-field">
                 <label for="fastupload-description-input">Descripción</label>
                 <textarea id="fastupload-description-input" class="b2b-form-input" rows="3" placeholder="Descripción breve y verificable del producto"></textarea>
               </div>
-              <div class="stock-field stock-field-wide">
+              <div class="stock-field stock-field-wide stock-autofilled-field">
                 <label for="fastupload-official-url-input">Página oficial encontrada</label>
                 <input type="url" id="fastupload-official-url-input" class="b2b-form-input" placeholder="https://marca.com/producto">
                 <div id="fastupload-source-links" class="stock-source-links" aria-live="polite"></div>
@@ -1626,8 +1639,8 @@
         </section>
 
         <footer class="stock-entry-submit-row">
-          <p><strong>Antes de enviar:</strong> verificá nombre, presentación y cantidad. Si no elegís un estante, quedará pendiente de ubicar.</p>
-          <button type="submit" id="fastupload-submit-btn">Enviar producto a revisión</button>
+          <p><strong>Antes de ingresar:</strong> confirmá cantidad y precio. Si no elegís un estante, quedará pendiente de ubicar.</p>
+          <button type="submit" id="fastupload-submit-btn">Ingresar producto al stock</button>
         </footer>
       </form>
     </section>
@@ -2102,6 +2115,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="mapa-local.js?v=stock_assistants_v1"></script>
-  <script src="vendedor.js?v=stock_assistants_v1"></script>
+  <script src="vendedor.js?v=barcode_scanner_v2"></script>
 </body>
 </html>

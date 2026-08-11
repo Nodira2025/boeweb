@@ -216,6 +216,51 @@
   line-height: 1.4;
 }
 
+.stock-scanner-state {
+  min-height: 34px;
+  margin-top: 10px;
+  padding: 7px 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(62, 95, 31, 0.2);
+  border-radius: 999px;
+  background: rgba(126, 166, 66, 0.09);
+  color: var(--vendor-forest);
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+.stock-scanner-state span {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--vendor-leaf);
+  box-shadow: 0 0 0 4px rgba(126, 166, 66, 0.12);
+}
+
+.stock-scanner-state[data-state="reading"] span {
+  background: var(--vendor-gold);
+  box-shadow: 0 0 0 4px rgba(194, 162, 70, 0.15);
+}
+
+.stock-scanner-state[data-state="found"] {
+  border-color: rgba(46, 125, 50, 0.34);
+  background: rgba(46, 125, 50, 0.1);
+}
+
+.stock-scanner-state[data-state="error"] {
+  border-color: rgba(159, 63, 50, 0.34);
+  background: rgba(159, 63, 50, 0.07);
+  color: #7c3329;
+}
+
+.stock-scanner-state[data-state="error"] span {
+  background: #9f3f32;
+  box-shadow: 0 0 0 4px rgba(159, 63, 50, 0.12);
+}
+
 .stock-noai-action-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -404,7 +449,9 @@
 .stock-photo-dropzone[hidden],
 .stock-ai-status[hidden],
 .stock-confidence[hidden],
-.stock-lookup-status[hidden] {
+.stock-lookup-status[hidden],
+.stock-lookup-result-summary[hidden],
+.stock-lookup-result-summary img[hidden] {
   display: none;
 }
 
@@ -481,6 +528,91 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.stock-lookup-result-summary {
+  margin-bottom: 16px;
+  padding: 13px;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgba(46, 125, 50, 0.3);
+  border-radius: 16px;
+  background: rgba(126, 166, 66, 0.1);
+}
+
+.stock-lookup-result-summary img {
+  width: 58px;
+  height: 58px;
+  border-radius: 11px;
+  background: #fffdf6;
+  object-fit: contain;
+}
+
+.stock-lookup-result-summary span,
+.stock-lookup-result-summary strong,
+.stock-lookup-result-summary small {
+  display: block;
+}
+
+.stock-lookup-result-summary span {
+  color: var(--vendor-leaf);
+  font-size: 0.62rem;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.stock-lookup-result-summary strong {
+  margin-top: 3px;
+  color: var(--vendor-forest);
+  font-size: 0.86rem;
+}
+
+.stock-lookup-result-summary small {
+  margin-top: 3px;
+  color: var(--vendor-muted);
+  font-size: 0.65rem;
+  line-height: 1.35;
+}
+
+.stock-lookup-result-summary button {
+  min-height: 44px;
+  padding: 0 13px;
+  border: 1px solid rgba(62, 95, 31, 0.28);
+  border-radius: 999px;
+  background: var(--vendor-paper);
+  color: var(--vendor-forest);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.stock-entry-details-panel.lookup-complete:not(.show-lookup-details) .stock-autofilled-field {
+  display: none;
+}
+
+.stock-entry-details-panel.lookup-complete .stock-entry-fields {
+  padding: 14px;
+  border: 1px solid rgba(194, 162, 70, 0.28);
+  border-radius: 16px;
+  background: rgba(246, 243, 232, 0.58);
+}
+
+.stock-entry-details-panel.lookup-complete .stock-seller-field label {
+  color: var(--vendor-forest);
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.stock-entry-details-panel.lookup-complete .stock-seller-field .b2b-form-input {
+  min-height: 52px;
+  border-color: rgba(194, 162, 70, 0.62);
+  background: #fffdf6;
+  font-size: 1rem;
+  font-weight: 750;
 }
 
 .stock-field {
@@ -1706,6 +1838,20 @@
 }
 
 @media (max-width: 720px) {
+  .stock-lookup-result-summary {
+    grid-template-columns: 50px minmax(0, 1fr);
+  }
+
+  .stock-lookup-result-summary img {
+    width: 50px;
+    height: 50px;
+  }
+
+  .stock-lookup-result-summary button {
+    width: 100%;
+    grid-column: 1 / -1;
+  }
+
   .location-assistant-workspace {
     width: min(100% - 20px, 640px);
     margin-top: 16px;

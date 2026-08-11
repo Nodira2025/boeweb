@@ -1,4 +1,5 @@
 const OPEN_PRODUCTS_URL = 'https://world.openfoodfacts.org/api/v3/product';
+const UPCITEMDB_LOOKUP_URL = 'https://api.upcitemdb.com/prod/trial/lookup';
 const MERCADOLIBRE_SEARCH_URL = 'https://api.mercadolibre.com/sites/MLA/search';
 const REQUEST_WINDOW_MS = 60_000;
 const REQUEST_LIMIT_PER_WINDOW = 20;
@@ -120,6 +121,48 @@ async function searchOpenProducts(barcode) {
     source: {
       label: 'Ficha pública por código de barras',
       url: `https://world.openfoodfacts.org/product/${encodeURIComponent(barcode)}`
+    }
+  };
+}
+
+function normalizeUpcItem(item, barcode) {
+  if (!item) return null;
+  const name = cleanText(item.title || '');
+  const brand = cleanText(item.brand || '');
+  const presentation = cleanText(item.size || item.model || '');
+  const category = cleanText(item.category || '');
+  return {
+    name: name || null,
+    brand: brand || null,
+    presentation: presentation || null,
+    category: mapCategory(name, category),
+    description: cleanText(item.description || category, 500) || null,
+    barcode,
+    official_url: null,
+    market_query: cleanText([brand, name, presentation].filter(Boolean).join(' ')) || barcode,
+    image_url: Array.isArray(item.images) ? item.images.find(Boolean) || null : null
+  };
+}
+
+async function searchUpcItemDb(barcode) {
+  if (!barcode) return null;
+  const url = new URL(UPCITEMDB_LOOKUP_URL);
+  url.searchParams.set('upc', barcode);
+  const response = await fetchWithTimeout(url, {
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': 'BO-Grow-Club/1.0 (https://boeweb.netlify.app)'
+    }
+  });
+  if (!response.ok) return null;
+  const payload = await response.json();
+  const item = payload?.items?.[0];
+  if (!item) return null;
+  return {
+    product: normalizeUpcItem(item, barcode),
+    source: {
+      label: 'Base internacional de códigos de barras',
+      url: `https://www.upcitemdb.com/upc/${encodeURIComponent(barcode)}`
     }
   };
 }
@@ -270,15 +313,19 @@ export default async function handler(request, context) {
       try {
         openResult = await searchOpenProducts(barcode);
         if (!openResult) {
+          openResult = await searchUpcItemDb(barcode);
+        }
+        if (!openResult) {
           openResult = await searchWebEanBarcode(barcode);
         }
       } catch (error) {
-        warnings.push('La base abierta no respondió; intentando con fuentes de respaldo.');
+        warnings.push('Una base pública no respondió; se usaron fuentes de respaldo.');
         console.warn('Falló la consulta de Open Products:', error.message);
         try {
-          openResult = await searchWebEanBarcode(barcode);
-        } catch (e) {
-          console.warn('Falló la búsqueda web EAN:', e.message);
+          openResult = await searchUpcItemDb(barcode);
+          if (!openResult) openResult = await searchWebEanBarcode(barcode);
+        } catch (fallbackError) {
+          console.warn('Fallaron las fuentes de respaldo EAN:', fallbackError.message);
         }
       }
     }
@@ -294,6 +341,7 @@ export default async function handler(request, context) {
       warnings.push('Mercado Libre no respondió; el precio puede completarse manualmente.');
       console.warn('Falló la consulta de Mercado Libre:', error.message);
     }
+    if (!market) warnings.push('El precio de venta debe confirmarlo el vendedor.');
 
     const product = openResult?.product || productFromMarket(market, barcode);
     const sources = [];

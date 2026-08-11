@@ -2080,11 +2080,21 @@ let fastUploadProductCode = '';
 let fastUploadQrPayload = '';
 let fastUploadAiResult = null;
 let fastUploadLookupResult = null;
+let fastUploadLookupImageShown = false;
 let fastUploadPhotoSelectionId = 0;
 let heicConverterPromise = null;
+let stockLookupInProgress = false;
+let stockLookupLastSignature = '';
+let stockLookupLastStartedAt = 0;
+let stockBarcodeAutoTimer = null;
+let stockGlobalScannerTimer = null;
+let stockGlobalScannerBuffer = '';
+let stockGlobalScannerLastKeyAt = 0;
 const pendingDraftCache = new Map();
 const FAST_UPLOAD_MAX_FILE_SIZE = 25 * 1024 * 1024;
 const FAST_UPLOAD_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif']);
+const STOCK_BARCODE_AUTO_DELAY_MS = 220;
+const STOCK_SCANNER_KEY_GAP_MS = 110;
 const HEIC_CONVERTER_URL = 'https://cdn.jsdelivr.net/npm/heic-to@1.5.2/dist/iife/heic-to.js';
 const HEIC_BRANDS = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1']);
 const MOBILE_PRODUCT_ASSISTANT_STEPS = ['method', 'identify', 'details', 'review'];
@@ -2183,6 +2193,102 @@ function renderFastUploadQr() {
   }
 }
 
+function setStockScannerState(state, message) {
+  const scannerState = document.getElementById('fastupload-scanner-state');
+  if (!scannerState) return;
+  scannerState.dataset.state = state;
+  scannerState.innerHTML = '<span aria-hidden="true"></span>';
+  scannerState.append(document.createTextNode(` ${message}`));
+}
+
+function cleanStockBarcode(value) {
+  return String(value || '').replace(/[^\d]/g, '').slice(0, 18);
+}
+
+function clearStockBarcodeAutoTimer() {
+  if (!stockBarcodeAutoTimer) return;
+  window.clearTimeout(stockBarcodeAutoTimer);
+  stockBarcodeAutoTimer = null;
+}
+
+function runStockBarcodeLookup(source = 'scanner') {
+  clearStockBarcodeAutoTimer();
+  const barcodeInput = document.getElementById('fastupload-barcode-input');
+  const barcode = cleanStockBarcode(barcodeInput?.value);
+  if (barcodeInput && barcodeInput.value !== barcode) barcodeInput.value = barcode;
+  if (barcode.length < 6 || barcode.length > 18) {
+    setStockScannerState('error', 'Código incompleto: deben ser entre 6 y 18 números');
+    return;
+  }
+  setStockScannerState('reading', source === 'button' ? 'Buscando el código ingresado…' : 'Código leído · buscando datos…');
+  lookupFastUploadProductWithoutAi('barcode');
+}
+
+function scheduleStockBarcodeLookup() {
+  const barcodeInput = document.getElementById('fastupload-barcode-input');
+  if (!barcodeInput) return;
+  const barcode = cleanStockBarcode(barcodeInput.value);
+  if (barcodeInput.value !== barcode) barcodeInput.value = barcode;
+  clearStockBarcodeAutoTimer();
+  if (!barcode) {
+    setStockScannerState('ready', 'Lector listo para escanear');
+    return;
+  }
+  if (barcode.length < 6) {
+    setStockScannerState('reading', 'Leyendo código…');
+    return;
+  }
+  setStockScannerState('reading', 'Código recibido · esperando fin de lectura…');
+  stockBarcodeAutoTimer = window.setTimeout(() => runStockBarcodeLookup('automatic'), STOCK_BARCODE_AUTO_DELAY_MS);
+}
+
+function handleStockBarcodeKeydown(event) {
+  if (!['Enter', 'Tab'].includes(event.key)) return;
+  event.preventDefault();
+  runStockBarcodeLookup('scanner');
+}
+
+function isFastUploadWorkspaceVisible() {
+  const section = document.getElementById('vendor-fast-upload-section');
+  return Boolean(section && section.style.display !== 'none' && section.offsetParent !== null);
+}
+
+function commitGlobalStockScannerBuffer() {
+  if (stockGlobalScannerTimer) window.clearTimeout(stockGlobalScannerTimer);
+  stockGlobalScannerTimer = null;
+  const barcode = cleanStockBarcode(stockGlobalScannerBuffer);
+  stockGlobalScannerBuffer = '';
+  if (barcode.length < 6 || barcode.length > 18) return;
+  const barcodeInput = document.getElementById('fastupload-barcode-input');
+  if (!barcodeInput) return;
+  barcodeInput.value = barcode;
+  runStockBarcodeLookup('scanner');
+}
+
+function handleGlobalStockScannerKeydown(event) {
+  if (!isFastUploadWorkspaceVisible()) return;
+  const barcodeInput = document.getElementById('fastupload-barcode-input');
+  if (!barcodeInput || event.target === barcodeInput) return;
+  const tagName = event.target?.tagName?.toLowerCase();
+  if (event.target?.isContentEditable || ['input', 'textarea', 'select'].includes(tagName)) return;
+
+  const now = Date.now();
+  if (/^\d$/.test(event.key)) {
+    if (now - stockGlobalScannerLastKeyAt > STOCK_SCANNER_KEY_GAP_MS) stockGlobalScannerBuffer = '';
+    stockGlobalScannerLastKeyAt = now;
+    stockGlobalScannerBuffer = `${stockGlobalScannerBuffer}${event.key}`.slice(-18);
+    if (stockGlobalScannerTimer) window.clearTimeout(stockGlobalScannerTimer);
+    stockGlobalScannerTimer = window.setTimeout(commitGlobalStockScannerBuffer, STOCK_BARCODE_AUTO_DELAY_MS);
+    setStockScannerState('reading', 'Recibiendo lectura de la pistola…');
+    return;
+  }
+
+  if (['Enter', 'Tab'].includes(event.key) && stockGlobalScannerBuffer.length >= 6) {
+    event.preventDefault();
+    commitGlobalStockScannerBuffer();
+  }
+}
+
 function initializeFastUploadForm() {
   if (!fastUploadProductCode) fastUploadProductCode = createProductCode();
   updateFastUploadLocationPreview();
@@ -2190,12 +2296,8 @@ function initializeFastUploadForm() {
   const barcodeInput = document.getElementById('fastupload-barcode-input');
   if (barcodeInput && !barcodeInput.dataset.scannerReady) {
     barcodeInput.dataset.scannerReady = 'true';
-    barcodeInput.addEventListener('keydown', event => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        lookupFastUploadProductWithoutAi('barcode');
-      }
-    });
+    barcodeInput.addEventListener('keydown', handleStockBarcodeKeydown);
+    barcodeInput.addEventListener('input', scheduleStockBarcodeLookup);
   }
   const manualQueryInput = document.getElementById('fastupload-manual-query-input');
   if (manualQueryInput && !manualQueryInput.dataset.lookupReady) {
@@ -2207,6 +2309,11 @@ function initializeFastUploadForm() {
       }
     });
   }
+  if (!document.documentElement.dataset.stockScannerCaptureReady) {
+    document.documentElement.dataset.stockScannerCaptureReady = 'true';
+    document.addEventListener('keydown', handleGlobalStockScannerKeydown, true);
+  }
+  setStockScannerState('ready', 'Lector listo para escanear');
 }
 
 function isMobileVendorAssistantView() {
@@ -2273,6 +2380,7 @@ function renderMobileProductAssistantReview() {
   const name = document.getElementById('fastupload-name-input')?.value.trim() || 'Sin nombre';
   const category = document.getElementById('fastupload-category-input')?.value || 'Sin categoría';
   const stock = document.getElementById('fastupload-stock-input')?.value || '0';
+  const salePrice = Number(document.getElementById('fastupload-sale-price-input')?.value || 0);
   const barcode = document.getElementById('fastupload-barcode-input')?.value.trim() || 'No informado';
   return `
     <p class="assistant-question">Revisá antes de finalizar</p>
@@ -2281,6 +2389,7 @@ function renderMobileProductAssistantReview() {
       <div class="assistant-review-row"><span>Producto</span><strong>${escapeStockHtml(name)}</strong></div>
       <div class="assistant-review-row"><span>Categoría</span><strong>${escapeStockHtml(category)}</strong></div>
       <div class="assistant-review-row"><span>Unidades</span><strong>${escapeStockHtml(stock)}</strong></div>
+      <div class="assistant-review-row"><span>Precio</span><strong>${salePrice > 0 ? `$ ${salePrice.toLocaleString('es-AR')}` : 'Sin confirmar'}</strong></div>
       <div class="assistant-review-row"><span>Código</span><strong>${escapeStockHtml(barcode)}</strong></div>
       <div class="assistant-review-row"><span>Ubicación</span><strong>Pendiente de ubicar</strong></div>
     </div>`;
@@ -2314,7 +2423,9 @@ function renderMobileProductAssistant() {
     return;
   }
   if (mobileProductAssistantStep === 'details') {
-    content.innerHTML = '<p class="assistant-question">Confirmá los datos y la cantidad</p><p class="assistant-help">Corregí cualquier sugerencia automática antes de continuar.</p>';
+    content.innerHTML = fastUploadLookupResult?.found
+      ? '<p class="assistant-question">Completá cantidad y precio</p><p class="assistant-help">Los demás datos ya fueron completados. Podés revisarlos si hace falta.</p>'
+      : '<p class="assistant-question">Confirmá los datos, la cantidad y el precio</p><p class="assistant-help">Corregí cualquier dato antes de continuar.</p>';
     if (nextButton) nextButton.textContent = 'Revisar ingreso';
     return;
   }
@@ -2342,8 +2453,8 @@ function chooseMobileProductEntryMethod(method) {
 
 function continueMobileProductAssistant() {
   if (mobileProductAssistantStep === 'identify') {
-    if (!fastUploadSelectedFile) {
-      showToast('Agregá una foto del producto para continuar.');
+    if (!fastUploadSelectedFile && !fastUploadLookupResult?.found) {
+      showToast('Escaneá un código encontrado o agregá una foto para continuar.');
       return;
     }
     setMobileProductAssistantStep('details');
@@ -2353,8 +2464,9 @@ function continueMobileProductAssistant() {
     const name = document.getElementById('fastupload-name-input')?.value.trim();
     const category = document.getElementById('fastupload-category-input')?.value;
     const stock = Number.parseInt(document.getElementById('fastupload-stock-input')?.value || '', 10);
-    if (!name || !category || !Number.isFinite(stock) || stock < 0) {
-      showToast('Completá nombre, categoría y unidades recibidas.');
+    const salePrice = Number(document.getElementById('fastupload-sale-price-input')?.value || 0);
+    if (!name || !category || !Number.isFinite(stock) || stock < 0 || !Number.isFinite(salePrice) || salePrice <= 0) {
+      showToast('Completá nombre, categoría, cantidad y precio de venta.');
       return;
     }
     setMobileProductAssistantStep('review');
@@ -2382,8 +2494,10 @@ function updateFastUploadLocationPreview() {
 function focusFastUploadBarcode() {
   const input = document.getElementById('fastupload-barcode-input');
   if (!input) return;
+  stockGlobalScannerBuffer = '';
   input.focus();
   input.select();
+  setStockScannerState('ready', 'Pistola activa · escaneá el código ahora');
   showToast('Lector listo: escaneá ahora o escribí el código.');
 }
 
@@ -2852,6 +2966,77 @@ function setStockLookupLoading(isLoading) {
   });
 }
 
+function resetFastUploadLookupPresentation(clearFields = false) {
+  const detailsPanel = document.querySelector('.stock-entry-details-panel');
+  const summary = document.getElementById('fastupload-found-summary');
+  detailsPanel?.classList.remove('lookup-complete', 'show-lookup-details');
+  if (summary) summary.hidden = true;
+  if (clearFields) {
+    [
+      'fastupload-name-input', 'fastupload-brand-input', 'fastupload-presentation-input',
+      'fastupload-category-input', 'fastupload-description-input', 'fastupload-official-url-input',
+      'fastupload-market-price-input', 'fastupload-sale-price-input'
+    ].forEach(id => {
+      const field = document.getElementById(id);
+      if (field) field.value = '';
+    });
+    const sourceLinks = document.getElementById('fastupload-source-links');
+    if (sourceLinks) sourceLinks.innerHTML = '';
+  }
+  if (fastUploadLookupImageShown && !fastUploadSelectedFile) {
+    const previewImage = document.getElementById('fastupload-photo-img');
+    const previewContainer = document.getElementById('fastupload-photo-preview-container');
+    const trigger = document.getElementById('fastupload-photo-trigger');
+    if (previewImage) previewImage.src = '';
+    if (previewContainer) previewContainer.hidden = true;
+    if (trigger) trigger.hidden = false;
+    fastUploadLookupImageShown = false;
+  }
+}
+
+function renderFastUploadLookupSummary(result) {
+  const product = result.product || {};
+  const summary = document.getElementById('fastupload-found-summary');
+  const name = document.getElementById('fastupload-found-name');
+  const meta = document.getElementById('fastupload-found-meta');
+  const image = document.getElementById('fastupload-found-image');
+  const detailsPanel = document.querySelector('.stock-entry-details-panel');
+  if (!summary || !detailsPanel) return;
+
+  if (name) name.textContent = product.name || 'Producto encontrado';
+  const details = [product.brand, product.presentation, product.category].filter(Boolean);
+  if (result.market?.average_price) details.push(`Referencia $${Math.round(result.market.average_price).toLocaleString('es-AR')}`);
+  if (meta) meta.textContent = details.join(' · ') || `Código ${product.barcode || 'identificado'}`;
+  if (image) {
+    image.hidden = !product.image_url;
+    image.src = product.image_url || '';
+    image.alt = product.image_url ? `Imagen encontrada de ${product.name || 'producto'}` : '';
+  }
+  summary.hidden = false;
+  detailsPanel.classList.add('lookup-complete');
+  detailsPanel.classList.remove('show-lookup-details');
+
+  if (product.image_url && !fastUploadSelectedFile) {
+    const previewImage = document.getElementById('fastupload-photo-img');
+    const previewContainer = document.getElementById('fastupload-photo-preview-container');
+    const trigger = document.getElementById('fastupload-photo-trigger');
+    if (previewImage) previewImage.src = product.image_url;
+    if (previewContainer) previewContainer.hidden = false;
+    if (trigger) trigger.hidden = true;
+    fastUploadLookupImageShown = true;
+  }
+  const photoRequirement = document.getElementById('fastupload-photo-requirement');
+  if (photoRequirement) photoRequirement.textContent = 'Foto opcional · código encontrado';
+}
+
+function toggleFastUploadLookupDetails() {
+  const detailsPanel = document.querySelector('.stock-entry-details-panel');
+  if (!detailsPanel) return;
+  const showDetails = detailsPanel.classList.toggle('show-lookup-details');
+  const button = document.querySelector('#fastupload-found-summary button');
+  if (button) button.textContent = showDetails ? 'Ocultar datos' : 'Revisar datos';
+}
+
 function applyStockLookupResult(result) {
   const product = result.product || {};
   setStockFieldValue('fastupload-name-input', product.name);
@@ -2867,6 +3052,7 @@ function applyStockLookupResult(result) {
   const suggestedPrice = result.sale_price || result.market?.median_price || result.market?.average_price;
   setStockFieldValue('fastupload-sale-price-input', suggestedPrice ? Math.round(suggestedPrice) : null);
   renderAiSourceLinks(result);
+  renderFastUploadLookupSummary(result);
 }
 
 function mapCategoryClient(text) {
@@ -2952,6 +3138,10 @@ async function searchEanFromBrowser(barcode) {
 async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
   const status = document.getElementById('fastupload-lookup-status');
   if (!status) return;
+  if (stockLookupInProgress) {
+    setStockScannerState('reading', 'Búsqueda en curso…');
+    return;
+  }
   const barcodeInput = document.getElementById('fastupload-barcode-input');
   const rawBarcode = barcodeInput?.value || '';
   const cleanBarcode = rawBarcode.replace(/[^\d]/g, '');
@@ -2962,17 +3152,18 @@ async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
 
   const barcode = cleanBarcode;
   const manualQuery = document.getElementById('fastupload-manual-query-input')?.value.trim() || '';
-  const identityQuery = [
+  const identityQuery = (mode === 'barcode' ? [manualQuery] : [
     manualQuery,
     document.getElementById('fastupload-brand-input')?.value.trim(),
     document.getElementById('fastupload-name-input')?.value.trim(),
     document.getElementById('fastupload-presentation-input')?.value.trim()
-  ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  ]).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
 
   if (rawBarcode.trim() && !barcode && identityQuery.length < 2) {
     status.hidden = false;
     status.dataset.state = 'error';
     status.textContent = 'El código de barras debe contener números (entre 6 y 18 dígitos).';
+    setStockScannerState('error', 'No pudimos leer un código numérico válido');
     return;
   }
 
@@ -2980,6 +3171,7 @@ async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
     status.hidden = false;
     status.dataset.state = 'error';
     status.textContent = `El código ingresado tiene ${barcode.length} números. Debe contener entre 6 y 18 dígitos.`;
+    setStockScannerState('error', 'Código incompleto o demasiado largo');
     return;
   }
 
@@ -2990,10 +3182,21 @@ async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
     return;
   }
 
+  const lookupSignature = `${mode}:${barcode}:${identityQuery.toLocaleLowerCase('es')}`;
+  if (lookupSignature === stockLookupLastSignature && Date.now() - stockLookupLastStartedAt < 1600) return;
+  if (lookupSignature !== stockLookupLastSignature) {
+    resetFastUploadLookupPresentation(Boolean(stockLookupLastSignature));
+    fastUploadLookupResult = null;
+  }
+  stockLookupLastSignature = lookupSignature;
+  stockLookupLastStartedAt = Date.now();
+  stockLookupInProgress = true;
+
   setStockLookupLoading(true);
   status.hidden = false;
   status.dataset.state = 'loading';
   status.textContent = 'Buscando primero en BÔ y después en fuentes públicas, sin usar IA…';
+  if (barcode) setStockScannerState('reading', 'Código leído · completando la ficha…');
 
   try {
     const [localAttempt, externalAttempt] = await Promise.allSettled([
@@ -3026,6 +3229,7 @@ async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
     if (!result.found) {
       status.dataset.state = 'error';
       status.textContent = 'No encontramos una coincidencia confiable. Podés completar los campos manualmente y BÔ la recordará para la próxima.';
+      if (barcode) setStockScannerState('error', 'Código leído, pero sin datos disponibles');
       return;
     }
 
@@ -3036,12 +3240,25 @@ async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
       : (result.warnings.length ? '' : ' El precio puede completarse manualmente.');
     const warningCopy = result.warnings.length ? ` ${result.warnings.join(' ')}` : '';
     status.dataset.state = 'success';
-    status.textContent = `Datos encontrados en ${providers}.${marketCopy}${warningCopy} Revisalos antes de enviar.`;
+    status.textContent = `Datos encontrados en ${providers}.${marketCopy}${warningCopy} Ahora completá cantidad y precio.`;
+    if (barcode) setStockScannerState('found', 'Producto encontrado · ficha completada');
+    if (isMobileVendorAssistantView() && mobileProductAssistantStep === 'identify') {
+      setMobileProductAssistantStep('details');
+    }
+    window.setTimeout(() => {
+      const stockInput = document.getElementById('fastupload-stock-input');
+      if (stockInput && stockInput.offsetParent !== null) {
+        stockInput.focus();
+        stockInput.select();
+      }
+    }, 180);
   } catch (error) {
     console.error('Error en búsqueda de producto sin IA:', error);
     status.dataset.state = 'error';
     status.textContent = `${error.name === 'AbortError' ? 'La búsqueda tardó demasiado.' : error.message} Podés continuar manualmente o usar la foto con IA.`;
+    if (barcode) setStockScannerState('error', 'No se pudo consultar; podés reintentar');
   } finally {
+    stockLookupInProgress = false;
     setStockLookupLoading(false);
   }
 }
@@ -3155,8 +3372,8 @@ async function submitProductDraft(event) {
   const submitBtn = document.getElementById('fastupload-submit-btn');
 
   try {
-    if (!fastUploadSelectedFile) {
-      showToast('⚠️ Por favor sacá o elegí una foto antes de enviar.');
+    if (!fastUploadSelectedFile && !fastUploadLookupResult?.found) {
+      showToast('⚠️ Escaneá un código encontrado o agregá una foto antes de enviar.');
       return;
     }
 
@@ -3173,34 +3390,43 @@ async function submitProductDraft(event) {
     const shelfLevelVal = shelfVal ? Number(document.getElementById('fastupload-level-input').value || 2) : null;
     const locationVal = document.getElementById('fastupload-location-input').value.trim();
     const obsVal = document.getElementById('fastupload-obs-input').value.trim();
+    const salePriceVal = Number(document.getElementById('fastupload-sale-price-input').value || 0);
     const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'Vendedor Local';
 
     if (!nameVal || !categoryVal) {
       showToast('Completá el nombre y la categoría del producto.');
       return;
     }
+    if (!Number.isFinite(salePriceVal) || salePriceVal <= 0) {
+      showToast('Completá el precio de venta del producto.');
+      document.getElementById('fastupload-sale-price-input')?.focus();
+      return;
+    }
     if (submitBtn) {
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '⏳ Comprimiendo y subiendo foto...';
+      submitBtn.innerHTML = fastUploadSelectedFile ? '⏳ Comprimiendo y subiendo foto...' : '⏳ Guardando producto...';
     }
 
-    const compressedBlob = await compressImageFile(fastUploadSelectedFile, 1000, 1000, 0.75);
-    const filePath = `drafts/${fastUploadProductCode}_${Date.now()}.jpg`;
-    const { error: uploadError } = await supabaseClient
-      .storage
-      .from('product-images')
-      .upload(filePath, compressedBlob, { contentType: 'image/jpeg', upsert: false });
+    let filePath = null;
+    let imageUrl = fastUploadLookupResult?.product?.image_url || '';
+    if (fastUploadSelectedFile) {
+      const compressedBlob = await compressImageFile(fastUploadSelectedFile, 1000, 1000, 0.75);
+      filePath = `drafts/${fastUploadProductCode}_${Date.now()}.jpg`;
+      const { error: uploadError } = await supabaseClient
+        .storage
+        .from('product-images')
+        .upload(filePath, compressedBlob, { contentType: 'image/jpeg', upsert: false });
 
-    if (uploadError) {
-      throw new Error(`Error al subir imagen a Supabase Storage: ${uploadError.message}`);
+      if (uploadError) {
+        throw new Error(`Error al subir imagen a Supabase Storage: ${uploadError.message}`);
+      }
+
+      const { data: urlData } = supabaseClient
+        .storage
+        .from('product-images')
+        .getPublicUrl(filePath);
+      imageUrl = urlData ? urlData.publicUrl : imageUrl;
     }
-
-    const { data: urlData } = supabaseClient
-      .storage
-      .from('product-images')
-      .getPublicUrl(filePath);
-
-    const imageUrl = urlData ? urlData.publicUrl : '';
     const marketResult = fastUploadAiResult?.market || fastUploadLookupResult?.market || {};
     const metadata = {
       product_code: fastUploadProductCode,
@@ -3213,7 +3439,7 @@ async function submitProductDraft(event) {
       official_url: document.getElementById('fastupload-official-url-input').value.trim() || null,
       market_reference_url: marketResult.search_url || null,
       market_average_price: Number(document.getElementById('fastupload-market-price-input').value) || null,
-      sale_price: Number(document.getElementById('fastupload-sale-price-input').value) || null,
+      sale_price: salePriceVal,
       floor_level: floorVal,
       shelf_code: shelfVal || null,
       shelf_level: shelfLevelVal,
@@ -3263,7 +3489,11 @@ async function submitProductDraft(event) {
 
     fastUploadSelectedFile = null;
     fastUploadAiResult = null;
+    resetFastUploadLookupPresentation();
     fastUploadLookupResult = null;
+    fastUploadLookupImageShown = false;
+    stockLookupLastSignature = '';
+    stockLookupLastStartedAt = 0;
     revokeFastUploadPreviewUrl();
     fastUploadProductCode = createProductCode();
     document.getElementById('fast-upload-form').reset();
@@ -3274,6 +3504,8 @@ async function submitProductDraft(event) {
     document.getElementById('fastupload-lookup-status').hidden = true;
     document.getElementById('fastupload-ai-confidence').hidden = true;
     document.getElementById('fastupload-source-links').innerHTML = '';
+    const photoRequirement = document.getElementById('fastupload-photo-requirement');
+    if (photoRequirement) photoRequirement.textContent = 'Foto opcional con código';
     initializeFastUploadForm();
 
     loadPendingProductDrafts();
@@ -3289,7 +3521,7 @@ async function submitProductDraft(event) {
       submitBtn.disabled = false;
       submitBtn.textContent = isMobileVendorAssistantView() && mobileProductAssistantStep === 'review'
         ? 'Ingresar y ubicar después'
-        : 'Enviar producto a revisión';
+        : 'Ingresar producto al stock';
     }
   }
 }
@@ -4184,5 +4416,6 @@ window.loadPendingProductDrafts = loadPendingProductDrafts;
 window.approveProductDraft = approveProductDraft;
 window.rejectProductDraft = rejectProductDraft;
 window.lookupFastUploadProductWithoutAi = lookupFastUploadProductWithoutAi;
+window.toggleFastUploadLookupDetails = toggleFastUploadLookupDetails;
 window.searchEanFromBrowser = searchEanFromBrowser;
 
