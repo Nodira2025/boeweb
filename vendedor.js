@@ -2667,9 +2667,17 @@ function setStockFieldValue(id, value, overwrite = false) {
 }
 
 async function readStockLookupRows(query, sourceName) {
-  const { data, error } = await query;
-  if (error) throw new Error(`${sourceName}: ${error.message}`);
-  return data || [];
+  try {
+    const { data, error } = await query;
+    if (error) {
+      console.warn(`Consulta BÔ (${sourceName}):`, error.message);
+      return [];
+    }
+    return data || [];
+  } catch (err) {
+    console.warn(`Consulta BÔ (${sourceName}):`, err.message);
+    return [];
+  }
 }
 
 function catalogDescriptionToPlainText(value) {
