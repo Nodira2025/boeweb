@@ -2869,6 +2869,86 @@ function applyStockLookupResult(result) {
   renderAiSourceLinks(result);
 }
 
+function mapCategoryClient(text) {
+  const t = (text || '').toLowerCase();
+  const rules = [
+    ['Semillas', /semilla|seed|germin/],
+    ['Sustratos', /sustrat|substrat|tierra|soil|turba|peat|coco/],
+    ['Fertilizantes', /fertili|nutrient|abono|bio grow|bio bloom|estimulador/],
+    ['Vaporizadores', /vaporiz|vaporizer/],
+    ['Macetas', /maceta|plant pot|flower pot/],
+    ['Medición y Riego', /riego|irrig|medidor|meter|conductiv|\bph\b|\bec\b/],
+    ['Indoor', /indoor|lámpara|lampara|lighting|\bled\b|extractor|ventilador|carpa|prohanger|polea|ratchet|colgador|hanger/],
+    ['Parafernalia', /grinder|picador|papel|pipa|bong|parafernalia/]
+  ];
+  return (rules.find(([, p]) => p.test(t)) || ['Otros'])[0];
+}
+
+async function searchEanFromBrowser(barcode) {
+  if (!barcode || !/^\d{6,18}$/.test(barcode)) return null;
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await fetch('https://lite.duckduckgo.com/lite/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `q=${encodeURIComponent(barcode)}`,
+      signal: controller.signal
+    });
+    if (!response.ok) return null;
+    const html = await response.text();
+
+    const titleMatches = [...html.matchAll(/<a[^>]+class=['"]result-link['"][^>]*>([\s\S]*?)<\/a>/gi)];
+    const titles = titleMatches
+      .map(m => m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())
+      .filter(t => t.length > 5 && !/duckduckgo/i.test(t));
+
+    if (!titles.length) return null;
+
+    let rawTitle = titles[0].replace(/\s*[-|–|:]\s*[A-Za-z0-9.\s]+$/gi, '').trim();
+    if (!rawTitle || rawTitle.length < 3) rawTitle = titles[0];
+
+    let brand = null;
+    const brandRules = [
+      [/garden\s*high\s*pro/i, 'Garden HighPro'],
+      [/biobizz/i, 'BioBizz'],
+      [/top\s*crop/i, 'Top Crop'],
+      [/namaste/i, 'Namaste'],
+      [/plagron/i, 'Plagron'],
+      [/advanced\s*nutrients/i, 'Advanced Nutrients'],
+      [/canna\b/i, 'Canna'],
+      [/general\s*hydroponics/i, 'General Hydroponics']
+    ];
+    const brandMatch = brandRules.find(([re]) => re.test(rawTitle));
+    if (brandMatch) brand = brandMatch[1];
+
+    return {
+      mode: 'browser_ean_lookup',
+      found: true,
+      product: {
+        name: rawTitle,
+        brand,
+        presentation: null,
+        category: mapCategoryClient(rawTitle),
+        description: `Identificado por EAN ${barcode}.`,
+        barcode,
+        official_url: null,
+        market_query: rawTitle,
+        image_url: null
+      },
+      market: null,
+      sources: [{ label: `Búsqueda EAN ${barcode}`, url: `https://duckduckgo.com/?q=${encodeURIComponent(barcode)}` }],
+      providers: ['Búsqueda EAN (navegador)'],
+      warnings: []
+    };
+  } catch (err) {
+    console.warn('searchEanFromBrowser error:', err.message);
+    return null;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
   const status = document.getElementById('fastupload-lookup-status');
   if (!status) return;
@@ -2905,7 +2985,21 @@ async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
       fetchExternalStockLookup(barcode, identityQuery)
     ]);
     const localResult = localAttempt.status === 'fulfilled' ? localAttempt.value : null;
-    const externalResult = externalAttempt.status === 'fulfilled' ? externalAttempt.value : null;
+    let externalResult = externalAttempt.status === 'fulfilled' ? externalAttempt.value : null;
+
+    // Fallback: if server found nothing and we have a barcode, search from the browser
+    if (barcode && (!externalResult || !externalResult.found)) {
+      try {
+        status.textContent = 'Buscando EAN desde el navegador…';
+        const browserResult = await searchEanFromBrowser(barcode);
+        if (browserResult && browserResult.found) {
+          externalResult = browserResult;
+        }
+      } catch (e) {
+        console.warn('Búsqueda EAN desde navegador falló:', e.message);
+      }
+    }
+
     if (!localResult && !externalResult) {
       const reason = externalAttempt.status === 'rejected' ? externalAttempt.reason : localAttempt.reason;
       throw reason || new Error('No se pudo completar la búsqueda.');
