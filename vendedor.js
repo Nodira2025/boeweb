@@ -2952,7 +2952,15 @@ async function searchEanFromBrowser(barcode) {
 async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
   const status = document.getElementById('fastupload-lookup-status');
   if (!status) return;
-  const barcode = document.getElementById('fastupload-barcode-input')?.value.replace(/[\s-]+/g, '') || '';
+  const barcodeInput = document.getElementById('fastupload-barcode-input');
+  const rawBarcode = barcodeInput?.value || '';
+  const cleanBarcode = rawBarcode.replace(/[^\d]/g, '');
+
+  if (cleanBarcode && barcodeInput && barcodeInput.value !== cleanBarcode) {
+    barcodeInput.value = cleanBarcode;
+  }
+
+  const barcode = cleanBarcode;
   const manualQuery = document.getElementById('fastupload-manual-query-input')?.value.trim() || '';
   const identityQuery = [
     manualQuery,
@@ -2961,12 +2969,20 @@ async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
     document.getElementById('fastupload-presentation-input')?.value.trim()
   ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
 
-  if (mode === 'barcode' && barcode && !/^\d{6,18}$/.test(barcode)) {
+  if (rawBarcode.trim() && !barcode && identityQuery.length < 2) {
     status.hidden = false;
     status.dataset.state = 'error';
-    status.textContent = 'Revisá el código: debe contener entre 6 y 18 números.';
+    status.textContent = 'El código de barras debe contener números (entre 6 y 18 dígitos).';
     return;
   }
+
+  if (barcode && (barcode.length < 6 || barcode.length > 18)) {
+    status.hidden = false;
+    status.dataset.state = 'error';
+    status.textContent = `El código ingresado tiene ${barcode.length} números. Debe contener entre 6 y 18 dígitos.`;
+    return;
+  }
+
   if (!barcode && identityQuery.length < 2) {
     status.hidden = false;
     status.dataset.state = 'error';

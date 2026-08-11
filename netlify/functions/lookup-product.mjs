@@ -41,8 +41,8 @@ function cleanText(value, maxLength = 180) {
 }
 
 function normalizeBarcode(value) {
-  const barcode = cleanText(value, 24).replace(/[\s-]+/g, '');
-  return /^\d{6,18}$/.test(barcode) ? barcode : '';
+  const barcode = cleanText(value, 24).replace(/[^\d]/g, '');
+  return barcode.length >= 6 && barcode.length <= 18 ? barcode : '';
 }
 
 function mapCategory(...values) {
