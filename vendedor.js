@@ -4167,3 +4167,6 @@ window.submitProductDraft = submitProductDraft;
 window.loadPendingProductDrafts = loadPendingProductDrafts;
 window.approveProductDraft = approveProductDraft;
 window.rejectProductDraft = rejectProductDraft;
+window.lookupFastUploadProductWithoutAi = lookupFastUploadProductWithoutAi;
+window.searchEanFromBrowser = searchEanFromBrowser;
+
