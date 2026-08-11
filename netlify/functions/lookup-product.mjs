@@ -54,7 +54,7 @@ function mapCategory(...values) {
     ['Vaporizadores', /vaporiz|vaporizer/],
     ['Macetas', /maceta|plant pot|flower pot/],
     ['Medición y Riego', /riego|irrig|medidor|meter|conductiv|\bph\b|\bec\b/],
-    ['Indoor', /indoor|lámpara|lampara|lighting|\bled\b|extractor|ventilador|carpa/],
+    ['Indoor', /indoor|lámpara|lampara|lighting|\bled\b|extractor|ventilador|carpa|prohanger|polea|ratchet|colgador|hanger/],
     ['Parafernalia', /grinder|picador|papel|pipa|bong|parafernalia/]
   ];
   return categoryRules.find(([, pattern]) => pattern.test(text))?.[0] || 'Otros';
@@ -122,6 +122,59 @@ async function searchOpenProducts(barcode) {
       url: `https://world.openfoodfacts.org/product/${encodeURIComponent(barcode)}`
     }
   };
+}
+
+async function searchWebEanBarcode(barcode) {
+  if (!barcode) return null;
+  try {
+    const response = await fetchWithTimeout('https://lite.duckduckgo.com/lite/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      body: `q=${encodeURIComponent(barcode)}`
+    });
+    if (!response.ok) return null;
+    const html = await response.text();
+
+    const titleMatches = [...html.matchAll(/<a[^>]+class=['"]result-link['"][^>]*>([\s\S]*?)<\/a>/gi)];
+    const titles = titleMatches
+      .map(m => m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())
+      .filter(t => t.length > 5 && !/duckduckgo/i.test(t));
+
+    if (!titles.length) return null;
+
+    let rawTitle = titles[0].replace(/\s*[-|–|:]\s*[A-Za-z0-9.\s]+$/gi, '').trim();
+    if (!rawTitle || rawTitle.length < 3) rawTitle = titles[0];
+
+    let brand = null;
+    if (/garden\s*high\s*pro/i.test(rawTitle)) brand = 'Garden HighPro';
+    else if (/biobizz/i.test(rawTitle)) brand = 'BioBizz';
+    else if (/top\ crop/i.test(rawTitle)) brand = 'Top Crop';
+    else if (/namaste/i.test(rawTitle)) brand = 'Namaste';
+
+    return {
+      product: {
+        name: rawTitle,
+        brand,
+        presentation: null,
+        category: mapCategory(rawTitle),
+        description: `Producto identificado mediante EAN ${barcode}.`,
+        barcode,
+        official_url: null,
+        market_query: rawTitle,
+        image_url: null
+      },
+      source: {
+        label: `Búsqueda pública por EAN ${barcode}`,
+        url: `https://duckduckgo.com/?q=${encodeURIComponent(barcode)}`
+      }
+    };
+  } catch (err) {
+    console.warn('Falló la consulta web EAN:', err.message);
+    return null;
+  }
 }
 
 function calculateMarketStats(items) {
@@ -208,13 +261,21 @@ export default async function handler(request, context) {
     if (barcode) {
       try {
         openResult = await searchOpenProducts(barcode);
+        if (!openResult) {
+          openResult = await searchWebEanBarcode(barcode);
+        }
       } catch (error) {
-        warnings.push('La base abierta no respondió; continuamos con las demás fuentes.');
+        warnings.push('La base abierta no respondió; intentando con fuentes de respaldo.');
         console.warn('Falló la consulta de Open Products:', error.message);
+        try {
+          openResult = await searchWebEanBarcode(barcode);
+        } catch (e) {
+          console.warn('Falló la búsqueda web EAN:', e.message);
+        }
       }
     }
 
-    const primaryMarketQuery = barcode || query || openResult?.product?.market_query;
+    const primaryMarketQuery = openResult?.product?.name || openResult?.product?.market_query || query || barcode;
     let market = null;
     try {
       market = await searchMercadoLibre(primaryMarketQuery);
@@ -239,7 +300,7 @@ export default async function handler(request, context) {
       product,
       market,
       sources,
-      providers: [openResult ? 'Open Products' : null, market ? 'Mercado Libre' : null].filter(Boolean),
+      providers: [openResult ? 'Búsqueda EAN' : null, market ? 'Mercado Libre' : null].filter(Boolean),
       warnings
     });
   } catch (error) {
