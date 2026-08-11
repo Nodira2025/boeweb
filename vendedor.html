@@ -1455,7 +1455,7 @@
 
               <label for="fastupload-barcode-input">Código de barras</label>
               <div class="stock-noai-action-row">
-                <input type="text" id="fastupload-barcode-input" class="b2b-form-input" placeholder="Escanear o escribir" inputmode="numeric" autocomplete="off">
+                <input type="text" id="fastupload-barcode-input" class="b2b-form-input" placeholder="Escanear o escribir" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupFastUploadProductWithoutAi('barcode');}">
                 <button type="button" class="stock-entry-secondary-btn" onclick="focusFastUploadBarcode()">Usar lector</button>
                 <button type="button" class="stock-lookup-btn" data-stock-lookup-button onclick="lookupFastUploadProductWithoutAi('barcode')">Buscar datos</button>
               </div>
@@ -1464,7 +1464,7 @@
               <div class="stock-noai-divider"><span>Si no tiene código</span></div>
               <label for="fastupload-manual-query-input">Nombre, marca o SKU</label>
               <div class="stock-noai-action-row stock-noai-manual-row">
-                <input type="search" id="fastupload-manual-query-input" class="b2b-form-input" placeholder="Ej: BioBizz Bio Grow 1 L" autocomplete="off">
+                <input type="search" id="fastupload-manual-query-input" class="b2b-form-input" placeholder="Ej: BioBizz Bio Grow 1 L" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupFastUploadProductWithoutAi('manual');}">
                 <button type="button" class="stock-lookup-btn" data-stock-lookup-button onclick="lookupFastUploadProductWithoutAi('manual')">Buscar por nombre</button>
               </div>
               <div id="fastupload-lookup-status" class="stock-lookup-status" role="status" aria-live="polite" hidden></div>

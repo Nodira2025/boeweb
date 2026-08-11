@@ -127,18 +127,18 @@ async function searchOpenProducts(barcode) {
 async function searchWebEanBarcode(barcode) {
   if (!barcode) return null;
   try {
-    const response = await fetchWithTimeout('https://lite.duckduckgo.com/lite/', {
-      method: 'POST',
+    const response = await fetchWithTimeout(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(barcode)}`, {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      },
-      body: `q=${encodeURIComponent(barcode)}`
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8'
+      }
     });
     if (!response.ok) return null;
     const html = await response.text();
 
-    const titleMatches = [...html.matchAll(/<a[^>]+class=['"]result-link['"][^>]*>([\s\S]*?)<\/a>/gi)];
+    const titleMatches = [...html.matchAll(/<h2[^>]*class="result__title"[^>]*>([\s\S]*?)<\/h2>/gi)];
     const titles = titleMatches
       .map(m => m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())
       .filter(t => t.length > 5 && !/duckduckgo/i.test(t));
@@ -149,10 +149,18 @@ async function searchWebEanBarcode(barcode) {
     if (!rawTitle || rawTitle.length < 3) rawTitle = titles[0];
 
     let brand = null;
-    if (/garden\s*high\s*pro/i.test(rawTitle)) brand = 'Garden HighPro';
-    else if (/biobizz/i.test(rawTitle)) brand = 'BioBizz';
-    else if (/top\ crop/i.test(rawTitle)) brand = 'Top Crop';
-    else if (/namaste/i.test(rawTitle)) brand = 'Namaste';
+    const brandRules = [
+      [/garden\s*high\s*pro/i, 'Garden HighPro'],
+      [/biobizz/i, 'BioBizz'],
+      [/top\s*crop/i, 'Top Crop'],
+      [/namaste/i, 'Namaste'],
+      [/plagron/i, 'Plagron'],
+      [/advanced\s*nutrients/i, 'Advanced Nutrients'],
+      [/canna\b/i, 'Canna'],
+      [/general\s*hydroponics/i, 'General Hydroponics']
+    ];
+    const brandMatch = brandRules.find(([re]) => re.test(rawTitle));
+    if (brandMatch) brand = brandMatch[1];
 
     return {
       product: {
