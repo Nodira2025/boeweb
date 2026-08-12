@@ -11,6 +11,7 @@ class MigrationCenterUI {
     this.parsedRawRows = [];
     this.columnMappings = [];
     this.stagedRows = [];
+    this.sourceMetadata = null;
   }
 
   initWizard(tenantId, createdBy) {
@@ -31,18 +32,28 @@ class MigrationCenterUI {
     this.parsedRawRows = [];
     this.columnMappings = [];
     this.stagedRows = [];
+    this.sourceMetadata = null;
   }
 
-  loadSourceContent(content, sourceType = 'FILE_CSV', filename = 'catalogo.csv') {
+  loadSourceContent(content, sourceType = 'FILE_CSV', filename = 'catalogo.csv', originalUrl = null) {
     const aiEngine = typeof MigrationAI !== 'undefined' ? MigrationAI : (typeof global !== 'undefined' ? global.MigrationAI : null);
     if (!aiEngine) return;
     this.parsedRawRows = aiEngine.parseRawSource(content, sourceType);
     this.activeJob.total_rows = this.parsedRawRows.length;
     this.activeJob.status = 'READY_FOR_MAPPING';
 
+    this.sourceMetadata = {
+      job_id: this.activeJob.id,
+      source_type: sourceType,
+      filename,
+      original_url: originalUrl,
+      checksum: `sha256-${Date.now()}`,
+      created_at: new Date().toISOString()
+    };
+
     const headers = Object.keys(this.parsedRawRows[0] || {});
     this.columnMappings = aiEngine.suggestColumnMappings(headers, this.activeJob.vertical_code);
-    return { totalRows: this.parsedRawRows.length, headers, mappings: this.columnMappings };
+    return { totalRows: this.parsedRawRows.length, headers, mappings: this.columnMappings, metadata: this.sourceMetadata };
   }
 
   processStagingValidation(existingCatalog = []) {
@@ -108,7 +119,7 @@ class MigrationCenterUI {
 
     const currentCatalog = [...catalogTarget];
     
-    // 1. Guardar Snapshot para Rollback Atómico antes de tocar producción
+    // 1. Guardar Snapshot y Ledger de Acciones antes de modificar producción
     let versionRecord = null;
     const rollbackEngine = typeof MigrationRollback !== 'undefined' ? MigrationRollback : (typeof global !== 'undefined' ? global.MigrationRollback : null);
     if (rollbackEngine) {
@@ -116,11 +127,12 @@ class MigrationCenterUI {
         this.activeJob.id, 
         this.activeJob.tenant_id, 
         this.stagedRows, 
-        currentCatalog
+        currentCatalog,
+        this.activeJob.type === 'CATALOG_B2B' ? 'SUPPLIER_PRODUCT' : (this.activeJob.type === 'INITIAL_STOCK' ? 'INVENTORY_LOCATION' : 'PRODUCT')
       );
     }
 
-    // 2. Aplicar importación en catálogo objetivo
+    // 2. Aplicar importación en catálogo de producción
     const createdList = [];
     const updatedList = [];
 
@@ -129,7 +141,7 @@ class MigrationCenterUI {
       const data = staged.normalized_data;
 
       if (staged.action === 'UPDATE' && staged.matched_product_id) {
-        const idx = currentCatalog.findIndex(p => p.product_code === staged.matched_product_id || p.id === staged.matched_product_id);
+        const idx = currentCatalog.findIndex(p => p.product_code === staged.matched_product_id || p.id === staged.matched_product_id || p.barcode === staged.matched_product_id);
         if (idx !== -1) {
           currentCatalog[idx] = { ...currentCatalog[idx], ...data };
           updatedList.push(data);

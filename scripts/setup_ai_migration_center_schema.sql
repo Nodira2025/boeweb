@@ -72,12 +72,26 @@ CREATE TABLE IF NOT EXISTS public.migration_versions (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 6. HABILITACIÓN DE ROW LEVEL SECURITY (RLS ESTRICTO POR TENANT)
+-- 6. LEDGER DE ACCIONES GRANULARES PARA ROLLBACK CONCURRENTE (MIGRATION ACTIONS)
+CREATE TABLE IF NOT EXISTS public.migration_actions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_id UUID NOT NULL REFERENCES public.migration_jobs(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  entity_type VARCHAR(50) NOT NULL CHECK (entity_type IN ('PRODUCT', 'SUPPLIER_PRODUCT', 'INVENTORY_LOCATION')),
+  entity_id VARCHAR(255) NOT NULL,
+  action VARCHAR(50) NOT NULL CHECK (action IN ('CREATE', 'UPDATE')),
+  before_data JSONB,
+  after_data JSONB NOT NULL,
+  executed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 7. HABILITACIÓN DE ROW LEVEL SECURITY (RLS ESTRICTO POR TENANT)
 ALTER TABLE public.migration_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.migration_sources ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.migration_rows ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.migration_mappings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.migration_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.migration_actions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "RLS migration_jobs_isolation" ON public.migration_jobs
   FOR ALL USING (
@@ -125,8 +139,17 @@ CREATE POLICY "RLS migration_versions_isolation" ON public.migration_versions
     )
   );
 
+CREATE POLICY "RLS migration_actions_isolation" ON public.migration_actions
+  FOR ALL USING (
+    public.is_superadmin() OR
+    tenant_id IN (
+      SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.role IN ('ADMIN', 'SUPERADMIN') AND tu.active = true
+    )
+  );
+
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.migration_jobs TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.migration_sources TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.migration_rows TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.migration_mappings TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.migration_versions TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.migration_actions TO authenticated;
