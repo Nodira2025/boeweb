@@ -150,8 +150,8 @@ CREATE TABLE IF NOT EXISTS public.patient_intakes (
 ```sql
 CREATE TABLE IF NOT EXISTS public.product_drafts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    image_url TEXT NOT NULL,
-    image_path TEXT NOT NULL,
+    image_url TEXT,
+    image_path TEXT,
     stock INTEGER NOT NULL CHECK (stock >= 0),
     location TEXT,
     observations TEXT,

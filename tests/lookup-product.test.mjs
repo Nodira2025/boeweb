@@ -119,6 +119,7 @@ test('usa el precio público de Astro para Top Bud y descarta combos parecidos',
 test('el vendedor no consulta tablas o columnas ausentes del esquema anterior', async () => {
   const sellerSource = await readFile(new URL('../vendedor.js', import.meta.url), 'utf8');
 
+  assert.match(sellerSource, /let filePath = '';/);
   assert.doesNotMatch(sellerSource, /\.from\(['"]product_locations['"]\)/);
   assert.doesNotMatch(
     sellerSource,

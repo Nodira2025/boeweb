@@ -22,6 +22,10 @@ ALTER TABLE public.product_drafts ADD COLUMN IF NOT EXISTS ai_confidence NUMERIC
 ALTER TABLE public.product_drafts ADD COLUMN IF NOT EXISTS ai_payload JSONB;
 ALTER TABLE public.product_drafts ADD COLUMN IF NOT EXISTS qr_payload TEXT;
 
+-- La foto es opcional cuando el producto fue identificado por código de barras.
+ALTER TABLE public.product_drafts ALTER COLUMN image_url DROP NOT NULL;
+ALTER TABLE public.product_drafts ALTER COLUMN image_path DROP NOT NULL;
+
 CREATE UNIQUE INDEX IF NOT EXISTS product_drafts_product_code_idx
 ON public.product_drafts (product_code)
 WHERE product_code IS NOT NULL;
@@ -138,4 +142,3 @@ COMMIT;
 
 -- Pedir a PostgREST que reconozca las tablas y columnas inmediatamente.
 NOTIFY pgrst, 'reload schema';
-

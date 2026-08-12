@@ -3346,7 +3346,9 @@ async function submitProductDraft(event) {
       submitBtn.innerHTML = fastUploadSelectedFile ? '⏳ Comprimiendo y subiendo foto...' : '⏳ Guardando producto...';
     }
 
-    let filePath = null;
+    // La foto es opcional. La tabla histórica exige un texto en image_path,
+    // por eso usamos una cadena vacía cuando el ingreso se hizo por código.
+    let filePath = '';
     let imageUrl = fastUploadLookupResult?.product?.image_url || '';
     if (fastUploadSelectedFile) {
       const compressedBlob = await compressImageFile(fastUploadSelectedFile, 1000, 1000, 0.75);

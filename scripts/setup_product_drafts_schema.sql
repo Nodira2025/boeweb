@@ -4,8 +4,8 @@
 -- 1. Crear Tabla product_drafts para Borradores de Vendedores
 CREATE TABLE IF NOT EXISTS public.product_drafts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    image_url TEXT NOT NULL,
-    image_path TEXT NOT NULL,
+    image_url TEXT,
+    image_path TEXT,
     stock INTEGER NOT NULL CHECK (stock >= 0),
     location TEXT,
     observations TEXT,
@@ -33,6 +33,10 @@ ALTER TABLE public.product_drafts ADD COLUMN IF NOT EXISTS shelf_level SMALLINT 
 ALTER TABLE public.product_drafts ADD COLUMN IF NOT EXISTS ai_confidence NUMERIC(4, 3);
 ALTER TABLE public.product_drafts ADD COLUMN IF NOT EXISTS ai_payload JSONB;
 ALTER TABLE public.product_drafts ADD COLUMN IF NOT EXISTS qr_payload TEXT;
+
+-- La identificación por código permite ingresar productos sin fotografía.
+ALTER TABLE public.product_drafts ALTER COLUMN image_url DROP NOT NULL;
+ALTER TABLE public.product_drafts ALTER COLUMN image_path DROP NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS product_drafts_product_code_idx
 ON public.product_drafts (product_code)
