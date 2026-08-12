@@ -2901,10 +2901,10 @@ async function findLocalStockProduct(barcode, query) {
         .from('product_drafts')
         .select('*')
         .eq('barcode', barcode)
-        .neq('status', 'REJECTED')
+        .eq('status', 'APPROVED')
         .order('updated_at', { ascending: false })
         .limit(1),
-      'Ingresos anteriores de BÔ'
+      'Productos aprobados de BÔ'
     );
     const draft = draftRows[0] ? hydrateProductDraft(draftRows[0]) : null;
     if (draft) return normalizeCatalogLookup(null, draft);
