@@ -1026,7 +1026,7 @@
   </style>
   <link rel="stylesheet" href="vendedor-caja.css?v=legado_v1">
   <link rel="stylesheet" href="vendedor-portal.css?v=desktop_v2_crema">
-  <link rel="stylesheet" href="vendedor-stock.css?v=barcode_scanner_v2">
+  <link rel="stylesheet" href="vendedor-stock.css?v=growshop_search_v6">
   <link rel="stylesheet" href="vendedor-login.css?v=login_editorial_v1">
 </head>
 <body>
@@ -1407,7 +1407,7 @@
         <div>
           <span class="stock-entry-eyebrow">Ingreso asistido · Revisión humana</span>
           <h2 id="stock-entry-title">Ingresar producto al stock</h2>
-          <p>Identificá el producto por código o nombre. BÔ busca primero en su catálogo y en fuentes públicas; la foto con IA queda como ayuda opcional.</p>
+          <p>Identificá el producto por código o nombre. BÔ prioriza Google Argentina y comercios de growshop; la foto con IA queda como ayuda opcional.</p>
         </div>
         <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
       </header>
@@ -1447,10 +1447,10 @@
             <div class="stock-noai-card" aria-labelledby="stock-noai-title">
               <div class="stock-noai-heading">
                 <div>
-                  <span class="stock-noai-badge">Sin IA · Sin costo</span>
+                  <span class="stock-noai-badge">Internet · Growshops AR</span>
                   <h4 id="stock-noai-title">Buscar datos del producto</h4>
                 </div>
-                <span class="stock-noai-source">BÔ + fuentes públicas</span>
+                <span class="stock-noai-source">Google Argentina + growshops</span>
               </div>
 
               <label for="fastupload-barcode-input">Código de barras</label>
@@ -1555,7 +1555,7 @@
                 <input type="number" id="fastupload-stock-input" min="0" value="1" required class="b2b-form-input" inputmode="numeric">
               </div>
               <div class="stock-field stock-autofilled-field">
-                <label for="fastupload-market-price-input">Promedio Mercado Libre</label>
+                <label for="fastupload-market-price-input">Precio promedio online (ARS)</label>
                 <input type="number" id="fastupload-market-price-input" class="b2b-form-input" placeholder="Se completa al buscar" readonly>
               </div>
               <div class="stock-field stock-seller-field">
@@ -2115,6 +2115,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="mapa-local.js?v=stock_assistants_v1"></script>
-  <script src="vendedor.js?v=barcode_scanner_v2"></script>
+  <script src="vendedor.js?v=growshop_search_v6"></script>
 </body>
 </html>

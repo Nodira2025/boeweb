@@ -2848,6 +2848,33 @@ async function fetchCatalogProductById(productId) {
   return rows[0] || null;
 }
 
+function normalizeStockMatchToken(value) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/^(\d+(?:[.,]\d+)?)(?:litros?|lts?|lt)$/i, '$1l')
+    .replace(/^(\d+(?:[.,]\d+)?)(?:gramos?|grs?|gr)$/i, '$1g')
+    .toLowerCase();
+}
+
+function stockMatchTokens(value) {
+  return String(value || '')
+    .match(/[\p{L}\p{N}.,]+/gu)?.map(normalizeStockMatchToken)
+    .filter(token => token.length >= 2) || [];
+}
+
+function isReliableCatalogNameMatch(productName, requestedName) {
+  const requestedTokens = stockMatchTokens(requestedName);
+  const productTokens = new Set(stockMatchTokens(productName));
+  if (!requestedTokens.length || !productTokens.size) return false;
+  if (requestedTokens.length === 1) return productTokens.has(requestedTokens[0]);
+  const totalWeight = requestedTokens.reduce((sum, token) => sum + token.length, 0);
+  const matchedWeight = requestedTokens
+    .filter(token => productTokens.has(token))
+    .reduce((sum, token) => sum + token.length, 0);
+  return matchedWeight / totalWeight >= 0.78;
+}
+
 async function findLocalStockProduct(barcode, query) {
   if (!supabaseClient) return null;
   if (barcode) {
@@ -2899,19 +2926,22 @@ async function findLocalStockProduct(barcode, query) {
     'Catálogo BÔ'
   );
   if (!catalogRows.length) {
-    const firstUsefulTerm = safeQuery.split(' ').find(term => term.length >= 4);
-    if (firstUsefulTerm && firstUsefulTerm !== safeQuery) {
+    const mostSpecificTerm = stockMatchTokens(safeQuery)
+      .filter(term => term.length >= 4)
+      .sort((a, b) => b.length - a.length)[0];
+    if (mostSpecificTerm && mostSpecificTerm !== safeQuery.toLowerCase()) {
       catalogRows = await readStockLookupRows(
         supabaseClient
           .from('products')
           .select('id, name, image, category, description, supplier_products(supplier_id, name, price, stock, available, link)')
-          .ilike('name', `%${firstUsefulTerm}%`)
+          .ilike('name', `%${mostSpecificTerm}%`)
           .limit(3),
         'Catálogo BÔ'
       );
     }
   }
-  return catalogRows[0] ? normalizeCatalogLookup(catalogRows[0]) : null;
+  const reliableMatch = catalogRows.find(product => isReliableCatalogNameMatch(product.name, safeQuery));
+  return reliableMatch ? normalizeCatalogLookup(reliableMatch) : null;
 }
 
 async function fetchExternalStockLookup(barcode, query) {
@@ -3055,86 +3085,6 @@ function applyStockLookupResult(result) {
   renderFastUploadLookupSummary(result);
 }
 
-function mapCategoryClient(text) {
-  const t = (text || '').toLowerCase();
-  const rules = [
-    ['Semillas', /semilla|seed|germin/],
-    ['Sustratos', /sustrat|substrat|tierra|soil|turba|peat|coco/],
-    ['Fertilizantes', /fertili|nutrient|abono|bio grow|bio bloom|estimulador/],
-    ['Vaporizadores', /vaporiz|vaporizer/],
-    ['Macetas', /maceta|plant pot|flower pot/],
-    ['Medición y Riego', /riego|irrig|medidor|meter|conductiv|\bph\b|\bec\b/],
-    ['Indoor', /indoor|lámpara|lampara|lighting|\bled\b|extractor|ventilador|carpa|prohanger|polea|ratchet|colgador|hanger/],
-    ['Parafernalia', /grinder|picador|papel|pipa|bong|parafernalia/]
-  ];
-  return (rules.find(([, p]) => p.test(t)) || ['Otros'])[0];
-}
-
-async function searchEanFromBrowser(barcode) {
-  if (!barcode || !/^\d{6,18}$/.test(barcode)) return null;
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 12000);
-  try {
-    const response = await fetch('https://lite.duckduckgo.com/lite/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `q=${encodeURIComponent(barcode)}`,
-      signal: controller.signal
-    });
-    if (!response.ok) return null;
-    const html = await response.text();
-
-    const titleMatches = [...html.matchAll(/<a[^>]+class=['"]result-link['"][^>]*>([\s\S]*?)<\/a>/gi)];
-    const titles = titleMatches
-      .map(m => m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())
-      .filter(t => t.length > 5 && !/duckduckgo/i.test(t));
-
-    if (!titles.length) return null;
-
-    let rawTitle = titles[0].replace(/\s*[-|–|:]\s*[A-Za-z0-9.\s]+$/gi, '').trim();
-    if (!rawTitle || rawTitle.length < 3) rawTitle = titles[0];
-
-    let brand = null;
-    const brandRules = [
-      [/garden\s*high\s*pro/i, 'Garden HighPro'],
-      [/biobizz/i, 'BioBizz'],
-      [/top\s*crop/i, 'Top Crop'],
-      [/namaste/i, 'Namaste'],
-      [/plagron/i, 'Plagron'],
-      [/advanced\s*nutrients/i, 'Advanced Nutrients'],
-      [/canna\b/i, 'Canna'],
-      [/general\s*hydroponics/i, 'General Hydroponics']
-    ];
-    const brandMatch = brandRules.find(([re]) => re.test(rawTitle));
-    if (brandMatch) brand = brandMatch[1];
-
-    return {
-      mode: 'browser_ean_lookup',
-      found: true,
-      product: {
-        name: rawTitle,
-        brand,
-        presentation: null,
-        category: mapCategoryClient(rawTitle),
-        description: `Identificado por EAN ${barcode}.`,
-        barcode,
-        official_url: null,
-        market_query: rawTitle,
-        image_url: null
-      },
-      market: null,
-      sources: [{ label: `Búsqueda EAN ${barcode}`, url: `https://duckduckgo.com/?q=${encodeURIComponent(barcode)}` }],
-      providers: ['Búsqueda EAN (navegador)'],
-      warnings: []
-    };
-  } catch (err) {
-    console.warn('searchEanFromBrowser error:', err.message);
-    return null;
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
-}
-
 async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
   const status = document.getElementById('fastupload-lookup-status');
   if (!status) return;
@@ -3151,13 +3101,19 @@ async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
   }
 
   const barcode = cleanBarcode;
-  const manualQuery = document.getElementById('fastupload-manual-query-input')?.value.trim() || '';
-  const identityQuery = (mode === 'barcode' ? [manualQuery] : [
-    manualQuery,
+  const manualQueryInput = document.getElementById('fastupload-manual-query-input');
+  const manualQuery = manualQueryInput?.value.trim() || '';
+  if (mode === 'barcode' && barcode && manualQueryInput) manualQueryInput.value = '';
+  const identityFields = manualQuery ? [manualQuery] : [
     document.getElementById('fastupload-brand-input')?.value.trim(),
     document.getElementById('fastupload-name-input')?.value.trim(),
     document.getElementById('fastupload-presentation-input')?.value.trim()
-  ]).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  ];
+  const identityQuery = (mode === 'barcode' ? [] : identityFields)
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
   if (rawBarcode.trim() && !barcode && identityQuery.length < 2) {
     status.hidden = false;
@@ -3195,7 +3151,7 @@ async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
   setStockLookupLoading(true);
   status.hidden = false;
   status.dataset.state = 'loading';
-  status.textContent = 'Buscando primero en BÔ y después en fuentes públicas, sin usar IA…';
+  status.textContent = 'Buscando en BÔ, Google Argentina y comercios de growshop…';
   if (barcode) setStockScannerState('reading', 'Código leído · completando la ficha…');
 
   try {
@@ -3204,20 +3160,7 @@ async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
       fetchExternalStockLookup(barcode, identityQuery)
     ]);
     const localResult = localAttempt.status === 'fulfilled' ? localAttempt.value : null;
-    let externalResult = externalAttempt.status === 'fulfilled' ? externalAttempt.value : null;
-
-    // Fallback: if server found nothing and we have a barcode, search from the browser
-    if (barcode && (!externalResult || !externalResult.found)) {
-      try {
-        status.textContent = 'Buscando EAN desde el navegador…';
-        const browserResult = await searchEanFromBrowser(barcode);
-        if (browserResult && browserResult.found) {
-          externalResult = browserResult;
-        }
-      } catch (e) {
-        console.warn('Búsqueda EAN desde navegador falló:', e.message);
-      }
-    }
+    const externalResult = externalAttempt.status === 'fulfilled' ? externalAttempt.value : null;
 
     if (!localResult && !externalResult) {
       const reason = externalAttempt.status === 'rejected' ? externalAttempt.reason : localAttempt.reason;
@@ -3227,8 +3170,9 @@ async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
     const result = mergeStockLookupResults(localResult, externalResult);
     fastUploadLookupResult = result;
     if (!result.found) {
+      renderAiSourceLinks(result);
       status.dataset.state = 'error';
-      status.textContent = 'No encontramos una coincidencia confiable. Podés completar los campos manualmente y BÔ la recordará para la próxima.';
+      status.textContent = 'No encontramos una coincidencia confiable en growshops. Podés abrir Google Argentina desde las fuentes o completar los datos manualmente.';
       if (barcode) setStockScannerState('error', 'Código leído, pero sin datos disponibles');
       return;
     }
@@ -3270,7 +3214,10 @@ function renderAiSourceLinks(result) {
   const candidates = [];
   if (result.product?.official_url) candidates.push({ label: 'Página oficial', url: result.product.official_url });
   (result.sources || []).forEach(source => candidates.push({ label: source.title || source.label || 'Fuente consultada', url: source.url }));
-  (result.market?.results || []).slice(0, 3).forEach(item => candidates.push({ label: 'Ver referencia en Mercado Libre', url: item.permalink }));
+  (result.market?.results || []).slice(0, 3).forEach(item => candidates.push({
+    label: `Ver referencia en ${item.source || result.market?.provider || 'internet'}`,
+    url: item.permalink
+  }));
   const valid = candidates.filter(item => {
     try {
       const url = new URL(item.url);
@@ -4417,5 +4364,4 @@ window.approveProductDraft = approveProductDraft;
 window.rejectProductDraft = rejectProductDraft;
 window.lookupFastUploadProductWithoutAi = lookupFastUploadProductWithoutAi;
 window.toggleFastUploadLookupDetails = toggleFastUploadLookupDetails;
-window.searchEanFromBrowser = searchEanFromBrowser;
 
