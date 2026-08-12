@@ -1128,25 +1128,14 @@
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="catalog" onclick="switchVendorTab('catalog')">
           <span class="vendor-side-nav-icon" aria-hidden="true">▦</span><span>Catálogo B2B</span>
         </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="internal-catalog" onclick="switchVendorTab('internal-catalog')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">▤</span><span>Catálogo interno</span>
+        </button>
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="cash" onclick="switchVendorTab('cash')">
           <span class="vendor-side-nav-icon" aria-hidden="true">$</span><span>Caja & Arqueo</span>
         </button>
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="portfolio" onclick="switchVendorTab('portfolio')">
           <span class="vendor-side-nav-icon" aria-hidden="true">♙</span><span>Clientes</span>
-        </button>
-        <button type="button" class="vendor-side-nav-item" data-vendor-tab="map" onclick="switchVendorTab('map')">
-          <span class="vendor-side-nav-icon" aria-hidden="true">⌖</span><span>Estantes</span>
-        </button>
-        <button type="button" class="vendor-side-nav-item" data-vendor-tab="fast-upload" onclick="switchVendorTab('fast-upload')">
-          <span class="vendor-side-nav-icon" aria-hidden="true">＋</span><span>Ingresar producto</span>
-        </button>
-        <button type="button" class="vendor-side-nav-item" data-vendor-tab="location-assistant" onclick="switchVendorTab('location-assistant')">
-          <span class="vendor-side-nav-icon" aria-hidden="true">⌖</span><span>Ubicar pendientes</span>
-        </button>
-      </nav>
-
-      <div class="vendor-sidebar-tools" aria-label="Herramientas externas">
-        <a href="tablet.html" class="vendor-sidebar-tool-link" target="_blank" rel="noopener">Tablet</a>
         <a href="tv.html" class="vendor-sidebar-tool-link" target="_blank" rel="noopener">TV</a>
         <a href="coffee.html" class="vendor-sidebar-tool-link" target="_blank" rel="noopener">Coffee</a>
       </div>
@@ -1305,6 +1294,9 @@
             <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('fast-upload')">
               <span aria-hidden="true">＋</span><span><strong>Ingresar producto</strong><small>Foto, datos y stock guiados</small></span><span aria-hidden="true">›</span>
             </button>
+            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('internal-catalog')">
+              <span aria-hidden="true">▤</span><span><strong>Catálogo interno</strong><small>Editar productos propios</small></span><span aria-hidden="true">›</span>
+            </button>
           </div>
         </aside>
       </div>
@@ -1324,6 +1316,12 @@
           <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📦</span>
           <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Catálogo B2B</span>
           <span style="font-size: 0.72rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase;">PROCESAR VENTA</span>
+        </button>
+
+        <button type="button" class="vendor-launchpad-card" id="vcard-internalcatalog" onclick="switchVendorTab('internal-catalog')" style="background: var(--color-card-bg); border: 1.5px solid #7ea642; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
+          <span style="font-size: 2rem; display: block; margin-bottom: 6px;" aria-hidden="true">🏷️</span>
+          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Catálogo interno</span>
+          <span style="font-size: 0.72rem; color: #2e7d32; font-weight: 800; text-transform: uppercase;">PRODUCTOS DE LA TIENDA</span>
         </button>
 
         <!-- Card 2: Mi Cartera de Clientes -->
@@ -1700,6 +1698,335 @@
           <!-- Se renderizan vía JavaScript -->
         </div>
 
+      </div>
+    </div>
+
+    <section id="vendor-internal-catalog-section" class="vendor-workspace-section internal-catalog-workspace" style="display: none;" aria-labelledby="internal-catalog-title">
+      <header class="internal-catalog-hero">
+        <div>
+          <span class="stock-entry-eyebrow">Inventario propio · BÔ Grow Club</span>
+          <h2 id="internal-catalog-title">Catálogo interno</h2>
+          <p>Productos ingresados por la tienda. Este catálogo es independiente del Catálogo B2B y de los proveedores externos.</p>
+        </div>
+        <div class="internal-catalog-hero-actions">
+          <button type="button" class="internal-catalog-add" onclick="switchVendorTab('fast-upload')">+ Ingresar producto</button>
+          <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
+        </div>
+      </header>
+
+      <div class="internal-catalog-toolbar" role="search">
+        <label>
+          <span>Buscar en la tienda</span>
+          <input type="search" id="internal-catalog-search" placeholder="Nombre, marca, código o categoría" autocomplete="off" oninput="filterInternalCatalog()">
+        </label>
+        <label>
+          <span>Categoría</span>
+          <select id="internal-catalog-category" onchange="filterInternalCatalog()">
+            <option value="all">Todas</option>
+          </select>
+        </label>
+        <div class="internal-catalog-summary" aria-live="polite">
+          <strong id="internal-catalog-count">0</strong>
+          <span>productos propios</span>
+        </div>
+      </div>
+
+      <div id="internal-catalog-status" class="stock-ai-status" role="status" aria-live="polite" hidden></div>
+      <div id="internal-catalog-layout" class="internal-catalog-layout">
+        <div id="internal-catalog-grid" class="internal-catalog-grid" aria-live="polite"></div>
+
+        <aside id="internal-catalog-editor" class="internal-catalog-editor" aria-labelledby="internal-editor-title" hidden>
+          <div class="internal-editor-heading">
+            <div>
+              <span class="stock-entry-eyebrow">Edición del producto</span>
+              <h3 id="internal-editor-title">Editar ficha</h3>
+            </div>
+            <button type="button" class="internal-editor-close" onclick="closeInternalCatalogEditor()" aria-label="Cerrar edición">×</button>
+          </div>
+
+          <form id="internal-catalog-form" onsubmit="saveInternalCatalogProduct(event)">
+            <div class="internal-editor-image">
+              <img id="internal-editor-image" src="assets/logo.jpg" alt="Imagen actual del producto">
+              <input type="file" id="internal-editor-image-file" accept="image/*,.heic,.heif" onchange="handleInternalCatalogImageChange(event)" hidden>
+              <button type="button" onclick="openInternalCatalogImagePicker()">Cambiar imagen</button>
+              <small>Se comprime antes de guardarse. También podés conservar la imagen pública encontrada.</small>
+            </div>
+
+            <div class="internal-editor-fields">
+              <label class="internal-editor-field internal-editor-field-wide"><span>Nombre *</span><input id="internal-editor-name" required></label>
+              <label class="internal-editor-field"><span>Marca</span><input id="internal-editor-brand"></label>
+              <label class="internal-editor-field"><span>Presentación</span><input id="internal-editor-presentation"></label>
+              <label class="internal-editor-field"><span>Categoría *</span><select id="internal-editor-category" required>
+                <option>Semillas</option><option>Sustratos</option><option>Fertilizantes</option><option>Indoor</option><option>Vaporizadores</option><option>Macetas</option><option>Medición y Riego</option><option>Parafernalia</option><option>Otros</option>
+              </select></label>
+              <label class="internal-editor-field"><span>Código de barras</span><input id="internal-editor-barcode" inputmode="numeric"></label>
+              <label class="internal-editor-field"><span>Precio de venta *</span><input id="internal-editor-price" type="number" min="0.01" step="0.01" required></label>
+              <label class="internal-editor-field"><span>Stock *</span><input id="internal-editor-stock" type="number" min="0" step="1" required></label>
+              <label class="internal-editor-field internal-editor-field-wide"><span>Descripción</span><textarea id="internal-editor-description" rows="4"></textarea></label>
+            </div>
+
+            <div class="internal-editor-actions">
+              <button type="button" class="stock-entry-secondary-btn" onclick="closeInternalCatalogEditor()">Cancelar</button>
+              <button type="submit" id="internal-editor-save">Guardar cambios</button>
+            </div>
+          </form>
+        </aside>
+      </div>
+    </section>
+
+    <!-- SECTION: WMS INVENTARIO FÍSICO & QR (FASES 1 A 5) -->
+    <section id="vendor-wms-inventory-section" class="vendor-workspace-section" style="display: none;" aria-labelledby="wms-section-title">
+      <div class="wms-hero-banner">
+        <div class="wms-hero-title">
+          <span class="wms-sync-badge" id="wms-sync-status-badge">🟢 WMS Conectado (Fases 1 a 5)</span>
+          <h2 id="wms-section-title">📦 Sistema de Localización & Trazabilidad (WMS)</h2>
+          <p>Gestión de ubicaciones por QR, multiubicación por SKU, transferencias atómicas y auditorías físicas de estantería.</p>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button type="button" class="wms-btn wms-btn-primary" onclick="openWmsQrScannerModal()">
+            📷 Escanear QR Módulo
+          </button>
+          <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
+        </div>
+      </div>
+
+      <!-- Quick Action Dashboard -->
+      <div class="wms-dashboard-grid">
+        <div class="wms-action-card" onclick="openWmsQrScannerModal()">
+          <div class="wms-action-card-icon">📷</div>
+          <div>
+            <h3>Escanear QR de Módulo</h3>
+            <p>Escanear código pegado en la estantería (ej: PI-M04) para ver su contenido.</p>
+          </div>
+        </div>
+
+        <div class="wms-action-card" onclick="openWmsReverseSearchModal()">
+          <div class="wms-action-card-icon">🔍</div>
+          <div>
+            <h3>Búsqueda Inversa</h3>
+            <p>Buscar un producto y conocer todas las ubicaciones donde hay stock almacenado.</p>
+          </div>
+        </div>
+
+        <div class="wms-action-card" onclick="renderWmsModulesGrid()">
+          <div class="wms-action-card-icon">📑</div>
+          <div>
+            <h3>Módulos Físicos</h3>
+            <p>Explorar las paredes (PI, PT, PD, VF, DP) y sus 10 módulos configurados.</p>
+          </div>
+        </div>
+
+        <div class="wms-action-card" onclick="openWmsMovementsHistoryModal()">
+          <div class="wms-action-card-icon">📋</div>
+          <div>
+            <h3>Historial Inmutable</h3>
+            <p>Registro append-only de transferencias, ingresos, retiros y auditorías.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- WMS Modules List View -->
+      <div id="wms-modules-view" style="margin-top: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+          <h3 style="margin: 0; font-family: var(--font-display); color: var(--vendor-forest); font-size: 1.4rem;">Módulos Físicos en el Local</h3>
+          <div style="display: flex; gap: 8px;">
+            <select id="wms-filter-wall-select" class="wms-btn" onchange="renderWmsModulesGrid()" style="height: auto; padding: 6px 12px;">
+              <option value="all">Todas las Paredes / Áreas</option>
+              <option value="PI">Pared Izquierda (PI)</option>
+              <option value="PT">Pared Trasera (PT)</option>
+              <option value="PD">Pared Derecha (PD)</option>
+              <option value="DP">Depósito (DP)</option>
+            </select>
+          </div>
+        </div>
+        <div id="wms-modules-grid" class="wms-modules-list-grid">
+          <!-- Populated dynamically by renderWmsModulesGrid() -->
+        </div>
+      </div>
+    </section>
+
+    <!-- MODAL: ESCÁNER QR DE MÓDULO (WMS) -->
+    <div id="wms-qr-modal" class="location-assistant-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="wms-qr-modal-title">
+      <div class="location-assistant-shell" style="max-width: 520px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 id="wms-qr-modal-title" style="margin: 0; color: var(--vendor-forest); font-family: var(--font-display);">📷 Escanear QR de Módulo Físico</h3>
+          <button type="button" class="stock-entry-close" onclick="closeWmsModal('wms-qr-modal')">×</button>
+        </div>
+        <p style="font-size: 0.88rem; color: var(--vendor-muted); margin-bottom: 16px;">Apuntá la cámara a la etiqueta QR del módulo (ej: <strong>PI-M04</strong>) o seleccioná un módulo demo:</p>
+        <div style="background: rgba(0,0,0,0.04); border: 2px dashed var(--vendor-gold); border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 16px;">
+          <div style="font-size: 3rem; margin-bottom: 8px;">📷</div>
+          <p style="font-size: 0.85rem; margin-bottom: 14px;">Escanear código de barras o QR de módulo</p>
+          <label style="display: block; margin-bottom: 8px; font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest);">Seleccionar Módulo Demo:</label>
+          <select id="wms-demo-module-select" class="wms-btn" style="width: 100%; margin-bottom: 14px;">
+            <option value="PI-M04">PI-M04 (Pared Izquierda - Control de plagas)</option>
+            <option value="PD-M02">PD-M02 (Pared Derecha - Accesorios)</option>
+            <option value="DEP-M01">DEP-M01 (Depósito - Sustratos 50L)</option>
+            <option value="PI-M01">PI-M01 (Pared Izquierda - Nutrición)</option>
+            <option value="PT-M01">PT-M01 (Pared Trasera - Iluminación)</option>
+          </select>
+          <button type="button" class="wms-btn wms-btn-primary" style="width: 100%;" onclick="confirmWmsQrScanFromSelect()">
+            ⚡ ABRIR MÓDULO SELECCIONADO
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: VER CONTENIDO DEL MÓDULO (WMS) -->
+    <div id="wms-module-detail-modal" class="location-assistant-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="wms-detail-title">
+      <div class="location-assistant-shell" style="max-width: 820px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--vendor-line); padding-bottom: 12px;">
+          <div>
+            <span class="wms-sync-badge" id="wms-detail-wall">Pared Izquierda (PI)</span>
+            <h2 id="wms-detail-title" style="margin: 4px 0 0 0; color: var(--vendor-forest); font-family: var(--font-display); font-size: 1.6rem;">Módulo PI-M04</h2>
+          </div>
+          <button type="button" class="stock-entry-close" onclick="closeWmsModal('wms-module-detail-modal')">×</button>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px;">
+          <button type="button" class="wms-btn wms-btn-primary" onclick="triggerWmsTransferFromCurrentModule()">⇄ MOVER PRODUCTO</button>
+          <button type="button" class="wms-btn wms-btn-warning" onclick="triggerWmsAuditFromCurrentModule()">📋 AUDITAR MÓDULO</button>
+        </div>
+
+        <!-- Contenido Ordenado por Niveles Humanos -->
+        <div id="wms-module-items-container">
+          <!-- Populated dynamically by renderWmsModuleDetails() -->
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: TRANSFERIR PRODUCTO (WMS - FASE 3) -->
+    <div id="wms-transfer-modal" class="location-assistant-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="wms-transfer-title">
+      <div class="location-assistant-shell" style="max-width: 620px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 id="wms-transfer-title" style="margin: 0; color: var(--vendor-forest); font-family: var(--font-display);">⇄ Transferencia Atómica de Stock</h3>
+          <button type="button" class="stock-entry-close" onclick="closeWmsModal('wms-transfer-modal')">×</button>
+        </div>
+
+        <form id="wms-transfer-form" onsubmit="handleWmsTransferSubmit(event)">
+          <div style="background: rgba(0,0,0,0.03); border: 1px solid var(--vendor-line); border-radius: 14px; padding: 14px; margin-bottom: 14px;">
+            <p style="margin: 0 0 4px 0; font-size: 0.8rem; color: var(--vendor-muted); text-transform: uppercase; font-weight: 800;">Producto A Mover</p>
+            <h4 id="wms-tr-product-name" style="margin: 0; color: var(--vendor-forest); font-size: 1.1rem;">Sustrato Klasmann 50L</h4>
+            <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: var(--vendor-ink);" id="wms-tr-origin-label">Origen: PI-M04 (Nivel 3 — altura media / Centro)</p>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+            <label class="internal-editor-field">
+              <span>Cantidad a mover *</span>
+              <input type="number" id="wms-tr-qty" min="1" step="1" required style="font-size: 1.2rem; font-weight: 800; color: var(--vendor-forest);">
+            </label>
+            <div style="display: flex; align-items: center; font-size: 0.85rem; color: var(--vendor-muted);" id="wms-tr-available-label">
+              Disponible: 25 u.
+            </div>
+          </div>
+
+          <div style="border-top: 1px solid var(--vendor-line); padding-top: 14px; margin-top: 14px;">
+            <p style="margin: 0 0 10px 0; font-size: 0.88rem; font-weight: 800; color: var(--vendor-forest);">Destino Físico</p>
+
+            <label class="internal-editor-field" style="margin-bottom: 10px;">
+              <span>Módulo Destino *</span>
+              <select id="wms-tr-dest-module" required style="font-weight: 700;">
+                <!-- Populated dynamically -->
+              </select>
+            </label>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <label class="internal-editor-field">
+                <span>Nivel Humano Destino *</span>
+                <select id="wms-tr-dest-level" required>
+                  <option value="1">Nivel 1 — abajo</option>
+                  <option value="2">Nivel 2 — bajo</option>
+                  <option value="3" selected>Nivel 3 — altura media</option>
+                  <option value="4">Nivel 4 — alto</option>
+                  <option value="5">Nivel 5 — arriba</option>
+                </select>
+              </label>
+
+              <label class="internal-editor-field">
+                <span>Posición Sector *</span>
+                <select id="wms-tr-dest-sector" required>
+                  <option value="I">Izquierda</option>
+                  <option value="C" selected>Centro</option>
+                  <option value="D">Derecha</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="stock-entry-secondary-btn" onclick="closeWmsModal('wms-transfer-modal')">Cancelar</button>
+            <button type="submit" class="wms-btn wms-btn-primary" style="padding: 12px 24px; font-size: 0.95rem;">⚡ CONFIRMAR TRANSFERENCIA</button>
+          </div>
+        </form>
+
+        <div id="wms-transfer-result-card" style="display: none;">
+          <!-- Filled dynamically upon successful transfer -->
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: BÚSQUEDA INVERSA (WMS) -->
+    <div id="wms-reverse-search-modal" class="location-assistant-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="wms-rev-title">
+      <div class="location-assistant-shell" style="max-width: 680px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 id="wms-rev-title" style="margin: 0; color: var(--vendor-forest); font-family: var(--font-display);">🔍 Búsqueda Inversa de Ubicaciones</h3>
+          <button type="button" class="stock-entry-close" onclick="closeWmsModal('wms-reverse-search-modal')">×</button>
+        </div>
+        <p style="font-size: 0.88rem; color: var(--vendor-muted); margin-bottom: 12px;">Ingresá el nombre o código del producto para ver en qué módulos y niveles está almacenado:</p>
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+          <input type="search" id="wms-rev-input" class="internal-editor-field" placeholder="Nombre, SKU o código de barras (ej: Sustrato, 7791234001)" style="flex: 1; padding: 10px 14px; font-size: 0.95rem;" oninput="runWmsReverseSearch()">
+          <button type="button" class="wms-btn wms-btn-primary" onclick="runWmsReverseSearch()">Buscar</button>
+        </div>
+
+        <div id="wms-rev-results-container">
+          <!-- Populated dynamically by runWmsReverseSearch() -->
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: AUDITORÍA FÍSICA DE MÓDULO (WMS - FASE 5) -->
+    <div id="wms-audit-modal" class="location-assistant-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="wms-audit-title">
+      <div class="location-assistant-shell" style="max-width: 720px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div>
+            <span class="wms-sync-badge" style="background: #fff3e0; color: #e65100; border-color: #ffe0b2;">Control de Inventario Real</span>
+            <h3 id="wms-audit-title" style="margin: 4px 0 0 0; color: var(--vendor-forest); font-family: var(--font-display);">📋 Auditando Módulo PI-M04</h3>
+          </div>
+          <button type="button" class="stock-entry-close" onclick="closeWmsModal('wms-audit-modal')">×</button>
+        </div>
+
+        <p style="font-size: 0.88rem; color: var(--vendor-muted); margin-bottom: 14px;">Ingresá la cantidad física real contada en el estante. Si coincide todo, presioná <strong>CONTEO CORRECTO</strong>.</p>
+
+        <form id="wms-audit-form" onsubmit="handleWmsAuditSubmit(event)">
+          <div id="wms-audit-items-list" style="margin-bottom: 18px;">
+            <!-- Populated dynamically -->
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="wms-btn" style="background: #e8f5e9; color: #2e7d32; border-color: #a5d6a7;" onclick="submitWmsAuditWithStatus('CORRECTO')">
+              🟢 CONTEO CORRECTO
+            </button>
+            <button type="submit" class="wms-btn wms-btn-warning">
+              🟠 REPORTAR DIFERENCIA
+            </button>
+          </div>
+        </form>
+
+        <div id="wms-audit-result-notice" style="display: none; margin-top: 14px; padding: 14px; background: #fff3e0; border: 1px solid #ffe0b2; border-radius: 12px; font-size: 0.88rem; color: #e65100;">
+          <strong>📋 Auditoría Registrada:</strong> Estado asignado como <em>PENDIENTE DE REVISIÓN</em>. Las diferencias detectadas no alteran el stock comercial automáticamente.
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: HISTORIAL DE MOVIMIENTOS INMUTABLE (WMS) -->
+    <div id="wms-history-modal" class="location-assistant-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="wms-hist-title">
+      <div class="location-assistant-shell" style="max-width: 840px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 id="wms-hist-title" style="margin: 0; color: var(--vendor-forest); font-family: var(--font-display);">📋 Historial Inmutable de Movimientos</h3>
+          <button type="button" class="stock-entry-close" onclick="closeWmsModal('wms-history-modal')">×</button>
+        </div>
+        <div id="wms-history-table-container" style="max-height: 420px; overflow-y: auto;">
+          <!-- Populated dynamically -->
+        </div>
       </div>
     </div>
 
@@ -2116,6 +2443,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="mapa-local.js?v=stock_assistants_v1"></script>
-  <script src="vendedor.js?v=provisional_product_image_v9"></script>
+  <script src="vendedor.js?v=internal_catalog_v10"></script>
 </body>
 </html>

@@ -174,3 +174,17 @@ test('el vendedor no consulta tablas o columnas ausentes del esquema anterior', 
     /\.from\(['"]product_drafts['"]\)[\s\S]{0,180}\.eq\(['"]barcode['"]/
   );
 });
+
+test('el catálogo interno queda separado de proveedores y permite editar productos propios', async () => {
+  const [sellerSource, sellerHtml] = await Promise.all([
+    readFile(new URL('../vendedor.js', import.meta.url), 'utf8'),
+    readFile(new URL('../vendedor.html', import.meta.url), 'utf8')
+  ]);
+
+  assert.match(sellerHtml, /id="vendor-internal-catalog-section"/);
+  assert.match(sellerHtml, /data-vendor-tab="internal-catalog"/);
+  assert.match(sellerHtml, /onsubmit="saveInternalCatalogProduct\(event\)"/);
+  assert.match(sellerSource, /\.eq\('supplier_id', 'local_store'\)/);
+  assert.match(sellerSource, /async function uploadInternalCatalogImage/);
+  assert.match(sellerSource, /async function updateInternalCatalogRelations/);
+});

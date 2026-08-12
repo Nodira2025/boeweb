@@ -1110,6 +1110,7 @@ function switchVendorTab(tab) {
   const fastUploadSection = document.getElementById('vendor-fast-upload-section');
   const locationAssistantSection = document.getElementById('vendor-location-assistant-section');
   const draftsReviewSection = document.getElementById('vendor-drafts-review-section');
+  const internalCatalogSection = document.getElementById('vendor-internal-catalog-section');
 
   const btnCatalog = document.getElementById('tab-btn-catalog');
   const btnMap = document.getElementById('tab-btn-map');
@@ -1123,11 +1124,12 @@ function switchVendorTab(tab) {
   const vcardFastUpload = document.getElementById('vcard-fastupload');
   const vcardLocationAssistant = document.getElementById('vcard-locationassistant');
   const vcardDraftsReview = document.getElementById('vcard-draftsreview');
+  const vcardInternalCatalog = document.getElementById('vcard-internalcatalog');
 
   const allBtns = [btnCatalog, btnMap, btnScan];
   allBtns.forEach(btn => { if (btn) btn.classList.remove('active'); });
 
-  const allCards = [vcardCatalog, vcardPortfolio, vcardCash, vcardMap, vcardScan, vcardFastUpload, vcardLocationAssistant, vcardDraftsReview];
+  const allCards = [vcardCatalog, vcardPortfolio, vcardCash, vcardMap, vcardScan, vcardFastUpload, vcardLocationAssistant, vcardDraftsReview, vcardInternalCatalog];
   allCards.forEach(card => {
     if (card) {
       card.style.borderColor = 'rgba(255,255,255,0.15)';
@@ -1144,6 +1146,9 @@ function switchVendorTab(tab) {
   if (fastUploadSection) fastUploadSection.style.display = 'none';
   if (locationAssistantSection) locationAssistantSection.style.display = 'none';
   if (draftsReviewSection) draftsReviewSection.style.display = 'none';
+  if (internalCatalogSection) internalCatalogSection.style.display = 'none';
+  const wmsSection = document.getElementById('vendor-wms-inventory-section');
+  if (wmsSection) wmsSection.style.display = 'none';
 
   let targetSection = null;
 
@@ -1235,6 +1240,22 @@ function switchVendorTab(tab) {
       vcardDraftsReview.style.transform = 'scale(1.02)';
     }
     loadPendingProductDrafts();
+  } else if (tab === 'internal-catalog') {
+    if (internalCatalogSection) {
+      internalCatalogSection.style.display = 'block';
+      targetSection = internalCatalogSection;
+    }
+    if (vcardInternalCatalog) {
+      vcardInternalCatalog.style.borderColor = '#7ea642';
+      vcardInternalCatalog.style.transform = 'scale(1.02)';
+    }
+    loadInternalCatalog();
+  } else if (tab === 'wms-inventory' || tab === 'wms') {
+    if (wmsSection) {
+      wmsSection.style.display = 'block';
+      targetSection = wmsSection;
+    }
+    renderWmsModulesGrid();
   }
 
   const activeSidebarTab = tab === 'reposicion' ? 'catalog' : tab;
@@ -4083,6 +4104,18 @@ async function loadPendingProductDrafts() {
   }
 }
 
+async function ensureLocalStoreSupplierExists() {
+  if (!supabaseClient) return;
+  const { error } = await supabaseClient
+    .from('suppliers')
+    .upsert([{
+      id: 'local_store',
+      name: 'BÔ Grow Club (Stock Propio)',
+      website: 'https://boeweb.netlify.app'
+    }], { onConflict: 'id' });
+  if (error) console.warn('Aviso al asegurar el proveedor local_store:', error.message);
+}
+
 // Aprobar el borrador, publicar y vincularlo a su ubicación física.
 async function approveProductDraft(draftId) {
   try {
@@ -4116,19 +4149,21 @@ async function approveProductDraft(draftId) {
 
     const { error: prodErr } = await supabaseClient
       .from('products')
-      .insert([{
+      .upsert([{
         id: productId,
         name: nameVal,
         category: catVal,
         image: imageUrl,
         description: draft.description || `${draft.brand || ''} ${draft.presentation || ''}`.trim() || `Costo de referencia: $${costVal} ARS.`
-      }]);
+      }], { onConflict: 'id' });
 
     if (prodErr) throw new Error(`Error al crear producto: ${prodErr.message}`);
 
+    await ensureLocalStoreSupplierExists();
+
     const { error: spErr } = await supabaseClient
       .from('supplier_products')
-      .insert([{
+      .upsert([{
         supplier_id: 'local_store',
         supplier_product_id: productId,
         name: nameVal,
@@ -4137,9 +4172,9 @@ async function approveProductDraft(draftId) {
         available: true,
         image: imageUrl,
         mapped_product_id: productId
-      }]);
+      }], { onConflict: 'supplier_id,supplier_product_id' });
 
-    if (spErr) console.warn('Aviso supplier_products:', spErr.message);
+    if (spErr) throw new Error(`Error al incorporar el producto al catálogo interno: ${spErr.message}`);
 
     const resolvedShelfCode = draft.shelf_code || String(draft.location || '').match(/[A-E]-\d/i)?.[0]?.toUpperCase() || '';
     let productLocation = null;
@@ -4364,6 +4399,1118 @@ window.submitProductDraft = submitProductDraft;
 window.loadPendingProductDrafts = loadPendingProductDrafts;
 window.approveProductDraft = approveProductDraft;
 window.rejectProductDraft = rejectProductDraft;
-window.lookupFastUploadProductWithoutAi = lookupFastUploadProductWithoutAi;
-window.toggleFastUploadLookupDetails = toggleFastUploadLookupDetails;
+let internalCatalogProducts = [];
+let internalCatalogFilterQuery = '';
+let internalCatalogFilterCategory = 'all';
+let internalCatalogEditingId = null;
+let internalCatalogImageFile = null;
+let internalCatalogImagePreviewUrl = null;
+
+function revokeInternalCatalogImagePreview() {
+  if (internalCatalogImagePreviewUrl && internalCatalogImagePreviewUrl.startsWith('blob:')) {
+    URL.revokeObjectURL(internalCatalogImagePreviewUrl);
+  }
+  internalCatalogImagePreviewUrl = null;
+}
+
+function clearInternalCatalogImageState() {
+  internalCatalogImageFile = null;
+  revokeInternalCatalogImagePreview();
+}
+
+function setInternalCatalogStatus(message, state = 'info') {
+  const status = document.getElementById('internal-catalog-status');
+  if (!status) return;
+  status.hidden = !message;
+  status.dataset.state = state;
+  status.textContent = message || '';
+}
+
+function internalCatalogProductIds(supplierRows) {
+  return [...new Set(supplierRows.map(row => row.mapped_product_id || row.supplier_product_id).filter(Boolean))];
+}
+
+async function fetchInternalCatalogRelations(productIds) {
+  if (!productIds.length) return { products: [], drafts: [] };
+  const [productsResult, draftsResult] = await Promise.all([
+    supabaseClient.from('products').select('*').in('id', productIds),
+    supabaseClient.from('product_drafts').select('*').eq('status', 'APPROVED').in('product_code', productIds)
+  ]);
+  if (productsResult.error) throw new Error(`No se pudo leer el catálogo interno: ${productsResult.error.message}`);
+  return {
+    products: productsResult.data || [],
+    drafts: draftsResult.error ? [] : (draftsResult.data || []).map(hydrateProductDraft)
+  };
+}
+
+function normalizeInternalCatalogProduct(supplier, product, draft, location) {
+  const productId = supplier.mapped_product_id || supplier.supplier_product_id;
+  return {
+    id: productId,
+    supplierRowId: supplier.id,
+    draftId: draft?.id || null,
+    name: product?.name || supplier.name || draft?.name || productId,
+    brand: draft?.brand || '',
+    presentation: draft?.presentation || '',
+    category: product?.category || draft?.category || 'Otros',
+    description: product?.description || draft?.description || '',
+    barcode: draft?.barcode || location?.barcode || '',
+    image: product?.image || supplier.image || draft?.image_url || location?.image_url || '',
+    imagePath: draft?.image_path || '',
+    price: Number(supplier.price) || Number(draft?.sale_price) || 0,
+    stock: Math.max(0, Number(supplier.stock ?? draft?.stock ?? location?.stock) || 0),
+    available: supplier.available !== false,
+    supplier
+  };
+}
+
+async function loadInternalCatalog() {
+  const grid = document.getElementById('internal-catalog-grid');
+  if (!grid || !supabaseClient) return;
+  setInternalCatalogStatus('Cargando los productos propios de la tienda…', 'loading');
+  grid.innerHTML = '';
+  try {
+    const { data: supplierRows, error } = await supabaseClient
+      .from('supplier_products')
+      .select('*')
+      .eq('supplier_id', 'local_store')
+      .order('name', { ascending: true });
+    if (error) throw new Error(error.message);
+
+    const rows = supplierRows || [];
+    const productIds = internalCatalogProductIds(rows);
+    const related = await fetchInternalCatalogRelations(productIds);
+    const productsById = new Map(related.products.map(product => [String(product.id), product]));
+    const draftsByCode = new Map(related.drafts.map(draft => [String(draft.product_code), draft]));
+    const locationsByCode = new Map(readLocalProductLocations().map(location => [String(location.product_code), location]));
+
+    internalCatalogProducts = rows.map(supplier => {
+      const productId = String(supplier.mapped_product_id || supplier.supplier_product_id);
+      return normalizeInternalCatalogProduct(
+        supplier,
+        productsById.get(productId),
+        draftsByCode.get(productId),
+        locationsByCode.get(productId)
+      );
+    });
+
+    populateInternalCatalogCategoryFilter();
+    renderInternalCatalogGrid();
+    setInternalCatalogStatus('');
+  } catch (error) {
+    console.error('Error al cargar el catálogo interno:', error);
+    setInternalCatalogStatus(`No se pudieron cargar los productos propios: ${error.message}`, 'error');
+  }
+}
+
+function populateInternalCatalogCategoryFilter() {
+  const select = document.getElementById('internal-catalog-category');
+  if (!select) return;
+  const currentValue = select.value || 'all';
+  const categories = [...new Set(internalCatalogProducts.map(p => p.category).filter(Boolean))].sort();
+  select.innerHTML = '<option value="all">Todas</option>' +
+    categories.map(cat => `<option value="${escapeStockHtml(cat)}" ${cat === currentValue ? 'selected' : ''}>${escapeStockHtml(cat)}</option>`).join('');
+  internalCatalogFilterCategory = select.value;
+}
+
+function filterInternalCatalog() {
+  const searchInput = document.getElementById('internal-catalog-search');
+  const categorySelect = document.getElementById('internal-catalog-category');
+  internalCatalogFilterQuery = searchInput?.value.trim().toLowerCase() || '';
+  internalCatalogFilterCategory = categorySelect?.value || 'all';
+  renderInternalCatalogGrid();
+}
+
+function renderInternalCatalogGrid() {
+  const grid = document.getElementById('internal-catalog-grid');
+  const countEl = document.getElementById('internal-catalog-count');
+  if (!grid) return;
+
+  const filtered = internalCatalogProducts.filter(product => {
+    const matchesCategory = internalCatalogFilterCategory === 'all' || product.category === internalCatalogFilterCategory;
+    const searchText = [product.name, product.brand, product.presentation, product.category, product.id, product.barcode].filter(Boolean).join(' ').toLowerCase();
+    const matchesSearch = !internalCatalogFilterQuery || searchText.includes(internalCatalogFilterQuery);
+    return matchesCategory && matchesSearch;
+  });
+
+  if (countEl) countEl.textContent = filtered.length;
+
+  if (!filtered.length) {
+    grid.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 48px 20px; background: rgba(0,0,0,0.2); border: 1px dashed var(--color-border-accent); border-radius: 16px; color: var(--color-text-muted);">
+        <p style="font-weight: 700; font-size: 1.1rem; color: var(--color-accent-gold); margin: 0 0 6px 0;">No encontramos productos con ese filtro</p>
+        <p style="font-size: 0.88rem; margin: 0;">Probá cambiando la búsqueda o agregá un producto nuevo desde Ingresar producto.</p>
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(product => `
+    <article class="internal-catalog-card" style="background: var(--color-card-bg-alt); border: 1.5px solid var(--color-border-accent); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-sm);">
+      <div style="aspect-ratio: 1/1; max-height: 200px; background: #000; position: relative; overflow: hidden;">
+        <img src="${escapeStockHtml(product.image || 'assets/logo.jpg')}" alt="${escapeStockHtml(product.name)}" style="width: 100%; height: 100%; object-fit: contain;">
+        <span style="position: absolute; top: 8px; right: 8px; background: ${product.stock > 0 ? 'rgba(46,125,50,0.9)' : 'rgba(198,40,40,0.9)'}; color: #fff; font-size: 0.72rem; font-weight: 800; padding: 3px 8px; border-radius: 8px;">
+          ${product.stock > 0 ? `${product.stock} u. en stock` : 'Sin stock'}
+        </span>
+      </div>
+      <div style="padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 0.75rem; color: var(--color-accent-gold); font-weight: 700;">${escapeStockHtml(product.category)}</div>
+        <h4 style="margin: 0; font-size: 1rem; font-weight: 800; color: var(--color-text-main); line-height: 1.3;">${escapeStockHtml(product.name)}</h4>
+        ${product.barcode ? `<div style="font-size: 0.78rem; font-family: monospace; color: var(--color-text-muted);">Barra: ${escapeStockHtml(product.barcode)}</div>` : ''}
+        <div style="margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08);">
+          <span style="font-size: 1.1rem; font-weight: 900; color: #66bb6a;">$${Number(product.price).toLocaleString('es-AR')}</span>
+          <button type="button" onclick="openInternalCatalogEditor('${product.id}')" style="background: rgba(195,155,75,0.15); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">
+            ✏️ Editar
+          </button>
+        </div>
+      </div>
+    </article>
+  `).join('');
+}
+
+function openInternalCatalogEditor(productId) {
+  const product = internalCatalogProducts.find(item => String(item.id) === String(productId));
+  const editor = document.getElementById('internal-catalog-editor');
+  if (!product || !editor) return;
+
+  internalCatalogEditingId = product.id;
+  clearInternalCatalogImageState();
+
+  document.getElementById('internal-editor-name').value = product.name || '';
+  document.getElementById('internal-editor-brand').value = product.brand || '';
+  document.getElementById('internal-editor-presentation').value = product.presentation || '';
+  document.getElementById('internal-editor-category').value = product.category || 'Otros';
+  document.getElementById('internal-editor-barcode').value = product.barcode || '';
+  document.getElementById('internal-editor-price').value = product.price || '';
+  document.getElementById('internal-editor-stock').value = product.stock || 0;
+  document.getElementById('internal-editor-description').value = product.description || '';
+
+  const imageEl = document.getElementById('internal-editor-image');
+  if (imageEl) imageEl.src = product.image || 'assets/logo.jpg';
+
+  editor.hidden = false;
+  editor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeInternalCatalogEditor() {
+  const editor = document.getElementById('internal-catalog-editor');
+  if (editor) editor.hidden = true;
+  internalCatalogEditingId = null;
+  clearInternalCatalogImageState();
+}
+
+function openInternalCatalogImagePicker() {
+  const input = document.getElementById('internal-editor-image-file');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+async function handleInternalCatalogImageChange(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  if (!isSupportedFastUploadImage(file) || file.size > FAST_UPLOAD_MAX_FILE_SIZE) {
+    showToast('Elegí una imagen JPG, PNG, WebP, HEIC o HEIF de hasta 25 MB.');
+    return;
+  }
+  try {
+    const prepared = await prepareFastUploadImage(file);
+    const decoded = await decodeFastUploadImage(prepared);
+    revokeInternalCatalogImagePreview();
+    internalCatalogImageFile = prepared;
+    internalCatalogImagePreviewUrl = decoded.previewUrl;
+    const image = document.getElementById('internal-editor-image');
+    if (image) image.src = decoded.previewUrl;
+  } catch (error) {
+    console.error('Error al preparar la imagen del catálogo:', error);
+    showToast(`No se pudo preparar la imagen: ${error.message}`);
+  }
+}
+
+async function uploadInternalCatalogImage(productId, currentImage) {
+  if (!internalCatalogImageFile) return { url: currentImage || '', path: null };
+  const compressed = await compressImageFile(internalCatalogImageFile, 1100, 1100, 0.78);
+  const path = `catalog/${String(productId).toLowerCase()}_${Date.now()}.jpg`;
+  const { error } = await supabaseClient.storage
+    .from('product-images')
+    .upload(path, compressed, { contentType: 'image/jpeg', upsert: false });
+  if (error) throw new Error(`No se pudo subir la imagen: ${error.message}`);
+  const { data } = supabaseClient.storage.from('product-images').getPublicUrl(path);
+  return { url: data?.publicUrl || currentImage || '', path };
+}
+
+function internalCatalogFormValues() {
+  return {
+    name: document.getElementById('internal-editor-name')?.value.trim() || '',
+    brand: document.getElementById('internal-editor-brand')?.value.trim() || null,
+    presentation: document.getElementById('internal-editor-presentation')?.value.trim() || null,
+    category: document.getElementById('internal-editor-category')?.value || 'Otros',
+    barcode: cleanStockBarcode(document.getElementById('internal-editor-barcode')?.value || '') || null,
+    price: Number(document.getElementById('internal-editor-price')?.value || 0),
+    stock: Number.parseInt(document.getElementById('internal-editor-stock')?.value || '0', 10),
+    description: document.getElementById('internal-editor-description')?.value.trim() || null
+  };
+}
+
+async function updateInternalCatalogRelations(product, values, image) {
+  const productResult = await supabaseClient.from('products').update({
+    name: values.name,
+    category: values.category,
+    description: values.description,
+    image: image.url
+  }).eq('id', product.id);
+  if (productResult.error) throw new Error(`No se pudo actualizar la ficha: ${productResult.error.message}`);
+
+  const supplierResult = await supabaseClient.from('supplier_products').update({
+    name: values.name,
+    price: values.price,
+    stock: values.stock,
+    available: values.stock > 0,
+    image: image.url
+  }).eq('id', product.supplierRowId);
+  if (supplierResult.error) throw new Error(`No se pudo actualizar precio y stock: ${supplierResult.error.message}`);
+
+  if (product.draftId) {
+    const draftPayload = {
+      name: values.name,
+      brand: values.brand,
+      presentation: values.presentation,
+      category: values.category,
+      description: values.description,
+      barcode: values.barcode,
+      image_url: image.url,
+      stock: values.stock,
+      sale_price: values.price,
+      updated_at: new Date().toISOString()
+    };
+    if (image.path) draftPayload.image_path = image.path;
+    const draftResult = await supabaseClient.from('product_drafts').update(draftPayload).eq('id', product.draftId);
+    if (draftResult.error) console.warn('No se pudo sincronizar el borrador aprobado:', draftResult.error.message);
+  }
+}
+
+function updateInternalCatalogLocalLocation(product, values, imageUrl) {
+  const location = readLocalProductLocations().find(item => String(item.product_code) === String(product.id));
+  if (!location) return;
+  saveLocalProductLocation({
+    ...location,
+    name: values.name,
+    barcode: values.barcode,
+    image_url: imageUrl,
+    stock: values.stock,
+    updated_at: new Date().toISOString()
+  });
+}
+
+async function saveInternalCatalogProduct(event) {
+  event.preventDefault();
+  const product = internalCatalogProducts.find(item => String(item.id) === String(internalCatalogEditingId));
+  const saveButton = document.getElementById('internal-editor-save');
+  if (!product) return;
+  const values = internalCatalogFormValues();
+  if (!values.name || values.price <= 0 || !Number.isInteger(values.stock) || values.stock < 0) {
+    showToast('Completá nombre, precio y stock con valores válidos.');
+    return;
+  }
+  try {
+    if (saveButton) {
+      saveButton.disabled = true;
+      saveButton.textContent = 'Guardando…';
+    }
+    const image = await uploadInternalCatalogImage(product.id, product.image);
+    await updateInternalCatalogRelations(product, values, image);
+    updateInternalCatalogLocalLocation(product, values, image.url);
+    storeMapDataLoaded = false;
+    closeInternalCatalogEditor();
+    await loadInternalCatalog();
+    if (window.fetchB2BProducts) window.fetchB2BProducts(true);
+    showToast(`Producto “${values.name}” actualizado en el catálogo interno.`);
+  } catch (error) {
+    console.error('Error al guardar el producto interno:', error);
+    showToast(`❌ ${error.message}`);
+  } finally {
+    if (saveButton) {
+      saveButton.disabled = false;
+      saveButton.textContent = 'Guardar cambios';
+    }
+  }
+}
+
+window.loadInternalCatalog = loadInternalCatalog;
+window.filterInternalCatalog = filterInternalCatalog;
+window.openInternalCatalogEditor = openInternalCatalogEditor;
+window.closeInternalCatalogEditor = closeInternalCatalogEditor;
+window.openInternalCatalogImagePicker = openInternalCatalogImagePicker;
+window.handleInternalCatalogImageChange = handleInternalCatalogImageChange;
+window.saveInternalCatalogProduct = saveInternalCatalogProduct;
+
+/* ==========================================================================
+   BÔ GROW CLUB — SISTEMA WMS (INVENTARIO FÍSICO & QR) - FASES 1 A 5
+   ========================================================================== */
+
+const WMS_MODULES_KEY = 'boeweb_wms_store_modules_v1';
+const WMS_LOCATIONS_KEY = 'boeweb_wms_inventory_locations_v1';
+const WMS_MOVEMENTS_KEY = 'boeweb_wms_inventory_movements_v1';
+const WMS_AUDITS_KEY = 'boeweb_wms_inventory_audits_v1';
+
+let currentWmsModuleCode = 'PI-M04';
+
+function getHumanLevelLabel(level) {
+  const num = Number(level) || 3;
+  const labels = {
+    1: 'Nivel 1 — abajo',
+    2: 'Nivel 2 — bajo',
+    3: 'Nivel 3 — altura media',
+    4: 'Nivel 4 — alto',
+    5: 'Nivel 5 — arriba'
+  };
+  return labels[num] || `Nivel ${num}`;
+}
+
+function getHumanSectorLabel(sector) {
+  const code = String(sector || 'C').toUpperCase();
+  const labels = { 'I': 'Izquierda', 'C': 'Centro', 'D': 'Derecha' };
+  return labels[code] || code;
+}
+
+function getWmsModules() {
+  try {
+    const raw = localStorage.getItem(WMS_MODULES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.warn('Error al leer WMS modules:', e);
+  }
+  const defaultModules = [
+    { code: 'PI-M01', sector_name: 'Fertilizantes y Nutrición', wall_code: 'PI', module_number: 1, max_levels: 5, description: 'Pared Izquierda - Módulo 1 (Fertilizantes orgánicos)' },
+    { code: 'PI-M02', sector_name: 'Nutrición Vegetal', wall_code: 'PI', module_number: 2, max_levels: 5, description: 'Pared Izquierda - Módulo 2 (Bioestimulantes)' },
+    { code: 'PI-M03', sector_name: 'Sustratos y Enmiendas', wall_code: 'PI', module_number: 3, max_levels: 5, description: 'Pared Izquierda - Módulo 3 (Sustratos Klasmann/Grow)' },
+    { code: 'PI-M04', sector_name: 'Módulo Principal Botánico', wall_code: 'PI', module_number: 4, max_levels: 5, description: 'Pared Izquierda - Módulo 4 (Control de plagas)' },
+    { code: 'PT-M01', sector_name: 'Luz e Iluminación Indoor', wall_code: 'PT', module_number: 1, max_levels: 5, description: 'Pared Trasera - Módulo 1 (Paneles LED y Kits)' },
+    { code: 'PT-M02', sector_name: 'Ventilación y Clima', wall_code: 'PT', module_number: 2, max_levels: 5, description: 'Pared Trasera - Módulo 2 (Extractores y filtros)' },
+    { code: 'PD-M01', sector_name: 'Macetas y Riego', wall_code: 'PD', module_number: 1, max_levels: 5, description: 'Pared Derecha - Módulo 1 (Macetas geotextiles)' },
+    { code: 'PD-M02', sector_name: 'Accesorios de Cultivo', wall_code: 'PD', module_number: 2, max_levels: 5, description: 'Pared Derecha - Módulo 2 (Tijeras y medidores)' },
+    { code: 'DEP-M01', sector_name: 'Depósito Insumos Pesados', wall_code: 'DP', module_number: 1, max_levels: 5, description: 'Depósito - Módulo 1 (Sustratos 50L en pallets)' },
+    { code: 'DEP-M02', sector_name: 'Depósito Reserva General', wall_code: 'DP', module_number: 2, max_levels: 5, description: 'Depósito - Módulo 2 (Reserva de seguridad)' }
+  ];
+  localStorage.setItem(WMS_MODULES_KEY, JSON.stringify(defaultModules));
+  return defaultModules;
+}
+
+function getWmsLocations() {
+  try {
+    const raw = localStorage.getItem(WMS_LOCATIONS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.warn('Error al leer WMS locations:', e);
+  }
+  const defaultLocations = [
+    {
+      id: 'wms-loc-1',
+      module_code: 'PI-M04',
+      product_id: 'klasmann-50l',
+      product_code: '7791234001',
+      name: 'Sustrato Klasmann Potground H 50L',
+      barcode: '7791234001',
+      human_level: 3,
+      sector_position: 'C',
+      quantity: 25,
+      image_url: 'https://astrogrow.com.ar/wp-content/uploads/2021/04/potground-h.jpg'
+    },
+    {
+      id: 'wms-loc-2',
+      module_code: 'PD-M02',
+      product_id: 'klasmann-50l',
+      product_code: '7791234001',
+      name: 'Sustrato Klasmann Potground H 50L',
+      barcode: '7791234001',
+      human_level: 2,
+      sector_position: 'I',
+      quantity: 10,
+      image_url: 'https://astrogrow.com.ar/wp-content/uploads/2021/04/potground-h.jpg'
+    },
+    {
+      id: 'wms-loc-3',
+      module_code: 'DEP-M01',
+      product_id: 'klasmann-50l',
+      product_code: '7791234001',
+      name: 'Sustrato Klasmann Potground H 50L',
+      barcode: '7791234001',
+      human_level: 5,
+      sector_position: 'C',
+      quantity: 3,
+      image_url: 'https://astrogrow.com.ar/wp-content/uploads/2021/04/potground-h.jpg'
+    },
+    {
+      id: 'wms-loc-4',
+      module_code: 'PI-M04',
+      product_id: 'top-bud-250ml',
+      product_code: '7791234002',
+      name: 'Top Crop Top Bud Bioestimulante 250ml',
+      barcode: '7791234002',
+      human_level: 4,
+      sector_position: 'D',
+      quantity: 14,
+      image_url: 'https://astrogrow.com.ar/wp-content/uploads/2020/05/top-bud-250.jpg'
+    },
+    {
+      id: 'wms-loc-5',
+      module_code: 'PI-M01',
+      product_id: 'top-bud-250ml',
+      product_code: '7791234002',
+      name: 'Top Crop Top Bud Bioestimulante 250ml',
+      barcode: '7791234002',
+      human_level: 1,
+      sector_position: 'C',
+      quantity: 6,
+      image_url: 'https://astrogrow.com.ar/wp-content/uploads/2020/05/top-bud-250.jpg'
+    },
+    {
+      id: 'wms-loc-6',
+      module_code: 'PI-M04',
+      product_id: 'mamboreta-aba-30ml',
+      product_code: '7791234003',
+      name: 'Mamboretá ABA Acaricida 30ml',
+      barcode: '7791234003',
+      human_level: 2,
+      sector_position: 'I',
+      quantity: 8,
+      image_url: ''
+    }
+  ];
+  localStorage.setItem(WMS_LOCATIONS_KEY, JSON.stringify(defaultLocations));
+  return defaultLocations;
+}
+
+function saveWmsLocations(locations) {
+  localStorage.setItem(WMS_LOCATIONS_KEY, JSON.stringify(locations));
+}
+
+function getWmsMovements() {
+  try {
+    const raw = localStorage.getItem(WMS_MOVEMENTS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return [];
+}
+
+function saveWmsMovement(movement) {
+  const list = getWmsMovements();
+  list.unshift(movement);
+  localStorage.setItem(WMS_MOVEMENTS_KEY, JSON.stringify(list.slice(0, 200)));
+}
+
+function getWmsAudits() {
+  try {
+    const raw = localStorage.getItem(WMS_AUDITS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return [];
+}
+
+function saveWmsAudit(audit) {
+  const list = getWmsAudits();
+  list.unshift(audit);
+  localStorage.setItem(WMS_AUDITS_KEY, JSON.stringify(list.slice(0, 100)));
+}
+
+function closeWmsModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) modal.style.display = 'none';
+}
+
+function renderWmsModulesGrid() {
+  const container = document.getElementById('wms-modules-grid');
+  const filterWall = (document.getElementById('wms-filter-wall-select')?.value || 'all').toUpperCase();
+  if (!container) return;
+
+  const modules = getWmsModules();
+  const locations = getWmsLocations();
+
+  const filtered = filterWall === 'ALL' ? modules : modules.filter(m => String(m.wall_code).toUpperCase() === filterWall);
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="location-empty-state"><p>No se encontraron módulos para esta pared.</p></div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(m => {
+    const itemsInModule = locations.filter(loc => loc.module_code === m.code && loc.quantity > 0);
+    const totalQty = itemsInModule.reduce((acc, curr) => acc + Number(curr.quantity), 0);
+    const uniqueSkus = new Set(itemsInModule.map(loc => loc.product_id)).size;
+
+    return `
+      <div class="wms-module-card">
+        <div class="wms-module-card-header">
+          <span class="wms-module-code">${m.code}</span>
+          <span class="wms-sector-badge">${m.sector_name}</span>
+        </div>
+        <p style="font-size:0.86rem; color:var(--vendor-muted); margin:0 0 10px 0;">${m.description}</p>
+        <div style="font-size:0.88rem; font-weight:700; color:var(--vendor-forest); margin-bottom:12px;">
+          📦 ${uniqueSkus} SKUs · ${totalQty} unidades almacenadas
+        </div>
+        <div class="wms-module-btn-group">
+          <button type="button" class="wms-btn wms-btn-primary" onclick="openWmsModuleModal('${m.code}')">👁️ Ver Contenido</button>
+          <button type="button" class="wms-btn wms-btn-warning" onclick="openWmsAuditModal('${m.code}')">📋 Auditar</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openWmsQrScannerModal() {
+  const modal = document.getElementById('wms-qr-modal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function confirmWmsQrScanFromSelect() {
+  const select = document.getElementById('wms-demo-module-select');
+  const code = select ? select.value : 'PI-M04';
+  closeWmsModal('wms-qr-modal');
+  openWmsModuleModal(code);
+}
+
+function openWmsModuleModal(moduleCode) {
+  currentWmsModuleCode = moduleCode;
+  const modal = document.getElementById('wms-module-detail-modal');
+  const title = document.getElementById('wms-detail-title');
+  const wallBadge = document.getElementById('wms-detail-wall');
+  const container = document.getElementById('wms-module-items-container');
+
+  const modules = getWmsModules();
+  const mod = modules.find(m => m.code === moduleCode) || { code: moduleCode, sector_name: 'Módulo', wall_code: 'Pared' };
+
+  if (title) title.textContent = `Módulo ${mod.code}`;
+  if (wallBadge) wallBadge.textContent = `${mod.sector_name} (${mod.wall_code})`;
+
+  renderWmsModuleDetails(moduleCode, container);
+
+  if (modal) modal.style.display = 'flex';
+}
+
+function renderWmsModuleDetails(moduleCode, container) {
+  if (!container) container = document.getElementById('wms-module-items-container');
+  if (!container) return;
+
+  const locations = getWmsLocations().filter(loc => loc.module_code === moduleCode && loc.quantity > 0);
+
+  if (locations.length === 0) {
+    container.innerHTML = `
+      <div class="location-empty-state">
+        <strong>Módulo Vacío</strong>
+        <p>No hay productos almacenados en ${moduleCode}. Podés ingresar o transferir stock hacia este módulo.</p>
+      </div>
+    `;
+    return;
+  }
+
+  // Group by Human Level (5 to 1)
+  const levelGroups = {};
+  for (let lvl = 5; lvl >= 1; lvl--) {
+    levelGroups[lvl] = locations.filter(loc => Number(loc.human_level) === lvl);
+  }
+
+  let html = '';
+  for (let lvl = 5; lvl >= 1; lvl--) {
+    const items = levelGroups[lvl];
+    if (!items || items.length === 0) continue;
+
+    html += `
+      <div style="margin-bottom: 16px; border: 1px solid var(--vendor-line); border-radius: 14px; overflow: hidden; background: #fff;">
+        <div style="background: rgba(62,95,31,0.08); padding: 10px 16px; border-bottom: 1px solid var(--vendor-line); display: flex; justify-content: space-between; align-items: center;">
+          <span class="wms-level-badge">
+            🏢 ${getHumanLevelLabel(lvl)}
+          </span>
+          <span style="font-size: 0.8rem; font-weight: 700; color: var(--vendor-muted);">${items.length} ítem(s) en este nivel</span>
+        </div>
+        <div style="padding: 12px; display: grid; gap: 10px;">
+          ${items.map(item => `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1px solid rgba(0,0,0,0.06); border-radius: 12px; background: #faf8f2; gap: 12px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <img src="${item.image_url || 'assets/logo.jpg'}" alt="${item.name}" style="width: 48px; height: 48px; object-fit: contain; border-radius: 8px; background: #fff; border: 1px solid var(--vendor-line);">
+                <div>
+                  <h5 style="margin:0 0 4px 0; color: var(--vendor-forest); font-size: 0.98rem; font-weight: 700;">${item.name}</h5>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <span class="wms-sector-badge">Sector ${getHumanSectorLabel(item.sector_position)}</span>
+                    <span style="font-size: 0.78rem; color: var(--vendor-muted);">SKU: ${item.product_code}</span>
+                  </div>
+                </div>
+              </div>
+              <div style="text-align: right; display: flex; align-items: center; gap: 14px;">
+                <div>
+                  <span style="font-size: 1.2rem; font-weight: 800; color: var(--vendor-forest); display: block;">${item.quantity} u.</span>
+                  <small style="color: var(--vendor-muted); font-size: 0.75rem;">Disponibles</small>
+                </div>
+                <button type="button" class="wms-btn wms-btn-primary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="openWmsTransferModal('${moduleCode}', '${item.product_id}', ${item.human_level}, '${item.sector_position}')">
+                  ⇄ Mover
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
+}
+
+function openWmsTransferModal(originModuleCode, productId, humanLevel, sectorPos) {
+  const modal = document.getElementById('wms-transfer-modal');
+  const productNameEl = document.getElementById('wms-tr-product-name');
+  const originLabelEl = document.getElementById('wms-tr-origin-label');
+  const availableLabelEl = document.getElementById('wms-tr-available-label');
+  const qtyInput = document.getElementById('wms-tr-qty');
+  const destSelect = document.getElementById('wms-tr-dest-module');
+
+  const locations = getWmsLocations();
+  const targetLoc = locations.find(loc => 
+    loc.module_code === originModuleCode &&
+    loc.product_id === productId &&
+    Number(loc.human_level) === Number(humanLevel) &&
+    String(loc.sector_position).toUpperCase() === String(sectorPos).toUpperCase()
+  );
+
+  if (!targetLoc) {
+    showToast('❌ No se encontró el ítem origen en la ubicación seleccionada.');
+    return;
+  }
+
+  if (productNameEl) productNameEl.textContent = targetLoc.name;
+  if (originLabelEl) originLabelEl.textContent = `Origen: ${originModuleCode} (${getHumanLevelLabel(targetLoc.human_level)} / Sector ${getHumanSectorLabel(targetLoc.sector_position)})`;
+  if (availableLabelEl) availableLabelEl.textContent = `Disponible: ${targetLoc.quantity} u.`;
+
+  if (qtyInput) {
+    qtyInput.max = targetLoc.quantity;
+    qtyInput.value = 1;
+  }
+
+  // Populate Destination Modules
+  if (destSelect) {
+    const modules = getWmsModules();
+    destSelect.innerHTML = modules.map(m => `
+      <option value="${m.code}" ${m.code === originModuleCode ? 'disabled' : ''}>${m.code} — ${m.sector_name} (${m.wall_code})</option>
+    `).join('');
+
+    const availableModule = modules.find(m => m.code !== originModuleCode);
+    if (availableModule) destSelect.value = availableModule.code;
+  }
+
+  window._wmsCurrentTransferOrigin = {
+    originModuleCode,
+    productId,
+    humanLevel: Number(humanLevel),
+    sectorPos: String(sectorPos).toUpperCase(),
+    maxQty: targetLoc.quantity,
+    item: targetLoc
+  };
+
+  const resultCard = document.getElementById('wms-transfer-result-card');
+  const form = document.getElementById('wms-transfer-form');
+  if (resultCard) resultCard.style.display = 'none';
+  if (form) form.style.display = 'block';
+
+  if (modal) modal.style.display = 'flex';
+}
+
+function triggerWmsTransferFromCurrentModule() {
+  const locations = getWmsLocations().filter(loc => loc.module_code === currentWmsModuleCode && loc.quantity > 0);
+  if (locations.length === 0) {
+    showToast('El módulo actual está vacío.');
+    return;
+  }
+  const first = locations[0];
+  openWmsTransferModal(currentWmsModuleCode, first.product_id, first.human_level, first.sector_position);
+}
+
+async function handleWmsTransferSubmit(event) {
+  event.preventDefault();
+  const originState = window._wmsCurrentTransferOrigin;
+  if (!originState) return;
+
+  const qtyInput = document.getElementById('wms-tr-qty');
+  const destSelect = document.getElementById('wms-tr-dest-module');
+  const destLevelSelect = document.getElementById('wms-tr-dest-level');
+  const destSectorSelect = document.getElementById('wms-tr-dest-sector');
+
+  const transferQty = Number(qtyInput?.value) || 0;
+  const destModuleCode = destSelect?.value;
+  const destLevel = Number(destLevelSelect?.value) || 3;
+  const destSector = String(destSectorSelect?.value || 'C').toUpperCase();
+
+  const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'Vendedor Local';
+
+  // ATOMIC VALIDATIONS
+  if (transferQty <= 0) {
+    showToast('❌ La cantidad a mover debe ser mayor a cero.');
+    return;
+  }
+
+  if (transferQty > originState.maxQty) {
+    showToast(`❌ Stock insuficiente en origen: sólo quedan ${originState.maxQty} unidades.`);
+    return;
+  }
+
+  if (originState.originModuleCode === destModuleCode && 
+      originState.humanLevel === destLevel && 
+      originState.sectorPos === destSector) {
+    showToast('❌ El módulo y posición de origen y destino no pueden ser idénticos.');
+    return;
+  }
+
+  try {
+    const locations = getWmsLocations();
+    const originIdx = locations.findIndex(loc => 
+      loc.module_code === originState.originModuleCode &&
+      loc.product_id === originState.productId &&
+      Number(loc.human_level) === originState.humanLevel &&
+      String(loc.sector_position).toUpperCase() === originState.sectorPos
+    );
+
+    if (originIdx === -1 || locations[originIdx].quantity < transferQty) {
+      showToast('❌ Error de concurrencia: El stock de origen fue modificado.');
+      return;
+    }
+
+    // Decrement Origin
+    locations[originIdx].quantity -= transferQty;
+    const originItem = locations[originIdx];
+
+    // Remove empty origin row
+    if (locations[originIdx].quantity <= 0) {
+      locations.splice(originIdx, 1);
+    }
+
+    // Increment/Upsert Destination
+    const destIdx = locations.findIndex(loc =>
+      loc.module_code === destModuleCode &&
+      loc.product_id === originState.productId &&
+      Number(loc.human_level) === destLevel &&
+      String(loc.sector_position).toUpperCase() === destSector
+    );
+
+    if (destIdx !== -1) {
+      locations[destIdx].quantity += transferQty;
+    } else {
+      locations.push({
+        id: `wms-loc-${Date.now()}`,
+        module_code: destModuleCode,
+        product_id: originState.productId,
+        product_code: originItem.product_code,
+        name: originItem.name,
+        barcode: originItem.barcode,
+        image_url: originItem.image_url,
+        human_level: destLevel,
+        sector_position: destSector,
+        quantity: transferQty
+      });
+    }
+
+    saveWmsLocations(locations);
+
+    // Record Append-Only Movement Log
+    const movementRecord = {
+      id: `wms-mov-${Date.now()}`,
+      movement_type: 'TRANSFERENCIA',
+      product_id: originState.productId,
+      product_name: originItem.name,
+      quantity: transferQty,
+      origin_module_code: originState.originModuleCode,
+      origin_level: originState.humanLevel,
+      origin_sector: originState.sectorPos,
+      destination_module_code: destModuleCode,
+      destination_level: destLevel,
+      destination_sector: destSector,
+      user_name: activeVendor,
+      timestamp: new Date().toISOString()
+    };
+    saveWmsMovement(movementRecord);
+
+    // Show Confirmation Receipt Card
+    const form = document.getElementById('wms-transfer-form');
+    const resultCard = document.getElementById('wms-transfer-result-card');
+    if (form) form.style.display = 'none';
+
+    if (resultCard) {
+      resultCard.style.display = 'block';
+      resultCard.innerHTML = `
+        <div class="wms-receipt-card">
+          <div class="wms-receipt-title">✅ MOVIMIENTO COMPLETADO</div>
+          <div class="wms-receipt-row"><span>Producto:</span><strong>${originItem.name}</strong></div>
+          <div class="wms-receipt-row"><span>Cantidad:</span><strong>${transferQty} unidades</strong></div>
+          <div class="wms-receipt-row"><span>Origen:</span><strong>${originState.originModuleCode} (${getHumanLevelLabel(originState.humanLevel)})</strong></div>
+          <div class="wms-receipt-row"><span>Destino:</span><strong>${destModuleCode} (${getHumanLevelLabel(destLevel)})</strong></div>
+          <div class="wms-receipt-row"><span>Operador:</span><strong>${activeVendor}</strong></div>
+          <div class="wms-receipt-row"><span>Fecha / Hora:</span><strong>${new Date().toLocaleTimeString()}</strong></div>
+          <button type="button" class="wms-btn wms-btn-primary" style="width: 100%; margin-top: 16px;" onclick="closeWmsModal('wms-transfer-modal'); openWmsModuleModal('${destModuleCode}');">
+            👁️ VER CONTENIDO DEL DESTINO (${destModuleCode})
+          </button>
+        </div>
+      `;
+    }
+
+    showToast(`✅ Transferidos ${transferQty} u. a ${destModuleCode}`);
+
+  } catch (err) {
+    console.error('Error al ejecutar transferencia WMS:', err);
+    showToast(`❌ Error: ${err.message}`);
+  }
+}
+
+function openWmsReverseSearchModal() {
+  const modal = document.getElementById('wms-reverse-search-modal');
+  if (modal) modal.style.display = 'flex';
+  runWmsReverseSearch();
+}
+
+function runWmsReverseSearch() {
+  const input = document.getElementById('wms-rev-input');
+  const container = document.getElementById('wms-rev-results-container');
+  if (!container) return;
+
+  const query = String(input?.value || '').trim().toLowerCase();
+  const locations = getWmsLocations().filter(loc => loc.quantity > 0);
+
+  let filtered = locations;
+  if (query) {
+    filtered = locations.filter(loc => 
+      loc.name.toLowerCase().includes(query) ||
+      loc.product_code.toLowerCase().includes(query) ||
+      (loc.barcode && loc.barcode.includes(query)) ||
+      loc.module_code.toLowerCase().includes(query)
+    );
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="location-empty-state">
+        <p>No se encontraron ubicaciones físicas para "${query}".</p>
+      </div>
+    `;
+    return;
+  }
+
+  // Group by Product
+  const groupedByProduct = new Map();
+  filtered.forEach(loc => {
+    if (!groupedByProduct.has(loc.product_id)) {
+      groupedByProduct.set(loc.product_id, {
+        productId: loc.product_id,
+        name: loc.name,
+        code: loc.product_code,
+        image: loc.image_url,
+        locations: []
+      });
+    }
+    groupedByProduct.get(loc.product_id).locations.push(loc);
+  });
+
+  container.innerHTML = Array.from(groupedByProduct.values()).map(prod => {
+    const totalPhysicalStock = prod.locations.reduce((acc, curr) => acc + Number(curr.quantity), 0);
+    return `
+      <div style="border: 1px solid var(--vendor-line); border-radius: 16px; padding: 16px; margin-bottom: 14px; background: #fff;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.06); padding-bottom: 10px; margin-bottom: 12px;">
+          <div>
+            <h4 style="margin: 0 0 4px 0; color: var(--vendor-forest); font-size: 1.1rem; font-weight: 800;">${prod.name}</h4>
+            <span style="font-size: 0.8rem; color: var(--vendor-muted);">SKU: ${prod.code}</span>
+          </div>
+          <div style="text-align: right;">
+            <span class="wms-sync-badge" style="font-size: 0.85rem; padding: 6px 12px;">
+              📦 STOCK FÍSICO LOCALIZADO: ${totalPhysicalStock} u.
+            </span>
+          </div>
+        </div>
+
+        <div style="display: grid; gap: 8px;">
+          ${prod.locations.map(loc => `
+            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,253,246,0.9); padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.05);">
+              <div>
+                <strong style="color: var(--vendor-forest); font-size: 0.95rem;">${loc.module_code}</strong>
+                <span class="wms-level-badge" style="margin-left: 8px; font-size: 0.76rem;">${getHumanLevelLabel(loc.human_level)}</span>
+                <span class="wms-sector-badge" style="margin-left: 4px; font-size: 0.74rem;">Sector ${getHumanSectorLabel(loc.sector_position)}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <strong style="font-size: 1.05rem; color: var(--vendor-forest);">${loc.quantity} u.</strong>
+                <button type="button" class="wms-btn" style="padding: 4px 8px; font-size: 0.78rem;" onclick="closeWmsModal('wms-reverse-search-modal'); openWmsModuleModal('${loc.module_code}');">
+                  Ir al módulo
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openWmsAuditModal(moduleCode) {
+  currentWmsModuleCode = moduleCode;
+  const modal = document.getElementById('wms-audit-modal');
+  const title = document.getElementById('wms-audit-title');
+  const container = document.getElementById('wms-audit-items-list');
+
+  if (title) title.textContent = `Auditando Módulo ${moduleCode}`;
+
+  const locations = getWmsLocations().filter(loc => loc.module_code === moduleCode && loc.quantity > 0);
+
+  if (!container) return;
+
+  if (locations.length === 0) {
+    container.innerHTML = `
+      <div class="location-empty-state">
+        <p>No hay productos esperados en este módulo para auditar.</p>
+      </div>
+    `;
+  } else {
+    container.innerHTML = locations.map((loc, idx) => `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1px solid var(--vendor-line); border-radius: 12px; margin-bottom: 8px; background: #fff;">
+        <div>
+          <strong style="color: var(--vendor-forest); display: block; font-size: 0.95rem;">${loc.name}</strong>
+          <span style="font-size: 0.78rem; color: var(--vendor-muted);">${getHumanLevelLabel(loc.human_level)} (${getHumanSectorLabel(loc.sector_position)})</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 0.85rem; color: var(--vendor-muted);">Esperado: <strong>${loc.quantity} u.</strong></span>
+          <label style="font-size: 0.8rem; font-weight: 700;">Real:
+            <input type="number" id="wms-audit-qty-${idx}" data-product-id="${loc.product_id}" data-expected="${loc.quantity}" data-level="${loc.human_level}" data-sector="${loc.sector_position}" value="${loc.quantity}" min="0" step="1" style="width: 70px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--vendor-line); font-weight: 800; text-align: center;">
+          </label>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  const notice = document.getElementById('wms-audit-result-notice');
+  if (notice) notice.style.display = 'none';
+
+  if (modal) modal.style.display = 'flex';
+}
+
+function triggerWmsAuditFromCurrentModule() {
+  openWmsAuditModal(currentWmsModuleCode);
+}
+
+function submitWmsAuditWithStatus(forcedStatus) {
+  const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'Vendedor Local';
+  const locations = getWmsLocations().filter(loc => loc.module_code === currentWmsModuleCode && loc.quantity > 0);
+
+  const auditRecord = {
+    id: `wms-audit-${Date.now()}`,
+    module_code: currentWmsModuleCode,
+    auditor_user: activeVendor,
+    status: forcedStatus || 'CORRECTO',
+    timestamp: new Date().toISOString(),
+    items: locations.map((loc, idx) => {
+      const input = document.getElementById(`wms-audit-qty-${idx}`);
+      const foundQty = input ? Number(input.value) : loc.quantity;
+      return {
+        product_id: loc.product_id,
+        name: loc.name,
+        expected_qty: loc.quantity,
+        found_qty: foundQty,
+        difference: foundQty - loc.quantity,
+        human_level: loc.human_level,
+        sector_position: loc.sector_position
+      };
+    })
+  };
+
+  saveWmsAudit(auditRecord);
+
+  // Record Audit Movement Log
+  saveWmsMovement({
+    id: `wms-mov-${Date.now()}`,
+    movement_type: 'AJUSTE_AUDITORIA',
+    product_id: currentWmsModuleCode,
+    product_name: `Auditoría Módulo ${currentWmsModuleCode}`,
+    quantity: locations.length,
+    origin_module_code: currentWmsModuleCode,
+    destination_module_code: currentWmsModuleCode,
+    user_name: activeVendor,
+    timestamp: new Date().toISOString(),
+    notes: `Estado: ${auditRecord.status}`
+  });
+
+  const notice = document.getElementById('wms-audit-result-notice');
+  if (notice) {
+    notice.style.display = 'block';
+    notice.innerHTML = `
+      <strong>📋 Auditoría Registrada (${auditRecord.status}):</strong> 
+      Se guardó el control del Módulo ${currentWmsModuleCode}. 
+      <br><small><strong>REGLA DE SEGURIDAD:</strong> El stock comercial y las cantidades de producción NO sufren alteraciones automáticas.</small>
+    `;
+  }
+
+  showToast(`📋 Auditoría de ${currentWmsModuleCode} registrada correctamente.`);
+}
+
+function handleWmsAuditSubmit(event) {
+  event.preventDefault();
+  submitWmsAuditWithStatus('PENDIENTE_APROBACION');
+}
+
+function openWmsMovementsHistoryModal() {
+  const modal = document.getElementById('wms-history-modal');
+  const container = document.getElementById('wms-history-table-container');
+
+  const movements = getWmsMovements();
+
+  if (!container) return;
+
+  if (movements.length === 0) {
+    container.innerHTML = `
+      <div class="location-empty-state">
+        <p>No se registraron movimientos en esta sesión.</p>
+      </div>
+    `;
+  } else {
+    container.innerHTML = `
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.86rem; text-align: left;">
+        <thead>
+          <tr style="background: rgba(62,95,31,0.1); border-bottom: 2px solid var(--vendor-line); color: var(--vendor-forest);">
+            <th style="padding: 10px;">Fecha / Hora</th>
+            <th style="padding: 10px;">Tipo</th>
+            <th style="padding: 10px;">Producto</th>
+            <th style="padding: 10px;">Cantidad</th>
+            <th style="padding: 10px;">Origen ➔ Destino</th>
+            <th style="padding: 10px;">Operador</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${movements.map(m => `
+            <tr style="border-bottom: 1px solid rgba(0,0,0,0.05);">
+              <td style="padding: 10px; color: var(--vendor-muted);">${new Date(m.timestamp || Date.now()).toLocaleTimeString()}</td>
+              <td style="padding: 10px;"><span class="wms-level-badge" style="font-size: 0.72rem;">${m.movement_type}</span></td>
+              <td style="padding: 10px; font-weight: 700; color: var(--vendor-forest);">${m.product_name}</td>
+              <td style="padding: 10px; font-weight: 800;">${m.quantity} u.</td>
+              <td style="padding: 10px;">${m.origin_module_code || '-'} ➔ ${m.destination_module_code || '-'}</td>
+              <td style="padding: 10px;">${m.user_name}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  if (modal) modal.style.display = 'flex';
+}
+
+// Global WMS Exports
+window.getHumanLevelLabel = getHumanLevelLabel;
+window.getHumanSectorLabel = getHumanSectorLabel;
+window.renderWmsModulesGrid = renderWmsModulesGrid;
+window.openWmsQrScannerModal = openWmsQrScannerModal;
+window.confirmWmsQrScanFromSelect = confirmWmsQrScanFromSelect;
+window.openWmsModuleModal = openWmsModuleModal;
+window.openWmsTransferModal = openWmsTransferModal;
+window.triggerWmsTransferFromCurrentModule = triggerWmsTransferFromCurrentModule;
+window.handleWmsTransferSubmit = handleWmsTransferSubmit;
+window.openWmsReverseSearchModal = openWmsReverseSearchModal;
+window.runWmsReverseSearch = runWmsReverseSearch;
+window.openWmsAuditModal = openWmsAuditModal;
+window.triggerWmsAuditFromCurrentModule = triggerWmsAuditFromCurrentModule;
+window.submitWmsAuditWithStatus = submitWmsAuditWithStatus;
+window.handleWmsAuditSubmit = handleWmsAuditSubmit;
+window.openWmsMovementsHistoryModal = openWmsMovementsHistoryModal;
+window.closeWmsModal = closeWmsModal;
+
+
+
 
