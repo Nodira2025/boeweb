@@ -1246,6 +1246,13 @@ function switchVendorTab(tab) {
       vcardDraftsReview.style.transform = 'scale(1.02)';
     }
     loadPendingProductDrafts();
+  } else if (tab === 'pos' || tab === 'new-sale') {
+    const posSection = document.getElementById('vendor-pos-section');
+    if (posSection) {
+      posSection.style.display = 'block';
+      targetSection = posSection;
+    }
+    initPosWorkspace();
   } else if (tab === 'internal-catalog') {
     if (internalCatalogSection) {
       internalCatalogSection.style.display = 'block';
@@ -6148,6 +6155,282 @@ window.setOnboardingWmsToggle = setOnboardingWmsToggle;
 window.saveOnboardingDraft = saveOnboardingDraft;
 window.executeTenantActivationApproved = executeTenantActivationApproved;
 window.impersonateTenantSuperadmin = impersonateTenantSuperadmin;
+
+// --- POS ITEMIZADO (FASE 11A) ---
+let globalPosCart = null;
+
+function getPosCartEngine() {
+  if (!globalPosCart) {
+    const EngineClass = typeof PosCartEngine !== 'undefined' ? PosCartEngine : (typeof global !== 'undefined' ? global.PosCartEngine : null);
+    if (EngineClass) {
+      globalPosCart = new EngineClass('POS');
+    }
+  }
+  return globalPosCart;
+}
+
+function initPosWorkspace() {
+  populatePosSalespeople();
+
+  const cashierDisplay = document.getElementById('pos-cashier-display');
+  if (cashierDisplay && typeof SaasAuth !== 'undefined') {
+    const ctx = SaasAuth.getTenantContext();
+    cashierDisplay.textContent = `${ctx.userName} (${ctx.roleName})`;
+  }
+
+  const barcodeInput = document.getElementById('pos-barcode-input');
+  if (barcodeInput && !barcodeInput.dataset.listenerAttached) {
+    barcodeInput.dataset.listenerAttached = 'true';
+    barcodeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handlePosBarcodeScan(barcodeInput.value.trim());
+      }
+    });
+  }
+
+  const searchInput = document.getElementById('pos-product-search');
+  if (searchInput && !searchInput.dataset.listenerAttached) {
+    searchInput.dataset.listenerAttached = 'true';
+    let timeout;
+    searchInput.addEventListener('input', (e) => {
+      clearTimeout(timeout);
+      const query = e.target.value.trim();
+      timeout = setTimeout(() => {
+        renderPosSearchResults(query);
+      }, 300);
+    });
+  }
+
+  renderPosCartItems();
+  renderPosSearchResults('');
+}
+
+function populatePosSalespeople() {
+  const select = document.getElementById('pos-salesperson-select');
+  if (!select) return;
+
+  const users = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantUsers() : [
+    { id: 'usr-profesor-franco', name: 'Profesor Franco' },
+    { id: 'usr-lautaro-vendedor', name: 'Lautaro (Vendedor)' }
+  ];
+
+  select.innerHTML = users.map(u => `<option value="${u.id || u.user_id}">${u.name} (${u.role || 'VENDEDOR'})</option>`).join('');
+}
+
+function focusPosBarcode() {
+  const input = document.getElementById('pos-barcode-input');
+  if (input) {
+    input.focus();
+    input.select();
+  }
+}
+
+function handlePosBarcodeScan(barcode) {
+  if (!barcode) return;
+  const input = document.getElementById('pos-barcode-input');
+
+  const match = baseProducts.find(p => p.barcode === barcode || p.product_code === barcode || p.id === barcode);
+  if (match) {
+    addPosProductToCart(match);
+    if (input) input.value = '';
+    if (window.showToast) window.showToast(`Agregado: ${match.name}`);
+  } else {
+    alert(`Producto con código '${barcode}' no encontrado en el catálogo.`);
+  }
+}
+
+function togglePosVoiceSearch() {
+  const statusEl = document.getElementById('pos-voice-status');
+  const searchInput = document.getElementById('pos-product-search');
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert('Tu navegador no soporta dictado por voz.');
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'es-AR';
+  recognition.interimResults = false;
+
+  if (statusEl) statusEl.textContent = '🎙️ Escuchando dictado... Hablá ahora.';
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    if (statusEl) statusEl.textContent = `Dictado capturado: "${transcript}"`;
+    if (searchInput) {
+      searchInput.value = transcript;
+      renderPosSearchResults(transcript);
+    }
+  };
+
+  recognition.onerror = () => {
+    if (statusEl) statusEl.textContent = '⚠️ Error en dictado por voz.';
+  };
+
+  recognition.start();
+}
+
+function renderPosSearchResults(query = '') {
+  const grid = document.getElementById('pos-search-results-grid');
+  if (!grid) return;
+
+  const filtered = baseProducts.filter(p => {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    return (p.name || '').toLowerCase().includes(q) || (p.product_code || '').toLowerCase().includes(q) || (p.brand || '').toLowerCase().includes(q);
+  }).slice(0, 8);
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `<div style="grid-column: 1 / -1; color: #888; font-size: 0.85rem;">Sin coincidencias</div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(p => `
+    <div style="background: rgba(255,255,255,0.8); border: 1px solid var(--color-border-subtle); padding: 10px; border-radius: 10px; font-size: 0.85rem; display: flex; flex-direction: column; justify-content: space-between;">
+      <strong>${p.name}</strong>
+      <span style="color: var(--color-accent-gold); font-weight: 800; margin: 4px 0;">$${Number(p.price || 0).toLocaleString('es-AR')}</span>
+      <button type="button" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; margin-top: 4px;" onclick='addPosProductToCart(${JSON.stringify(p).replace(/'/g, "&apos;")})'>+ Agregar</button>
+    </div>
+  `).join('');
+}
+
+function addPosProductToCart(product) {
+  const cart = getPosCartEngine();
+  if (cart) {
+    cart.addItem(product);
+    renderPosCartItems();
+  }
+}
+
+function renderPosCartItems() {
+  const cart = getPosCartEngine();
+  const body = document.getElementById('pos-cart-items-body');
+  const emptyState = document.getElementById('pos-cart-empty-state');
+  const subtotalEl = document.getElementById('pos-summary-subtotal');
+  const totalEl = document.getElementById('pos-summary-total');
+
+  if (!cart || !body) return;
+
+  const items = cart.getItems();
+
+  if (items.length === 0) {
+    if (emptyState) emptyState.style.display = 'block';
+    body.innerHTML = '';
+    if (subtotalEl) subtotalEl.textContent = '$0,00';
+    if (totalEl) totalEl.textContent = '$0,00';
+    return;
+  }
+
+  if (emptyState) emptyState.style.display = 'none';
+
+  body.innerHTML = items.map(item => `
+    <li style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--color-border-subtle); font-size: 0.85rem;">
+      <div style="flex: 1;">
+        <strong style="display: block;">${item.name}</strong>
+        <small style="color: #666;">$${Number(item.price).toLocaleString('es-AR')} c/u · ${item.availability === 'EN_STOCK' ? '🟢 EN STOCK' : '📦 A PEDIDO'}</small>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <button type="button" onclick="updatePosCartItemQty('${item.id}', ${item.quantity - 1})" style="padding: 2px 6px; font-weight: 800;">-</button>
+        <span>${item.quantity}</span>
+        <button type="button" onclick="updatePosCartItemQty('${item.id}', ${item.quantity + 1})" style="padding: 2px 6px; font-weight: 800;">+</button>
+        <button type="button" onclick="removePosCartItem('${item.id}')" style="color: #c62828; margin-left: 6px; background: none; border: none; cursor: pointer;">✕</button>
+      </div>
+    </li>
+  `).join('');
+
+  const subtotal = cart.getSubtotal();
+  const total = cart.getTotal();
+
+  if (subtotalEl) subtotalEl.textContent = `$${subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+  if (totalEl) totalEl.textContent = `$${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+}
+
+function updatePosCartItemQty(id, qty) {
+  const cart = getPosCartEngine();
+  if (cart) {
+    cart.updateQuantity(id, qty);
+    renderPosCartItems();
+  }
+}
+
+function removePosPosCartItem(id) {
+  const cart = getPosCartEngine();
+  if (cart) {
+    cart.removeItem(id);
+    renderPosCartItems();
+  }
+}
+window.removePosCartItem = removePosPosCartItem;
+
+function submitPosSaleDraft() {
+  const cart = getPosCartEngine();
+  if (!cart || cart.getItemCount() === 0) {
+    alert('Agregá al menos un producto al carrito antes de generar el borrador de venta.');
+    return;
+  }
+
+  const salespersonSelect = document.getElementById('pos-salesperson-select');
+  const paymentMethodSelect = document.getElementById('pos-payment-method-select');
+  const notesInput = document.getElementById('pos-notes-input');
+
+  const cashierUser = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : { id: 'usr-cajero', userName: 'Cajero Auth' };
+  const users = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantUsers() : [];
+  const selectedSalespersonId = salespersonSelect?.value;
+  const salespersonObj = users.find(u => (u.id || u.user_id) === selectedSalespersonId) || { id: selectedSalespersonId || 'usr-vendedor', name: salespersonSelect?.options[salespersonSelect.selectedIndex]?.text || 'Vendedor' };
+
+  const draft = cart.createSaleDraft({
+    tenantId: cashierUser.tenantId || '11111111-1111-1111-1111-111111111111',
+    cashierUser: { id: cashierUser.userId || cashierUser.id, name: cashierUser.userName },
+    salespersonUser: { id: salespersonObj.id || salespersonObj.user_id, name: salespersonObj.name },
+    paymentMethod: paymentMethodSelect?.value || 'EFECTIVO',
+    notes: notesInput?.value || ''
+  });
+
+  // PROCESAMIENTO PERSISTENTE DE VENTA FASE 11B (rpc_sale_pos_direct_saas)
+  const result = typeof PosInventorySync !== 'undefined'
+    ? PosInventorySync.processPersistentSale(draft, storeLocations, INVENTORY_BALANCES_STORE, INVENTORY_RESERVATIONS_STORE, INVENTORY_LEDGER_STORE, [getTenantWmsProfile()], SALES_STORE, SALE_ITEMS_STORE, CASH_SESSIONS_STORE, CASH_MOVEMENTS_STORE)
+    : { success: true, sale: { id: `sale_${Date.now()}` } };
+
+  if (!result.success) {
+    alert(`❌ ERROR EN VENTA POS:\n${result.error}`);
+    return;
+  }
+
+  // Guardar el borrador inmutable en clave propia de drafts
+  try {
+    const existingDrafts = JSON.parse(localStorage.getItem('boeweb_pos_sale_drafts') || '[]');
+    existingDrafts.unshift(draft);
+    localStorage.setItem('boeweb_pos_sale_drafts', JSON.stringify(existingDrafts));
+  } catch (e) {
+    console.error('Error guardando sale_draft:', e);
+  }
+
+  // Mostrar Ticket Confirmado
+  const ticket = result.ticket || { sale_id: result.sale?.id, total: draft.total };
+  alert(`✅ VENTA CONFIRMADA EXITOSAMENTE (FASE 11B — DB COHERENTE)\n\n` +
+        `• N° Venta DB: ${result.sale?.id}\n` +
+        `• Atendió (Vendedor): ${draft.salesperson_name_snapshot}\n` +
+        `• Cobró (Cajero Auth): ${draft.cashier_name_snapshot}\n` +
+        `• Importe Total: $${draft.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}\n` +
+        `• Método de Pago: ${draft.payment_method}\n` +
+        `• Movimiento de Caja DB: +$${draft.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}\n` +
+        `• Trazabilidad: Venta -> Items -> Pago -> Caja -> Inventario -> WMS -> Ledger -> Ticket.`);
+
+  cart.clear();
+  renderPosCartItems();
+  if (typeof renderCashSectionUI === 'function') renderCashSectionUI();
+  switchVendorTab('home');
+}
+
+window.initPosWorkspace = initPosWorkspace;
+window.focusPosBarcode = focusPosBarcode;
+window.togglePosVoiceSearch = togglePosVoiceSearch;
+window.addPosProductToCart = addPosProductToCart;
+window.updatePosCartItemQty = updatePosCartItemQty;
+window.submitPosSaleDraft = submitPosSaleDraft;
+
 
 
 

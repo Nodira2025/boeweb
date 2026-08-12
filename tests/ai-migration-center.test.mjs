@@ -137,6 +137,7 @@ test('8. Gatekeeper Real: El catálogo de producción permanece 100% INMUTABLE a
 test('9. Rollback Real con Ledger de Acciones (MIGRATION_ACTIONS): Reversión granular exacta', () => {
   const tenantId = '11111111-1111-1111-1111-111111111111';
   const initialCatalog = [{ product_code: 'FER-01', name: 'Amoladora Vieja', price: 100 }];
+  if (typeof MIGRATION_ACTIONS_LEDGER !== 'undefined') MIGRATION_ACTIONS_LEDGER.length = 0;
 
   MigrationCenter.initWizard(tenantId, 'Profesor Franco');
   const sampleCsv = `COD_ART,DESCRIPCION,MARCA,PVP,CANT\nFER-01,Amoladora Nueva Bosch,Bosch,150.00,30\nFER-02,Taladro Bosch Nuevo,Bosch,80.00,20`;

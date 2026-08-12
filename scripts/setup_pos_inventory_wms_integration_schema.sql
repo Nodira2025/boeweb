@@ -248,3 +248,93 @@ GRANT SELECT ON public.inventory_ledger TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.inventory_locations TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_inventory_availability(UUID, VARCHAR) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rpc_sale_pos_direct_saas(UUID, VARCHAR, INT, VARCHAR, VARCHAR, VARCHAR) TO authenticated;
+
+-- ============================================================================
+-- 8. TABLAS DE VENTAS COMERCIALES Y CAJA (FASE 11B)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.sales (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  status VARCHAR(50) NOT NULL DEFAULT 'CONFIRMED' CHECK (status IN ('CONFIRMED', 'CANCELLED', 'REFUNDED')),
+  cashier_user_id VARCHAR(255) NOT NULL,
+  cashier_name_snapshot VARCHAR(255) NOT NULL,
+  salesperson_user_id VARCHAR(255) NOT NULL,
+  salesperson_name_snapshot VARCHAR(255) NOT NULL,
+  customer_id VARCHAR(255),
+  subtotal NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+  discount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+  total NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+  payment_method VARCHAR(50) NOT NULL DEFAULT 'EFECTIVO',
+  idempotency_key VARCHAR(255) NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.sale_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sale_id UUID NOT NULL REFERENCES public.sales(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  product_id VARCHAR(255) NOT NULL,
+  product_name_snapshot VARCHAR(255) NOT NULL,
+  quantity NUMERIC(12,2) NOT NULL CHECK (quantity > 0),
+  unit_price NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+  subtotal NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+  fulfillment_type VARCHAR(50) NOT NULL DEFAULT 'DIRECT'
+);
+
+CREATE TABLE IF NOT EXISTS public.cash_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  register_id VARCHAR(100) NOT NULL DEFAULT 'MAIN_REGISTER',
+  opened_by VARCHAR(255) NOT NULL,
+  opening_amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+  opened_at TIMESTAMPTZ DEFAULT NOW(),
+  closed_by VARCHAR(255),
+  closing_counted NUMERIC(12,2),
+  closed_at TIMESTAMPTZ,
+  status VARCHAR(50) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'CLOSED'))
+);
+
+CREATE TABLE IF NOT EXISTS public.cash_movements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID REFERENCES public.cash_sessions(id) ON DELETE SET NULL,
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  type VARCHAR(50) NOT NULL CHECK (type IN ('venta_efectivo', 'venta_transferencia', 'ingreso_manual', 'gasto', 'devolucion')),
+  amount NUMERIC(12,2) NOT NULL,
+  payment_method VARCHAR(50) NOT NULL DEFAULT 'EFECTIVO',
+  reference_type VARCHAR(50) DEFAULT 'SALE',
+  reference_id VARCHAR(255),
+  created_by VARCHAR(255) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.sales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sale_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cash_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cash_movements ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "RLS sales_isolation" ON public.sales;
+DROP POLICY IF EXISTS "RLS sale_items_isolation" ON public.sale_items;
+DROP POLICY IF EXISTS "RLS cash_sessions_isolation" ON public.cash_sessions;
+DROP POLICY IF EXISTS "RLS cash_movements_isolation" ON public.cash_movements;
+
+CREATE POLICY "RLS sales_isolation" ON public.sales FOR ALL USING (
+  public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
+);
+
+CREATE POLICY "RLS sale_items_isolation" ON public.sale_items FOR ALL USING (
+  public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
+);
+
+CREATE POLICY "RLS cash_sessions_isolation" ON public.cash_sessions FOR ALL USING (
+  public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
+);
+
+CREATE POLICY "RLS cash_movements_isolation" ON public.cash_movements FOR ALL USING (
+  public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
+);
+
+GRANT SELECT, INSERT, UPDATE ON public.sales TO authenticated;
+GRANT SELECT, INSERT ON public.sale_items TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.cash_sessions TO authenticated;
+GRANT SELECT, INSERT ON public.cash_movements TO authenticated;
+

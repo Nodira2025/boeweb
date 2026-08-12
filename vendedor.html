@@ -1407,6 +1407,100 @@
       </div>
     </section>
 
+    <!-- SECTION: POS ITEMIZADO (NUEVA VENTA) -->
+    <section id="vendor-pos-section" class="vendor-workspace-section" style="display: none;" aria-labelledby="pos-workspace-title">
+      <header class="stock-entry-hero" style="background: var(--color-card-bg); border-bottom: 2px solid var(--color-accent-gold); padding: 20px; border-radius: 16px; margin-bottom: 20px;">
+        <div>
+          <span class="stock-entry-eyebrow" style="color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase;">Punto de Venta · POS Itemizado (Fase 11A)</span>
+          <h2 id="pos-workspace-title" style="margin: 4px 0 8px 0; font-family: 'Playfair Display', serif;">Nueva Venta de Mostrador</h2>
+          <p style="margin: 0; opacity: 0.85; font-size: 0.9rem;">Escanear o buscar productos, asignar vendedor que atendió y preparar el borrador de venta.</p>
+        </div>
+        <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
+      </header>
+
+      <div style="display: grid; grid-template-columns: 1fr 380px; gap: 20px;">
+        <!-- Columna Izquierda: Búsqueda, Dictado y Selección de Productos -->
+        <div>
+          <div style="background: var(--color-card-bg); padding: 20px; border-radius: 16px; border: 1px solid var(--color-border-accent); margin-bottom: 20px;">
+            <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+              <input type="text" id="pos-barcode-input" class="b2b-form-input" placeholder="⚡ Escanear código de barras (Enter para agregar)..." autocomplete="off" style="font-size: 0.95rem; font-weight: 700;">
+              <button type="button" class="btn btn-secondary" onclick="focusPosBarcode()" style="white-space: nowrap;">⚡ Lector</button>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+              <input type="search" id="pos-product-search" class="b2b-form-input" placeholder="🔍 Buscar por nombre, marca o SKU..." autocomplete="off">
+              <button type="button" id="pos-voice-search-btn" class="btn btn-secondary" onclick="togglePosVoiceSearch()" style="white-space: nowrap; background: rgba(194,162,70,0.15); border-color: var(--color-accent-gold);">🎙️ Dictar</button>
+            </div>
+            <small id="pos-voice-status" style="display: block; margin-top: 6px; color: var(--color-accent-gold); font-weight: 600;"></small>
+
+            <!-- Grid de Búsqueda Rápida POS -->
+            <div id="pos-search-results-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 15px; max-height: 280px; overflow-y: auto;">
+              <!-- Productos de búsqueda dinámica -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Columna Derecha: Ítems del Carrito POS & Formulario de Cierre Draft -->
+        <div style="background: var(--color-card-bg); padding: 20px; border-radius: 16px; border: 1.5px solid var(--color-accent-gold);">
+          <h3 style="font-size: 1.1rem; margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 8px;">🛒 Carrito de Venta POS</h3>
+
+          <!-- Selección de Vendedor e Identidad -->
+          <div style="margin-bottom: 15px; background: rgba(21,45,36,0.04); padding: 12px; border-radius: 10px; border: 1px solid var(--color-border-subtle);">
+            <label for="pos-salesperson-select" style="font-size: 0.8rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 4px;">👤 Atendió el Cliente (Vendedor):</label>
+            <select id="pos-salesperson-select" class="b2b-form-input" style="font-size: 0.9rem; font-weight: 700; background: #fff; margin-bottom: 8px;">
+              <!-- Poblado dinámicamente con SaasAuth.getTenantUsers() -->
+            </select>
+
+            <div style="font-size: 0.8rem; color: var(--color-text-muted);">
+              <span>🔑 Cobró / Cajero (Auth): </span>
+              <strong id="pos-cashier-display" style="color: var(--color-text-main);">Profesor Franco</strong>
+            </div>
+          </div>
+
+          <!-- Listado de Ítems POS -->
+          <div id="pos-cart-items-list" style="max-height: 250px; overflow-y: auto; margin-bottom: 15px;">
+            <div id="pos-cart-empty-state" style="text-align: center; padding: 20px; color: #888; font-size: 0.88rem;">
+              El carrito está vacío.<br>Escaneá o buscá un producto.
+            </div>
+            <ul id="pos-cart-items-body" style="list-style: none; padding: 0; margin: 0;">
+              <!-- Ítems agregados -->
+            </ul>
+          </div>
+
+          <!-- Resumen de Importes -->
+          <div style="border-top: 2px solid var(--color-border-accent); padding-top: 12px; margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 6px;">
+              <span>Subtotal:</span>
+              <strong id="pos-summary-subtotal">$0,00</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 1.2rem; font-weight: 900; color: var(--color-accent-gold);">
+              <span>TOTAL:</span>
+              <strong id="pos-summary-total">$0,00</strong>
+            </div>
+          </div>
+
+          <!-- Método de Pago & Observación -->
+          <div style="margin-bottom: 15px;">
+            <label for="pos-payment-method-select" style="font-size: 0.8rem; font-weight: 800; text-transform: uppercase; display: block; margin-bottom: 4px;">Forma de Pago:</label>
+            <select id="pos-payment-method-select" class="b2b-form-input" style="font-size: 0.9rem; font-weight: 700; background: #fff; margin-bottom: 8px;">
+              <option value="EFECTIVO">💵 Efectivo</option>
+              <option value="TRANSFERENCIA">🏦 Transferencia Bancaria</option>
+              <option value="DEBITO">💳 Tarjeta de Débito</option>
+              <option value="CREDITO">💳 Tarjeta de Crédito</option>
+              <option value="MERCADOPAGO">📱 MercadoPago QR</option>
+            </select>
+
+            <input type="text" id="pos-notes-input" class="b2b-form-input" placeholder="Observaciones (opcional)..." style="font-size: 0.85rem;">
+          </div>
+
+          <!-- Botón de Confirmación Borrador Draft -->
+          <button type="button" id="pos-create-draft-btn" class="b2b-checkout-btn" onclick="submitPosSaleDraft()" style="width: 100%; font-size: 1rem; font-weight: 800; padding: 14px;">
+            📄 Generar Borrador de Venta
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- SECTION: INGRESAR PRODUCTO AL STOCK -->
     <section id="vendor-fast-upload-section" class="vendor-workspace-section stock-entry-workspace" style="display: none;" aria-labelledby="stock-entry-title">
       <header class="stock-entry-hero">
@@ -2729,6 +2823,9 @@
 
       <!-- Products Content Area -->
       <main>
+        <div class="b2b-search-bar-container" style="margin-bottom: 20px;">
+          <input type="search" id="b2b-search-input" class="b2b-form-input" placeholder="🔍 Buscar por nombre, marca, código de barras o SKU..." autocomplete="off" style="font-size: 0.95rem; padding: 12px 16px; border-radius: 12px; border: 1.5px solid var(--color-border-accent, #c2a246); width: 100%; box-shadow: var(--shadow-sm);">
+        </div>
         <div id="b2b-product-grid" class="b2b-grid">
           <!-- Products will be dynamically populated here -->
         </div>
@@ -2875,6 +2972,8 @@
   <script src="migration-rollback.js?v=migration_v1"></script>
   <script src="migration-center.js?v=migration_v1"></script>
   <script src="tenant-onboarding.js?v=onboarding_v1"></script>
+  <script src="pos-cart-engine.js?v=cart_v1"></script>
+  <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="vendedor.js?v=internal_catalog_v10"></script>
 </body>

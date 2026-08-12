@@ -63,6 +63,16 @@ class SaasAuthEngine {
     };
   }
 
+  getTenantUsers(tenantId = this.activeTenantId) {
+    const defaultUsers = [
+      { id: 'usr-profesor-franco', user_id: 'usr-profesor-franco', tenant_id: tenantId, name: 'Profesor Franco', role: 'SUPERADMIN', active: true },
+      { id: 'usr-lautaro-vendedor', user_id: 'usr-lautaro-vendedor', tenant_id: tenantId, name: 'Lautaro (Vendedor)', role: 'VENDEDOR', active: true },
+      { id: 'usr-valeria-supervisor', user_id: 'usr-valeria-supervisor', tenant_id: tenantId, name: 'Valeria (Supervisor)', role: 'SUPERVISOR', active: true },
+      { id: 'usr-agustin-cajero', user_id: 'usr-agustin-cajero', tenant_id: tenantId, name: 'Agustín (Cajero/Vendedor)', role: 'VENDEDOR', active: true }
+    ];
+    return defaultUsers;
+  }
+
   hasPermission(permissionKey) {
     const ctx = this.getTenantContext();
     if (ctx.role === 'SUPERADMIN' || ctx.permissions.includes('*')) return true;
