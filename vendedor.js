@@ -1330,10 +1330,6 @@ function openCashWithType(type) {
 let storeMapDataLoaded = false;
 let storeMapDataLoading = false;
 const LOCAL_PRODUCT_LOCATIONS_KEY = 'boeweb_product_locations_v1';
-const LEGACY_PRODUCT_DRAFT_FIELDS = [
-  'id', 'image_url', 'image_path', 'stock', 'location', 'observations',
-  'status', 'seller_name', 'created_at', 'updated_at'
-].join(',');
 
 function readLocalProductLocations() {
   try {
@@ -1385,7 +1381,7 @@ async function loadStoreMapData(forceReload = false) {
       supabaseClient.from('store_shelves').select('*').order('code', { ascending: true }),
       supabaseClient
         .from('product_drafts')
-        .select(LEGACY_PRODUCT_DRAFT_FIELDS)
+        .select('*')
         .eq('status', 'APPROVED')
         .order('updated_at', { ascending: false })
     ]);
@@ -2894,7 +2890,7 @@ async function findLocalStockProduct(barcode, query) {
     const draftRows = await readStockLookupRows(
       supabaseClient
         .from('product_drafts')
-        .select(LEGACY_PRODUCT_DRAFT_FIELDS)
+        .select('*')
         .eq('status', 'APPROVED')
         .order('updated_at', { ascending: false })
         .limit(250),
