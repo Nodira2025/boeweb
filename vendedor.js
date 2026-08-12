@@ -1330,6 +1330,10 @@ function openCashWithType(type) {
 let storeMapDataLoaded = false;
 let storeMapDataLoading = false;
 const LOCAL_PRODUCT_LOCATIONS_KEY = 'boeweb_product_locations_v1';
+const LEGACY_PRODUCT_DRAFT_FIELDS = [
+  'id', 'image_url', 'image_path', 'stock', 'location', 'observations',
+  'status', 'seller_name', 'created_at', 'updated_at'
+].join(',');
 
 function readLocalProductLocations() {
   try {
@@ -1377,13 +1381,15 @@ async function loadStoreMapData(forceReload = false) {
   if (!supabaseClient || storeMapDataLoading || (storeMapDataLoaded && !forceReload)) return;
   storeMapDataLoading = true;
   try {
-    const [shelvesResult, locationsResult, draftsResult] = await Promise.all([
+    const [shelvesResult, draftsResult] = await Promise.all([
       supabaseClient.from('store_shelves').select('*').order('code', { ascending: true }),
-      supabaseClient.from('product_locations').select('*').order('updated_at', { ascending: false }),
-      supabaseClient.from('product_drafts').select('*').eq('status', 'APPROVED').order('updated_at', { ascending: false })
+      supabaseClient
+        .from('product_drafts')
+        .select(LEGACY_PRODUCT_DRAFT_FIELDS)
+        .eq('status', 'APPROVED')
+        .order('updated_at', { ascending: false })
     ]);
     const localLocations = readLocalProductLocations();
-    const remoteLocations = locationsResult.error ? [] : (locationsResult.data || []);
     const draftLocations = draftsResult.error
       ? []
       : (draftsResult.data || []).map(mapLocatedDraftToProductLocation).filter(Boolean);
@@ -1393,11 +1399,7 @@ async function loadStoreMapData(forceReload = false) {
       const knownDetails = mergedByCode.get(item.product_code) || {};
       mergedByCode.set(item.product_code, { ...knownDetails, ...item });
     });
-    remoteLocations.forEach(item => {
-      const knownDetails = mergedByCode.get(item.product_code) || {};
-      mergedByCode.set(item.product_code, { ...knownDetails, ...item });
-    });
-    const syncLabel = draftsResult.error && locationsResult.error
+    const syncLabel = draftsResult.error
       ? 'Modo local · sin conexión al inventario'
       : 'Inventario sincronizado';
     if (window.setStoreMapData) {
@@ -2878,15 +2880,8 @@ function isReliableCatalogNameMatch(productName, requestedName) {
 async function findLocalStockProduct(barcode, query) {
   if (!supabaseClient) return null;
   if (barcode) {
-    const locationRows = await readStockLookupRows(
-      supabaseClient
-        .from('product_locations')
-        .select('*')
-        .eq('barcode', barcode)
-        .limit(1),
-      'Ubicaciones BÔ'
-    );
-    const location = locationRows[0];
+    const location = readLocalProductLocations()
+      .find(item => cleanStockBarcode(item.barcode) === barcode);
     if (location) {
       const product = await fetchCatalogProductById(location.product_id);
       return normalizeCatalogLookup(product, {
@@ -2899,14 +2894,15 @@ async function findLocalStockProduct(barcode, query) {
     const draftRows = await readStockLookupRows(
       supabaseClient
         .from('product_drafts')
-        .select('*')
-        .eq('barcode', barcode)
+        .select(LEGACY_PRODUCT_DRAFT_FIELDS)
         .eq('status', 'APPROVED')
         .order('updated_at', { ascending: false })
-        .limit(1),
+        .limit(250),
       'Productos aprobados de BÔ'
     );
-    const draft = draftRows[0] ? hydrateProductDraft(draftRows[0]) : null;
+    const draft = draftRows
+      .map(hydrateProductDraft)
+      .find(item => cleanStockBarcode(item.barcode) === barcode) || null;
     if (draft) return normalizeCatalogLookup(null, draft);
   }
 
@@ -3830,26 +3826,12 @@ async function uploadLocationAssistantPhoto(productCode) {
   return { url: data?.publicUrl || '', path: photoPath };
 }
 
-function getBaseProductLocation(location) {
-  const allowedFields = [
-    'product_id', 'product_code', 'name', 'image_url', 'barcode', 'floor_level',
-    'shelf_code', 'shelf_level', 'stock', 'qr_payload', 'updated_at'
-  ];
-  return Object.fromEntries(allowedFields.map(field => [field, location[field]]));
-}
-
 async function upsertProductLocationWithFallback(location) {
-  let { error } = await supabaseClient
-    .from('product_locations')
-    .upsert([location], { onConflict: 'product_code' });
-  if (error && /column|schema cache/i.test(error.message || '')) {
-    const fallbackResult = await supabaseClient
-      .from('product_locations')
-      .upsert([getBaseProductLocation(location)], { onConflict: 'product_code' });
-    error = fallbackResult.error;
-  }
+  // La instalación actual persiste la ubicación dentro del borrador aprobado.
+  // Conservamos además una copia local para que el mapa responda de inmediato,
+  // sin consultar la tabla opcional product_locations cuando todavía no existe.
   saveLocalProductLocation(location);
-  return error;
+  return null;
 }
 
 async function updateDraftLocationWithFallback(draft, updatePayload, legacyObservations) {

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import lookupProduct from '../netlify/functions/lookup-product.mjs';
 
 const originalFetch = globalThis.fetch;
@@ -61,4 +62,14 @@ test('acepta una ficha que coincide con el nombre y la presentación', async () 
   assert.equal(response.status, 200);
   assert.equal(result.found, true);
   assert.match(result.product.name, /BIO TRAP 30GR/i);
+});
+
+test('el vendedor no consulta tablas o columnas ausentes del esquema anterior', async () => {
+  const sellerSource = await readFile(new URL('../vendedor.js', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(sellerSource, /\.from\(['"]product_locations['"]\)/);
+  assert.doesNotMatch(
+    sellerSource,
+    /\.from\(['"]product_drafts['"]\)[\s\S]{0,180}\.eq\(['"]barcode['"]/
+  );
 });
