@@ -3,6 +3,7 @@ const UPCITEMDB_LOOKUP_URL = 'https://api.upcitemdb.com/prod/trial/lookup';
 const GOOGLE_CUSTOM_SEARCH_URL = 'https://customsearch.googleapis.com/customsearch/v1';
 const GOOGLE_SEARCH_WEB_URL = 'https://www.google.com/search';
 const YAHOO_SEARCH_WEB_URL = 'https://search.yahoo.com/search';
+const ASTRO_CATALOG_SEARCH_URL = 'https://www.astrogrow.com.ar/search/';
 const MERCADOLIBRE_SEARCH_URL = 'https://api.mercadolibre.com/sites/MLA/search';
 const REQUEST_WINDOW_MS = 60_000;
 const REQUEST_LIMIT_PER_WINDOW = 20;
@@ -171,6 +172,15 @@ function decodeHtmlEntities(value) {
     .replace(/&amp;/gi, '&')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&ndash;/gi, '–')
+    .replace(/&mdash;/gi, '—')
+    .replace(/&aacute;/gi, 'á')
+    .replace(/&eacute;/gi, 'é')
+    .replace(/&iacute;/gi, 'í')
+    .replace(/&oacute;/gi, 'ó')
+    .replace(/&uacute;/gi, 'ú')
+    .replace(/&ntilde;/gi, 'ñ')
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/&#(\d+);/g, (entity, code) => {
@@ -248,9 +258,9 @@ function normalizeLookupMatchText(value) {
 }
 
 function lookupMatchTokens(value) {
-  return normalizeLookupMatchText(value)
+  return [...new Set(normalizeLookupMatchText(value)
     .split(/\s+/)
-    .filter(token => token.length >= 2 && !SEARCH_MATCH_STOP_WORDS.has(token));
+    .filter(token => token.length >= 2 && !SEARCH_MATCH_STOP_WORDS.has(token)))];
 }
 
 function isLikelyStoreLandingPage(item) {
@@ -272,10 +282,26 @@ function isLikelyStoreLandingPage(item) {
 }
 
 function growshopLookupMatchScore(item, query, barcode) {
-  const searchableText = normalizeLookupMatchText([item.title, item.snippet, item.url].filter(Boolean).join(' '));
+  let urlForMatching = item.url;
+  try {
+    const parsedUrl = new URL(item.url);
+    urlForMatching = `${parsedUrl.hostname} ${parsedUrl.pathname}`;
+  } catch (error) {
+    urlForMatching = '';
+  }
+  // Los parámetros de una página de búsqueda repiten la consulta y no prueban
+  // que cada producto listado coincida con ella.
+  const searchableText = normalizeLookupMatchText(
+    [item.title, item.snippet, urlForMatching].filter(Boolean).join(' ')
+  );
   if (barcode) {
     const searchableDigits = searchableText.replace(/\D/g, '');
-    return searchableDigits.includes(barcode) ? 20 : Number.NEGATIVE_INFINITY;
+    if (searchableDigits.includes(barcode)) return 20;
+    // Algunos buscadores usan el EAN para hallar la ficha pero no repiten el
+    // número en el resultado. Aceptamos únicamente una ficha de producto con
+    // contexto growshop fuerte; nunca una portada genérica.
+    if (isLikelyStoreLandingPage(item)) return Number.NEGATIVE_INFINITY;
+    return growshopRelevanceScore(item) >= 6 ? 0 : Number.NEGATIVE_INFINITY;
   }
 
   const queryTokens = lookupMatchTokens(query);
@@ -310,6 +336,112 @@ function parseArgentinePrice(value) {
   const normalized = match[1].replace(/[.\s]/g, '').replace(',', '.');
   const price = Number(normalized);
   return Number.isFinite(price) && price >= 100 ? price : null;
+}
+
+function normalizeStructuredPrice(value) {
+  if (typeof value === 'number') return Number.isFinite(value) && value >= 100 ? value : null;
+  const text = cleanText(String(value || ''), 40).replace(/[^\d.,]/g, '');
+  if (!text) return null;
+  let normalized = text;
+  if (text.includes(',') && text.includes('.')) {
+    normalized = text.lastIndexOf(',') > text.lastIndexOf('.')
+      ? text.replace(/\./g, '').replace(',', '.')
+      : text.replace(/,/g, '');
+  } else if (text.includes(',')) {
+    normalized = text.replace(/\./g, '').replace(',', '.');
+  }
+  const price = Number(normalized);
+  return Number.isFinite(price) && price >= 100 ? price : null;
+}
+
+function structuredProductNodes(value, products = []) {
+  if (Array.isArray(value)) {
+    value.forEach(item => structuredProductNodes(item, products));
+    return products;
+  }
+  if (!value || typeof value !== 'object') return products;
+  const types = Array.isArray(value['@type']) ? value['@type'] : [value['@type']];
+  if (types.some(type => String(type || '').toLowerCase() === 'product')) products.push(value);
+  Object.values(value).forEach(item => structuredProductNodes(item, products));
+  return products;
+}
+
+function priceFromOffer(offer) {
+  if (Array.isArray(offer)) {
+    return offer.map(priceFromOffer).find(price => Number.isFinite(price)) || null;
+  }
+  if (!offer || typeof offer !== 'object') return null;
+  return normalizeStructuredPrice(
+    offer.price
+    ?? offer.lowPrice
+    ?? offer.highPrice
+    ?? offer.priceSpecification?.price
+  );
+}
+
+function productPageDataFromHtml(html) {
+  const scripts = [...String(html || '').matchAll(
+    /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+  )];
+  for (const script of scripts) {
+    try {
+      const payload = JSON.parse(decodeHtmlEntities(script[1]).trim());
+      const product = structuredProductNodes(payload)[0];
+      if (!product) continue;
+      const brandValue = typeof product.brand === 'object' ? product.brand?.name : product.brand;
+      const imageValue = Array.isArray(product.image) ? product.image[0] : product.image;
+      return {
+        name: cleanText(product.name || '', 180) || null,
+        brand: cleanText(brandValue || '', 100) || null,
+        description: stripHtml(product.description || '') || null,
+        image: cleanText(typeof imageValue === 'object' ? imageValue?.url || '' : imageValue || '', 500) || null,
+        price: priceFromOffer(product.offers),
+        barcode: normalizeBarcode(product.gtin13 || product.gtin || product.sku || product.upc || '') || null
+      };
+    } catch (error) {
+      // Algunas tiendas publican bloques JSON-LD incompletos; continuamos con el siguiente.
+    }
+  }
+  return null;
+}
+
+function isSafeArgentineProductUrl(value) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:') return false;
+    const hostname = url.hostname.replace(/^www\./, '').toLowerCase();
+    return hostname.endsWith('.com.ar') || hostname.endsWith('.ar');
+  } catch (error) {
+    return false;
+  }
+}
+
+async function enrichItemsFromPublicPages(items, limit = 5) {
+  return Promise.all(items.map(async (item, index) => {
+    if (index >= limit || item.price || !isSafeArgentineProductUrl(item.url)) return item;
+    try {
+      const response = await fetchWithTimeout(item.url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml',
+          'Accept-Language': 'es-AR,es;q=0.9'
+        }
+      });
+      if (!response.ok) return item;
+      const pageData = productPageDataFromHtml(await response.text());
+      if (!pageData) return item;
+      return {
+        ...item,
+        title: item.title || pageData.name,
+        snippet: item.snippet || pageData.description || '',
+        image: item.image || pageData.image,
+        price: pageData.price || item.price,
+        pageBarcode: pageData.barcode
+      };
+    } catch (error) {
+      return item;
+    }
+  }));
 }
 
 function normalizeUpcItem(item, barcode) {
@@ -358,8 +490,26 @@ function normalizeSearchTitle(value) {
   const title = stripHtml(value)
     .replace(/^comprar\s+/i, '')
     .replace(/\s+[|–—-]\s+[^|–—-]*(?:grow\s*shop|tienda online|mercado libre)[^|–—-]*$/i, '')
+    .replace(/\s+[|–—-]\s+[a-z0-9.-]+\.(?:com|net|org)(?:\.[a-z]{2})?\s*$/i, '')
     .trim();
   return cleanText(title, 180);
+}
+
+function buildMarketLookupQuery(product, fallback) {
+  if (!product) return cleanText(fallback || '', 160);
+  const simplifiedName = decodeHtmlEntities(product.name || '')
+    .replace(/\s+[|–—-]\s+[a-z0-9.-]+\.(?:com|net|org)(?:\.[a-z]{2})?\s*$/i, '')
+    .replace(/\b(?:comprar|online|fertilizante|fertilizer|flowering|booster|engorde|flora|floraci[oó]n)\b/gi, ' ')
+    .replace(/[()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const parts = [simplifiedName];
+  const normalizedName = normalizeLookupMatchText(simplifiedName);
+  if (product.brand && !normalizedName.includes(normalizeLookupMatchText(product.brand))) parts.push(product.brand);
+  if (product.presentation && !normalizedName.replace(/\s+/g, '').includes(
+    normalizeLookupMatchText(product.presentation).replace(/\s+/g, '')
+  )) parts.push(product.presentation);
+  return cleanText(parts.filter(Boolean).join(' '), 160) || cleanText(fallback || '', 160);
 }
 
 function normalizeGrowshopSearchItem(item) {
@@ -490,7 +640,7 @@ function resultUrlFromDuckDuckGo(value) {
 }
 
 async function searchGrowshopWeb(value, barcode) {
-  const query = buildGrowshopQuery(value);
+  const query = barcode ? barcode : buildGrowshopQuery(value);
   const response = await fetchWithTimeout(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
     method: 'GET',
     headers: {
@@ -554,9 +704,11 @@ function parseYahooWebItems(html) {
   }).filter(Boolean);
 }
 
-async function searchYahooBarcode(value, barcode) {
-  if (!barcode) return null;
-  const query = cleanText(`${value || barcode} Argentina`, 170);
+async function searchYahooGrowshops(value, barcode = '') {
+  if (!value && !barcode) return null;
+  const query = barcode
+    ? cleanText(`${value || barcode} Argentina`, 170)
+    : buildGrowshopQuery(value);
   const url = new URL(YAHOO_SEARCH_WEB_URL);
   url.searchParams.set('p', query);
   const response = await fetchWithTimeout(url, {
@@ -568,12 +720,63 @@ async function searchYahooBarcode(value, barcode) {
   });
   if (!response.ok) return null;
   const html = await response.text();
+  const parsedItems = parseYahooWebItems(html);
+  const items = barcode ? parsedItems : await enrichItemsFromPublicPages(parsedItems);
   return growshopResultFromItems(
-    parseYahooWebItems(html),
-    query,
+    items,
+    value || barcode,
     url.toString(),
     barcode,
-    'Búsqueda web por código'
+    barcode ? 'Búsqueda web por código' : 'Precios públicos de growshops'
+  );
+}
+
+function parseAstroCatalogItems(html, searchUrl) {
+  const match = String(html || '').match(/const\s+googleItems\s*=\s*(\[[\s\S]*?\]);/i);
+  if (!match) return [];
+  try {
+    const products = JSON.parse(match[1]);
+    return products.map(product => ({
+      title: cleanText(product?.info?.item_name || '', 180),
+      snippet: cleanText([
+        product?.info?.item_brand,
+        product?.info?.item_category4,
+        product?.info?.item_category3,
+        product?.info?.item_category2,
+        product?.info?.item_category
+      ].filter(Boolean).join(' '), 500),
+      url: searchUrl,
+      image: null,
+      price: normalizeStructuredPrice(product?.info?.price),
+      score: 0
+    })).filter(item => item.title);
+  } catch (error) {
+    return [];
+  }
+}
+
+async function searchAstroCatalog(value) {
+  if (!value) return null;
+  const url = new URL(ASTRO_CATALOG_SEARCH_URL);
+  const catalogQuery = cleanText(
+    String(value).replace(/(\d)(ml|cc|l|lts?|g|grs?|kg|w|cm|mm)\b/gi, '$1 $2'),
+    160
+  );
+  url.searchParams.set('q', catalogQuery);
+  const response = await fetchWithTimeout(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml',
+      'Accept-Language': 'es-AR,es;q=0.9'
+    }
+  });
+  if (!response.ok) return null;
+  return growshopResultFromItems(
+    parseAstroCatalogItems(await response.text(), url.toString()),
+    value,
+    url.toString(),
+    '',
+    'Catálogo público Astro Grow'
   );
 }
 
@@ -591,6 +794,34 @@ function calculateMarketStats(items) {
   });
   const average = comparableItems.reduce((sum, item) => sum + Number(item.price), 0) / comparableItems.length;
   return { average, median, comparableItems };
+}
+
+function mergePublicMarkets(markets, query) {
+  const seen = new Set();
+  const results = markets
+    .filter(Boolean)
+    .flatMap(market => market.results || [])
+    .filter(item => {
+      const key = `${item.permalink || ''}|${item.title || ''}|${item.price || ''}`;
+      if (!Number.isFinite(Number(item.price)) || Number(item.price) <= 0 || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  const stats = calculateMarketStats(results);
+  if (!stats.comparableItems.length) return null;
+  const providers = [...new Set(stats.comparableItems.map(item => item.source).filter(Boolean))];
+  return {
+    provider: providers.includes('Catálogo público Astro Grow')
+      ? 'Astro Grow + mercado argentino'
+      : providers.join(' + ') || 'Precios públicos argentinos',
+    query,
+    search_url: markets.find(market => market?.search_url)?.search_url || null,
+    currency: 'ARS',
+    average_price: Math.round(stats.average),
+    median_price: Math.round(stats.median),
+    sample_size: stats.comparableItems.length,
+    results: stats.comparableItems.slice(0, 8)
+  };
 }
 
 async function searchMercadoLibre(query) {
@@ -639,6 +870,20 @@ function productFromMarket(market, barcode) {
   };
 }
 
+function mergePreferredProduct(preferred, fallback, barcode) {
+  if (!preferred && !fallback) return null;
+  const fields = [
+    'name', 'brand', 'presentation', 'category', 'description',
+    'official_url', 'market_query', 'image_url'
+  ];
+  const product = {};
+  fields.forEach(field => {
+    product[field] = preferred?.[field] || fallback?.[field] || null;
+  });
+  product.barcode = barcode || preferred?.barcode || fallback?.barcode || null;
+  return product;
+}
+
 async function searchValidatedGenericBarcode(barcode) {
   if (!barcode) return null;
   for (const searchProvider of [searchOpenProducts, searchUpcItemDb]) {
@@ -684,7 +929,7 @@ export default async function handler(request, context) {
     const lookupValue = query || barcode;
     const [googleAttempt, yahooAttempt, webAttempt, genericAttempt] = await Promise.allSettled([
       searchGoogleArgentinaGrowshops(lookupValue, barcode),
-      searchYahooBarcode(lookupValue, barcode),
+      searchYahooGrowshops(lookupValue, barcode),
       searchGrowshopWeb(lookupValue, barcode),
       searchValidatedGenericBarcode(barcode)
     ]);
@@ -707,24 +952,38 @@ export default async function handler(request, context) {
       || (webAttempt.status === 'fulfilled' ? webAttempt.value : null)
       || (genericAttempt.status === 'fulfilled' ? genericAttempt.value : null);
 
-    const primaryMarketQuery = productResult?.product?.market_query || productResult?.product?.name || query || barcode;
-    let market = productResult?.market || null;
-    try {
-      if (!market) market = await searchMercadoLibre(primaryMarketQuery);
-      if (!market && productResult?.product?.name && productResult.product.name !== primaryMarketQuery) {
-        market = await searchMercadoLibre(productResult.product.name);
-      }
-    } catch (error) {
-      warnings.push('Mercado Libre no respondió; el precio puede completarse manualmente.');
-      console.warn('Falló la consulta de Mercado Libre:', error.message);
+    const primaryMarketQuery = buildMarketLookupQuery(productResult?.product, query || barcode);
+    const [astroAttempt, publicPricesAttempt, mercadoLibreAttempt] = await Promise.allSettled([
+      searchAstroCatalog(primaryMarketQuery),
+      searchYahooGrowshops(primaryMarketQuery),
+      searchMercadoLibre(primaryMarketQuery)
+    ]);
+    const astroResult = astroAttempt.status === 'fulfilled' ? astroAttempt.value : null;
+    const publicPricesResult = publicPricesAttempt.status === 'fulfilled' ? publicPricesAttempt.value : null;
+    const mercadoLibreMarket = mercadoLibreAttempt.status === 'fulfilled' ? mercadoLibreAttempt.value : null;
+    let market = mergePublicMarkets([
+      astroResult?.market,
+      publicPricesResult?.market,
+      productResult?.market,
+      mercadoLibreMarket
+    ], primaryMarketQuery);
+    if (!market) market = productResult?.market || mercadoLibreMarket || null;
+    if (mercadoLibreAttempt.status === 'rejected') {
+      console.warn('Falló la consulta de Mercado Libre:', mercadoLibreAttempt.reason?.message);
     }
     if (!market) warnings.push('El precio de venta debe confirmarlo el vendedor.');
 
-    const product = productResult?.product || productFromMarket(market, barcode);
+    const product = mergePreferredProduct(
+      astroResult?.product,
+      productResult?.product || productFromMarket(market, barcode),
+      barcode
+    );
     const sources = [
       { label: 'Ver búsqueda en Google Argentina', url: googleSearch?.searchUrl },
       ...(productResult?.sources || []),
-      ...(productResult?.source ? [productResult.source] : [])
+      ...(productResult?.source ? [productResult.source] : []),
+      ...(astroResult?.sources || []),
+      ...(publicPricesResult?.sources || [])
     ];
     (market?.results || []).slice(0, 3).forEach(item => {
       sources.push({ label: `Referencia en ${item.source || market.provider || 'internet'}`, url: item.permalink });

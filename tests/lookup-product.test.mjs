@@ -20,11 +20,12 @@ function lookupRequest(body) {
   };
 }
 
-function installFetchMock(searchHtml, yahooHtml = '') {
+function installFetchMock(searchHtml, yahooHtml = '', astroHtml = '') {
   globalThis.fetch = async url => {
     const href = String(url);
     if (href.includes('customsearch.googleapis.com')) return jsonResponse({}, 403);
     if (href.includes('search.yahoo.com/search')) return new Response(yahooHtml, { status: 200 });
+    if (href.includes('astrogrow.com.ar/search/')) return new Response(astroHtml, { status: 200 });
     if (href.includes('html.duckduckgo.com')) return new Response(searchHtml, { status: 200 });
     if (href.includes('api.mercadolibre.com')) return jsonResponse({ results: [] });
     if (href.includes('world.openfoodfacts.org')) return jsonResponse({}, 404);
@@ -85,6 +86,34 @@ test('autocompleta un código encontrado en una ficha de producto argentina', as
   assert.equal(result.product.brand, 'Garden HighPro');
   assert.equal(result.product.presentation, '68 Kg');
   assert.equal(result.market.average_price, 15638);
+});
+
+test('usa el precio público de Astro para Top Bud y descarta combos parecidos', async () => {
+  installFetchMock('', `
+    <li><div class="dd algo algo-sr">
+      <a href="https://monkeygrowshop.com.ar/producto/top-crop-bud-100ml/">
+        <h3><span>TOP CROP BUD 100ml &ndash; Monkey Grow Shop</span></h3>
+      </a>
+      <div class="compText"><p>SKU: 8414606516469 · Categoría: Fertilizantes · Marca: Top Crop</p></div>
+    </div></li>
+  `, `
+    <script>
+      const googleItems = [
+        {"info":{"item_brand":"TOP CROP","item_name":"Fertilizante Top Crop Top Bud - 100 Ml","price":22010,"item_category":"Cultivo"}},
+        {"info":{"item_brand":"TOP CROP","item_name":"Tripack Auto Top Crop","price":47440,"item_category":"Cultivo"}}
+      ];
+    </script>
+  `);
+
+  const response = await lookupProduct(lookupRequest({ barcode: '8414606516469' }), { ip: 'test-top-bud-price' });
+  const result = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(result.found, true);
+  assert.match(result.product.name, /Top Crop Top Bud/i);
+  assert.equal(result.market.average_price, 22010);
+  assert.equal(result.market.sample_size, 1);
+  assert.match(result.market.provider, /Astro Grow/i);
 });
 
 test('el vendedor no consulta tablas o columnas ausentes del esquema anterior', async () => {
