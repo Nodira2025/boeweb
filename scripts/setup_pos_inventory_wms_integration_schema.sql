@@ -489,5 +489,105 @@ $$;
 GRANT EXECUTE ON FUNCTION public.rpc_log_admin_activity_saas TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rpc_manage_tenant_user_saas TO authenticated;
 
+-- ============================================================================
+-- 10. CENTRO DE SALUD OPERATIVO Y MOTOR DE ALERTAS (FASE 13)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.operational_alerts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  alert_type VARCHAR(100) NOT NULL,
+  category VARCHAR(50) NOT NULL CHECK (category IN ('INVENTORY', 'CASH', 'RESERVATIONS', 'WMS_AUDIT', 'MIGRATION', 'INTEGRITY', 'B2B')),
+  severity VARCHAR(20) NOT NULL CHECK (severity IN ('INFO', 'WARNING', 'CRITICAL')),
+  status VARCHAR(20) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'ACKNOWLEDGED', 'RESOLVED', 'SNOOZED')),
+  title VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  source_entity_type VARCHAR(100),
+  source_entity_id VARCHAR(255),
+  fingerprint VARCHAR(255) NOT NULL,
+  context JSONB DEFAULT '{}'::jsonb,
+  first_detected_at TIMESTAMPTZ DEFAULT NOW(),
+  last_detected_at TIMESTAMPTZ DEFAULT NOW(),
+  occurrence_count INT NOT NULL DEFAULT 1,
+  assigned_user_id VARCHAR(255),
+  acknowledged_by VARCHAR(255),
+  acknowledged_at TIMESTAMPTZ,
+  resolved_by VARCHAR(255),
+  resolved_at TIMESTAMPTZ,
+  resolution_type VARCHAR(50),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.operational_alert_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  alert_id UUID NOT NULL REFERENCES public.operational_alerts(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  event_type VARCHAR(50) NOT NULL CHECK (event_type IN ('CREATED', 'DETECTED_AGAIN', 'ACKNOWLEDGED', 'ASSIGNED', 'SNOOZED', 'REOPENED', 'AUTO_RESOLVED', 'MANUALLY_RESOLVED')),
+  actor_user_id VARCHAR(255),
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.alert_rules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  rule_type VARCHAR(100) NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  severity VARCHAR(20) NOT NULL DEFAULT 'WARNING',
+  thresholds JSONB DEFAULT '{}'::jsonb,
+  cooldown INT NOT NULL DEFAULT 300,
+  settings JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.health_check_runs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  status VARCHAR(20) NOT NULL CHECK (status IN ('HEALTHY', 'ATTENTION', 'CRITICAL', 'CHECK_FAILED')),
+  started_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  checks_executed INT NOT NULL DEFAULT 0,
+  alerts_opened INT NOT NULL DEFAULT 0,
+  alerts_updated INT NOT NULL DEFAULT 0,
+  alerts_resolved INT NOT NULL DEFAULT 0,
+  errors JSONB DEFAULT '[]'::jsonb
+);
+
+ALTER TABLE public.operational_alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.operational_alert_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.alert_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.health_check_runs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "RLS operational_alerts_isolation" ON public.operational_alerts;
+DROP POLICY IF EXISTS "RLS operational_alert_events_isolation" ON public.operational_alert_events;
+DROP POLICY IF EXISTS "RLS alert_rules_isolation" ON public.alert_rules;
+DROP POLICY IF EXISTS "RLS health_check_runs_isolation" ON public.health_check_runs;
+
+CREATE POLICY "RLS operational_alerts_isolation" ON public.operational_alerts FOR ALL USING (
+  public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
+);
+
+CREATE POLICY "RLS operational_alert_events_isolation" ON public.operational_alert_events FOR SELECT USING (
+  public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
+);
+
+CREATE POLICY "RLS alert_rules_isolation" ON public.alert_rules FOR ALL USING (
+  public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
+);
+
+CREATE POLICY "RLS health_check_runs_isolation" ON public.health_check_runs FOR ALL USING (
+  public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
+);
+
+-- Denegar UPDATE y DELETE en operational_alert_events (bitácora inmutable append-only)
+REVOKE UPDATE, DELETE ON public.operational_alert_events FROM anon, authenticated;
+
+GRANT SELECT, INSERT, UPDATE ON public.operational_alerts TO authenticated;
+GRANT SELECT, INSERT ON public.operational_alert_events TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.alert_rules TO authenticated;
+GRANT SELECT, INSERT ON public.health_check_runs TO authenticated;
+
+
 
 
