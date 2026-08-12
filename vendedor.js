@@ -1151,6 +1151,8 @@ function switchVendorTab(tab) {
   if (wmsSection) wmsSection.style.display = 'none';
   const tenantProfileSection = document.getElementById('vendor-tenant-profile-section');
   if (tenantProfileSection) tenantProfileSection.style.display = 'none';
+  const migrationSection = document.getElementById('vendor-migration-center-section');
+  if (migrationSection) migrationSection.style.display = 'none';
 
   let targetSection = null;
 
@@ -1265,6 +1267,12 @@ function switchVendorTab(tab) {
     }
     const curVert = document.getElementById('tenant-input-vertical')?.value || 'growshop';
     handleTenantVerticalChange(curVert);
+  } else if (tab === 'migration-center') {
+    if (migrationSection) {
+      migrationSection.style.display = 'block';
+      targetSection = migrationSection;
+    }
+    startNewMigrationWizard();
   }
 
   const activeSidebarTab = tab === 'reposicion' ? 'catalog' : tab;
@@ -5682,6 +5690,215 @@ window.handleTenantVerticalChange = handleTenantVerticalChange;
 window.handleTenantProfileDraftPreview = handleTenantProfileDraftPreview;
 window.handleTenantLogoFileSelect = handleTenantLogoFileSelect;
 window.handleTenantProfileSubmit = handleTenantProfileSubmit;
+
+/* ==========================================================================
+   BÔ GROW CLUB / PLATAFORMA SAAS — FASE 9 UI INTEGRATION (MIGRATION WIZARD)
+   ========================================================================== */
+
+function startNewMigrationWizard() {
+  if (typeof MigrationCenter === 'undefined') return;
+  const ctx = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : { tenantId: '11111111-1111-1111-1111-111111111111', userName: 'Profesor Franco' };
+  MigrationCenter.initWizard(ctx.tenantId, ctx.userName);
+  renderMigrationWizardStep(1);
+}
+
+function selectMigrationType(type) {
+  if (typeof MigrationCenter === 'undefined' || !MigrationCenter.activeJob) return;
+  MigrationCenter.activeJob.type = type;
+  showToast(`📁 Tipo de migración seleccionado: ${type}`);
+  navigateWizardStep(1);
+}
+
+function renderMigrationWizardStep(step) {
+  if (typeof MigrationCenter === 'undefined') return;
+  MigrationCenter.currentStep = step;
+
+  const badgeEl = document.getElementById('wizard-step-badge');
+  const titleEl = document.getElementById('wizard-step-title');
+  const bodyEl = document.getElementById('wizard-step-body');
+  const prevBtn = document.getElementById('wizard-btn-prev');
+
+  if (badgeEl) badgeEl.textContent = `PASO ${step} DE 8`;
+  if (prevBtn) prevBtn.style.display = step > 1 ? 'inline-block' : 'none';
+
+  if (!bodyEl) return;
+
+  if (step === 1) {
+    if (titleEl) titleEl.textContent = 'Selección del Tipo de Migración';
+    bodyEl.innerHTML = `
+      <p style="font-size: 0.9rem; color: var(--vendor-muted); margin-bottom: 16px;">Seleccioná qué tipo de información querés importar a tu empresa:</p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div style="border: 2px solid var(--vendor-gold); border-radius: 14px; padding: 18px; cursor: pointer; background: #faf8f2;" onclick="selectMigrationType('CATALOG_INTERNAL')">
+          <div style="font-size: 1.8rem; margin-bottom: 8px;">📦</div>
+          <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">Catálogo Interno de Productos</h4>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Alta masiva de SKUs, precios públicos, marcas, presentaciones y descripciones.</p>
+        </div>
+        <div style="border: 1px solid var(--vendor-line); border-radius: 14px; padding: 18px; cursor: pointer;" onclick="selectMigrationType('CATALOG_B2B')">
+          <div style="font-size: 1.8rem; margin-bottom: 8px;">🏢</div>
+          <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">Catálogo Proveedor B2B</h4>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Listas de costo, productos aislados por supplier_id sin mezclar proveedores.</p>
+        </div>
+      </div>
+    `;
+  } else if (step === 2) {
+    if (titleEl) titleEl.textContent = 'Carga de Archivos de Origen (Sources)';
+    bodyEl.innerHTML = `
+      <p style="font-size: 0.9rem; color: var(--vendor-muted); margin-bottom: 16px;">Arrastrá o seleccioná tu archivo de origen (CSV, XLSX, JSON, PDF o Imagen):</p>
+      <div style="border: 2px dashed var(--vendor-gold); border-radius: 16px; padding: 32px; text-align: center; background: #faf8f2;">
+        <div style="font-size: 2.5rem; margin-bottom: 8px;">📄</div>
+        <h4 style="margin: 0 0 8px 0; color: var(--vendor-forest);">Subir archivo de catálogo</h4>
+        <p style="font-size: 0.82rem; color: var(--vendor-muted); margin-bottom: 16px;">Soporta .csv, .xlsx, .json, .pdf, .png, .jpg (Máx 5MB). Inmunizado contra macros de Excel o scripts PDF.</p>
+        <input type="file" id="migration-file-input" accept=".csv,.json,.xlsx,.pdf,image/*" onchange="handleMigrationSourceFile(event)" style="display: none;">
+        <button type="button" class="wms-btn wms-btn-primary" onclick="document.getElementById('migration-file-input').click()">
+          📁 Seleccionar Archivo desde la PC
+        </button>
+      </div>
+    `;
+  } else if (step === 3 || step === 4) {
+    if (titleEl) titleEl.textContent = 'Análisis & Mapeo de Columnas con IA';
+    const mappings = MigrationCenter.columnMappings || [];
+    const rowsHtml = mappings.map((m, i) => `
+      <tr>
+        <td style="padding: 8px; font-weight: 700; color: var(--vendor-forest);">${m.source_column}</td>
+        <td style="padding: 8px;">➔</td>
+        <td style="padding: 8px;">
+          <select class="b2b-search-input" style="width: 100%;">
+            <option value="${m.target_column}" selected>${m.target_column.toUpperCase()}</option>
+            <option value="name">NAME (Nombre Producto)</option>
+            <option value="brand">BRAND (Marca)</option>
+            <option value="price">PRICE (Precio)</option>
+            <option value="stock">STOCK (Stock)</option>
+          </select>
+        </td>
+      </tr>
+    `).join('');
+
+    bodyEl.innerHTML = `
+      <p style="font-size: 0.9rem; color: var(--vendor-muted); margin-bottom: 12px;">La IA detectó las siguientes columnas en tu archivo y sugiere su mapeo al esquema de ${MigrationCenter.activeJob.vertical_code.toUpperCase()}:</p>
+      <table class="wms-table" style="width: 100%;">
+        <thead><tr style="background: rgba(21,45,36,0.06);"><th>Columna Archivo Origen</th><th>Mapeo</th><th>Atributo Destino</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    `;
+  } else if (step === 5 || step === 6) {
+    if (titleEl) titleEl.textContent = 'Staging, Validación & Detección de Duplicados';
+    const stagedRes = MigrationCenter.processStagingValidation(typeof currentProducts !== 'undefined' ? currentProducts : []);
+    const stagedRows = stagedRes.stagedRows || [];
+
+    const rowsHtml = stagedRows.slice(0, 5).map(r => `
+      <tr>
+        <td style="padding: 8px;">${r.row_number}</td>
+        <td style="padding: 8px; font-weight: 700;">${r.normalized_data.name || r.normalized_data.product_code || 'Item'}</td>
+        <td style="padding: 8px;">$${r.normalized_data.price || 0}</td>
+        <td style="padding: 8px;"><span class="wms-level-badge" style="background: ${r.confidence >= 0.85 ? '#e8f5e9' : '#fff3e0'}; color: ${r.confidence >= 0.85 ? '#2e7d32' : '#e65100'};">${(r.confidence * 100).toFixed(0)}% Confianza</span></td>
+        <td style="padding: 8px;"><span class="wms-level-badge" style="background: ${r.action === 'UPDATE' ? '#e1f5fe' : '#e8f5e9'}; color: ${r.action === 'UPDATE' ? '#0288d1' : '#2e7d32'};">${r.action}</span></td>
+      </tr>
+    `).join('');
+
+    bodyEl.innerHTML = `
+      <div style="display: flex; gap: 14px; margin-bottom: 16px;">
+        <div style="background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 10px; padding: 12px; flex: 1;">
+          <small style="color: #2e7d32; font-weight: 700;">Filas Válidas</small>
+          <div style="font-size: 1.4rem; font-weight: 800; color: #2e7d32;">${stagedRes.valid}</div>
+        </div>
+        <div style="background: #fff3e0; border: 1px solid #ffe0b2; border-radius: 10px; padding: 12px; flex: 1;">
+          <small style="color: #e65100; font-weight: 700;">Duplicados / Advertencias</small>
+          <div style="font-size: 1.4rem; font-weight: 800; color: #e65100;">${stagedRes.warning}</div>
+        </div>
+      </div>
+      <table class="wms-table" style="width: 100%;">
+        <thead><tr style="background: rgba(21,45,36,0.06);"><th>Fila</th><th>Producto</th><th>Precio</th><th>Confianza IA</th><th>Acción Registrada</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    `;
+  } else if (step === 7) {
+    if (titleEl) titleEl.textContent = '🔒 Puerta de Aprobación Humana (Human Approval Gatekeeper)';
+    bodyEl.innerHTML = `
+      <div style="background: #fff8e1; border: 2px solid #ffa000; border-radius: 14px; padding: 20px; text-align: center;">
+        <div style="font-size: 2.2rem; margin-bottom: 8px;">🛡️</div>
+        <h4 style="margin: 0 0 8px 0; color: #b78103;">Revisión de Seguridad Final Obligatoria</h4>
+        <p style="font-size: 0.88rem; color: #5d4037; margin-bottom: 16px;">
+          Estás por autorizar la importación de <strong>${MigrationCenter.stagedRows.length} filas</strong> en el catálogo de producción de tu empresa. La operación registrará un Snapshot antes de modificar la base de datos para permitir Rollback Atómico en cualquier momento.
+        </p>
+        <button type="button" class="wms-btn wms-btn-primary" style="padding: 12px 24px; font-size: 1rem;" onclick="executeMigrationImportApproved()">
+          ⚡ APROBAR E IMPORTAR DENTRO DE PRODUCCIÓN
+        </button>
+      </div>
+    `;
+  } else if (step === 8) {
+    if (titleEl) titleEl.textContent = '🎉 Importación Ejecutada con Éxito';
+    bodyEl.innerHTML = `
+      <div style="background: #e8f5e9; border: 2px solid #4caf50; border-radius: 14px; padding: 20px; text-align: center;">
+        <div style="font-size: 2.5rem; margin-bottom: 8px;">✅</div>
+        <h4 style="margin: 0 0 8px 0; color: #2e7d32;">Migración Completada</h4>
+        <p style="font-size: 0.88rem; color: #1b5e20; margin-bottom: 16px;">
+          Se importaron correctamente los datos en producción. Se creó la versión <strong>${MigrationCenter.activeJob.version_id || 'ver-01'}</strong>.
+        </p>
+        <button type="button" class="wms-btn" style="padding: 8px 16px;" onclick="triggerDemoRollback('${MigrationCenter.activeJob.version_id}')">
+          ↩️ Ejecutar Rollback Atómico si fue un error
+        </button>
+      </div>
+    `;
+  }
+}
+
+function navigateWizardStep(delta) {
+  if (typeof MigrationCenter === 'undefined') return;
+  const nextStep = Math.min(Math.max(1, MigrationCenter.currentStep + delta), 8);
+  renderMigrationWizardStep(nextStep);
+}
+
+function handleMigrationSourceFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const res = MigrationCenter.loadSourceContent(e.target.result, 'FILE_CSV', file.name);
+    showToast(`📄 Archivo cargado: ${file.name} (${res.totalRows} filas detectadas)`);
+    navigateWizardStep(1);
+  };
+  reader.readAsText(file);
+}
+
+function demoSampleCsvImport() {
+  const sampleCsv = `COD_ART,DESCRIPCION,MARCA,PVP,CANT\nFER-01,Taladro Bosch GSB 13 RE 750W,Bosch,150.00,30\nFER-02,Amoladora Angular Bosch GWS 7-115,Bosch,85.00,25\nFER-03,Rotomartillo Bosch GBH 2-20 D,Bosch,210.00,20`;
+  const res = MigrationCenter.loadSourceContent(sampleCsv, 'FILE_CSV', 'ferreteria_sample.csv');
+  showToast(`🧪 Carga demo completada: ${res.totalRows} filas de ferretería en Staging`);
+  navigateWizardStep(1);
+}
+
+function executeMigrationImportApproved() {
+  const catalog = typeof currentProducts !== 'undefined' ? currentProducts : [];
+  const res = MigrationCenter.approveAndExecuteImport(catalog);
+  if (res.success) {
+    showToast(`⚡ Importación ejecutada en producción: ${res.createdCount} creados, ${res.updatedCount} actualizados!`);
+    navigateWizardStep(1);
+  } else {
+    showToast(`🚨 Error al importar: ${res.error}`);
+  }
+}
+
+function triggerDemoRollback(versionId) {
+  const catalog = typeof currentProducts !== 'undefined' ? currentProducts : [];
+  const ctx = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : { tenantId: '11111111-1111-1111-1111-111111111111' };
+  const res = MigrationRollback.executeRollback(versionId, ctx.tenantId, catalog);
+
+  if (res.success) {
+    showToast(`↩️ Rollback ejecutado correctamente para la versión ${versionId}`);
+  } else {
+    showToast(`ℹ️ ${res.error}`);
+  }
+}
+
+window.startNewMigrationWizard = startNewMigrationWizard;
+window.selectMigrationType = selectMigrationType;
+window.navigateWizardStep = navigateWizardStep;
+window.handleMigrationSourceFile = handleMigrationSourceFile;
+window.demoSampleCsvImport = demoSampleCsvImport;
+window.executeMigrationImportApproved = executeMigrationImportApproved;
+window.triggerDemoRollback = triggerDemoRollback;
+
 
 
 

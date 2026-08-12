@@ -1140,6 +1140,9 @@
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="tenant-profile" onclick="switchVendorTab('tenant-profile')">
           <span class="vendor-side-nav-icon" aria-hidden="true">🎨</span><span>Perfil & Marca</span>
         </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="migration-center" onclick="switchVendorTab('migration-center')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">📥</span><span>Migration Center IA</span>
+        </button>
         <a href="tv.html" class="vendor-sidebar-tool-link" target="_blank" rel="noopener">TV</a>
         <a href="coffee.html" class="vendor-sidebar-tool-link" target="_blank" rel="noopener">Coffee</a>
       </div>
@@ -1975,6 +1978,138 @@
       </div>
     </section>
 
+    <!-- SECTION: AI MIGRATION CENTER (FASE 9) -->
+    <section id="vendor-migration-center-section" class="vendor-workspace-section" style="display: none;" aria-labelledby="migration-section-title">
+      <div class="wms-hero-banner">
+        <div class="wms-hero-title">
+          <span class="wms-sync-badge">🤖 AI Migration Center & Onboarding Multi-Tenant (Fase 9)</span>
+          <h2 id="migration-section-title">🤖 AI Migration Center — Onboarding & Migración de Catálogos</h2>
+          <p>Importá catálogos de proveedores, listas de precios, inventario inicial o archivos externos (Excel, CSV, PDF, Imágenes, JSON) mediante extracción inteligente con IA, área de Staging protegida y aprobación humana obligatoria.</p>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button type="button" class="wms-btn wms-btn-primary" onclick="startNewMigrationWizard()">
+            ➕ Nueva Migración con IA
+          </button>
+          <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
+        </div>
+      </div>
+
+      <!-- Migration Jobs Dashboard Grid -->
+      <div class="wms-dashboard-grid" style="margin-top: 20px;">
+        <div class="wms-action-card">
+          <div class="wms-action-card-icon">📂</div>
+          <div>
+            <h3 style="margin: 0; font-size: 1rem;">Migraciones Ejecutadas</h3>
+            <p style="margin: 4px 0 0 0; font-size: 1.4rem; font-weight: 800; color: var(--vendor-forest);" id="migration-stat-total-jobs">2</p>
+          </div>
+        </div>
+        <div class="wms-action-card">
+          <div class="wms-action-card-icon">📊</div>
+          <div>
+            <h3 style="margin: 0; font-size: 1rem;">Filas Importadas</h3>
+            <p style="margin: 4px 0 0 0; font-size: 1.4rem; font-weight: 800; color: var(--vendor-forest);" id="migration-stat-total-rows">1.284</p>
+          </div>
+        </div>
+        <div class="wms-action-card">
+          <div class="wms-action-card-icon">⚡</div>
+          <div>
+            <h3 style="margin: 0; font-size: 1rem;">Confianza Promedio IA</h3>
+            <p style="margin: 4px 0 0 0; font-size: 1.4rem; font-weight: 800; color: #2e7d32;" id="migration-stat-avg-confidence">97.8%</p>
+          </div>
+        </div>
+        <div class="wms-action-card">
+          <div class="wms-action-card-icon">↩️</div>
+          <div>
+            <h3 style="margin: 0; font-size: 1rem;">Rollbacks Disponibles</h3>
+            <p style="margin: 4px 0 0 0; font-size: 1.4rem; font-weight: 800; color: #7b1fa2;" id="migration-stat-rollbacks">2</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Migration Wizard Interactive Container -->
+      <div id="migration-wizard-shell" style="background: #fff; border: 1px solid var(--vendor-line); border-radius: 16px; padding: 24px; margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--vendor-line); padding-bottom: 16px; margin-bottom: 20px;">
+          <div>
+            <span class="wms-level-badge" id="wizard-step-badge">PASO 1 DE 8</span>
+            <h3 id="wizard-step-title" style="margin: 6px 0 0 0; color: var(--vendor-forest); font-family: var(--font-display); font-size: 1.3rem;">Selección del Tipo de Migración</h3>
+          </div>
+          <small style="color: var(--vendor-muted); font-weight: 700;">🔒 Staging Protegido: La IA NUNCA escribe en producción directamente.</small>
+        </div>
+
+        <!-- Wizard Step Content Box -->
+        <div id="wizard-step-body">
+          <!-- Step 1: Type Selection -->
+          <div id="wizard-step-1-content">
+            <p style="font-size: 0.9rem; color: var(--vendor-muted); margin-bottom: 16px;">Seleccioná qué tipo de información querés importar a tu empresa:</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div style="border: 2px solid var(--vendor-gold); border-radius: 14px; padding: 18px; cursor: pointer; background: #faf8f2;" onclick="selectMigrationType('CATALOG_INTERNAL')">
+                <div style="font-size: 1.8rem; margin-bottom: 8px;">📦</div>
+                <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">Catálogo Interno de Productos</h4>
+                <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Alta masiva de SKUs, precios públicos, marcas, presentaciones y descripciones.</p>
+              </div>
+              <div style="border: 1px solid var(--vendor-line); border-radius: 14px; padding: 18px; cursor: pointer;" onclick="selectMigrationType('CATALOG_B2B')">
+                <div style="font-size: 1.8rem; margin-bottom: 8px;">🏢</div>
+                <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">Catálogo Proveedor B2B</h4>
+                <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Listas de costo, productos aislados por supplier_id sin mezclar proveedores.</p>
+              </div>
+              <div style="border: 1px solid var(--vendor-line); border-radius: 14px; padding: 18px; cursor: pointer;" onclick="selectMigrationType('INITIAL_STOCK')">
+                <div style="font-size: 1.8rem; margin-bottom: 8px;">📋</div>
+                <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">Inventario Inicial & WMS</h4>
+                <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Carga inicial de stock por módulos de estantería o ubicaciones físicas.</p>
+              </div>
+              <div style="border: 1px solid var(--vendor-line); border-radius: 14px; padding: 18px; cursor: pointer;" onclick="selectMigrationType('PRICE_LIST')">
+                <div style="font-size: 1.8rem; margin-bottom: 8px;">💲</div>
+                <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">Lista de Precios & Actualizaciones</h4>
+                <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Actualización masiva de precios por porcentaje o archivo de proveedor.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Wizard Footer Controls -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--vendor-line); pt: 16px; margin-top: 24px;">
+          <button type="button" class="wms-btn" id="wizard-btn-prev" onclick="navigateWizardStep(-1)" style="display: none;">← Anterior</button>
+          <div style="display: flex; gap: 10px;">
+            <button type="button" class="wms-btn" onclick="demoSampleCsvImport()">🧪 Cargar CSV Demo Ferretería/Growshop</button>
+            <button type="button" class="wms-btn wms-btn-primary" id="wizard-btn-next" onclick="navigateWizardStep(1)">Siguiente →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Migration Jobs History Table -->
+      <div style="background: #fff; border: 1px solid var(--vendor-line); border-radius: 16px; padding: 20px; margin-top: 24px;">
+        <h3 style="margin: 0 0 14px 0; color: var(--vendor-forest); font-family: var(--font-display);">📜 Historial de Migraciones & Rollback Atómico</h3>
+        <div style="overflow-x: auto;">
+          <table class="wms-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="background: rgba(21,45,36,0.06); text-align: left;">
+                <th style="padding: 10px;">ID Job</th>
+                <th style="padding: 10px;">Tipo</th>
+                <th style="padding: 10px;">Operador</th>
+                <th style="padding: 10px;">Filas</th>
+                <th style="padding: 10px;">Estado</th>
+                <th style="padding: 10px;">Fecha</th>
+                <th style="padding: 10px;">Acción Rollback</th>
+              </tr>
+            </thead>
+            <tbody id="migration-history-table-body">
+              <tr>
+                <td style="padding: 10px; font-weight: 700;">job-demo-01</td>
+                <td style="padding: 10px;"><span class="wms-level-badge">Catálogo Interno</span></td>
+                <td style="padding: 10px;">Profesor Franco</td>
+                <td style="padding: 10px;">1.200 filas</td>
+                <td style="padding: 10px;"><span class="wms-level-badge" style="background: #e8f5e9; color: #2e7d32;">COMPLETADO</span></td>
+                <td style="padding: 10px; font-size: 0.8rem;">12/08/2026 11:30</td>
+                <td style="padding: 10px;">
+                  <button type="button" class="wms-btn" style="padding: 4px 8px; font-size: 0.76rem;" onclick="triggerDemoRollback('ver-demo-01')">↩️ Rollback Atómico</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <!-- MODAL: ESCÁNER QR DE MÓDULO (WMS) -->
     <div id="wms-qr-modal" class="location-assistant-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="wms-qr-modal-title">
       <div class="location-assistant-shell" style="max-width: 520px;">
@@ -2601,6 +2736,9 @@
   <script src="saas-auth.js?v=saas_v2"></script>
   <script src="business-verticals.js?v=verticals_v1"></script>
   <script src="tenant-theme.js?v=theme_v1"></script>
+  <script src="migration-ai.js?v=migration_v1"></script>
+  <script src="migration-rollback.js?v=migration_v1"></script>
+  <script src="migration-center.js?v=migration_v1"></script>
   <script src="vendedor.js?v=internal_catalog_v10"></script>
 </body>
 </html>
