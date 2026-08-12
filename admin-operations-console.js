@@ -12,19 +12,25 @@ class AdminOperationsConsoleEngine {
     this.activityLog = ADMIN_ACTIVITY_LOG_STORE;
   }
 
-  // 1. Bitácora de Auditoría Administrativa Append-Only (`admin_activity_log`)
-  logAdminActivity({ actor_id, actor_name, tenant_id, action, entity, entity_id = null, metadata = {} }) {
+  // 1. Bitácora de Auditoría Administrativa Inmutable (`admin_activity_log`)
+  logAdminActivity({ actor_id, actor_name, tenant_id, action, entity_type, entity_id = null, before_data = null, after_data = null, metadata = {}, correlation_id = null }) {
     const entry = {
       id: `act-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      actor_id,
-      actor_name,
       tenant_id,
+      actor_user_id: actor_id,
+      actor_name_snapshot: actor_name,
       action,
-      entity,
+      entity_type,
       entity_id,
+      before_data,
+      after_data,
       metadata,
-      timestamp: new Date().toISOString()
+      correlation_id: correlation_id || `corr-${Date.now()}`,
+      created_at: new Date().toISOString()
     };
+
+    // Objeto inmutable in-memory (no-writable properties)
+    Object.freeze(entry);
     this.activityLog.push(entry);
     return entry;
   }
@@ -36,7 +42,72 @@ class AdminOperationsConsoleEngine {
       .reverse();
   }
 
-  // 2. Dashboard KPIs & Resumen Operativo
+  // Intentar modificar o eliminar una entrada de la bitácora es DENEGADO
+  mutateActivityLogEntry() {
+    throw new Error('🔒 Operación denegada: La bitácora admin_activity_log es inmutable (REVOKE UPDATE, DELETE).');
+  }
+
+  // 2. Gestión Segura de Usuarios & Prevención de Escalada de Roles
+  manageTenantUser({ requesterContext, targetTenantId, action, targetUserId, newRole, name }, tenantUsersStore = []) {
+    // Zero Trust Validation
+    if (!requesterContext || !requesterContext.userId) {
+      throw new Error('🔒 Acceso denegado: Usuario no autenticado.');
+    }
+
+    const isSuperadmin = requesterContext.isSuperadmin || requesterContext.role === 'SUPERADMIN';
+    if (!isSuperadmin && requesterContext.tenantId !== targetTenantId) {
+      throw new Error('🔒 Acceso denegado RLS Multi-Tenant: ADMIN de Tenant A no puede modificar usuarios de Tenant B.');
+    }
+
+    if (requesterContext.role !== 'ADMIN' && !isSuperadmin) {
+      throw new Error('🔒 Acceso denegado: Únicamente el ADMIN o SUPERADMIN puede gestionar la nómina de usuarios.');
+    }
+
+    // Prevención de Escalada a SUPERADMIN por parte de un ADMIN local
+    if (newRole === 'SUPERADMIN' && !isSuperadmin) {
+      throw new Error('🔒 Operación denegada: Un ADMIN local no puede otorgar ni promover a un usuario al rol SUPERADMIN.');
+    }
+
+    // Simulación server-side de mutación de usuario
+    let targetUser = tenantUsersStore.find(u => u.id === targetUserId || u.user_id === targetUserId);
+    const beforeData = targetUser ? { ...targetUser } : null;
+
+    if (action === 'INVITE' || action === 'CREATE') {
+      targetUser = {
+        id: targetUserId || `usr-${Date.now()}`,
+        user_id: targetUserId || `usr-${Date.now()}`,
+        tenant_id: targetTenantId,
+        name: name || 'Nuevo Usuario',
+        role: newRole || 'VENDEDOR',
+        active: true
+      };
+      tenantUsersStore.push(targetUser);
+    } else if (targetUser) {
+      if (action === 'SUSPEND') targetUser.active = false;
+      if (action === 'ACTIVATE') targetUser.active = true;
+      if (action === 'CHANGE_ROLE' && newRole) targetUser.role = newRole;
+      if (name) targetUser.name = name;
+    }
+
+    const afterData = targetUser ? { ...targetUser } : null;
+
+    // Grabar en bitácora de auditoría inmutable
+    this.logAdminActivity({
+      actor_id: requesterContext.userId,
+      actor_name: requesterContext.userName,
+      tenant_id: targetTenantId,
+      action: `USER_${action}`,
+      entity_type: 'USER',
+      entity_id: targetUserId,
+      before_data: beforeData,
+      after_data: afterData,
+      metadata: { requested_role: newRole }
+    });
+
+    return { success: true, user: targetUser };
+  }
+
+  // 3. Dashboard KPIs & Resumen Operativo
   getAdminDashboardSummary(tenantId, salesStore = [], cashSessionsStore = [], cashMovementsStore = [], locationsStore = [], balancesStore = [], reservationsStore = [], tenantUsersStore = []) {
     const nowIso = new Date().toISOString();
 
@@ -56,7 +127,6 @@ class AdminOperationsConsoleEngine {
     const activeReservations = reservationsStore.filter(r => r.tenant_id === tenantId && r.status === 'ACTIVE' && r.expires_at > nowIso);
     const activeUsers = (tenantUsersStore.length > 0 ? tenantUsersStore : (typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantUsers(tenantId) : [])).filter(u => u.active !== false);
 
-    // Conteo de items con stock bajo (< 5 u.)
     let lowStockCount = 0;
     if (balancesStore.length > 0) {
       lowStockCount = balancesStore.filter(b => b.tenant_id === tenantId && Number(b.on_hand_sellable || 0) < 5).length;
@@ -74,10 +144,10 @@ class AdminOperationsConsoleEngine {
     };
   }
 
-  // 3. Matriz RBAC para Secciones Administrativas
+  // 4. Matriz RBAC para Secciones Administrativas
   checkAdminAccess(role, sectionKey) {
     const roleUpper = (role || 'VENDEDOR').toUpperCase();
-    if (roleUpper === 'SUPERADMIN') return true; // Acceso total
+    if (roleUpper === 'SUPERADMIN') return true;
 
     const rbacMatrix = {
       dashboard: ['ADMIN', 'SUPERVISOR'],
@@ -102,7 +172,7 @@ class AdminOperationsConsoleEngine {
     return allowedRoles.includes(roleUpper);
   }
 
-  // 4. Buscador Global Admin
+  // 5. Buscador Global Admin
   globalAdminSearch(query, tenantId, productsStore = [], salesStore = [], usersStore = [], suppliersStore = []) {
     if (!query || query.trim().length < 2) return { products: [], sales: [], users: [], suppliers: [] };
     const q = query.toLowerCase().trim();

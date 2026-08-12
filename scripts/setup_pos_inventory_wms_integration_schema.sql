@@ -338,3 +338,39 @@ GRANT SELECT, INSERT ON public.sale_items TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.cash_sessions TO authenticated;
 GRANT SELECT, INSERT ON public.cash_movements TO authenticated;
 
+-- ============================================================================
+-- 9. BITÁCORA INMUTABLE DE ACTIVIDAD ADMINISTRATIVA (FASE 12)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.admin_activity_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  actor_user_id VARCHAR(255) NOT NULL,
+  actor_name_snapshot VARCHAR(255) NOT NULL,
+  action VARCHAR(100) NOT NULL,
+  entity_type VARCHAR(100) NOT NULL,
+  entity_id VARCHAR(255),
+  before_data JSONB,
+  after_data JSONB,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  correlation_id VARCHAR(255),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.admin_activity_log ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "RLS admin_activity_log_isolation" ON public.admin_activity_log;
+DROP POLICY IF EXISTS "RLS admin_activity_log_insert" ON public.admin_activity_log;
+
+CREATE POLICY "RLS admin_activity_log_isolation" ON public.admin_activity_log FOR SELECT USING (
+  public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
+);
+
+CREATE POLICY "RLS admin_activity_log_insert" ON public.admin_activity_log FOR INSERT WITH CHECK (
+  public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
+);
+
+-- Denegar UPDATE y DELETE para inmutabilidad estricta
+REVOKE UPDATE, DELETE ON public.admin_activity_log FROM anon, authenticated;
+
+GRANT SELECT, INSERT ON public.admin_activity_log TO authenticated;
+
+
