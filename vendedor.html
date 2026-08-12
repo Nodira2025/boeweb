@@ -1143,6 +1143,9 @@
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="migration-center" onclick="switchVendorTab('migration-center')">
           <span class="vendor-side-nav-icon" aria-hidden="true">📥</span><span>Migration Center IA</span>
         </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="tenant-onboarding" onclick="switchVendorTab('tenant-onboarding')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">🚀</span><span>Alta de Negocios (SaaS)</span>
+        </button>
         <a href="tv.html" class="vendor-sidebar-tool-link" target="_blank" rel="noopener">TV</a>
         <a href="coffee.html" class="vendor-sidebar-tool-link" target="_blank" rel="noopener">Coffee</a>
       </div>
@@ -2110,6 +2113,138 @@
       </div>
     </section>
 
+    <!-- SECTION: TENANT ONBOARDING WIZARD (FASE 10) -->
+    <section id="vendor-tenant-onboarding-section" class="vendor-workspace-section" style="display: none;" aria-labelledby="onboarding-section-title">
+      <div class="wms-hero-banner">
+        <div class="wms-hero-title">
+          <span class="wms-sync-badge">🚀 Onboarding Wizard & Gestión de Negocios SaaS (Fase 10)</span>
+          <h2 id="onboarding-section-title">🚀 Alta Completa de Nuevas Empresas & Onboarding Real</h2>
+          <p>Configurá e instalá nuevos comercios desde la consola Superadmin sin tocar código ni base de datos: Identidad, Rubro, Catálogo, Proveedores, Stock, Usuarios, WMS opcional y Activación.</p>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button type="button" class="wms-btn wms-btn-primary" onclick="startNewTenantOnboardingWizard()">
+            ➕ Alta de Nuevo Negocio (Wizard 10 Pasos)
+          </button>
+          <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
+        </div>
+      </div>
+
+      <!-- Onboarding Dashboard Grid -->
+      <div class="wms-dashboard-grid" style="margin-top: 20px;">
+        <div class="wms-action-card">
+          <div class="wms-action-card-icon">🏢</div>
+          <div>
+            <h3 style="margin: 0; font-size: 1rem;">Empresas Activas</h3>
+            <p style="margin: 4px 0 0 0; font-size: 1.4rem; font-weight: 800; color: var(--vendor-forest);" id="onboarding-stat-active-tenants">2</p>
+          </div>
+        </div>
+        <div class="wms-action-card">
+          <div class="wms-action-card-icon">⏳</div>
+          <div>
+            <h3 style="margin: 0; font-size: 1rem;">Setups en Proceso</h3>
+            <p style="margin: 4px 0 0 0; font-size: 1.4rem; font-weight: 800; color: #b78103;" id="onboarding-stat-draft-tenants">1</p>
+          </div>
+        </div>
+        <div class="wms-action-card">
+          <div class="wms-action-card-icon">🏬</div>
+          <div>
+            <h3 style="margin: 0; font-size: 1rem;">Rubros Instalados</h3>
+            <p style="margin: 4px 0 0 0; font-size: 1.4rem; font-weight: 800; color: var(--vendor-forest);" id="onboarding-stat-verticals">4</p>
+          </div>
+        </div>
+        <div class="wms-action-card">
+          <div class="wms-action-card-icon">🔒</div>
+          <div>
+            <h3 style="margin: 0; font-size: 1rem;">Estado RLS Multi-Tenant</h3>
+            <p style="margin: 4px 0 0 0; font-size: 1.4rem; font-weight: 800; color: #2e7d32;">ACTIVO & BLINDADO</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Onboarding Wizard Interactive Container -->
+      <div id="onboarding-wizard-shell" style="background: #fff; border: 1px solid var(--vendor-line); border-radius: 16px; padding: 24px; margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--vendor-line); padding-bottom: 16px; margin-bottom: 20px;">
+          <div>
+            <span class="wms-level-badge" id="onb-step-badge">PASO 1 DE 10</span>
+            <h3 id="onb-step-title" style="margin: 6px 0 0 0; color: var(--vendor-forest); font-family: var(--font-display); font-size: 1.3rem;">Paso 1: Datos de la Empresa</h3>
+          </div>
+          <small style="color: var(--vendor-muted); font-weight: 700;">💾 Guardado automático: Podés cerrar y reanudar en cualquier momento.</small>
+        </div>
+
+        <!-- Onboarding Step Content Body -->
+        <div id="onb-step-body">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div>
+              <label class="b2b-field-label">Nombre Comercial del Negocio *</label>
+              <input type="text" id="onb-input-name" class="b2b-search-input" placeholder="Ej: Ferretería San Martín" oninput="autoGenerateOnboardingSlug(this.value)">
+            </div>
+            <div>
+              <label class="b2b-field-label">Slug Comercial (Único) *</label>
+              <input type="text" id="onb-input-slug" class="b2b-search-input" placeholder="ferreteria-san-martin">
+            </div>
+            <div>
+              <label class="b2b-field-label">Email de Contacto *</label>
+              <input type="email" id="onb-input-email" class="b2b-search-input" placeholder="contacto@ferreteriasanmartin.com">
+            </div>
+            <div>
+              <label class="b2b-field-label">Moneda Principal</label>
+              <select id="onb-input-currency" class="b2b-search-input">
+                <option value="ARS" selected>Pesos Argentinos (ARS $)</option>
+                <option value="USD">Dólares Estadounidenses (USD $)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Onboarding Footer Controls -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--vendor-line); pt: 16px; margin-top: 24px;">
+          <button type="button" class="wms-btn" id="onb-btn-prev" onclick="navigateOnboardingStep(-1)" style="display: none;">← Anterior</button>
+          <div style="display: flex; gap: 10px;">
+            <button type="button" class="wms-btn" onclick="saveOnboardingDraft()">💾 Guardar Borrador</button>
+            <button type="button" class="wms-btn wms-btn-primary" id="onb-btn-next" onclick="navigateOnboardingStep(1)">Siguiente →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Superadmin Tenants Directory Table -->
+      <div style="background: #fff; border: 1px solid var(--vendor-line); border-radius: 16px; padding: 20px; margin-top: 24px;">
+        <h3 style="margin: 0 0 14px 0; color: var(--vendor-forest); font-family: var(--font-display);">🏢 Directorio de Negocios en la Plataforma</h3>
+        <div style="overflow-x: auto;">
+          <table class="wms-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="background: rgba(21,45,36,0.06); text-align: left;">
+                <th style="padding: 10px;">Empresa</th>
+                <th style="padding: 10px;">Rubro</th>
+                <th style="padding: 10px;">Estado</th>
+                <th style="padding: 10px;">WMS</th>
+                <th style="padding: 10px;">Acciones Superadmin</th>
+              </tr>
+            </thead>
+            <tbody id="onboarding-tenants-directory-body">
+              <tr>
+                <td style="padding: 10px; font-weight: 700;">BÔ Grow Club</td>
+                <td style="padding: 10px;"><span class="wms-level-badge">Growshop</span></td>
+                <td style="padding: 10px;"><span class="wms-level-badge" style="background: #e8f5e9; color: #2e7d32;">ACTIVO</span></td>
+                <td style="padding: 10px;"><span class="wms-level-badge" style="background: #e1f5fe; color: #0288d1;">SI (HABILITADO)</span></td>
+                <td style="padding: 10px;">
+                  <button type="button" class="wms-btn" style="padding: 4px 8px; font-size: 0.76rem;" onclick="impersonateTenantSuperadmin('11111111-1111-1111-1111-111111111111')">👁️ Abrir Empresa</button>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 10px; font-weight: 700;">Empresa B Demo (Ferretería)</td>
+                <td style="padding: 10px;"><span class="wms-level-badge">Ferretería</span></td>
+                <td style="padding: 10px;"><span class="wms-level-badge" style="background: #e8f5e9; color: #2e7d32;">ACTIVO</span></td>
+                <td style="padding: 10px;"><span class="wms-level-badge" style="background: #efebe9; color: #4e342e;">NO (SIN WMS)</span></td>
+                <td style="padding: 10px;">
+                  <button type="button" class="wms-btn" style="padding: 4px 8px; font-size: 0.76rem;" onclick="impersonateTenantSuperadmin('22222222-2222-2222-2222-222222222222')">👁️ Abrir Empresa</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <!-- MODAL: ESCÁNER QR DE MÓDULO (WMS) -->
     <div id="wms-qr-modal" class="location-assistant-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="wms-qr-modal-title">
       <div class="location-assistant-shell" style="max-width: 520px;">
@@ -2739,6 +2874,7 @@
   <script src="migration-ai.js?v=migration_v1"></script>
   <script src="migration-rollback.js?v=migration_v1"></script>
   <script src="migration-center.js?v=migration_v1"></script>
+  <script src="tenant-onboarding.js?v=onboarding_v1"></script>
   <script src="vendedor.js?v=internal_catalog_v10"></script>
 </body>
 </html>

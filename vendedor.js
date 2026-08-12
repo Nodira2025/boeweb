@@ -1153,6 +1153,8 @@ function switchVendorTab(tab) {
   if (tenantProfileSection) tenantProfileSection.style.display = 'none';
   const migrationSection = document.getElementById('vendor-migration-center-section');
   if (migrationSection) migrationSection.style.display = 'none';
+  const onboardingSection = document.getElementById('vendor-tenant-onboarding-section');
+  if (onboardingSection) onboardingSection.style.display = 'none';
 
   let targetSection = null;
 
@@ -1273,6 +1275,12 @@ function switchVendorTab(tab) {
       targetSection = migrationSection;
     }
     startNewMigrationWizard();
+  } else if (tab === 'tenant-onboarding') {
+    if (onboardingSection) {
+      onboardingSection.style.display = 'block';
+      targetSection = onboardingSection;
+    }
+    startNewTenantOnboardingWizard();
   }
 
   const activeSidebarTab = tab === 'reposicion' ? 'catalog' : tab;
@@ -5898,6 +5906,249 @@ window.handleMigrationSourceFile = handleMigrationSourceFile;
 window.demoSampleCsvImport = demoSampleCsvImport;
 window.executeMigrationImportApproved = executeMigrationImportApproved;
 window.triggerDemoRollback = triggerDemoRollback;
+
+/* ==========================================================================
+   BÔ GROW CLUB / PLATAFORMA SAAS — FASE 10 UI INTEGRATION (ONBOARDING WIZARD)
+   ========================================================================== */
+
+function startNewTenantOnboardingWizard() {
+  if (typeof TenantOnboarding === 'undefined') return;
+  const ctx = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : { userName: 'Profesor Franco' };
+  TenantOnboarding.initSession(ctx.userName);
+  renderOnboardingWizardStep(1);
+}
+
+function autoGenerateOnboardingSlug(val) {
+  const slugInput = document.getElementById('onb-input-slug');
+  if (slugInput) {
+    slugInput.value = String(val || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+  }
+}
+
+function renderOnboardingWizardStep(step) {
+  if (typeof TenantOnboarding === 'undefined') return;
+  const sess = TenantOnboarding.activeSession;
+  if (!sess) return;
+
+  sess.step_current = step;
+
+  const badgeEl = document.getElementById('onb-step-badge');
+  const titleEl = document.getElementById('onb-step-title');
+  const bodyEl = document.getElementById('onb-step-body');
+  const prevBtn = document.getElementById('onb-btn-prev');
+
+  if (badgeEl) badgeEl.textContent = `PASO ${step} DE 10`;
+  if (prevBtn) prevBtn.style.display = step > 1 ? 'inline-block' : 'none';
+
+  if (!bodyEl) return;
+
+  if (step === 1) {
+    if (titleEl) titleEl.textContent = 'Paso 1: Datos de la Empresa';
+    bodyEl.innerHTML = `
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <label class="b2b-field-label">Nombre Comercial del Negocio *</label>
+          <input type="text" id="onb-input-name" class="b2b-search-input" value="${sess.company_data.name || ''}" placeholder="Ej: Ferretería San Martín" oninput="autoGenerateOnboardingSlug(this.value)">
+        </div>
+        <div>
+          <label class="b2b-field-label">Slug Comercial (Único) *</label>
+          <input type="text" id="onb-input-slug" class="b2b-search-input" value="${sess.company_data.slug || ''}" placeholder="ferreteria-san-martin">
+        </div>
+        <div>
+          <label class="b2b-field-label">Email de Contacto *</label>
+          <input type="email" id="onb-input-email" class="b2b-search-input" value="${sess.company_data.email || ''}" placeholder="contacto@ferreteriasanmartin.com">
+        </div>
+        <div>
+          <label class="b2b-field-label">Moneda Principal</label>
+          <select id="onb-input-currency" class="b2b-search-input">
+            <option value="ARS" ${sess.company_data.currency === 'ARS' ? 'selected' : ''}>Pesos Argentinos (ARS $)</option>
+            <option value="USD" ${sess.company_data.currency === 'USD' ? 'selected' : ''}>Dólares Estadounidenses (USD $)</option>
+          </select>
+        </div>
+      </div>
+    `;
+  } else if (step === 2) {
+    if (titleEl) titleEl.textContent = 'Paso 2: Selección de Rubro (Business Vertical)';
+    bodyEl.innerHTML = `
+      <p style="font-size: 0.9rem; color: var(--vendor-muted); margin-bottom: 16px;">Seleccioná el rubro comercial almacenado dinámicamente en PostgreSQL:</p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div style="border: 2px solid ${sess.vertical_data.code === 'growshop' ? 'var(--vendor-gold)' : 'var(--vendor-line)'}; border-radius: 14px; padding: 18px; cursor: pointer; background: #faf8f2;" onclick="setOnboardingVertical('growshop', 'Growshop')">
+          <div style="font-size: 1.8rem; margin-bottom: 8px;">🌱</div>
+          <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">Growshop & Cultivo</h4>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Medición en Watts, Volts, volumen L/ml y compatibilidad con semillas/sustratos.</p>
+        </div>
+        <div style="border: 2px solid ${sess.vertical_data.code === 'ferreteria' ? 'var(--vendor-gold)' : 'var(--vendor-line)'}; border-radius: 14px; padding: 18px; cursor: pointer;" onclick="setOnboardingVertical('ferreteria', 'Ferretería')">
+          <div style="font-size: 1.8rem; margin-bottom: 8px;">🔧</div>
+          <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">Ferretería & Herramientas</h4>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Medición en mm/pulgadas, torque Nm, voltaje y marcas industriales.</p>
+        </div>
+      </div>
+    `;
+  } else if (step === 3) {
+    if (titleEl) titleEl.textContent = 'Paso 3: Branding & Perfil White-Label';
+    bodyEl.innerHTML = `
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <label class="b2b-field-label">Slogan o Subtítulo del Negocio</label>
+          <input type="text" id="onb-input-slogan" class="b2b-search-input" value="${sess.identity_data.slogan || ''}" placeholder="Ej: Calidad y precisión profesional">
+        </div>
+        <div>
+          <label class="b2b-field-label">Color Primario de la Marca</label>
+          <input type="color" id="onb-input-color" class="b2b-search-input" value="${sess.identity_data.theme_color || '#152d24'}" style="height: 42px; padding: 4px;">
+        </div>
+      </div>
+    `;
+  } else if (step === 4) {
+    if (titleEl) titleEl.textContent = 'Paso 4: Carga de Catálogo Inicial';
+    bodyEl.innerHTML = `
+      <p style="font-size: 0.9rem; color: var(--vendor-muted); margin-bottom: 16px;">Elegí cómo querés inicializar el catálogo de productos:</p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div style="border: 1px solid var(--vendor-line); border-radius: 14px; padding: 18px; cursor: pointer;" onclick="setOnboardingCatalogMode('EMPTY')">
+          <div style="font-size: 1.8rem; margin-bottom: 8px;">📝</div>
+          <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">Empezar Catálogo Vacío</h4>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Crear productos manualmente más adelante.</p>
+        </div>
+        <div style="border: 2px solid var(--vendor-gold); border-radius: 14px; padding: 18px; cursor: pointer; background: #faf8f2;" onclick="switchVendorTab('migration-center')">
+          <div style="font-size: 1.8rem; margin-bottom: 8px;">🤖</div>
+          <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">Importar con Migration Center IA</h4>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Usar CSV, XLSX, PDF o Imágenes escaneadas.</p>
+        </div>
+      </div>
+    `;
+  } else if (step === 7) {
+    if (titleEl) titleEl.textContent = 'Paso 7: Provisión de Usuarios & Roles RBAC';
+    bodyEl.innerHTML = `
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <label class="b2b-field-label">Nombre del Administrador Principal *</label>
+          <input type="text" id="onb-input-admin-name" class="b2b-search-input" value="${sess.users_data.admin_name || ''}" placeholder="Ej: Juan Pérez">
+        </div>
+        <div>
+          <label class="b2b-field-label">Email del Administrador Principal *</label>
+          <input type="email" id="onb-input-admin-email" class="b2b-search-input" value="${sess.users_data.admin_email || ''}" placeholder="admin@empresa.com">
+        </div>
+      </div>
+    `;
+  } else if (step === 8) {
+    if (titleEl) titleEl.textContent = 'Paso 8: Configuración del WMS & Depósito Físico';
+    bodyEl.innerHTML = `
+      <p style="font-size: 0.9rem; color: var(--vendor-muted); margin-bottom: 16px;">¿Este comercio requiere gestión de ubicaciones físicas por estantería / módulo / nivel?</p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div style="border: 2px solid ${!sess.wms_data.enabled ? 'var(--vendor-gold)' : 'var(--vendor-line)'}; border-radius: 14px; padding: 18px; cursor: pointer;" onclick="setOnboardingWmsToggle(false)">
+          <div style="font-size: 1.8rem; margin-bottom: 8px;">🏬</div>
+          <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">NO (Sin WMS Físico)</h4>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Operación comercial simple sin mapa de depósito.</p>
+        </div>
+        <div style="border: 2px solid ${sess.wms_data.enabled ? 'var(--vendor-gold)' : 'var(--vendor-line)'}; border-radius: 14px; padding: 18px; cursor: pointer; background: #faf8f2;" onclick="setOnboardingWmsToggle(true)">
+          <div style="font-size: 1.8rem; margin-bottom: 8px;">📦</div>
+          <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">SÍ (Habilitar WMS Físico)</h4>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Crear depósitos, sectores, módulos y niveles físicos.</p>
+        </div>
+      </div>
+    `;
+  } else if (step === 9 || step === 10) {
+    if (titleEl) titleEl.textContent = 'Paso 9 & 10: Checklist Pre-Activación & Confirmación Idempotente';
+    const checkRes = TenantOnboarding.runPreactivationChecklist(typeof window.saasTenants !== 'undefined' ? window.saasTenants : []);
+    
+    bodyEl.innerHTML = `
+      <div style="background: ${checkRes.valid ? '#e8f5e9' : '#ffebee'}; border: 2px solid ${checkRes.valid ? '#4caf50' : '#ef5350'}; border-radius: 14px; padding: 20px; text-align: center;">
+        <div style="font-size: 2.5rem; margin-bottom: 8px;">${checkRes.valid ? '✅' : '🚨'}</div>
+        <h4 style="margin: 0 0 8px 0; color: ${checkRes.valid ? '#2e7d32' : '#c62828'};">${checkRes.valid ? 'Checklist de Activación Exitoso' : 'Se encontraron bloqueos para activar'}</h4>
+        <p style="font-size: 0.88rem; color: var(--vendor-muted); margin-bottom: 16px;">
+          ${checkRes.valid ? 'El negocio está 100% configurado y listo para pasar de SETUP a ACTIVE.' : checkRes.errors.join('<br>')}
+        </p>
+        ${checkRes.valid ? `
+          <button type="button" class="wms-btn wms-btn-primary" style="padding: 12px 24px; font-size: 1rem;" onclick="executeTenantActivationApproved()">
+            🚀 ACTIVAR NEGOCIO EN PRODUCCIÓN
+          </button>
+        ` : ''}
+      </div>
+    `;
+  }
+}
+
+function navigateOnboardingStep(delta) {
+  if (typeof TenantOnboarding === 'undefined') return;
+  const sess = TenantOnboarding.activeSession;
+  if (!sess) return;
+
+  // Recoger inputs del paso actual
+  if (sess.step_current === 1) {
+    const name = document.getElementById('onb-input-name')?.value;
+    const slug = document.getElementById('onb-input-slug')?.value;
+    const email = document.getElementById('onb-input-email')?.value;
+    const currency = document.getElementById('onb-input-currency')?.value;
+    TenantOnboarding.saveStepData(1, { name, slug, email, currency });
+  } else if (sess.step_current === 3) {
+    const slogan = document.getElementById('onb-input-slogan')?.value;
+    const theme_color = document.getElementById('onb-input-color')?.value;
+    TenantOnboarding.saveStepData(3, { slogan, theme_color });
+  } else if (sess.step_current === 7) {
+    const admin_name = document.getElementById('onb-input-admin-name')?.value;
+    const admin_email = document.getElementById('onb-input-admin-email')?.value;
+    TenantOnboarding.saveStepData(7, { admin_name, admin_email });
+  }
+
+  const nextStep = Math.min(Math.max(1, sess.step_current + delta), 10);
+  renderOnboardingWizardStep(nextStep);
+}
+
+function setOnboardingVertical(code, name) {
+  if (typeof TenantOnboarding === 'undefined') return;
+  TenantOnboarding.saveStepData(2, { code, name });
+  showToast(`🏬 Rubro seleccionado: ${name}`);
+  renderOnboardingWizardStep(2);
+}
+
+function setOnboardingCatalogMode(mode) {
+  if (typeof TenantOnboarding === 'undefined') return;
+  TenantOnboarding.saveStepData(4, { mode });
+  showToast(`📦 Catálogo configurado en modo: ${mode}`);
+  renderOnboardingWizardStep(4);
+}
+
+function setOnboardingWmsToggle(enabled) {
+  if (typeof TenantOnboarding === 'undefined') return;
+  TenantOnboarding.saveStepData(8, { enabled });
+  showToast(`📦 WMS Físico: ${enabled ? 'HABILITADO' : 'DESHABILITADO'}`);
+  renderOnboardingWizardStep(8);
+}
+
+function saveOnboardingDraft() {
+  if (typeof TenantOnboarding === 'undefined' || !TenantOnboarding.activeSession) return;
+  showToast(`💾 Borrador de onboarding guardado (ID: ${TenantOnboarding.activeSession.id})`);
+}
+
+function executeTenantActivationApproved() {
+  if (typeof TenantOnboarding === 'undefined') return;
+  const tenantsList = typeof window.saasTenants !== 'undefined' ? window.saasTenants : [];
+  const res = TenantOnboarding.activateTenant(tenantsList);
+
+  if (res.success) {
+    showToast(`🚀 Negocio "${res.tenant.name}" activado en producción correctamente!`);
+    renderOnboardingWizardStep(10);
+  } else {
+    showToast(`🚨 Error al activar: ${res.errors ? res.errors.join(', ') : res.error}`);
+  }
+}
+
+function impersonateTenantSuperadmin(tenantId) {
+  if (typeof SaasAuth !== 'undefined') {
+    const ok = SaasAuth.switchActiveTenant(tenantId);
+    if (ok) showToast(`👁️ Superadmin impersonando Tenant ${tenantId}`);
+  }
+}
+
+window.startNewTenantOnboardingWizard = startNewTenantOnboardingWizard;
+window.autoGenerateOnboardingSlug = autoGenerateOnboardingSlug;
+window.navigateOnboardingStep = navigateOnboardingStep;
+window.setOnboardingVertical = setOnboardingVertical;
+window.setOnboardingCatalogMode = setOnboardingCatalogMode;
+window.setOnboardingWmsToggle = setOnboardingWmsToggle;
+window.saveOnboardingDraft = saveOnboardingDraft;
+window.executeTenantActivationApproved = executeTenantActivationApproved;
+window.impersonateTenantSuperadmin = impersonateTenantSuperadmin;
+
 
 
 
