@@ -20,10 +20,12 @@ function lookupRequest(body) {
   };
 }
 
-function installFetchMock(searchHtml) {
+function installFetchMock(searchHtml, braveHtml = '') {
   globalThis.fetch = async url => {
     const href = String(url);
     if (href.includes('customsearch.googleapis.com')) return jsonResponse({}, 403);
+    if (href.includes('search.brave.com/images')) return new Response('', { status: 200 });
+    if (href.includes('search.brave.com/search')) return new Response(braveHtml, { status: 200 });
     if (href.includes('html.duckduckgo.com')) return new Response(searchHtml, { status: 200 });
     if (href.includes('api.mercadolibre.com')) return jsonResponse({ results: [] });
     if (href.includes('world.openfoodfacts.org')) return jsonResponse({}, 404);
@@ -62,6 +64,29 @@ test('acepta una ficha que coincide con el nombre y la presentación', async () 
   assert.equal(response.status, 200);
   assert.equal(result.found, true);
   assert.match(result.product.name, /BIO TRAP 30GR/i);
+});
+
+test('autocompleta un código encontrado en una ficha de producto argentina', async () => {
+  installFetchMock('', `
+    <div class="snippet" data-pos="0" data-type="web">
+      <a href="https://www.seedscience.com.ar/product-page/poleas-garden-highpro-prohanger-68-kg">
+        <div class="title search-snippet-title">Poleas Garden HighPro ProHanger (68 Kg) | Seed Science</div>
+      </a>
+      <div class="generic-snippet"><div class="content">SKU: 8436554760848 · $15.638,00 Precio · $14.074,20 Precio de oferta · Trinquete de cuerda hasta 68 Kg</div></div>
+    </div>
+    </main>
+  `);
+
+  const response = await lookupProduct(lookupRequest({ barcode: '8436554760848' }), { ip: 'test-brave-barcode' });
+  const result = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(result.found, true);
+  assert.match(result.product.name, /Garden HighPro ProHanger/i);
+  assert.equal(result.product.barcode, '8436554760848');
+  assert.equal(result.product.brand, 'Garden HighPro');
+  assert.equal(result.product.presentation, '68 Kg');
+  assert.equal(result.market.average_price, 15638);
 });
 
 test('el vendedor no consulta tablas o columnas ausentes del esquema anterior', async () => {

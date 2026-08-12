@@ -2,6 +2,8 @@ const OPEN_PRODUCTS_URL = 'https://world.openfoodfacts.org/api/v3/product';
 const UPCITEMDB_LOOKUP_URL = 'https://api.upcitemdb.com/prod/trial/lookup';
 const GOOGLE_CUSTOM_SEARCH_URL = 'https://customsearch.googleapis.com/customsearch/v1';
 const GOOGLE_SEARCH_WEB_URL = 'https://www.google.com/search';
+const BRAVE_SEARCH_WEB_URL = 'https://search.brave.com/search';
+const BRAVE_SEARCH_IMAGES_URL = 'https://search.brave.com/images';
 const MERCADOLIBRE_SEARCH_URL = 'https://api.mercadolibre.com/sites/MLA/search';
 const REQUEST_WINDOW_MS = 60_000;
 const REQUEST_LIMIT_PER_WINDOW = 20;
@@ -514,6 +516,78 @@ async function searchGrowshopWeb(value, barcode) {
   );
 }
 
+function parseBraveWebItems(html) {
+  const blocks = [...html.matchAll(/<div[^>]*class="[^"]*snippet[^"]*"[^>]*data-type="web"[^>]*>([\s\S]*?)(?=<div[^>]*class="[^"]*snippet[^"]*"[^>]*data-type="web"|<\/main>)/gi)];
+  return blocks.slice(0, 10).map(match => {
+    const block = match[1];
+    const linkMatch = block.match(/<a[^>]*href="(https?:\/\/[^"#]+)"[^>]*>[\s\S]*?<div[^>]*class="[^"]*title search-snippet-title[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+    if (!linkMatch) return null;
+    const snippetMatch = block.match(/<div[^>]*class="[^"]*generic-snippet[^"]*"[^>]*>[\s\S]*?<div[^>]*class="[^"]*content[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+    const title = normalizeSearchTitle(linkMatch[2]);
+    const snippet = stripHtml(snippetMatch?.[1] || '');
+    return {
+      title,
+      snippet,
+      url: decodeHtmlEntities(linkMatch[1]),
+      image: null,
+      price: parseArgentinePrice(`${snippet} ${title}`),
+      score: 0
+    };
+  }).filter(Boolean);
+}
+
+function findBraveImage(html, product) {
+  const expectedTokens = lookupMatchTokens([product?.name, product?.brand, product?.presentation].filter(Boolean).join(' '));
+  const candidates = [...html.matchAll(/<img[^>]*src="(https:\/\/imgs\.search\.brave\.com\/[^"]+)"[^>]*alt="([^"]*)"[^>]*data-rank="\d+"/gi)]
+    .map(match => ({ url: decodeHtmlEntities(match[1]), alt: decodeHtmlEntities(match[2]) }));
+  const matching = candidates.find(candidate => {
+    const altText = normalizeLookupMatchText(candidate.alt);
+    return expectedTokens.some(token => token.length >= 4 && altText.includes(token));
+  });
+  return matching?.url || null;
+}
+
+async function searchBraveBarcode(value, barcode) {
+  if (!barcode) return null;
+  const query = cleanText(value || barcode, 150);
+  const url = new URL(BRAVE_SEARCH_WEB_URL);
+  url.searchParams.set('q', query);
+  url.searchParams.set('source', 'web');
+  const response = await fetchWithTimeout(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml',
+      'Accept-Language': 'es-AR,es;q=0.9'
+    }
+  });
+  if (!response.ok) return null;
+  const html = await response.text();
+  const result = growshopResultFromItems(
+    parseBraveWebItems(html),
+    query,
+    url.toString(),
+    barcode,
+    'Búsqueda web por código'
+  );
+  if (!result?.product) return null;
+
+  try {
+    const imageUrl = new URL(BRAVE_SEARCH_IMAGES_URL);
+    imageUrl.searchParams.set('q', barcode);
+    imageUrl.searchParams.set('source', 'web');
+    const imageResponse = await fetchWithTimeout(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml'
+      }
+    });
+    if (imageResponse.ok) result.product.image_url = findBraveImage(await imageResponse.text(), result.product);
+  } catch (error) {
+    console.warn('No se pudo obtener la imagen de respaldo:', error.message);
+  }
+  return result;
+}
+
 function calculateMarketStats(items) {
   const prices = items
     .filter(item => item.currency_id === 'ARS' && Number.isFinite(Number(item.price)) && Number(item.price) > 0)
@@ -619,8 +693,9 @@ export default async function handler(request, context) {
 
     const warnings = [];
     const lookupValue = query || barcode;
-    const [googleAttempt, webAttempt, genericAttempt] = await Promise.allSettled([
+    const [googleAttempt, braveAttempt, webAttempt, genericAttempt] = await Promise.allSettled([
       searchGoogleArgentinaGrowshops(lookupValue, barcode),
+      searchBraveBarcode(lookupValue, barcode),
       searchGrowshopWeb(lookupValue, barcode),
       searchValidatedGenericBarcode(barcode)
     ]);
@@ -639,6 +714,7 @@ export default async function handler(request, context) {
       console.warn('Falló la búsqueda web de growshops:', webAttempt.reason?.message);
     }
     const productResult = googleSearch.result
+      || (braveAttempt.status === 'fulfilled' ? braveAttempt.value : null)
       || (webAttempt.status === 'fulfilled' ? webAttempt.value : null)
       || (genericAttempt.status === 'fulfilled' ? genericAttempt.value : null);
 
