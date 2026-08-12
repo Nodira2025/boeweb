@@ -40,13 +40,15 @@ class SaasAuthEngine {
     this.userName = getSafeItem(ls, SAAS_STORAGE_KEYS.USER_NAME) || 
                     getSafeItem(ls, SAAS_STORAGE_KEYS.LEGACY_VENDOR) || 
                     getSafeItem(ss, SAAS_STORAGE_KEYS.LEGACY_VENDOR) || 
-                    'Profesor Franco';
-    this.userEmail = getSafeItem(ls, SAAS_STORAGE_KEYS.USER_EMAIL) || 'profesor.franco@boeweb.com';
-    this.userRole = getSafeItem(ls, SAAS_STORAGE_KEYS.USER_ROLE) || 'SUPERADMIN';
+                    'Vendedor BÔ';
+    this.userEmail = getSafeItem(ls, SAAS_STORAGE_KEYS.USER_EMAIL) || 'vendedor@boeweb.com';
+    this.userRole = getSafeItem(ls, SAAS_STORAGE_KEYS.USER_ROLE) || 'VENDEDOR'; // Rol sin privilegios por defecto
   }
 
   getTenantContext() {
     const tenant = SAAS_TENANTS.find(t => t.id === this.activeTenantId) || SAAS_TENANTS[0];
+    const roleObj = SAAS_ROLES[this.userRole] || SAAS_ROLES.VENDEDOR;
+
     return {
       tenantId: tenant.id,
       tenantSlug: tenant.slug,
@@ -55,8 +57,8 @@ class SaasAuthEngine {
       userName: this.userName,
       userEmail: this.userEmail,
       role: this.userRole,
-      roleName: SAAS_ROLES[this.userRole] ? SAAS_ROLES[this.userRole].name : this.userRole,
-      permissions: SAAS_ROLES[this.userRole] ? SAAS_ROLES[this.userRole].permissions : ['wms.view'],
+      roleName: roleObj.name,
+      permissions: roleObj.permissions,
       isSuperadmin: this.userRole === 'SUPERADMIN'
     };
   }
@@ -70,7 +72,7 @@ class SaasAuthEngine {
   switchActiveTenant(newTenantId) {
     const ctx = this.getTenantContext();
     if (!ctx.isSuperadmin && newTenantId !== ctx.tenantId) {
-      console.warn('Acceso denegado: Sólo el Superadmin puede alternar entre tenants.');
+      console.warn('🔒 Acceso denegado: Únicamente el Superadmin autenticado puede alternar entre empresas.');
       return false;
     }
     const tenant = SAAS_TENANTS.find(t => t.id === newTenantId || t.slug === newTenantId);
@@ -126,9 +128,9 @@ class SaasAuthEngine {
     }
     
     this.activeTenantId = '11111111-1111-1111-1111-111111111111';
-    this.userName = 'Profesor Franco';
-    this.userEmail = 'profesor.franco@boeweb.com';
-    this.userRole = 'SUPERADMIN';
+    this.userName = 'Vendedor BÔ';
+    this.userEmail = 'vendedor@boeweb.com';
+    this.userRole = 'VENDEDOR';
   }
 }
 
