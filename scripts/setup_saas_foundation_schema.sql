@@ -8,9 +8,10 @@ CREATE TABLE IF NOT EXISTS public.platform_admins (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- FUNCIÓN DE SEGURIDAD SERVER-SIDE STABLE (Definida como SECURITY DEFINER)
+-- FUNCIÓN DE SEGURIDAD SERVER-SIDE STABLE (Definida como SECURITY DEFINER con search_path seguro)
 CREATE OR REPLACE FUNCTION public.is_superadmin()
-RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER STABLE AS $$
+RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER STABLE
+SET search_path = public, pg_temp AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.platform_admins WHERE user_id = auth.uid()
   );
