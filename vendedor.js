@@ -5509,7 +5509,80 @@ window.triggerWmsAuditFromCurrentModule = triggerWmsAuditFromCurrentModule;
 window.submitWmsAuditWithStatus = submitWmsAuditWithStatus;
 window.handleWmsAuditSubmit = handleWmsAuditSubmit;
 window.openWmsMovementsHistoryModal = openWmsMovementsHistoryModal;
+window.openMovementsHistoryModal = openWmsMovementsHistoryModal;
 window.closeWmsModal = closeWmsModal;
+
+/* ==========================================================================
+   BÔ GROW CLUB / PLATAFORMA SAAS — FASE 7 UI INTEGRATION
+   ========================================================================== */
+
+function updateSaasHeaderUI() {
+  if (typeof SaasAuth === 'undefined') return;
+  const ctx = SaasAuth.getTenantContext();
+
+  const tenantNameEl = document.getElementById('saas-active-tenant-name');
+  const tenantSelectEl = document.getElementById('saas-tenant-switcher');
+  const userNameEl = document.getElementById('saas-active-user-name');
+  const userRoleEl = document.getElementById('saas-active-user-role');
+  const activeVendorBadge = document.getElementById('active-vendor-display-name');
+
+  if (tenantNameEl) {
+    if (ctx.isSuperadmin && tenantSelectEl) {
+      tenantNameEl.style.display = 'none';
+      tenantSelectEl.style.display = 'inline-block';
+      tenantSelectEl.value = ctx.tenantId;
+    } else {
+      tenantNameEl.style.display = 'inline-block';
+      if (tenantSelectEl) tenantSelectEl.style.display = 'none';
+      tenantNameEl.textContent = ctx.tenantName;
+    }
+  }
+
+  if (userNameEl) userNameEl.textContent = ctx.userName;
+  if (userRoleEl) {
+    userRoleEl.textContent = ctx.role;
+    userRoleEl.style.background = ctx.isSuperadmin ? '#7b1fa2' : 'var(--vendor-forest)';
+  }
+
+  if (activeVendorBadge) {
+    activeVendorBadge.textContent = `🧑‍💼 ${ctx.userName} (${ctx.tenantName})`;
+  }
+}
+
+function openSaasLoginModal() {
+  const modal = document.getElementById('saas-login-modal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function handleSaasLoginSubmit(event) {
+  event.preventDefault();
+  const tenantId = document.getElementById('saas-login-tenant')?.value;
+  const name = document.getElementById('saas-login-name')?.value;
+  const email = document.getElementById('saas-login-email')?.value;
+  const role = document.getElementById('saas-login-role')?.value;
+
+  if (typeof SaasAuth !== 'undefined') {
+    SaasAuth.loginAsUser(name, email, role, tenantId);
+  }
+
+  closeWmsModal('saas-login-modal');
+  updateSaasHeaderUI();
+  if (typeof renderWmsModulesGrid === 'function') {
+    renderWmsModulesGrid();
+  }
+  showToast(`✅ Sesión SaaS iniciada como ${name} (${role}) en ${SaasAuth.getTenantContext().tenantName}`);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    updateSaasHeaderUI();
+  }, 300);
+});
+
+window.updateSaasHeaderUI = updateSaasHeaderUI;
+window.openSaasLoginModal = openSaasLoginModal;
+window.handleSaasLoginSubmit = handleSaasLoginSubmit;
+
 
 
 
