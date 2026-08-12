@@ -5556,6 +5556,11 @@ function updateSaasHeaderUI() {
   if (activeVendorBadge) {
     activeVendorBadge.textContent = `🧑‍💼 ${ctx.userName} (${ctx.tenantName})`;
   }
+
+  // Aplicación limpia de tema, colores y terminología del tenant activo
+  if (typeof TenantTheme !== 'undefined') {
+    TenantTheme.applyTenantTheme(ctx.tenantId);
+  }
 }
 
 function openSaasLoginModal() {

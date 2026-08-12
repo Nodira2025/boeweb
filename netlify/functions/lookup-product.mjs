@@ -48,6 +48,31 @@ const GROW_BRAND_RULES = [
   [/vamp\b/i, 'Vamp']
 ];
 
+// Resolutor de contexto de rubro Server-Side (Zero Trust Client Parameter)
+function resolveServerTenantVerticalContext(tenantId, requestedVertical) {
+  const tenantVerticals = {
+    '11111111-1111-1111-1111-111111111111': {
+      code: 'growshop',
+      name: 'Growshop & Botánica Premium',
+      priorityAttributes: ['brand', 'presentation', 'npk_ratio', 'substrate_type', 'ph_range'],
+      searchKeywords: ['fertilizante', 'grow', 'sustrato', 'maceta', 'top crop', 'klasmann']
+    },
+    '22222222-2222-2222-2222-222222222222': {
+      code: 'ferreteria',
+      name: 'Ferretería & Herramientas Industriales',
+      priorityAttributes: ['brand', 'model', 'power_watts', 'voltage', 'measurements_mm', 'material'],
+      searchKeywords: ['taladro', 'amoladora', 'bosch', 'dewalt', 'makita', 'llave']
+    }
+  };
+
+  // Resolver tenant autenticado primero
+  const authContext = tenantVerticals[tenantId];
+  if (authContext) return authContext;
+
+  // Fallback seguro a Growshop
+  return tenantVerticals['11111111-1111-1111-1111-111111111111'];
+}
+
 function jsonResponse(status, payload) {
   return new Response(JSON.stringify(payload), {
     status,
