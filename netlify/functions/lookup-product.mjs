@@ -395,6 +395,9 @@ async function searchGoogleArgentinaGrowshops(value, barcode) {
   url.searchParams.set('safe', 'active');
   url.searchParams.set('num', '10');
   const response = await fetchWithTimeout(url, { headers: { Accept: 'application/json' } });
+  // Google cerró esta API para clientes nuevos. En ese caso continuamos con
+  // las fuentes públicas de growshops sin mostrarle un error técnico al vendedor.
+  if (response.status === 403) return { result: null, searchUrl, configured: false };
   if (!response.ok) throw new Error(`Google Argentina respondió con estado ${response.status}`);
   const payload = await response.json();
   const items = (payload.items || []).map(normalizeGrowshopSearchItem);
