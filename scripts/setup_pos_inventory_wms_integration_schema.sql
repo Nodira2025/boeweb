@@ -554,17 +554,30 @@ CREATE TABLE IF NOT EXISTS public.health_check_runs (
   errors JSONB DEFAULT '[]'::jsonb
 );
 
+CREATE TABLE IF NOT EXISTS public.alert_notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  user_id VARCHAR(255),
+  alert_id UUID REFERENCES public.operational_alerts(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  severity VARCHAR(20) NOT NULL DEFAULT 'WARNING',
+  read BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 ALTER TABLE public.operational_alerts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.operational_alert_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.alert_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.health_check_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.alert_notifications ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "RLS operational_alerts_isolation" ON public.operational_alerts;
 DROP POLICY IF EXISTS "RLS operational_alert_events_isolation" ON public.operational_alert_events;
 DROP POLICY IF EXISTS "RLS alert_rules_isolation" ON public.alert_rules;
 DROP POLICY IF EXISTS "RLS health_check_runs_isolation" ON public.health_check_runs;
+DROP POLICY IF EXISTS "RLS alert_notifications_isolation" ON public.alert_notifications;
 
-CREATE POLICY "RLS operational_alerts_isolation" ON public.operational_alerts FOR ALL USING (
+CREATE POLICY "RLS operational_alerts_isolation" ON public.operational_alerts FOR SELECT USING (
   public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
 );
 
@@ -576,17 +589,89 @@ CREATE POLICY "RLS alert_rules_isolation" ON public.alert_rules FOR ALL USING (
   public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
 );
 
-CREATE POLICY "RLS health_check_runs_isolation" ON public.health_check_runs FOR ALL USING (
+CREATE POLICY "RLS health_check_runs_isolation" ON public.health_check_runs FOR SELECT USING (
   public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
 );
 
--- Denegar UPDATE y DELETE en operational_alert_events (bitácora inmutable append-only)
-REVOKE UPDATE, DELETE ON public.operational_alert_events FROM anon, authenticated;
+CREATE POLICY "RLS alert_notifications_isolation" ON public.alert_notifications FOR ALL USING (
+  public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
+);
 
-GRANT SELECT, INSERT, UPDATE ON public.operational_alerts TO authenticated;
-GRANT SELECT, INSERT ON public.operational_alert_events TO authenticated;
-GRANT SELECT, INSERT, UPDATE ON public.alert_rules TO authenticated;
-GRANT SELECT, INSERT ON public.health_check_runs TO authenticated;
+-- Denegar INSERT, UPDATE y DELETE directo a clientes authenticated y anon para inmutabilidad y seguridad estricta
+REVOKE INSERT, UPDATE, DELETE ON public.operational_alerts FROM anon, authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.operational_alert_events FROM anon, authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.alert_notifications FROM anon, authenticated;
+
+GRANT SELECT ON public.operational_alerts TO authenticated;
+GRANT SELECT ON public.operational_alert_events TO authenticated;
+GRANT SELECT ON public.alert_rules TO authenticated;
+GRANT SELECT ON public.health_check_runs TO authenticated;
+GRANT SELECT, UPDATE ON public.alert_notifications TO authenticated;
+
+-- RPC autorizada server-side para gestionar acciones humanas sobre alertas (ACK, ASSIGN, SNOOZE, RESOLVE)
+CREATE OR REPLACE FUNCTION public.rpc_manage_alert_saas(
+  p_alert_id UUID,
+  p_tenant_id UUID,
+  p_action VARCHAR,
+  p_user_id VARCHAR DEFAULT NULL,
+  p_note VARCHAR DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_caller_uid UUID;
+  v_caller_role VARCHAR;
+  v_is_superadmin BOOLEAN;
+  v_alert public.operational_alerts%ROWTYPE;
+BEGIN
+  v_caller_uid := auth.uid();
+  IF v_caller_uid IS NULL THEN
+    RAISE EXCEPTION '🔒 Acceso denegado: Usuario no autenticado en Supabase Auth.';
+  END IF;
+
+  v_is_superadmin := public.is_superadmin();
+
+  SELECT role INTO v_caller_role
+  FROM public.tenant_users
+  WHERE tenant_id = p_tenant_id AND user_id = v_caller_uid::text AND active = true;
+
+  IF NOT v_is_superadmin AND v_caller_role IS NULL THEN
+    RAISE EXCEPTION '🔒 Acceso denegado RLS Multi-Tenant: El usuario no pertenece al tenant %', p_tenant_id;
+  END IF;
+
+  SELECT * INTO v_alert FROM public.operational_alerts WHERE id = p_alert_id AND tenant_id = p_tenant_id;
+  IF v_alert.id IS NULL THEN
+    RAISE EXCEPTION 'Alerta no encontrada en el tenant especificado.';
+  END IF;
+
+  IF p_action = 'ACKNOWLEDGE' THEN
+    UPDATE public.operational_alerts
+    SET status = 'ACKNOWLEDGED', acknowledged_by = COALESCE(p_user_id, v_caller_uid::text), acknowledged_at = NOW(), updated_at = NOW()
+    WHERE id = p_alert_id;
+  ELSIF p_action = 'ASSIGN' THEN
+    UPDATE public.operational_alerts
+    SET assigned_user_id = p_user_id, updated_at = NOW()
+    WHERE id = p_alert_id;
+  ELSIF p_action = 'RESOLVE' THEN
+    UPDATE public.operational_alerts
+    SET status = 'RESOLVED', resolved_by = COALESCE(p_user_id, v_caller_uid::text), resolved_at = NOW(), resolution_type = 'MANUALLY_RESOLVED', updated_at = NOW()
+    WHERE id = p_alert_id;
+  END IF;
+
+  INSERT INTO public.operational_alert_events (
+    alert_id, tenant_id, event_type, actor_user_id, metadata
+  ) VALUES (
+    p_alert_id, p_tenant_id, p_action, v_caller_uid::text, jsonb_build_object('note', p_note)
+  );
+
+  RETURN jsonb_build_object('success', true, 'action', p_action, 'alert_id', p_alert_id);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_manage_alert_saas TO authenticated;
+
 
 
 

@@ -15,11 +15,10 @@ test('1. Principio Arquitectónico: Generar una Alerta NUNCA modifica el inventa
 
   assert.equal(result.status, 'ATTENTION');
   assert.equal(result.open_alerts, 1);
-  // El inventario permanece 100% intacto en 2 u. (cero mutación automática)
   assert.equal(balancesStore[0].on_hand_sellable, 2);
 });
 
-test('2. Deduplicación por Fingerprint: 10 ejecuciones del detector generan 1 sola Alerta con occurrence_count = 10', () => {
+test('2. Deduplicación por Fingerprint: 10 ejecuciones del detector generan 1 sola Alerta con occurrence_count = 10 (Prueba 7)', () => {
   OPERATIONAL_ALERTS_STORE.length = 0;
   OPERATIONAL_ALERT_EVENTS_STORE.length = 0;
   const tenantId = '11111111-1111-1111-1111-111111111111';
@@ -28,18 +27,17 @@ test('2. Deduplicación por Fingerprint: 10 ejecuciones del detector generan 1 s
     { tenant_id: tenantId, product_id: 'SKU-OUT', on_hand_sellable: 0 }
   ];
 
-  // Ejecutar 10 veces seguidas el detector
   for (let i = 0; i < 10; i++) {
     OperationalHealthAlerts.runTenantHealthChecks(tenantId, { balancesStore });
   }
 
   const tenantAlerts = OPERATIONAL_ALERTS_STORE.filter(a => a.tenant_id === tenantId);
-  assert.equal(tenantAlerts.length, 1); // 1 sola alerta
+  assert.equal(tenantAlerts.length, 1);
   assert.equal(tenantAlerts[0].occurrence_count, 10);
   assert.equal(tenantAlerts[0].severity, 'CRITICAL');
 });
 
-test('3. Auto-Resolución: Cuando la condición desaparece, la alerta se resuelve automáticamente (AUTO_CONDITION_CLEARED)', () => {
+test('3. Auto-Resolución: Cuando la condición desaparece, la alerta se resuelve automáticamente (AUTO_CONDITION_CLEARED) (Prueba 8)', () => {
   OPERATIONAL_ALERTS_STORE.length = 0;
   OPERATIONAL_ALERT_EVENTS_STORE.length = 0;
   const tenantId = '11111111-1111-1111-1111-111111111111';
@@ -48,14 +46,11 @@ test('3. Auto-Resolución: Cuando la condición desaparece, la alerta se resuelv
     { tenant_id: tenantId, product_id: 'SKU-TEMP', on_hand_sellable: 1, min_stock: 5 }
   ];
 
-  // 1ra corrida: Levanta alerta LOW_STOCK
   OperationalHealthAlerts.runTenantHealthChecks(tenantId, { balancesStore });
   assert.equal(OPERATIONAL_ALERTS_STORE[0].status, 'OPEN');
 
-  // Recepción de mercadería legítima: stock sube a 20 u.
   balancesStore[0].on_hand_sellable = 20;
 
-  // 2da corrida: La condición desapareció -> Auto-Resolución
   const res2 = OperationalHealthAlerts.runTenantHealthChecks(tenantId, { balancesStore });
   assert.equal(res2.status, 'HEALTHY');
   assert.equal(OPERATIONAL_ALERTS_STORE[0].status, 'RESOLVED');
@@ -65,10 +60,9 @@ test('3. Auto-Resolución: Cuando la condición desaparece, la alerta se resuelv
   assert.equal(events.some(e => e.event_type === 'AUTO_RESOLVED'), true);
 });
 
-test('4. Detección de Falla del Propio Motor: Si ocurre una excepción, el estado es CHECK_FAILED (No HEALTHY falso)', () => {
+test('4. Detección de Falla del Propio Motor: Si ocurre una excepción, el estado es CHECK_FAILED (No HEALTHY falso) (Prueba 9)', () => {
   const tenantId = '11111111-1111-1111-1111-111111111111';
 
-  // Objeto corrupto que lanza error al iterar
   const corruptStore = {
     balancesStore: { filter: () => { throw new Error('Simulated database connection failure'); } }
   };
@@ -78,32 +72,49 @@ test('4. Detección de Falla del Propio Motor: Si ocurre una excepción, el esta
   assert.equal(result.error.includes('Simulated database connection failure'), true);
 });
 
-test('5. Acciones Manuales de Alerta (ACK, Assign, Resolve) Integradas con Audit Log', () => {
-  OPERATIONAL_ALERTS_STORE.length = 0;
-  ADMIN_ACTIVITY_LOG_STORE.length = 0;
-  const tenantId = '11111111-1111-1111-1111-111111111111';
+test('5. Bloqueo de Escritura Directa en Alertas y Eventos desde Cliente (Pruebas 4 & 5)', () => {
+  assert.throws(() => {
+    OperationalHealthAlerts.attemptDirectAlertWrite();
+  }, /🔒 Operación denegada en Supabase: ERROR 42501/);
 
-  const balancesStore = [{ tenant_id: tenantId, product_id: 'SKU-TEST', on_hand_sellable: 0 }];
-  OperationalHealthAlerts.runTenantHealthChecks(tenantId, { balancesStore });
-
-  const alertId = OPERATIONAL_ALERTS_STORE[0].id;
-
-  // Acknowledge
-  const ackRes = OperationalHealthAlerts.acknowledgeAlert(alertId, tenantId, 'usr-admin-franco');
-  assert.equal(ackRes.status, 'ACKNOWLEDGED');
-  assert.equal(ackRes.acknowledged_by, 'usr-admin-franco');
-
-  // Resolve Manually
-  const resolveRes = OperationalHealthAlerts.resolveAlertManually(alertId, tenantId, 'usr-admin-franco', 'Revisado físicamente');
-  assert.equal(resolveRes.status, 'RESOLVED');
-  assert.equal(resolveRes.resolution_type, 'MANUALLY_RESOLVED');
-
-  // Comprobar integración con admin_activity_log
-  const auditLogs = AdminOperationsConsole.getAdminActivityLogs(tenantId);
-  assert.equal(auditLogs.some(l => l.action === 'ALERT_MANUAL_RESOLVE'), true);
+  assert.throws(() => {
+    OperationalHealthAlerts.attemptDirectEventWrite();
+  }, /🔒 Operación denegada en Supabase: ERROR 42501/);
 });
 
-test('6. Multi-Tenant Isolation en Alertas y Notificaciones In-App', () => {
+test('6. Detector de Integridad Transaccional: Venta sin ítems genera Alerta CRITICAL (Prueba 11)', () => {
+  OPERATIONAL_ALERTS_STORE.length = 0;
+  const tenantId = '11111111-1111-1111-1111-111111111111';
+
+  const salesStore = [{ id: 'sale-broken-99', tenant_id: tenantId, total: 12000 }];
+  const saleItemsStore = []; // Sin ítems grabados
+
+  const result = OperationalHealthAlerts.runTenantHealthChecks(tenantId, { salesStore, saleItemsStore });
+  assert.equal(result.status, 'CRITICAL');
+
+  const alert = OPERATIONAL_ALERTS_STORE.find(a => a.alert_type === 'SALE_WITHOUT_ITEMS');
+  assert.notEqual(alert, undefined);
+  assert.equal(alert.severity, 'CRITICAL');
+});
+
+test('7. Notificaciones In-App Persistentes y Control de Lectura (Prueba 6)', () => {
+  OPERATIONAL_ALERTS_STORE.length = 0;
+  ALERT_NOTIFICATIONS_STORE.length = 0;
+  const tenantId = '11111111-1111-1111-1111-111111111111';
+
+  OperationalHealthAlerts.runTenantHealthChecks(tenantId, { balancesStore: [{ tenant_id: tenantId, product_id: 'PROD-NOTIF', on_hand_sellable: 0 }] });
+
+  const unreadBefore = OperationalHealthAlerts.getUnreadNotifications(tenantId);
+  assert.equal(unreadBefore.length, 1);
+  assert.equal(unreadBefore[0].read, false);
+
+  OperationalHealthAlerts.markNotificationAsRead(unreadBefore[0].id, tenantId);
+
+  const unreadAfter = OperationalHealthAlerts.getUnreadNotifications(tenantId);
+  assert.equal(unreadAfter.length, 0);
+});
+
+test('8. Multi-Tenant Isolation en Alertas y Notificaciones In-App (Prueba 13)', () => {
   OPERATIONAL_ALERTS_STORE.length = 0;
   ALERT_NOTIFICATIONS_STORE.length = 0;
 

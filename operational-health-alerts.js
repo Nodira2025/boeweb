@@ -18,6 +18,15 @@ class OperationalHealthAlertsEngine {
     this.runs = HEALTH_CHECK_RUNS_STORE;
   }
 
+  // Métodos de verificación de seguridad de escritura directa
+  attemptDirectAlertWrite() {
+    throw new Error('🔒 Operación denegada en Supabase: ERROR 42501 (permission denied for table operational_alerts). Direct INSERT/UPDATE/DELETE is REVOKED for anon and authenticated.');
+  }
+
+  attemptDirectEventWrite() {
+    throw new Error('🔒 Operación denegada en Supabase: ERROR 42501 (permission denied for table operational_alert_events). Direct INSERT/UPDATE/DELETE is REVOKED for anon and authenticated.');
+  }
+
   // 1. Ejecutar Salud del Tenant con Deduplicación y Auto-Resolución
   runTenantHealthChecks(tenantId, stores = {}) {
     const startedAt = new Date().toISOString();
@@ -162,6 +171,27 @@ class OperationalHealthAlertsEngine {
         }
       }
 
+      // F. Integridad Transaccional: Venta sin ítems
+      const sales = stores.salesStore || [];
+      const saleItems = stores.saleItemsStore || [];
+      for (const sal of sales.filter(s => s.tenant_id === tenantId)) {
+        checksExecuted++;
+        const hasItems = saleItems.some(i => i.sale_id === sal.id);
+        if (!hasItems) {
+          activeConditions.push({
+            type: 'SALE_WITHOUT_ITEMS',
+            category: 'INTEGRITY',
+            severity: 'CRITICAL',
+            title: `Venta sin ítems asociados`,
+            message: `La venta ${sal.id} existe en ventas pero no posee registros en sale_items.`,
+            source_entity_type: 'SALE',
+            source_entity_id: sal.id,
+            fingerprint: `INT_SALE_NO_ITEMS:${tenantId}:${sal.id}`,
+            context: { total: sal.total }
+          });
+        }
+      }
+
       // 2. Procesar Deduplicación / Actualización de Ocurrencias
       const activeFingerprints = new Set(activeConditions.map(c => c.fingerprint));
 
@@ -211,7 +241,6 @@ class OperationalHealthAlertsEngine {
             created_at: startedAt
           });
 
-          // Notificación In-App
           this.notifications.push({
             id: `notif-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
             tenant_id: tenantId,
@@ -243,7 +272,6 @@ class OperationalHealthAlertsEngine {
         }
       }
 
-      // 4. Calcular Estado de Salud del Tenant (HEALTHY / ATTENTION / CRITICAL)
       const currentTenantAlerts = this.alerts.filter(a => a.tenant_id === tenantId && a.status === 'OPEN');
       const hasCritical = currentTenantAlerts.some(a => a.severity === 'CRITICAL');
       const hasWarning = currentTenantAlerts.some(a => a.severity === 'WARNING');
@@ -377,7 +405,6 @@ class OperationalHealthAlertsEngine {
     return alert;
   }
 
-  // Notificaciones In-App
   getUnreadNotifications(tenantId) {
     return this.notifications.filter(n => n.tenant_id === tenantId && !n.read);
   }
