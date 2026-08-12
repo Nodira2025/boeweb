@@ -88,7 +88,7 @@ class PosInventorySyncEngine {
   }
 
   // 2b. Venta POS Directa Presencial Multi-Item Atómica (FASE 11B: rpc_sale_pos_direct_saas)
-  processPersistentSale(saleDraft, locationsStore = [], balancesStore = this.balances, reservationsStore = this.reservations, ledgerStore = this.ledger, profilesStore = [], salesStore = this.sales, saleItemsStore = this.saleItems, cashSessionsStore = this.cashSessions, cashMovementsStore = this.cashMovements) {
+  processPersistentSale(saleDraft, locationsStore = [], balancesStore = this.balances, reservationsStore = this.reservations, ledgerStore = this.ledger, profilesStore = [], salesStore = this.sales, saleItemsStore = this.saleItems, cashSessionsStore = this.cashSessions, cashMovementsStore = this.cashMovements, productsStore = []) {
     const tenantId = saleDraft.tenant_id;
     const key = saleDraft.idempotency_key || this.generateIdempotencyKey('sale');
 
@@ -146,6 +146,16 @@ class PosInventorySyncEngine {
       const productId = item.product_id || item.id;
       const qty = Number(item.quantity || 1);
 
+      // Prevenir Adulteración de Precios de Cliente (DevTools Price Tampering Protection)
+      let authoritativePrice = Number(item.unit_price || item.price || 0);
+      const catList = Array.isArray(productsStore) ? productsStore : [];
+      if (catList.length > 0) {
+        const catProduct = catList.find(p => p.id === productId || p.product_code === productId);
+        if (catProduct && catProduct.price !== undefined && Math.abs(Number(catProduct.price) - authoritativePrice) > 0.01) {
+          authoritativePrice = Number(catProduct.price);
+        }
+      }
+
       const saleItemRecord = {
         id: `sitem-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         sale_id: saleId,
@@ -153,8 +163,8 @@ class PosInventorySyncEngine {
         product_id: productId,
         product_name_snapshot: item.name || productId,
         quantity: qty,
-        unit_price: Number(item.unit_price || item.price || 0),
-        subtotal: Number(item.subtotal || (qty * (item.price || 0))),
+        unit_price: authoritativePrice,
+        subtotal: qty * authoritativePrice,
         fulfillment_type: item.availability === 'A_PEDIDO' ? 'B2B_BACKORDER' : 'DIRECT'
       };
       saleItemsStore.push(saleItemRecord);

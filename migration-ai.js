@@ -78,9 +78,18 @@ class MigrationAIEngine {
     return rows.map(r => ({ ...r, _ocr_scanned: true }));
   }
 
-  // Parser para fuentes extraídas desde una URL externa
+  // Parser para fuentes extraídas desde una URL externa con prevención de SSRF estricta
   parseUrlSource(urlAddress) {
-    const urlStr = String(urlAddress || '');
+    const urlStr = String(urlAddress || '').trim();
+    
+    // Reglas de Bloqueo SSRF: Protocolos prohibidos y rangos de red privada / metadatos cloud
+    const forbiddenProtocols = /^(file|gopher|dict|ftp|ldap|ssh|smb):/i;
+    const privateIpPattern = /^https?:\/\/(localhost|127\.\d+\.\d+\.\d+|169\.254\.169\.254|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|::1|0\.0\.0\.0)/i;
+
+    if (forbiddenProtocols.test(urlStr) || privateIpPattern.test(urlStr)) {
+      throw new Error(`🔒 Bloqueo de Seguridad SSRF: La URL solicitada (${urlStr}) apunta a un rango de red privada o protocolo restringido.`);
+    }
+
     return [
       { COD_ART: 'URL-01', DESCRIPCION: `Producto extraído desde ${urlStr}`, MARCA: 'Proveedor Web', PVP: '120.00', CANT: '50', _source_url: urlStr, _extracted_at: new Date().toISOString() }
     ];
