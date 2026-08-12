@@ -339,7 +339,7 @@ GRANT SELECT, INSERT, UPDATE ON public.cash_sessions TO authenticated;
 GRANT SELECT, INSERT ON public.cash_movements TO authenticated;
 
 -- ============================================================================
--- 9. BITÁCORA INMUTABLE DE ACTIVIDAD ADMINISTRATIVA (FASE 12)
+-- 9. BITÁCORA INMUTABLE DE ACTIVIDAD ADMINISTRATIVA Y SERVER-SIDE USER RPC (FASE 12)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.admin_activity_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -358,19 +358,136 @@ CREATE TABLE IF NOT EXISTS public.admin_activity_log (
 
 ALTER TABLE public.admin_activity_log ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "RLS admin_activity_log_isolation" ON public.admin_activity_log;
-DROP POLICY IF EXISTS "RLS admin_activity_log_insert" ON public.admin_activity_log;
 
 CREATE POLICY "RLS admin_activity_log_isolation" ON public.admin_activity_log FOR SELECT USING (
   public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
 );
 
-CREATE POLICY "RLS admin_activity_log_insert" ON public.admin_activity_log FOR INSERT WITH CHECK (
-  public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
-);
+-- Denegar INSERT, UPDATE y DELETE directo a clientes autenticados y anónimos (Solo RPC server-side SECURITY DEFINER puede escribir)
+REVOKE INSERT, UPDATE, DELETE ON public.admin_activity_log FROM anon, authenticated;
+GRANT SELECT ON public.admin_activity_log TO authenticated;
 
--- Denegar UPDATE y DELETE para inmutabilidad estricta
-REVOKE UPDATE, DELETE ON public.admin_activity_log FROM anon, authenticated;
+-- RPC autorizada server-side para registrar eventos de auditoría administrativa
+CREATE OR REPLACE FUNCTION public.rpc_log_admin_activity_saas(
+  p_tenant_id UUID,
+  p_action VARCHAR,
+  p_entity_type VARCHAR,
+  p_entity_id VARCHAR DEFAULT NULL,
+  p_before_data JSONB DEFAULT NULL,
+  p_after_data JSONB DEFAULT NULL,
+  p_metadata JSONB DEFAULT '{}'::jsonb
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_caller_uid UUID;
+BEGIN
+  v_caller_uid := auth.uid();
+  IF v_caller_uid IS NULL THEN
+    RAISE EXCEPTION '🔒 Acceso denegado: Usuario no autenticado.';
+  END IF;
 
-GRANT SELECT, INSERT ON public.admin_activity_log TO authenticated;
+  INSERT INTO public.admin_activity_log (
+    tenant_id, actor_user_id, actor_name_snapshot, action, entity_type, entity_id, before_data, after_data, metadata
+  ) VALUES (
+    p_tenant_id,
+    v_caller_uid::text,
+    COALESCE((SELECT name FROM public.tenant_users WHERE user_id = v_caller_uid::text LIMIT 1), 'Admin Autenticado'),
+    p_action,
+    p_entity_type,
+    p_entity_id,
+    p_before_data,
+    p_after_data,
+    p_metadata
+  );
+
+  RETURN jsonb_build_object('success', true);
+END;
+$$;
+
+-- RPC autorizada server-side para gestión de usuarios de tenant sin exponer service_role al navegador
+CREATE OR REPLACE FUNCTION public.rpc_manage_tenant_user_saas(
+  p_target_tenant_id UUID,
+  p_action VARCHAR,
+  p_target_user_id VARCHAR,
+  p_new_role VARCHAR DEFAULT NULL,
+  p_name VARCHAR DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_caller_uid UUID;
+  v_caller_role VARCHAR;
+  v_is_superadmin BOOLEAN;
+  v_before_data JSONB;
+  v_after_data JSONB;
+BEGIN
+  v_caller_uid := auth.uid();
+  IF v_caller_uid IS NULL THEN
+    RAISE EXCEPTION '🔒 Acceso denegado: Usuario no autenticado en Supabase Auth.';
+  END IF;
+
+  v_is_superadmin := public.is_superadmin();
+
+  SELECT role INTO v_caller_role
+  FROM public.tenant_users
+  WHERE tenant_id = p_target_tenant_id AND user_id = v_caller_uid::text AND active = true;
+
+  IF NOT v_is_superadmin AND (v_caller_role IS NULL OR v_caller_role != 'ADMIN') THEN
+    RAISE EXCEPTION '🔒 Acceso denegado RLS Multi-Tenant: El usuario no tiene permisos de ADMIN en el tenant %', p_target_tenant_id;
+  END IF;
+
+  IF p_new_role = 'SUPERADMIN' AND NOT v_is_superadmin THEN
+    RAISE EXCEPTION '🔒 Operación denegada: Un ADMIN local no puede otorgar ni promover a un usuario al rol SUPERADMIN.';
+  END IF;
+
+  SELECT to_jsonb(tu.*) INTO v_before_data
+  FROM public.tenant_users tu
+  WHERE tu.tenant_id = p_target_tenant_id AND tu.user_id = p_target_user_id;
+
+  IF p_action IN ('INVITE', 'CREATE') THEN
+    INSERT INTO public.tenant_users (tenant_id, user_id, name, role, active)
+    VALUES (p_target_tenant_id, p_target_user_id, COALESCE(p_name, 'Nuevo Usuario'), COALESCE(p_new_role, 'VENDEDOR'), true)
+    ON CONFLICT (tenant_id, user_id) DO UPDATE
+    SET name = COALESCE(p_name, tenant_users.name),
+        role = COALESCE(p_new_role, tenant_users.role),
+        active = true;
+  ELSIF p_action = 'SUSPEND' THEN
+    UPDATE public.tenant_users SET active = false WHERE tenant_id = p_target_tenant_id AND user_id = p_target_user_id;
+  ELSIF p_action = 'ACTIVATE' THEN
+    UPDATE public.tenant_users SET active = true WHERE tenant_id = p_target_tenant_id AND user_id = p_target_user_id;
+  ELSIF p_action = 'CHANGE_ROLE' THEN
+    UPDATE public.tenant_users SET role = p_new_role WHERE tenant_id = p_target_tenant_id AND user_id = p_target_user_id;
+  END IF;
+
+  SELECT to_jsonb(tu.*) INTO v_after_data
+  FROM public.tenant_users tu
+  WHERE tu.tenant_id = p_target_tenant_id AND tu.user_id = p_target_user_id;
+
+  INSERT INTO public.admin_activity_log (
+    tenant_id, actor_user_id, actor_name_snapshot, action, entity_type, entity_id, before_data, after_data, metadata
+  ) VALUES (
+    p_target_tenant_id,
+    v_caller_uid::text,
+    COALESCE((SELECT name FROM public.tenant_users WHERE user_id = v_caller_uid::text LIMIT 1), 'Admin Autenticado'),
+    'USER_' || p_action,
+    'USER',
+    p_target_user_id,
+    v_before_data,
+    v_after_data,
+    jsonb_build_object('requested_role', p_new_role)
+  );
+
+  RETURN jsonb_build_object('success', true, 'action', p_action, 'user', v_after_data);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_log_admin_activity_saas TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_manage_tenant_user_saas TO authenticated;
+
 
 

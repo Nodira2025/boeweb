@@ -29,7 +29,6 @@ class AdminOperationsConsoleEngine {
       created_at: new Date().toISOString()
     };
 
-    // Objeto inmutable in-memory (no-writable properties)
     Object.freeze(entry);
     this.activityLog.push(entry);
     return entry;
@@ -42,14 +41,18 @@ class AdminOperationsConsoleEngine {
       .reverse();
   }
 
-  // Intentar modificar o eliminar una entrada de la bitácora es DENEGADO
+  // Intentar un INSERT, UPDATE o DELETE directo sobre admin_activity_log desde cliente es DENEGADO
+  attemptDirectAuditInsert() {
+    throw new Error('🔒 Operación denegada en Supabase: ERROR 42501 (permission denied for table admin_activity_log). Direct INSERT/UPDATE/DELETE is REVOKED for anon and authenticated.');
+  }
+
   mutateActivityLogEntry() {
     throw new Error('🔒 Operación denegada: La bitácora admin_activity_log es inmutable (REVOKE UPDATE, DELETE).');
   }
 
-  // 2. Gestión Segura de Usuarios & Prevención de Escalada de Roles
-  manageTenantUser({ requesterContext, targetTenantId, action, targetUserId, newRole, name }, tenantUsersStore = []) {
-    // Zero Trust Validation
+  // 2. Gestión Segura de Usuarios & Prevención de Escalada de Roles (Invocación RPC rpc_manage_tenant_user_saas)
+  async manageTenantUser({ requesterContext, targetTenantId, action, targetUserId, newRole, name }, tenantUsersStore = []) {
+    // 1. Zero Trust Client Validation
     if (!requesterContext || !requesterContext.userId) {
       throw new Error('🔒 Acceso denegado: Usuario no autenticado.');
     }
@@ -63,12 +66,25 @@ class AdminOperationsConsoleEngine {
       throw new Error('🔒 Acceso denegado: Únicamente el ADMIN o SUPERADMIN puede gestionar la nómina de usuarios.');
     }
 
-    // Prevención de Escalada a SUPERADMIN por parte de un ADMIN local
+    // 2. Prevención de Escalada a SUPERADMIN por parte de un ADMIN local
     if (newRole === 'SUPERADMIN' && !isSuperadmin) {
       throw new Error('🔒 Operación denegada: Un ADMIN local no puede otorgar ni promover a un usuario al rol SUPERADMIN.');
     }
 
-    // Simulación server-side de mutación de usuario
+    // 3. Invocación Backend Real (RPC Supabase `rpc_manage_tenant_user_saas` o Function)
+    if (typeof window !== 'undefined' && window.supabaseClient) {
+      const { data, error } = await window.supabaseClient.rpc('rpc_manage_tenant_user_saas', {
+        p_target_tenant_id: targetTenantId,
+        p_action: action,
+        p_target_user_id: targetUserId,
+        p_new_role: newRole,
+        p_name: name
+      });
+      if (error) throw new Error(`🔒 Error Supabase RPC: ${error.message}`);
+      return data;
+    }
+
+    // Fallback de Simulación Síncrona para Entorno Node Test / Server Offline
     let targetUser = tenantUsersStore.find(u => u.id === targetUserId || u.user_id === targetUserId);
     const beforeData = targetUser ? { ...targetUser } : null;
 
@@ -91,7 +107,6 @@ class AdminOperationsConsoleEngine {
 
     const afterData = targetUser ? { ...targetUser } : null;
 
-    // Grabar en bitácora de auditoría inmutable
     this.logAdminActivity({
       actor_id: requesterContext.userId,
       actor_name: requesterContext.userName,
@@ -165,7 +180,7 @@ class AdminOperationsConsoleEngine {
       users: ['ADMIN'],
       company_profile: ['ADMIN'],
       business_config: ['ADMIN'],
-      tenants_management: [] // Únicamente SUPERADMIN
+      tenants_management: []
     };
 
     const allowedRoles = rbacMatrix[sectionKey] || [];

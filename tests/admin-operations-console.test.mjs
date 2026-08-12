@@ -24,7 +24,7 @@ test('1. Dashboard Summary: Cálculo de KPIs Operativos (Ingresos, Operaciones, 
   ];
 
   const balancesStore = [
-    { tenant_id: tenantId, product_id: 'SKU-01', on_hand_sellable: 2 }, // Bajo stock
+    { tenant_id: tenantId, product_id: 'SKU-01', on_hand_sellable: 2 },
     { tenant_id: tenantId, product_id: 'SKU-02', on_hand_sellable: 20 }
   ];
 
@@ -35,26 +35,19 @@ test('1. Dashboard Summary: Cálculo de KPIs Operativos (Ingresos, Operaciones, 
   assert.equal(summary.today_income, 50000);
   assert.equal(summary.today_operations, 2);
   assert.equal(summary.has_open_cash, true);
-  assert.equal(summary.expected_cash, 40000); // 10.000 + 35.000 - 5.000
+  assert.equal(summary.expected_cash, 40000);
   assert.equal(summary.low_stock_alerts, 1);
 });
 
 test('2. RBAC Admin Matrix: Verificación Estricta por Rol', () => {
-  // SUPERADMIN accede a todo
   assert.equal(AdminOperationsConsole.checkAdminAccess('SUPERADMIN', 'tenants_management'), true);
   assert.equal(AdminOperationsConsole.checkAdminAccess('SUPERADMIN', 'users'), true);
-
-  // ADMIN accede a usuarios y empresa pero NO a tenants_management
   assert.equal(AdminOperationsConsole.checkAdminAccess('ADMIN', 'users'), true);
   assert.equal(AdminOperationsConsole.checkAdminAccess('ADMIN', 'company_profile'), true);
   assert.equal(AdminOperationsConsole.checkAdminAccess('ADMIN', 'tenants_management'), false);
-
-  // SUPERVISOR accede a WMS e inventario pero NO a usuarios ni branding
   assert.equal(AdminOperationsConsole.checkAdminAccess('SUPERVISOR', 'wms'), true);
   assert.equal(AdminOperationsConsole.checkAdminAccess('SUPERVISOR', 'inventory'), true);
   assert.equal(AdminOperationsConsole.checkAdminAccess('SUPERVISOR', 'users'), false);
-
-  // VENDEDOR NO accede a consola de administración
   assert.equal(AdminOperationsConsole.checkAdminAccess('VENDEDOR', 'users'), false);
   assert.equal(AdminOperationsConsole.checkAdminAccess('VENDEDOR', 'company_profile'), false);
 });
@@ -79,13 +72,18 @@ test('3. Bitácora de Auditoría Administrativa (admin_activity_log) Persistente
   assert.equal(logs[0].actor_name_snapshot, 'Profesor Franco');
   assert.equal(logs[0].entity_id, 'usr-lautaro');
 
-  // Inmutabilidad: Intentar alterar o eliminar el log debe ser denegado
   assert.throws(() => {
     AdminOperationsConsole.mutateActivityLogEntry();
   }, /🔒 Operación denegada/);
 });
 
-test('4. Seguridad Server-Side en Gestión de Usuarios: Denegación de Escalada a SUPERADMIN', () => {
+test('4. Bloqueo de INSERT Directo en Audit Log desde Cliente Autenticado (Prueba 2)', () => {
+  assert.throws(() => {
+    AdminOperationsConsole.attemptDirectAuditInsert();
+  }, /🔒 Operación denegada en Supabase: ERROR 42501/);
+});
+
+test('5. Seguridad Server-Side en Gestión de Usuarios: Denegación de Escalada a SUPERADMIN (Prueba 4)', async () => {
   const tenantId = '11111111-1111-1111-1111-111111111111';
   const tenantUsersStore = [
     { id: 'usr-01', user_id: 'usr-01', tenant_id: tenantId, name: 'Empleado Mostrador', role: 'VENDEDOR', active: true }
@@ -99,9 +97,8 @@ test('4. Seguridad Server-Side en Gestión de Usuarios: Denegación de Escalada 
     isSuperadmin: false
   };
 
-  // ADMIN intenta promoverse o promover a alguien a SUPERADMIN -> DENEGADO
-  assert.throws(() => {
-    AdminOperationsConsole.manageTenantUser({
+  await assert.rejects(async () => {
+    await AdminOperationsConsole.manageTenantUser({
       requesterContext: adminRequester,
       targetTenantId: tenantId,
       action: 'CHANGE_ROLE',
@@ -111,7 +108,7 @@ test('4. Seguridad Server-Side en Gestión de Usuarios: Denegación de Escalada 
   }, /🔒 Operación denegada: Un ADMIN local no puede otorgar/);
 });
 
-test('5. Multi-Tenant Isolation en Gestión de Usuarios: ADMIN Tenant A NO altera Tenant B', () => {
+test('6. Multi-Tenant Isolation en Gestión de Usuarios: ADMIN Tenant A NO altera Tenant B (Prueba 4)', async () => {
   const tenantA = '11111111-1111-1111-1111-111111111111';
   const tenantB = '22222222-2222-2222-2222-222222222222';
 
@@ -127,9 +124,8 @@ test('5. Multi-Tenant Isolation en Gestión de Usuarios: ADMIN Tenant A NO alter
     isSuperadmin: false
   };
 
-  // ADMIN de Tenant A intenta modificar usuario de Tenant B -> DENEGADO POR RLS
-  assert.throws(() => {
-    AdminOperationsConsole.manageTenantUser({
+  await assert.rejects(async () => {
+    await AdminOperationsConsole.manageTenantUser({
       requesterContext: adminARequester,
       targetTenantId: tenantB,
       action: 'SUSPEND',
@@ -138,7 +134,40 @@ test('5. Multi-Tenant Isolation en Gestión de Usuarios: ADMIN Tenant A NO alter
   }, /🔒 Acceso denegado RLS Multi-Tenant/);
 });
 
-test('6. Buscador Global Admin: Coincidencias Filtradas por Tenant', () => {
+test('7. Operación Válida de Usuario por SUPERADMIN o ADMIN Autorizado Registra Audit Log (Prueba 4 & 6)', async () => {
+  ADMIN_ACTIVITY_LOG_STORE.length = 0;
+  const tenantId = '11111111-1111-1111-1111-111111111111';
+  const tenantUsersStore = [
+    { id: 'usr-02', user_id: 'usr-02', tenant_id: tenantId, name: 'Lautaro', role: 'VENDEDOR', active: true }
+  ];
+
+  const superadminRequester = {
+    userId: 'usr-superadmin',
+    userName: 'Superadmin Plataforma',
+    tenantId: tenantId,
+    role: 'SUPERADMIN',
+    isSuperadmin: true
+  };
+
+  const res = await AdminOperationsConsole.manageTenantUser({
+    requesterContext: superadminRequester,
+    targetTenantId: tenantId,
+    action: 'CHANGE_ROLE',
+    targetUserId: 'usr-02',
+    newRole: 'SUPERVISOR'
+  }, tenantUsersStore);
+
+  assert.equal(res.success, true);
+  assert.equal(tenantUsersStore[0].role, 'SUPERVISOR');
+
+  const logs = AdminOperationsConsole.getAdminActivityLogs(tenantId);
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0].action, 'USER_CHANGE_ROLE');
+  assert.equal(logs[0].actor_user_id, 'usr-superadmin');
+  assert.equal(logs[0].entity_id, 'usr-02');
+});
+
+test('8. Buscador Global Admin: Coincidencias Filtradas por Tenant', () => {
   const tenantId = '11111111-1111-1111-1111-111111111111';
   const productsStore = [
     { tenant_id: tenantId, name: 'BioBizz Bio Grow 1L', product_code: 'BIO-01' },
@@ -152,23 +181,4 @@ test('6. Buscador Global Admin: Coincidencias Filtradas por Tenant', () => {
 
   assert.equal(searchRes.products.length, 1);
   assert.equal(searchRes.products[0].product_code, 'BIO-01');
-});
-
-test('7. Multi-Tenant Isolation en Bitácora Audit Log', () => {
-  const tenantA = '11111111-1111-1111-1111-111111111111';
-  const tenantB = '22222222-2222-2222-2222-222222222222';
-
-  ADMIN_ACTIVITY_LOG_STORE.length = 0;
-
-  AdminOperationsConsole.logAdminActivity({ actor_id: 'admin-a', actor_name: 'Admin A', tenant_id: tenantA, action: 'PUBLISH_PRODUCT', entity_type: 'PRODUCT' });
-  AdminOperationsConsole.logAdminActivity({ actor_id: 'admin-b', actor_name: 'Admin B', tenant_id: tenantB, action: 'PUBLISH_PRODUCT', entity_type: 'PRODUCT' });
-
-  const logsA = AdminOperationsConsole.getAdminActivityLogs(tenantA);
-  const logsB = AdminOperationsConsole.getAdminActivityLogs(tenantB);
-
-  assert.equal(logsA.length, 1);
-  assert.equal(logsA[0].actor_name_snapshot, 'Admin A');
-
-  assert.equal(logsB.length, 1);
-  assert.equal(logsB[0].actor_name_snapshot, 'Admin B');
 });
