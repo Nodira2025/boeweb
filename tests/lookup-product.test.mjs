@@ -20,7 +20,7 @@ function lookupRequest(body) {
   };
 }
 
-function installFetchMock(searchHtml, yahooHtml = '', astroHtml = '') {
+function installFetchMock(searchHtml, yahooHtml = '', astroHtml = '', publicPages = {}) {
   globalThis.fetch = async url => {
     const href = String(url);
     if (href.includes('customsearch.googleapis.com')) return jsonResponse({}, 403);
@@ -30,6 +30,7 @@ function installFetchMock(searchHtml, yahooHtml = '', astroHtml = '') {
     if (href.includes('api.mercadolibre.com')) return jsonResponse({ results: [] });
     if (href.includes('world.openfoodfacts.org')) return jsonResponse({}, 404);
     if (href.includes('api.upcitemdb.com')) return jsonResponse({ items: [] });
+    if (publicPages[href]) return new Response(publicPages[href], { status: 200 });
     return jsonResponse({}, 404);
   };
 }
@@ -114,6 +115,53 @@ test('usa el precio público de Astro para Top Bud y descarta combos parecidos',
   assert.equal(result.market.average_price, 22010);
   assert.equal(result.market.sample_size, 1);
   assert.match(result.market.provider, /Astro Grow/i);
+});
+
+test('usa una imagen pública provisoria encontrada por código', async () => {
+  const productUrl = 'https://monkeygrowshop.com.ar/producto/top-crop-bud-100ml/';
+  installFetchMock('', `
+    <li><div class="dd algo algo-sr">
+      <a href="${productUrl}"><h3><span>TOP CROP BUD 100ml</span></h3></a>
+      <div class="compText"><p>SKU: 8414606516469 · Marca: Top Crop</p></div>
+    </div></li>
+  `, '', {
+    [productUrl]: `
+      <script type="application/ld+json">
+        {"@type":"Product","name":"Top Crop Top Bud 100ml","brand":{"name":"Top Crop"},"gtin13":"8414606516469","image":"https://cdn.example.com/top-bud-100ml.webp","offers":{"@type":"Offer","price":"22010","priceCurrency":"ARS"}}
+      </script>
+    `
+  });
+
+  const response = await lookupProduct(lookupRequest({ barcode: '8414606516469' }), { ip: 'test-provisional-image' });
+  const result = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(result.product.image_url, 'https://cdn.example.com/top-bud-100ml.webp');
+  assert.equal(result.market.average_price, 22010);
+});
+
+test('recupera la imagen provisoria desde metadatos públicos de la ficha', async () => {
+  const productUrl = 'https://growshop.example.com.ar/productos/prohanger-68kg/';
+  installFetchMock('', `
+    <li><div class="dd algo algo-sr">
+      <a href="${productUrl}"><h3><span>Poleas Garden HighPro ProHanger 68 Kg</span></h3></a>
+      <div class="compText"><p>SKU 8436554760848 · Producto para cultivo indoor</p></div>
+    </div></li>
+  `, '', {
+    [productUrl]: `
+      <meta content="https://cdn.example.com/prohanger.webp" property="og:image">
+      <meta property="og:title" content="Poleas Garden HighPro ProHanger 68 Kg">
+      <meta property="product:price:currency" content="ARS">
+      <meta property="product:price:amount" content="15500">
+    `
+  });
+
+  const response = await lookupProduct(lookupRequest({ barcode: '8436554760848' }), { ip: 'test-meta-image' });
+  const result = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(result.product.image_url, 'https://cdn.example.com/prohanger.webp');
+  assert.equal(result.market.average_price, 15500);
 });
 
 test('el vendedor no consulta tablas o columnas ausentes del esquema anterior', async () => {

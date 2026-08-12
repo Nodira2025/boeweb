@@ -1026,7 +1026,7 @@
   </style>
   <link rel="stylesheet" href="vendedor-caja.css?v=legado_v1">
   <link rel="stylesheet" href="vendedor-portal.css?v=desktop_v2_crema">
-  <link rel="stylesheet" href="vendedor-stock.css?v=stock_schema_compat_v7">
+  <link rel="stylesheet" href="vendedor-stock.css?v=provisional_product_image_v9">
   <link rel="stylesheet" href="vendedor-login.css?v=login_editorial_v1">
 </head>
 <body>
@@ -1490,6 +1490,7 @@
             </div>
 
             <div id="fastupload-photo-preview-container" class="stock-photo-preview" hidden>
+              <span id="fastupload-photo-source" class="stock-photo-source" hidden>Imagen provisoria encontrada en internet</span>
               <img id="fastupload-photo-img" src="" alt="Vista previa del producto seleccionado">
               <div class="stock-photo-actions stock-photo-change-actions" role="group" aria-label="Cambiar foto del producto">
                 <button type="button" class="stock-entry-secondary-btn" onclick="openFastUploadPhotoPicker('fastupload-camera-input')">Sacar otra</button>
@@ -2115,6 +2116,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="mapa-local.js?v=stock_assistants_v1"></script>
-  <script src="vendedor.js?v=optional_product_photo_v8"></script>
+  <script src="vendedor.js?v=provisional_product_image_v9"></script>
 </body>
 </html>

@@ -455,6 +455,22 @@
   display: none;
 }
 
+.stock-photo-source[hidden] {
+  display: none;
+}
+
+.stock-photo-source {
+  width: fit-content;
+  padding: 7px 11px;
+  border: 1px solid rgba(194, 162, 70, 0.55);
+  border-radius: 999px;
+  background: rgba(194, 162, 70, 0.14);
+  color: #152d24;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
 .stock-photo-preview {
   display: grid;
   gap: 10px;

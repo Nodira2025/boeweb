@@ -379,6 +379,20 @@ function priceFromOffer(offer) {
   );
 }
 
+function htmlMetaContent(html, key) {
+  const tags = String(html || '').match(/<meta\b[^>]*>/gi) || [];
+  for (const tag of tags) {
+    const attributes = {};
+    for (const match of tag.matchAll(/([\w:-]+)\s*=\s*(["'])(.*?)\2/gi)) {
+      attributes[match[1].toLowerCase()] = decodeHtmlEntities(match[3]);
+    }
+    if ((attributes.property || attributes.name)?.toLowerCase() === key.toLowerCase()) {
+      return cleanText(attributes.content || '', 500);
+    }
+  }
+  return '';
+}
+
 function productPageDataFromHtml(html) {
   const scripts = [...String(html || '').matchAll(
     /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
@@ -402,7 +416,20 @@ function productPageDataFromHtml(html) {
       // Algunas tiendas publican bloques JSON-LD incompletos; continuamos con el siguiente.
     }
   }
-  return null;
+  const image = htmlMetaContent(html, 'og:image');
+  const name = htmlMetaContent(html, 'og:title');
+  if (!image && !name) return null;
+  const currency = htmlMetaContent(html, 'product:price:currency');
+  return {
+    name: name || null,
+    brand: null,
+    description: htmlMetaContent(html, 'og:description') || null,
+    image: image || null,
+    price: currency && currency !== 'ARS'
+      ? null
+      : normalizeStructuredPrice(htmlMetaContent(html, 'product:price:amount')),
+    barcode: null
+  };
 }
 
 function isSafeArgentineProductUrl(value) {
@@ -418,7 +445,9 @@ function isSafeArgentineProductUrl(value) {
 
 async function enrichItemsFromPublicPages(items, limit = 5) {
   return Promise.all(items.map(async (item, index) => {
-    if (index >= limit || item.price || !isSafeArgentineProductUrl(item.url)) return item;
+    // Aunque el buscador ya muestre el precio, abrimos la ficha para obtener
+    // su imagen pública, que se usará como vista provisoria en el ingreso.
+    if (index >= limit || !isSafeArgentineProductUrl(item.url)) return item;
     try {
       const response = await fetchWithTimeout(item.url, {
         headers: {
@@ -654,7 +683,7 @@ async function searchGrowshopWeb(value, barcode) {
   const links = [...html.matchAll(/<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)];
   const snippets = [...html.matchAll(/<(?:a|div)[^>]*class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/(?:a|div)>/gi)]
     .map(match => stripHtml(match[1]));
-  const items = links.map((match, index) => ({
+  const parsedItems = links.map((match, index) => ({
     title: normalizeSearchTitle(match[2]),
     snippet: snippets[index] || '',
     url: resultUrlFromDuckDuckGo(match[1]),
@@ -662,6 +691,7 @@ async function searchGrowshopWeb(value, barcode) {
     price: parseArgentinePrice(`${match[2]} ${snippets[index] || ''}`),
     score: 0
   }));
+  const items = await enrichItemsFromPublicPages(parsedItems);
   return growshopResultFromItems(
     items,
     value,
@@ -720,8 +750,10 @@ async function searchYahooGrowshops(value, barcode = '') {
   });
   if (!response.ok) return null;
   const html = await response.text();
-  const parsedItems = parseYahooWebItems(html);
-  const items = barcode ? parsedItems : await enrichItemsFromPublicPages(parsedItems);
+  // La ficha pública también aporta la imagen provisoria del producto. Se
+  // consulta tanto por código como por nombre y luego el vendedor puede
+  // reemplazarla con una fotografía propia.
+  const items = await enrichItemsFromPublicPages(parseYahooWebItems(html));
   return growshopResultFromItems(
     items,
     value || barcode,

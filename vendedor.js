@@ -2531,6 +2531,7 @@ function getFastUploadPhotoElements() {
     previewImg: document.getElementById('fastupload-photo-img'),
     trigger: document.getElementById('fastupload-photo-trigger'),
     previewContainer: document.getElementById('fastupload-photo-preview-container'),
+    sourceLabel: document.getElementById('fastupload-photo-source'),
     analyzeButton: document.getElementById('fastupload-ai-btn'),
     status: document.getElementById('fastupload-ai-status')
   };
@@ -2546,6 +2547,7 @@ function setFastUploadPhotoError(message, elements = getFastUploadPhotoElements(
   }
   if (elements.trigger) elements.trigger.hidden = false;
   if (elements.previewContainer) elements.previewContainer.hidden = true;
+  if (elements.sourceLabel) elements.sourceLabel.hidden = true;
   if (elements.analyzeButton) elements.analyzeButton.disabled = true;
   if (elements.status) {
     elements.status.hidden = false;
@@ -2667,6 +2669,7 @@ async function handleFastUploadPhotoChange(event) {
     revokeFastUploadPreviewUrl();
     fastUploadPreviewUrl = decoded.previewUrl;
     fastUploadSelectedFile = preparedFile;
+    fastUploadLookupImageShown = false;
     if (elements.previewImg) {
       elements.previewImg.onerror = () => {
         setFastUploadPhotoError('No pudimos mostrar esta foto. Elegí otra imagen o volvé a sacarla.', elements);
@@ -2679,6 +2682,7 @@ async function handleFastUploadPhotoChange(event) {
     }
     if (elements.trigger) elements.trigger.hidden = true;
     if (elements.previewContainer) elements.previewContainer.hidden = false;
+    if (elements.sourceLabel) elements.sourceLabel.hidden = true;
     if (elements.analyzeButton) elements.analyzeButton.disabled = false;
     if (elements.status) {
       elements.status.hidden = false;
@@ -3009,9 +3013,11 @@ function resetFastUploadLookupPresentation(clearFields = false) {
     const previewImage = document.getElementById('fastupload-photo-img');
     const previewContainer = document.getElementById('fastupload-photo-preview-container');
     const trigger = document.getElementById('fastupload-photo-trigger');
+    const sourceLabel = document.getElementById('fastupload-photo-source');
     if (previewImage) previewImage.src = '';
     if (previewContainer) previewContainer.hidden = true;
     if (trigger) trigger.hidden = false;
+    if (sourceLabel) sourceLabel.hidden = true;
     fastUploadLookupImageShown = false;
   }
 }
@@ -3042,9 +3048,24 @@ function renderFastUploadLookupSummary(result) {
     const previewImage = document.getElementById('fastupload-photo-img');
     const previewContainer = document.getElementById('fastupload-photo-preview-container');
     const trigger = document.getElementById('fastupload-photo-trigger');
-    if (previewImage) previewImage.src = product.image_url;
+    const sourceLabel = document.getElementById('fastupload-photo-source');
+    if (previewImage) {
+      previewImage.onerror = () => {
+        previewImage.removeAttribute('src');
+        previewImage.onerror = null;
+        if (previewContainer) previewContainer.hidden = true;
+        if (trigger) trigger.hidden = false;
+        if (sourceLabel) sourceLabel.hidden = true;
+        fastUploadLookupImageShown = false;
+      };
+      previewImage.onload = () => {
+        previewImage.onload = null;
+      };
+      previewImage.src = product.image_url;
+    }
     if (previewContainer) previewContainer.hidden = false;
     if (trigger) trigger.hidden = true;
+    if (sourceLabel) sourceLabel.hidden = false;
     fastUploadLookupImageShown = true;
   }
   const photoRequirement = document.getElementById('fastupload-photo-requirement');
@@ -3440,6 +3461,7 @@ async function submitProductDraft(event) {
     document.getElementById('fast-upload-form').reset();
     document.getElementById('fastupload-photo-trigger').hidden = false;
     document.getElementById('fastupload-photo-preview-container').hidden = true;
+    document.getElementById('fastupload-photo-source').hidden = true;
     document.getElementById('fastupload-ai-btn').disabled = true;
     document.getElementById('fastupload-ai-status').hidden = true;
     document.getElementById('fastupload-lookup-status').hidden = true;
