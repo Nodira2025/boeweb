@@ -20,12 +20,11 @@ function lookupRequest(body) {
   };
 }
 
-function installFetchMock(searchHtml, braveHtml = '') {
+function installFetchMock(searchHtml, yahooHtml = '') {
   globalThis.fetch = async url => {
     const href = String(url);
     if (href.includes('customsearch.googleapis.com')) return jsonResponse({}, 403);
-    if (href.includes('search.brave.com/images')) return new Response('', { status: 200 });
-    if (href.includes('search.brave.com/search')) return new Response(braveHtml, { status: 200 });
+    if (href.includes('search.yahoo.com/search')) return new Response(yahooHtml, { status: 200 });
     if (href.includes('html.duckduckgo.com')) return new Response(searchHtml, { status: 200 });
     if (href.includes('api.mercadolibre.com')) return jsonResponse({ results: [] });
     if (href.includes('world.openfoodfacts.org')) return jsonResponse({}, 404);
@@ -68,13 +67,12 @@ test('acepta una ficha que coincide con el nombre y la presentación', async () 
 
 test('autocompleta un código encontrado en una ficha de producto argentina', async () => {
   installFetchMock('', `
-    <div class="snippet" data-pos="0" data-type="web">
+    <li><div class="dd algo algo-sr">
       <a href="https://www.seedscience.com.ar/product-page/poleas-garden-highpro-prohanger-68-kg">
-        <div class="title search-snippet-title">Poleas Garden HighPro ProHanger (68 Kg) | Seed Science</div>
+        <h3><span>Poleas Garden HighPro ProHanger (68 Kg) | Seed Science</span></h3>
       </a>
-      <div class="generic-snippet"><div class="content">SKU: 8436554760848 · $15.638,00 Precio · $14.074,20 Precio de oferta · Trinquete de cuerda hasta 68 Kg</div></div>
-    </div>
-    </main>
+      <div class="compText"><p>SKU: 8436554760848 · $15.638,00 Precio · $14.074,20 Precio de oferta · Trinquete de cuerda hasta 68 Kg</p></div>
+    </div></li>
   `);
 
   const response = await lookupProduct(lookupRequest({ barcode: '8436554760848' }), { ip: 'test-brave-barcode' });
