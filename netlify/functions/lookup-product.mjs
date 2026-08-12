@@ -18,6 +18,11 @@ const OFFICIAL_GROW_BRAND_DOMAINS = [
 ];
 const GROW_CONTEXT_PATTERN = /grow\s*shop|cultivo|indoor|outdoor|hidropon|fertili|nutrient|sustrat|semilla|germin|floraci|vegetativo|enraizante|micorriza|trichoderma|carpa|panel\s*led|extractor|maceta|parafernalia|vaporiz|grinder|picador|bong|papelillo|riego|medidor\s*(?:ph|ec)/i;
 const NON_GROW_PRODUCT_PATTERN = /alimento|bebida|golosina|noodle|fideo|salsa|gallet|chocolate|shampoo|perfume|juguete|repuesto automotor|comida/i;
+const SEARCH_MATCH_STOP_WORDS = new Set([
+  'argentina', 'comprar', 'compra', 'online', 'oferta', 'precio', 'producto',
+  'productos', 'tienda', 'shop', 'grow', 'growshop', 'para', 'con', 'del', 'las',
+  'los', 'una', 'uno', 'por'
+]);
 const GROW_BRAND_RULES = [
   [/garden\s*high\s*pro/i, 'Garden HighPro'],
   [/advanced\s*nutrients/i, 'Advanced Nutrients'],
@@ -232,6 +237,62 @@ function buildGrowshopQuery(value) {
   return cleanText(`${base} growshop Argentina`, 190);
 }
 
+function normalizeLookupMatchText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function lookupMatchTokens(value) {
+  return normalizeLookupMatchText(value)
+    .split(/\s+/)
+    .filter(token => token.length >= 2 && !SEARCH_MATCH_STOP_WORDS.has(token));
+}
+
+function isLikelyStoreLandingPage(item) {
+  try {
+    const url = new URL(item.url);
+    const path = url.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+    const isGenericPath = !path || /^(?:home|inicio|tienda|shop|productos|catalogo)$/.test(path);
+    const text = [item.title, item.snippet].filter(Boolean).join(' ');
+    const hasProductEvidence = Boolean(
+      item.price
+      || extractPresentation(text)
+      || detectGrowBrand(text)
+      || /\b(?:sku|stock|comprar|precio|presentaci[oó]n)\b|\$\s*\d/i.test(text)
+    );
+    return isGenericPath && !hasProductEvidence;
+  } catch (error) {
+    return true;
+  }
+}
+
+function growshopLookupMatchScore(item, query, barcode) {
+  const searchableText = normalizeLookupMatchText([item.title, item.snippet, item.url].filter(Boolean).join(' '));
+  if (barcode) {
+    const searchableDigits = searchableText.replace(/\D/g, '');
+    return searchableDigits.includes(barcode) ? 20 : Number.NEGATIVE_INFINITY;
+  }
+
+  const queryTokens = lookupMatchTokens(query);
+  if (!queryTokens.length || isLikelyStoreLandingPage(item)) return Number.NEGATIVE_INFINITY;
+  const itemTokens = new Set(lookupMatchTokens(searchableText));
+  const compactItemText = searchableText.replace(/\s+/g, '');
+  const matchedTokens = queryTokens.filter(token => itemTokens.has(token) || compactItemText.includes(token));
+  const totalWeight = queryTokens.reduce((sum, token) => sum + token.length, 0);
+  const matchedWeight = matchedTokens.reduce((sum, token) => sum + token.length, 0);
+  const coverage = totalWeight ? matchedWeight / totalWeight : 0;
+  const hasDistinctiveMatch = matchedTokens.some(token => token.length >= 4);
+
+  // Un dominio de growshop no alcanza: el resultado también debe coincidir
+  // con términos concretos del producto solicitado.
+  if (!hasDistinctiveMatch || coverage < 0.55) return Number.NEGATIVE_INFINITY;
+  return Math.round(coverage * 10);
+}
+
 function buildGoogleArgentinaUrl(query) {
   const url = new URL(GOOGLE_SEARCH_WEB_URL);
   url.searchParams.set('q', query);
@@ -359,8 +420,11 @@ function marketFromGrowshopItems(query, searchUrl, items, provider) {
 
 function growshopResultFromItems(items, query, searchUrl, barcode, provider) {
   const rankedItems = items
-    .map(item => ({ ...item, score: growshopRelevanceScore(item) }))
-    .filter(item => item.title && item.url && item.score >= 3)
+    .map(item => ({
+      ...item,
+      score: growshopRelevanceScore(item) + growshopLookupMatchScore(item, query, barcode)
+    }))
+    .filter(item => item.title && item.url && Number.isFinite(item.score) && item.score >= 3)
     .sort((a, b) => b.score - a.score);
   if (!rankedItems.length) return null;
   const product = productFromGrowshopItem(rankedItems[0], barcode);
@@ -402,7 +466,7 @@ async function searchGoogleArgentinaGrowshops(value, barcode) {
   const payload = await response.json();
   const items = (payload.items || []).map(normalizeGrowshopSearchItem);
   return {
-    result: growshopResultFromItems(items, query, searchUrl, barcode, 'Google Argentina'),
+    result: growshopResultFromItems(items, value, searchUrl, barcode, 'Google Argentina'),
     searchUrl,
     configured: true
   };
@@ -443,7 +507,7 @@ async function searchGrowshopWeb(value, barcode) {
   }));
   return growshopResultFromItems(
     items,
-    query,
+    value,
     `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
     barcode,
     'Web growshop Argentina'
