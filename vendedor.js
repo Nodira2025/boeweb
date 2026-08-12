@@ -1149,6 +1149,8 @@ function switchVendorTab(tab) {
   if (internalCatalogSection) internalCatalogSection.style.display = 'none';
   const wmsSection = document.getElementById('vendor-wms-inventory-section');
   if (wmsSection) wmsSection.style.display = 'none';
+  const tenantProfileSection = document.getElementById('vendor-tenant-profile-section');
+  if (tenantProfileSection) tenantProfileSection.style.display = 'none';
 
   let targetSection = null;
 
@@ -1256,6 +1258,13 @@ function switchVendorTab(tab) {
       targetSection = wmsSection;
     }
     renderWmsModulesGrid();
+  } else if (tab === 'tenant-profile') {
+    if (tenantProfileSection) {
+      tenantProfileSection.style.display = 'block';
+      targetSection = tenantProfileSection;
+    }
+    const curVert = document.getElementById('tenant-input-vertical')?.value || 'growshop';
+    handleTenantVerticalChange(curVert);
   }
 
   const activeSidebarTab = tab === 'reposicion' ? 'catalog' : tab;
@@ -5582,6 +5591,93 @@ document.addEventListener('DOMContentLoaded', () => {
 window.updateSaasHeaderUI = updateSaasHeaderUI;
 window.openSaasLoginModal = openSaasLoginModal;
 window.handleSaasLoginSubmit = handleSaasLoginSubmit;
+
+/* ==========================================================================
+   BÔ GROW CLUB / PLATAFORMA SAAS — FASE 8 UI INTEGRATION (WHITE-LABEL & RUBROS)
+   ========================================================================== */
+
+function handleTenantVerticalChange(verticalCode) {
+  const container = document.getElementById('tenant-dynamic-schema-container');
+  const titleEl = document.getElementById('tenant-dynamic-vertical-title');
+  const previewVerticalEl = document.getElementById('tenant-preview-vertical-name');
+
+  if (typeof BusinessVerticals !== 'undefined') {
+    const vertical = BusinessVerticals.getVertical(verticalCode);
+    if (container) {
+      container.innerHTML = BusinessVerticals.renderDynamicFormFields(verticalCode);
+    }
+    if (titleEl) titleEl.textContent = vertical.name;
+    if (previewVerticalEl) previewVerticalEl.textContent = vertical.name;
+  }
+  handleTenantProfileDraftPreview();
+}
+
+function handleTenantProfileDraftPreview() {
+  const brandName = document.getElementById('tenant-input-brand-name')?.value || 'BÔ Grow Club';
+  const slogan = document.getElementById('tenant-input-slogan')?.value || '';
+  const primaryColor = document.getElementById('tenant-input-primary-color')?.value || '#152D24';
+  const accentColor = document.getElementById('tenant-input-accent-color')?.value || '#C2A246';
+  const verticalCode = document.getElementById('tenant-input-vertical')?.value || 'growshop';
+
+  const previewCard = document.getElementById('tenant-preview-card');
+  const previewName = document.getElementById('tenant-preview-brand-name');
+  const previewSlogan = document.getElementById('tenant-preview-slogan');
+  const previewBadge = document.getElementById('tenant-preview-badge');
+
+  if (previewCard) {
+    previewCard.style.background = primaryColor;
+    previewCard.style.borderColor = accentColor;
+  }
+  if (previewName) {
+    previewName.textContent = brandName;
+    previewName.style.color = accentColor;
+  }
+  if (previewSlogan) previewSlogan.textContent = slogan;
+  if (previewBadge) previewBadge.textContent = 'ESTADO: BORRADOR EN PREVIEW';
+
+  if (typeof TenantTheme !== 'undefined') {
+    TenantTheme.previewDraftTheme({ brand_name: brandName, primary_color: primaryColor, accent_color: accentColor, vertical_code: verticalCode });
+  }
+}
+
+function handleTenantLogoFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const previewImg = document.getElementById('tenant-preview-logo');
+    if (previewImg) previewImg.src = e.target.result;
+    showToast(`📁 Archivo de logo cargado: ${file.name}`);
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleTenantProfileSubmit(event) {
+  event.preventDefault();
+  const ctx = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : { tenantId: '11111111-1111-1111-1111-111111111111' };
+
+  const brandName = document.getElementById('tenant-input-brand-name')?.value;
+  const primaryColor = document.getElementById('tenant-input-primary-color')?.value;
+  const accentColor = document.getElementById('tenant-input-accent-color')?.value;
+  const verticalCode = document.getElementById('tenant-input-vertical')?.value;
+
+  if (typeof TenantTheme !== 'undefined') {
+    TenantTheme.saveDraft(ctx.tenantId, { brand_name: brandName, primary_color: primaryColor, accent_color: accentColor, vertical_code: verticalCode });
+    TenantTheme.publishBranding(ctx.tenantId);
+  }
+
+  const previewBadge = document.getElementById('tenant-preview-badge');
+  if (previewBadge) previewBadge.textContent = 'ESTADO: PUBLICADO EN PRODUCCIÓN';
+
+  showToast(`⚡ Cambios de marca y rubro (${verticalCode.toUpperCase()}) publicados correctamente para ${brandName}!`);
+}
+
+window.handleTenantVerticalChange = handleTenantVerticalChange;
+window.handleTenantProfileDraftPreview = handleTenantProfileDraftPreview;
+window.handleTenantLogoFileSelect = handleTenantLogoFileSelect;
+window.handleTenantProfileSubmit = handleTenantProfileSubmit;
+
 
 
 

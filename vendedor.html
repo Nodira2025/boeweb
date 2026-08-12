@@ -1136,6 +1136,10 @@
         </button>
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="portfolio" onclick="switchVendorTab('portfolio')">
           <span class="vendor-side-nav-icon" aria-hidden="true">♙</span><span>Clientes</span>
+        </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="tenant-profile" onclick="switchVendorTab('tenant-profile')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">🎨</span><span>Perfil & Marca</span>
+        </button>
         <a href="tv.html" class="vendor-sidebar-tool-link" target="_blank" rel="noopener">TV</a>
         <a href="coffee.html" class="vendor-sidebar-tool-link" target="_blank" rel="noopener">Coffee</a>
       </div>
@@ -1843,6 +1847,134 @@
       </div>
     </section>
 
+    <!-- SECTION: PERFIL DE EMPRESA, MARCA & RUBROS DINÁMICOS (FASE 8) -->
+    <section id="vendor-tenant-profile-section" class="vendor-workspace-section" style="display: none;" aria-labelledby="tenant-profile-section-title">
+      <div class="wms-hero-banner">
+        <div class="wms-hero-title">
+          <span class="wms-sync-badge">🎨 White-Label & Rubros Dinámicos (Fase 8)</span>
+          <h2 id="tenant-profile-section-title">🎨 Perfil de Empresa, Marca & Configuración de Rubro</h2>
+          <p>Configurá la identidad visual de tu negocio, cargá tu logo de marca, elegí los colores corporativos y seleccioná tu rubro comercial para adaptar automáticamente los campos y el autocompletado por IA.</p>
+        </div>
+        <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+        <!-- Left Column: Tenant Identity & Business Vertical Editor -->
+        <div style="background: #fff; border: 1px solid var(--vendor-line); border-radius: 16px; padding: 20px;">
+          <h3 style="margin: 0 0 16px 0; color: var(--vendor-forest); font-family: var(--font-display);">⚙️ Identidad del Negocio</h3>
+
+          <form id="tenant-profile-form" onsubmit="handleTenantProfileSubmit(event)">
+            <div style="margin-bottom: 14px;">
+              <label style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">Nombre Comercial / Marca:</label>
+              <input type="text" id="tenant-input-brand-name" class="b2b-search-input" style="width: 100%;" value="BÔ Grow Club" oninput="handleTenantProfileDraftPreview()" required>
+            </div>
+
+            <div style="margin-bottom: 14px;">
+              <label style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">Eslogan del Negocio:</label>
+              <input type="text" id="tenant-input-slogan" class="b2b-search-input" style="width: 100%;" value="Espacio Zen para Cultivo Premium" oninput="handleTenantProfileDraftPreview()">
+            </div>
+
+            <!-- Business Vertical / Rubro Selection -->
+            <div style="margin-bottom: 16px; background: rgba(62,95,31,0.06); padding: 14px; border-radius: 12px; border: 1px solid var(--vendor-line);">
+              <label style="font-size: 0.88rem; font-weight: 800; color: var(--vendor-forest); display: block; margin-bottom: 6px;">🏷️ Rubro / Vertical Comercial:</label>
+              <select id="tenant-input-vertical" class="b2b-search-input" style="width: 100%; font-weight: 700;" onchange="handleTenantVerticalChange(this.value)">
+                <option value="growshop">🌿 Growshop & Botánica Premium</option>
+                <option value="ferreteria">🛠️ Ferretería & Herramientas Industriales</option>
+                <option value="repuestos">🚗 Autopartes & Repuestos Automotores</option>
+                <option value="indumentaria">👕 Indumentaria, Calzado & Moda</option>
+              </select>
+              <small style="color: var(--vendor-muted); font-size: 0.76rem; display: block; margin-top: 6px;">
+                Al cambiar el rubro, la base de datos PostgreSQL adapta los formularios, los atributos prioritarios de código de barras y las sugerencias de IA.
+              </small>
+            </div>
+
+            <!-- Brand Color Pickers -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+              <div>
+                <label style="font-size: 0.82rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">Color Primario:</label>
+                <input type="color" id="tenant-input-primary-color" value="#152D24" style="width: 100%; height: 38px; border-radius: 8px; cursor: pointer;" oninput="handleTenantProfileDraftPreview()">
+              </div>
+              <div>
+                <label style="font-size: 0.82rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">Color Acento:</label>
+                <input type="color" id="tenant-input-accent-color" value="#C2A246" style="width: 100%; height: 38px; border-radius: 8px; cursor: pointer;" oninput="handleTenantProfileDraftPreview()">
+              </div>
+            </div>
+
+            <!-- Asset File Upload (Logo) -->
+            <div style="margin-bottom: 16px;">
+              <label style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">📁 Cargar Logo de Marca (Archivo PNG / JPG):</label>
+              <input type="file" id="tenant-input-logo-file" accept="image/*" class="b2b-search-input" style="width: 100%; padding: 6px;" onchange="handleTenantLogoFileSelect(event)">
+            </div>
+
+            <!-- Custom Terminology -->
+            <div style="margin-bottom: 16px; border-top: 1px solid var(--vendor-line); padding-top: 12px;">
+              <h4 style="margin: 0 0 10px 0; font-size: 0.9rem; color: var(--vendor-forest);">💬 Terminología Personalizada del Negocio:</h4>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                <div>
+                  <small style="font-size: 0.72rem; color: var(--vendor-muted);">Producto:</small>
+                  <input type="text" id="tenant-term-product" class="b2b-search-input" value="Producto Botánico" style="font-size: 0.8rem;">
+                </div>
+                <div>
+                  <small style="font-size: 0.72rem; color: var(--vendor-muted);">Vendedor:</small>
+                  <input type="text" id="tenant-term-vendor" class="b2b-search-input" value="Asesor de Cultivo" style="font-size: 0.8rem;">
+                </div>
+                <div>
+                  <small style="font-size: 0.72rem; color: var(--vendor-muted);">Depósito:</small>
+                  <input type="text" id="tenant-term-deposit" class="b2b-search-input" value="Depósito Principal" style="font-size: 0.8rem;">
+                </div>
+              </div>
+            </div>
+
+            <!-- Actions: Draft Preview & Publish -->
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+              <button type="button" class="wms-btn" style="flex: 1;" onclick="handleTenantProfileDraftPreview()">
+                👁️ Vista Previa Borrador
+              </button>
+              <button type="submit" class="wms-btn wms-btn-primary" style="flex: 1;">
+                ⚡ PUBLICAR CAMBIOS
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Right Column: Live Preview Card & Dynamic Vertical Schema Preview -->
+        <div>
+          <!-- Live Storefront Preview Card -->
+          <div style="background: #fff; border: 1px solid var(--vendor-line); border-radius: 16px; padding: 20px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0; color: var(--vendor-forest); font-family: var(--font-display);">🖼️ Vista Previa en Vivo (Live Preview)</h3>
+              <span class="wms-level-badge" id="tenant-preview-badge" style="font-size: 0.74rem;">ESTADO: BORRADOR</span>
+            </div>
+
+            <div id="tenant-preview-card" style="border: 2px solid var(--vendor-gold); border-radius: 16px; padding: 20px; background: #152D24; color: #fff; transition: all 0.3s ease;">
+              <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 12px;">
+                <img id="tenant-preview-logo" src="assets/logo.jpg" alt="Logo preview" style="width: 54px; height: 54px; border-radius: 10px; object-fit: contain; background: #fff; border: 2px solid #C2A246;">
+                <div>
+                  <h3 id="tenant-preview-brand-name" style="margin: 0; font-size: 1.25rem; font-family: var(--font-display); color: #C2A246;">BÔ Grow Club</h3>
+                  <small id="tenant-preview-slogan" style="color: #E2E8F0; font-size: 0.82rem;">Espacio Zen para Cultivo Premium</small>
+                </div>
+              </div>
+
+              <div style="background: rgba(255,255,255,0.1); padding: 10px 14px; border-radius: 10px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+                <span>Rubro Activo: <strong id="tenant-preview-vertical-name">Growshop & Botánica Premium</strong></span>
+                <span class="wms-level-badge" style="font-size: 0.72rem;">White-Label OK</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dynamic Form Schema Preview per Vertical -->
+          <div style="background: #fff; border: 1px solid var(--vendor-line); border-radius: 16px; padding: 20px;">
+            <h4 style="margin: 0 0 10px 0; color: var(--vendor-forest); font-size: 1rem;">
+              📋 Formulario Dinámico de Producto (<span id="tenant-dynamic-vertical-title">Growshop</span>):
+            </h4>
+            <div id="tenant-dynamic-schema-container" style="background: #faf8f2; border: 1px dashed var(--vendor-line); border-radius: 12px; padding: 14px;">
+              <!-- Dynamically populated by BusinessVerticals.renderDynamicFormFields() -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- MODAL: ESCÁNER QR DE MÓDULO (WMS) -->
     <div id="wms-qr-modal" class="location-assistant-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="wms-qr-modal-title">
       <div class="location-assistant-shell" style="max-width: 520px;">
@@ -2466,6 +2598,9 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="mapa-local.js?v=stock_assistants_v1"></script>
+  <script src="saas-auth.js?v=saas_v2"></script>
+  <script src="business-verticals.js?v=verticals_v1"></script>
+  <script src="tenant-theme.js?v=theme_v1"></script>
   <script src="vendedor.js?v=internal_catalog_v10"></script>
 </body>
 </html>
