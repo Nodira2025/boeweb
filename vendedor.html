@@ -829,6 +829,11 @@
       font-weight: 600;
     }
 
+    .b2b-mobile-cart-icon {
+      position: relative;
+      display: inline-flex;
+    }
+
     .b2b-mobile-cart-badge {
       position: absolute;
       top: -8px;
@@ -1026,7 +1031,36 @@
   </style>
   <link rel="stylesheet" href="vendedor-caja.css?v=legado_v1">
   <link rel="stylesheet" href="vendedor-portal.css?v=desktop_v2_crema">
-  <link rel="stylesheet" href="vendedor-stock.css?v=provisional_product_image_v9">
+  <link rel="stylesheet" href="vendedor-stock.css?v=rescate_estabilizacion_v11">
+  <style id="vendor-rescue-critical-styles">
+    .saas-prototype-only,
+    #saas-login-modal {
+      display: none !important;
+    }
+
+    @media (max-width: 768px) {
+      .b2b-header-container .theme-toggle-btn,
+      .b2b-header-container #vendor-user-status {
+        display: none !important;
+      }
+
+      .b2b-header {
+        min-height: 58px;
+        padding: 8px 0;
+      }
+
+      .b2b-header-container {
+        min-height: 42px;
+        flex-wrap: nowrap;
+      }
+
+      .vendor-dashboard-home,
+      .vendor-workspace-section,
+      .b2b-main-layout {
+        min-width: 0;
+      }
+    }
+  </style>
   <link rel="stylesheet" href="vendedor-login.css?v=login_editorial_v1">
 </head>
 <body>
@@ -1137,15 +1171,18 @@
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="portfolio" onclick="switchVendorTab('portfolio')">
           <span class="vendor-side-nav-icon" aria-hidden="true">♙</span><span>Clientes</span>
         </button>
-        <button type="button" class="vendor-side-nav-item" data-vendor-tab="tenant-profile" onclick="switchVendorTab('tenant-profile')">
+        <button type="button" class="vendor-side-nav-item saas-prototype-only" data-vendor-tab="tenant-profile" onclick="switchVendorTab('tenant-profile')">
           <span class="vendor-side-nav-icon" aria-hidden="true">🎨</span><span>Perfil & Marca</span>
         </button>
-        <button type="button" class="vendor-side-nav-item" data-vendor-tab="migration-center" onclick="switchVendorTab('migration-center')">
+        <button type="button" class="vendor-side-nav-item saas-prototype-only" data-vendor-tab="migration-center" onclick="switchVendorTab('migration-center')">
           <span class="vendor-side-nav-icon" aria-hidden="true">📥</span><span>Migration Center IA</span>
         </button>
-        <button type="button" class="vendor-side-nav-item" data-vendor-tab="tenant-onboarding" onclick="switchVendorTab('tenant-onboarding')">
+        <button type="button" class="vendor-side-nav-item saas-prototype-only" data-vendor-tab="tenant-onboarding" onclick="switchVendorTab('tenant-onboarding')">
           <span class="vendor-side-nav-icon" aria-hidden="true">🚀</span><span>Alta de Negocios (SaaS)</span>
         </button>
+      </nav>
+
+      <div class="vendor-sidebar-tools" aria-label="Herramientas externas">
         <a href="tv.html" class="vendor-sidebar-tool-link" target="_blank" rel="noopener">TV</a>
         <a href="coffee.html" class="vendor-sidebar-tool-link" target="_blank" rel="noopener">Coffee</a>
       </div>
@@ -1162,8 +1199,10 @@
               <p>Portal Vendedores B2B</p>
             </div>
           </a>
+        </div>
+
         <!-- SaaS Context Bar (Multi-tenant & Role Status) -->
-        <div id="saas-header-bar" class="vendor-header-context" style="display: flex; align-items: center; gap: 12px; background: rgba(21,45,36,0.06); padding: 6px 14px; border-radius: 12px; border: 1px solid var(--vendor-line);">
+        <div id="saas-header-bar" class="vendor-header-context saas-prototype-only" aria-hidden="true" style="display: flex; align-items: center; gap: 12px; background: rgba(21,45,36,0.06); padding: 6px 14px; border-radius: 12px; border: 1px solid var(--vendor-line);">
           <div style="display: flex; flex-direction: column;">
             <span style="font-size: 0.7rem; color: var(--vendor-muted); font-weight: 700; text-transform: uppercase;">🏢 Tenant / Empresa</span>
             <strong id="saas-active-tenant-name" style="font-size: 0.88rem; color: var(--vendor-forest);">BÔ Grow Club</strong>
@@ -1207,7 +1246,6 @@
             <span class="b2b-cart-count-badge" id="b2b-cart-count">0</span>
           </button>
         </div>
-      </div>
     </header>
 
     <!-- VENDOR HOME / CENTRO OPERATIVO -->
@@ -2958,6 +2996,21 @@
           <polyline points="9 22 9 12 15 12 15 22"></polyline>
         </svg>
         <span>Inicio</span>
+      </button>
+      <button type="button" class="b2b-mobile-nav-btn" id="b2b-mobile-cart-btn">
+        <span class="b2b-mobile-cart-icon">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="9" cy="21" r="1"></circle>
+            <circle cx="20" cy="21" r="1"></circle>
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+          </svg>
+          <span class="b2b-mobile-cart-badge" id="b2b-mobile-cart-count">0</span>
+        </span>
+        <span>Mi Pedido</span>
+      </button>
+    </div>
+
+    <!-- Toast Notification -->
     <div class="b2b-toast b2b-toast-success" id="b2b-toast">
       <span id="b2b-toast-message">Producto agregado al pedido</span>
     </div>

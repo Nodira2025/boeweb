@@ -41,6 +41,21 @@ CREATE TABLE IF NOT EXISTS public.tenant_users (
   UNIQUE(tenant_id, user_id)
 );
 
+CREATE OR REPLACE FUNCTION public.is_tenant_member(p_tenant_id UUID)
+RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER STABLE
+SET search_path = public, pg_temp
+SET row_security = off AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.tenant_users
+    WHERE tenant_id = p_tenant_id
+      AND user_id = auth.uid()
+      AND active = true
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.is_tenant_member(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_tenant_member(UUID) TO authenticated;
+
 -- 4. SEMBRADO DE TENANTS INICIALES (Tenant #1 BÔ Grow Club + Tenant B Demo)
 INSERT INTO public.tenants (id, slug, name, status) VALUES
   ('11111111-1111-1111-1111-111111111111', 'boe-grow-club', 'BÔ Grow Club', 'ACTIVO'),
@@ -64,9 +79,7 @@ DROP POLICY IF EXISTS "RLS inventory_movements multi-tenant INSERT" ON public.in
 CREATE POLICY "RLS tenants_select" ON public.tenants
   FOR SELECT USING (
     public.is_superadmin() OR
-    id IN (
-      SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true
-    )
+    public.is_tenant_member(id)
   );
 
 -- POLÍTICA TENANT USERS:
@@ -74,9 +87,7 @@ CREATE POLICY "RLS tenant_users_select" ON public.tenant_users
   FOR SELECT USING (
     public.is_superadmin() OR
     (user_id = auth.uid() AND active = true) OR
-    tenant_id IN (
-      SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true
-    )
+    public.is_tenant_member(tenant_id)
   );
 
 -- POLÍTICA INVENTORY LOCATIONS: Aislamiento Estricto

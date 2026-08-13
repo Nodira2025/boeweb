@@ -49,6 +49,23 @@ CREATE TABLE IF NOT EXISTS public.tenant_users (
   UNIQUE(tenant_id, user_id)
 );
 
+-- Evita que las políticas consulten tenant_users desde la propia política y
+-- entren en recursión infinita. SECURITY DEFINER evalúa la membresía sin RLS.
+CREATE OR REPLACE FUNCTION public.is_tenant_member(p_tenant_id UUID)
+RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER STABLE
+SET search_path = public, pg_temp
+SET row_security = off AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.tenant_users
+    WHERE tenant_id = p_tenant_id
+      AND user_id = auth.uid()
+      AND active = true
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.is_tenant_member(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_tenant_member(UUID) TO authenticated;
+
 -- Sembrado de Tenants Iniciales
 INSERT INTO public.tenants (id, slug, name, status, vertical_code) VALUES
   ('11111111-1111-1111-1111-111111111111', 'boe-grow-club', 'BÔ Grow Club', 'ACTIVE', 'growshop'),
@@ -631,18 +648,18 @@ DROP POLICY IF EXISTS "RLS inventory_ledger_isolation" ON public.inventory_ledge
 DROP POLICY IF EXISTS "RLS inventory_locations_isolation" ON public.inventory_locations;
 
 CREATE POLICY "RLS tenants_select" ON public.tenants FOR SELECT USING (
-  public.is_superadmin() OR id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
+  public.is_superadmin() OR public.is_tenant_member(id)
 );
 
 CREATE POLICY "RLS tenant_users_select" ON public.tenant_users FOR SELECT USING (
-  public.is_superadmin() OR (user_id = auth.uid() AND active = true) OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
+  public.is_superadmin() OR (user_id = auth.uid() AND active = true) OR public.is_tenant_member(tenant_id)
 );
 
 CREATE POLICY "RLS business_verticals_select" ON public.business_verticals FOR SELECT USING (true);
 CREATE POLICY "RLS business_verticals_write" ON public.business_verticals FOR ALL USING (public.is_superadmin());
 
 CREATE POLICY "RLS tenant_profiles_select" ON public.tenant_profiles FOR SELECT USING (
-  public.is_superadmin() OR tenant_id IN (SELECT tu.tenant_id FROM public.tenant_users tu WHERE tu.user_id = auth.uid() AND tu.active = true)
+  public.is_superadmin() OR public.is_tenant_member(tenant_id)
 );
 
 CREATE POLICY "RLS migration_jobs_isolation" ON public.migration_jobs FOR ALL USING (

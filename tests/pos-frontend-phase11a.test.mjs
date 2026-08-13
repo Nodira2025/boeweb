@@ -84,12 +84,11 @@ test('3. Sale Draft Contract (Contrato de Venta Fase 11A)', () => {
   assert.ok(draft.idempotency_key.includes('pos_draft_'));
 });
 
-test('4. Identidad del Vendedor desde tenant_users', () => {
+test('4. Identidad del Vendedor no se inventa sin sesión autenticada', () => {
   const users = SaasAuth.getTenantUsers('11111111-1111-1111-1111-111111111111');
   assert.ok(Array.isArray(users));
-  assert.ok(users.length >= 3);
-  assert.equal(users[0].name, 'Profesor Franco');
-  assert.equal(users[1].name, 'Lautaro (Vendedor)');
+  assert.equal(users.length, 0);
+  assert.equal(SaasAuth.getTenantContext().isVerified, false);
 });
 
 test('5. Aislamiento de Drafts vs Caja (Previene Doble Contabilización)', () => {
@@ -117,4 +116,3 @@ test('5. Aislamiento de Drafts vs Caja (Previene Doble Contabilización)', () =>
   assert.equal(cashKeys.length, 0);
   assert.ok(mockStorage['boeweb_pos_sale_drafts'].includes('draft_'));
 });
-

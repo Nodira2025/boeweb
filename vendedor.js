@@ -60,23 +60,29 @@ const mobileCartBtn = document.getElementById('b2b-mobile-cart-btn');
 const mobileCartCountEl = document.getElementById('b2b-mobile-cart-count');
 
 // --- INITIALIZE PORTAL ---
-document.addEventListener('DOMContentLoaded', () => {
-  if (window.supabase) {
-    supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
-  } else {
-    console.error('Supabase CDN failed to load.');
-    alert('Error: No se pudo cargar la librería de Supabase. Por favor, recarga la página o comprueba tu conexión.');
-    return;
-  }
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    if (!window.supabase) {
+      throw new Error('No se pudo cargar la librería de Supabase.');
+    }
 
-  setupEventListeners();
-  fetchB2BProducts(true); // Initial fetch (clearing grid)
-  updateCartBadge();
-  renderCart();
-  updateCategoryCounts();
-  loadPendingProductDrafts();
-  initializeFastUploadForm();
-  refreshPendingLocationBadge();
+    supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+    if (window.SaasAuth?.hydrateFromSupabase) {
+      await window.SaasAuth.hydrateFromSupabase(supabaseClient);
+    }
+
+    setupEventListeners();
+    await fetchB2BProducts(true);
+    updateCartBadge();
+    renderCart();
+    updateCategoryCounts();
+    await loadPendingProductDrafts();
+    initializeFastUploadForm();
+    await refreshPendingLocationBadge();
+  } catch (error) {
+    console.error('No se pudo inicializar el portal:', error);
+    showToast('No pudimos conectar todos los servicios. Recargá la página en unos segundos.');
+  }
 });
 
 // --- EVENT LISTENERS ---
@@ -6210,12 +6216,22 @@ function populatePosSalespeople() {
   const select = document.getElementById('pos-salesperson-select');
   if (!select) return;
 
-  const users = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantUsers() : [
-    { id: 'usr-profesor-franco', name: 'Profesor Franco' },
-    { id: 'usr-lautaro-vendedor', name: 'Lautaro (Vendedor)' }
-  ];
+  const verifiedUsers = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantUsers() : [];
+  const activeVendor = sessionStorage.getItem('boeweb_vendor_name')
+    || localStorage.getItem('boeweb_vendor_name')
+    || 'Vendedor';
+  const users = verifiedUsers.length > 0 ? verifiedUsers : [{
+    id: `legacy-${activeVendor.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    name: activeVendor,
+    role: 'VENDEDOR'
+  }];
 
-  select.innerHTML = users.map(u => `<option value="${u.id || u.user_id}">${u.name} (${u.role || 'VENDEDOR'})</option>`).join('');
+  select.innerHTML = users.map(user => {
+    const id = escapeStockHtml(user.id || user.user_id || 'vendedor');
+    const name = escapeStockHtml(user.name || 'Vendedor');
+    const role = escapeStockHtml(user.role || 'VENDEDOR');
+    return `<option value="${id}">${name} (${role})</option>`;
+  }).join('');
 }
 
 function focusPosBarcode() {
@@ -6364,7 +6380,7 @@ function removePosPosCartItem(id) {
 }
 window.removePosCartItem = removePosPosCartItem;
 
-function submitPosSaleDraft() {
+async function submitPosSaleDraft() {
   const cart = getPosCartEngine();
   if (!cart || cart.getItemCount() === 0) {
     alert('Agregá al menos un producto al carrito antes de generar el borrador de venta.');
@@ -6388,40 +6404,60 @@ function submitPosSaleDraft() {
     notes: notesInput?.value || ''
   });
 
-  // PROCESAMIENTO PERSISTENTE DE VENTA FASE 11B (rpc_sale_pos_direct_saas)
-  const result = typeof PosInventorySync !== 'undefined'
-    ? PosInventorySync.processPersistentSale(draft, storeLocations, INVENTORY_BALANCES_STORE, INVENTORY_RESERVATIONS_STORE, INVENTORY_LEDGER_STORE, [getTenantWmsProfile()], SALES_STORE, SALE_ITEMS_STORE, CASH_SESSIONS_STORE, CASH_MOVEMENTS_STORE)
-    : { success: true, sale: { id: `sale_${Date.now()}` } };
-
-  if (!result.success) {
-    alert(`❌ ERROR EN VENTA POS:\n${result.error}`);
-    return;
-  }
-
-  // Guardar el borrador inmutable en clave propia de drafts
-  try {
+  const saveLocalDraft = () => {
     const existingDrafts = JSON.parse(localStorage.getItem('boeweb_pos_sale_drafts') || '[]');
     existingDrafts.unshift(draft);
     localStorage.setItem('boeweb_pos_sale_drafts', JSON.stringify(existingDrafts));
-  } catch (e) {
-    console.error('Error guardando sale_draft:', e);
+  };
+
+  const authContext = typeof SaasAuth !== 'undefined'
+    ? SaasAuth.getTenantContext()
+    : { isVerified: false };
+
+  if (!supabaseClient || !authContext.isVerified) {
+    try {
+      saveLocalDraft();
+      alert('Borrador guardado en este dispositivo. La venta todavía NO fue confirmada porque falta una sesión segura de Supabase.');
+    } catch (error) {
+      console.error('No se pudo guardar el borrador de venta:', error);
+      alert('No pudimos guardar el borrador. Revisá el espacio disponible del navegador.');
+    }
+    return;
   }
 
-  // Mostrar Ticket Confirmado
-  const ticket = result.ticket || { sale_id: result.sale?.id, total: draft.total };
-  alert(`✅ VENTA CONFIRMADA EXITOSAMENTE (FASE 11B — DB COHERENTE)\n\n` +
-        `• N° Venta DB: ${result.sale?.id}\n` +
-        `• Atendió (Vendedor): ${draft.salesperson_name_snapshot}\n` +
-        `• Cobró (Cajero Auth): ${draft.cashier_name_snapshot}\n` +
-        `• Importe Total: $${draft.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}\n` +
-        `• Método de Pago: ${draft.payment_method}\n` +
-        `• Movimiento de Caja DB: +$${draft.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}\n` +
-        `• Trazabilidad: Venta -> Items -> Pago -> Caja -> Inventario -> WMS -> Ledger -> Ticket.`);
+  try {
+    const rpcItems = draft.items.map(item => ({
+      product_id: item.product_code || item.id,
+      quantity: item.quantity,
+      unit_price: item.price
+    }));
+    const { data, error } = await supabaseClient.rpc('rpc_process_sale_checkout_saas', {
+      p_tenant_id: draft.tenant_id,
+      p_idempotency_key: draft.idempotency_key,
+      p_items: rpcItems,
+      p_cashier_user_id: draft.cashier_user_id,
+      p_salesperson_user_id: draft.salesperson_user_id,
+      p_payment_method: draft.payment_method,
+      p_discount_amount: 0
+    });
 
-  cart.clear();
-  renderPosCartItems();
-  if (typeof renderCashSectionUI === 'function') renderCashSectionUI();
-  switchVendorTab('home');
+    if (error) throw error;
+    if (!data?.success) throw new Error(data?.error || 'Supabase no confirmó la operación.');
+
+    alert(`Venta confirmada en la base de datos.\n\nN.º: ${data.sale_id}\nTotal: $${Number(data.total || draft.total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`);
+    cart.clear();
+    renderPosCartItems();
+    if (typeof renderCashSectionUI === 'function') renderCashSectionUI();
+    switchVendorTab('home');
+  } catch (error) {
+    console.error('Error al confirmar la venta en Supabase:', error);
+    try {
+      saveLocalDraft();
+    } catch (storageError) {
+      console.error('Tampoco se pudo guardar el borrador local:', storageError);
+    }
+    alert(`La venta NO fue confirmada. Guardamos un borrador para no perder el trabajo.\n\nDetalle: ${error.message}`);
+  }
 }
 
 window.initPosWorkspace = initPosWorkspace;

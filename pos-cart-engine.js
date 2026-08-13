@@ -22,6 +22,7 @@ class PosCartEngine {
   }
 
   loadFromStorage() {
+    if (typeof localStorage === 'undefined') return [];
     try {
       const stored = localStorage.getItem(this.storageKey);
       return stored ? JSON.parse(stored) : [];
@@ -32,6 +33,7 @@ class PosCartEngine {
   }
 
   saveToStorage() {
+    if (typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(this.items));
     } catch (e) {

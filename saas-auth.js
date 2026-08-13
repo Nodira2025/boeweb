@@ -1,18 +1,16 @@
-/* ==========================================================================
-   BÔ GROW CLUB / PLATAFORMA SAAS — MOTOR DE AUTENTICACIÓN & TENANT CONTEXT
-   ========================================================================== */
+/* BÔ Grow Club - contexto SaaS validado contra Supabase Auth. */
 
 const SAAS_TENANTS = [
   { id: '11111111-1111-1111-1111-111111111111', slug: 'boe-grow-club', name: 'BÔ Grow Club', status: 'ACTIVO' },
-  { id: '22222222-2222-2222-2222-222222222222', slug: 'empresa-b-demo', name: 'Empresa B Demo (Ferretería Norte)', status: 'ACTIVO' }
+  { id: '22222222-2222-2222-2222-222222222222', slug: 'empresa-b-demo', name: 'Empresa B Demo', status: 'ACTIVO' }
 ];
 
 const SAAS_ROLES = {
   SUPERADMIN: { name: 'Superadministrador', permissions: ['*'] },
-  ADMIN: { name: 'Administrador de Empresa', permissions: ['tenant.edit', 'wms.transfer', 'wms.audit', 'catalog.edit', 'sales.cash'] },
-  SUPERVISOR: { name: 'Supervisor de Depósito', permissions: ['wms.transfer', 'wms.audit', 'wms.approve', 'catalog.view'] },
+  ADMIN: { name: 'Administrador', permissions: ['tenant.edit', 'wms.transfer', 'wms.audit', 'catalog.edit', 'sales.cash'] },
+  SUPERVISOR: { name: 'Supervisor', permissions: ['wms.transfer', 'wms.audit', 'wms.approve', 'catalog.view'] },
   VENDEDOR: { name: 'Vendedor', permissions: ['wms.transfer', 'wms.view', 'sales.cash'] },
-  DEPOSITO: { name: 'Operador de Depósito', permissions: ['wms.transfer', 'wms.view'] }
+  DEPOSITO: { name: 'Operador de deposito', permissions: ['wms.transfer', 'wms.view'] }
 };
 
 const SAAS_STORAGE_KEYS = {
@@ -23,107 +21,125 @@ const SAAS_STORAGE_KEYS = {
   LEGACY_VENDOR: 'boeweb_vendor_name'
 };
 
+function getSafeStorageItem(storage, key) {
+  try {
+    return storage?.getItem(key) || null;
+  } catch (error) {
+    return null;
+  }
+}
+
 class SaasAuthEngine {
   constructor() {
-    const getSafeItem = (storage, key) => {
-      try {
-        return (typeof window !== 'undefined' || typeof global !== 'undefined') && storage ? storage.getItem(key) : null;
-      } catch (e) {
-        return null;
-      }
-    };
+    const local = typeof localStorage !== 'undefined' ? localStorage : null;
+    const session = typeof sessionStorage !== 'undefined' ? sessionStorage : null;
 
-    const ls = typeof localStorage !== 'undefined' ? localStorage : null;
-    const ss = typeof sessionStorage !== 'undefined' ? sessionStorage : null;
-
-    this.activeTenantId = getSafeItem(ls, SAAS_STORAGE_KEYS.TENANT_ID) || '11111111-1111-1111-1111-111111111111';
-    this.userName = getSafeItem(ls, SAAS_STORAGE_KEYS.USER_NAME) || 
-                    getSafeItem(ls, SAAS_STORAGE_KEYS.LEGACY_VENDOR) || 
-                    getSafeItem(ss, SAAS_STORAGE_KEYS.LEGACY_VENDOR) || 
-                    'Vendedor BÔ';
-    this.userEmail = getSafeItem(ls, SAAS_STORAGE_KEYS.USER_EMAIL) || 'vendedor@boeweb.com';
-    this.userRole = getSafeItem(ls, SAAS_STORAGE_KEYS.USER_ROLE) || 'VENDEDOR'; // Rol sin privilegios por defecto
+    this.activeTenantId = SAAS_TENANTS[0].id;
+    this.userId = null;
+    this.userName = getSafeStorageItem(local, SAAS_STORAGE_KEYS.LEGACY_VENDOR)
+      || getSafeStorageItem(session, SAAS_STORAGE_KEYS.LEGACY_VENDOR)
+      || 'Vendedor BÔ';
+    this.userEmail = '';
+    this.userRole = 'VENDEDOR';
+    this.verifiedSession = false;
+    this.tenantUsers = [];
   }
 
   getTenantContext() {
-    const tenant = SAAS_TENANTS.find(t => t.id === this.activeTenantId) || SAAS_TENANTS[0];
-    const roleObj = SAAS_ROLES[this.userRole] || SAAS_ROLES.VENDEDOR;
+    const tenant = SAAS_TENANTS.find(item => item.id === this.activeTenantId) || SAAS_TENANTS[0];
+    const role = SAAS_ROLES[this.userRole] || SAAS_ROLES.VENDEDOR;
+    const isSuperadmin = this.verifiedSession && this.userRole === 'SUPERADMIN';
 
     return {
       tenantId: tenant.id,
       tenantSlug: tenant.slug,
       tenantName: tenant.name,
-      userId: `usr-${this.userName.toLowerCase().replace(/\s+/g, '-')}`,
+      userId: this.userId,
       userName: this.userName,
       userEmail: this.userEmail,
       role: this.userRole,
-      roleName: roleObj.name,
-      permissions: roleObj.permissions,
-      isSuperadmin: this.userRole === 'SUPERADMIN'
+      roleName: role.name,
+      permissions: this.verifiedSession ? role.permissions : [],
+      isSuperadmin,
+      isVerified: this.verifiedSession
     };
   }
 
   getTenantUsers(tenantId = this.activeTenantId) {
-    const defaultUsers = [
-      { id: 'usr-profesor-franco', user_id: 'usr-profesor-franco', tenant_id: tenantId, name: 'Profesor Franco', role: 'SUPERADMIN', active: true },
-      { id: 'usr-lautaro-vendedor', user_id: 'usr-lautaro-vendedor', tenant_id: tenantId, name: 'Lautaro (Vendedor)', role: 'VENDEDOR', active: true },
-      { id: 'usr-valeria-supervisor', user_id: 'usr-valeria-supervisor', tenant_id: tenantId, name: 'Valeria (Supervisor)', role: 'SUPERVISOR', active: true },
-      { id: 'usr-agustin-cajero', user_id: 'usr-agustin-cajero', tenant_id: tenantId, name: 'Agustín (Cajero/Vendedor)', role: 'VENDEDOR', active: true }
-    ];
-    return defaultUsers;
+    return this.tenantUsers.filter(user => user.tenant_id === tenantId && user.active !== false);
   }
 
   hasPermission(permissionKey) {
-    const ctx = this.getTenantContext();
-    if (ctx.role === 'SUPERADMIN' || ctx.permissions.includes('*')) return true;
-    return ctx.permissions.includes(permissionKey);
+    const context = this.getTenantContext();
+    if (!context.isVerified) return false;
+    if (context.isSuperadmin || context.permissions.includes('*')) return true;
+    return context.permissions.includes(permissionKey);
+  }
+
+  async hydrateFromSupabase(client) {
+    if (!client?.auth || typeof client.auth.getUser !== 'function') return false;
+
+    try {
+      const { data: authData, error: authError } = await client.auth.getUser();
+      const authUser = authData?.user;
+      if (authError || !authUser) {
+        this.resetVerifiedContext();
+        return false;
+      }
+
+      const { data: membership, error: membershipError } = await client
+        .from('tenant_users')
+        .select('tenant_id,user_id,email,name,role,active')
+        .eq('user_id', authUser.id)
+        .eq('active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (membershipError || !membership) {
+        this.resetVerifiedContext();
+        return false;
+      }
+
+      this.activeTenantId = membership.tenant_id;
+      this.userId = authUser.id;
+      this.userName = membership.name || authUser.email || 'Usuario BÔ';
+      this.userEmail = membership.email || authUser.email || '';
+      this.userRole = SAAS_ROLES[membership.role] ? membership.role : 'VENDEDOR';
+      this.verifiedSession = true;
+      this.tenantUsers = [{ ...membership, id: membership.user_id }];
+      return true;
+    } catch (error) {
+      console.error('No se pudo validar la sesion SaaS:', error);
+      this.resetVerifiedContext();
+      return false;
+    }
   }
 
   switchActiveTenant(newTenantId) {
-    const ctx = this.getTenantContext();
-    if (!ctx.isSuperadmin && newTenantId !== ctx.tenantId) {
-      console.warn('🔒 Acceso denegado: Únicamente el Superadmin autenticado puede alternar entre empresas.');
+    const context = this.getTenantContext();
+    if (!context.isVerified || !context.isSuperadmin || newTenantId === context.tenantId) {
+      console.warn('Cambio de empresa denegado: falta una sesion verificada de superadministrador.');
       return false;
     }
-    const tenant = SAAS_TENANTS.find(t => t.id === newTenantId || t.slug === newTenantId);
-    if (!tenant) return false;
 
+    const tenant = SAAS_TENANTS.find(item => item.id === newTenantId || item.slug === newTenantId);
+    if (!tenant) return false;
     this.activeTenantId = tenant.id;
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(SAAS_STORAGE_KEYS.TENANT_ID, tenant.id);
-    }
-    console.log(`[SaaS Context] Cambio de tenant activo a: ${tenant.name} (${tenant.id})`);
-    
-    if (typeof window !== 'undefined' && typeof window.renderWmsModulesGrid === 'function') {
-      window.renderWmsModulesGrid();
-    }
-    if (typeof window !== 'undefined' && typeof window.updateSaasHeaderUI === 'function') {
-      window.updateSaasHeaderUI();
-    }
     return true;
   }
 
-  loginAsUser(name, email, role, tenantId) {
-    this.userName = name;
-    this.userEmail = email;
-    this.userRole = role;
-    if (tenantId) this.activeTenantId = tenantId;
+  loginAsUser() {
+    console.warn('Inicio SaaS local deshabilitado: la identidad debe provenir de Supabase Auth.');
+    return false;
+  }
 
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(SAAS_STORAGE_KEYS.USER_NAME, name);
-      localStorage.setItem(SAAS_STORAGE_KEYS.USER_EMAIL, email);
-      localStorage.setItem(SAAS_STORAGE_KEYS.USER_ROLE, role);
-      localStorage.setItem(SAAS_STORAGE_KEYS.TENANT_ID, this.activeTenantId);
-      localStorage.setItem(SAAS_STORAGE_KEYS.LEGACY_VENDOR, name);
-    }
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.setItem(SAAS_STORAGE_KEYS.LEGACY_VENDOR, name);
-    }
-
-    if (typeof window !== 'undefined' && typeof window.updateSaasHeaderUI === 'function') {
-      window.updateSaasHeaderUI();
-    }
-    return this.getTenantContext();
+  resetVerifiedContext() {
+    this.activeTenantId = SAAS_TENANTS[0].id;
+    this.userId = null;
+    this.userEmail = '';
+    this.userRole = 'VENDEDOR';
+    this.verifiedSession = false;
+    this.tenantUsers = [];
   }
 
   logout() {
@@ -131,20 +147,15 @@ class SaasAuthEngine {
       localStorage.removeItem(SAAS_STORAGE_KEYS.USER_NAME);
       localStorage.removeItem(SAAS_STORAGE_KEYS.USER_EMAIL);
       localStorage.removeItem(SAAS_STORAGE_KEYS.USER_ROLE);
-      localStorage.removeItem(SAAS_STORAGE_KEYS.LEGACY_VENDOR);
+      localStorage.removeItem(SAAS_STORAGE_KEYS.TENANT_ID);
     }
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.removeItem(SAAS_STORAGE_KEYS.LEGACY_VENDOR);
-    }
-    
-    this.activeTenantId = '11111111-1111-1111-1111-111111111111';
+    this.resetVerifiedContext();
     this.userName = 'Vendedor BÔ';
-    this.userEmail = 'vendedor@boeweb.com';
-    this.userRole = 'VENDEDOR';
   }
 }
 
 const SaasAuth = new SaasAuthEngine();
+
 if (typeof window !== 'undefined') {
   window.SaasAuth = SaasAuth;
   window.SAAS_TENANTS = SAAS_TENANTS;

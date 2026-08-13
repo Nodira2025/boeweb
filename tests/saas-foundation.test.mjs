@@ -36,24 +36,41 @@ test('SaaS Security: DevTools Tamper Protection (Alterar localStorage a SUPERADM
   assert.equal(SaasAuth.getTenantContext().isSuperadmin, false);
 });
 
-test('SaaS Roles & Tenant Switching: Solo cuando el usuario está verificado como SUPERADMIN puede alternar Tenants', () => {
-  // Iniciar sesión autenticada como Profesor Franco SUPERADMIN
-  SaasAuth.loginAsUser('Profesor Franco', 'profesor.franco@boeweb.com', 'SUPERADMIN', '11111111-1111-1111-1111-111111111111');
-  assert.equal(SaasAuth.getTenantContext().isSuperadmin, true);
+test('SaaS Security: el selector local de roles está deshabilitado', () => {
+  const result = SaasAuth.loginAsUser('Usuario falso', 'fake@example.com', 'SUPERADMIN', SAAS_TENANTS[1].id);
+  const context = SaasAuth.getTenantContext();
 
-  // Switch to Tenant B Demo
-  const switched = SaasAuth.switchActiveTenant('22222222-2222-2222-2222-222222222222');
-  assert.equal(switched, true);
-  assert.equal(SaasAuth.getTenantContext().tenantName, 'Empresa B Demo (Ferretería Norte)');
-
-  // Reset back to Tenant #1
-  SaasAuth.switchActiveTenant('11111111-1111-1111-1111-111111111111');
+  assert.equal(result, false);
+  assert.equal(context.isVerified, false);
+  assert.equal(context.isSuperadmin, false);
+  assert.equal(SaasAuth.switchActiveTenant(SAAS_TENANTS[1].id), false);
 });
 
-test('SaaS Roles: VENDEDOR posee permisos operativos pero NO administrativos', () => {
-  SaasAuth.loginAsUser('Vendedor Test', 'vendedor@test.com', 'VENDEDOR', '11111111-1111-1111-1111-111111111111');
+test('SaaS Roles: una membresía validada por Supabase recibe solo sus permisos', async () => {
+  const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const membership = {
+    tenant_id: SAAS_TENANTS[0].id,
+    user_id: userId,
+    email: 'vendedor@example.com',
+    name: 'Vendedor Test',
+    role: 'VENDEDOR',
+    active: true
+  };
+  const query = {
+    select() { return this; },
+    eq() { return this; },
+    limit() { return this; },
+    async maybeSingle() { return { data: membership, error: null }; }
+  };
+  const client = {
+    auth: { async getUser() { return { data: { user: { id: userId, email: membership.email } }, error: null }; } },
+    from() { return query; }
+  };
+
+  assert.equal(await SaasAuth.hydrateFromSupabase(client), true);
   const ctx = SaasAuth.getTenantContext();
 
+  assert.equal(ctx.isVerified, true);
   assert.equal(ctx.role, 'VENDEDOR');
   assert.equal(ctx.isSuperadmin, false);
   assert.equal(SaasAuth.hasPermission('wms.transfer'), true);
@@ -85,4 +102,13 @@ test('SaaS RLS Isolation Rule: Subconsulta RLS evalúa is_superadmin() O tenant_
   assert.equal(ferreteriaData.length, 1);
   assert.equal(boeData[0].item, 'Sustrato BÔ');
   assert.equal(ferreteriaData[0].item, 'Taladro Ferretería');
+});
+
+test('SaaS RLS: la política tenant_users usa helper SECURITY DEFINER y no se autoconsulta', () => {
+  const hotfixPath = path.resolve('scripts', 'fix_tenant_users_rls_recursion.sql');
+  const sql = fs.readFileSync(hotfixPath, 'utf8');
+
+  assert.match(sql, /FUNCTION public\.is_tenant_member/);
+  assert.match(sql, /SET row_security = off/);
+  assert.match(sql, /public\.is_tenant_member\(tenant_id\)/);
 });
