@@ -5,6 +5,8 @@ import fs from 'node:fs';
 const html = fs.readFileSync('vendedor.html', 'utf8');
 const vendorJs = fs.readFileSync('vendedor.js', 'utf8');
 const saasAuthJs = fs.readFileSync('saas-auth.js', 'utf8');
+const revokeAnonSql = fs.readFileSync('scripts/revoke_anon_internal_permissions.sql', 'utf8');
+const fixRlsSql = fs.readFileSync('scripts/fix_tenant_users_rls_recursion.sql', 'utf8');
 
 test('portal vendedor conserva sus secciones dentro del contenedor autenticado', () => {
   const portalStart = html.indexOf('<div id="vendedor-portal-app"');
@@ -40,3 +42,23 @@ test('el POS confirma mediante RPC o informa que solo guardó un borrador', () =
   assert.doesNotMatch(vendorJs, /VENTA CONFIRMADA EXITOSAMENTE \(FASE 11B/);
 });
 
+test('el catálogo público aísla columnas sensibles via vista public_catalog_products', () => {
+  assert.match(revokeAnonSql, /CREATE OR REPLACE VIEW public\.public_catalog_products/);
+  assert.match(revokeAnonSql, /REVOKE ALL ON TABLE public\.products FROM anon, PUBLIC/);
+  assert.match(revokeAnonSql, /GRANT SELECT ON public\.public_catalog_products TO anon, authenticated/);
+  assert.doesNotMatch(revokeAnonSql, /SELECT cost/);
+});
+
+test('el acceso anónimo a borradores y WMS interno queda estrictamente revocado', () => {
+  assert.match(revokeAnonSql, /REVOKE ALL ON TABLE public\.product_drafts FROM anon, PUBLIC/);
+  assert.match(revokeAnonSql, /REVOKE ALL ON TABLE public\.store_shelves FROM anon, PUBLIC/);
+  assert.match(revokeAnonSql, /REVOKE ALL ON TABLE public\.inventory_audits FROM anon, PUBLIC/);
+  assert.match(revokeAnonSql, /REVOKE ALL ON TABLE public\.admin_activity_log FROM anon, PUBLIC/);
+});
+
+test('el fix de RLS tenant_users usa SECURITY DEFINER con row_security = off', () => {
+  assert.match(fixRlsSql, /SECURITY DEFINER/);
+  assert.match(fixRlsSql, /SET search_path = public, pg_temp/);
+  assert.match(fixRlsSql, /SET row_security = off/);
+  assert.match(fixRlsSql, /REVOKE ALL ON FUNCTION public\.is_tenant_member\(UUID\) FROM PUBLIC/);
+});
