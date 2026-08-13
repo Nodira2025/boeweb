@@ -771,8 +771,40 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.rpc_process_sale_checkout_saas TO authenticated;
 
+-- ============================================================================
+-- 12. VERSIONADO DE ESQUEMA DB Y AUDITORÍA DE RELEASES (FASE 15)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.schema_migrations (
+  version VARCHAR(50) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  checksum VARCHAR(100) NOT NULL,
+  backward_compatible BOOLEAN NOT NULL DEFAULT true,
+  applied_at TIMESTAMPTZ DEFAULT NOW(),
+  applied_by VARCHAR(255) DEFAULT 'system'
+);
 
+CREATE TABLE IF NOT EXISTS public.release_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  environment VARCHAR(50) NOT NULL DEFAULT 'LOCAL',
+  app_version VARCHAR(50) NOT NULL,
+  git_commit VARCHAR(100) NOT NULL,
+  git_tag VARCHAR(100) NOT NULL,
+  schema_version VARCHAR(50) NOT NULL,
+  deployed_by VARCHAR(255) NOT NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'HEALTHY' CHECK (status IN ('DEPLOYING', 'VERIFYING', 'HEALTHY', 'DEGRADED', 'ROLLED_BACK', 'FAILED')),
+  deployed_at TIMESTAMPTZ DEFAULT NOW()
+);
 
+ALTER TABLE public.schema_migrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.release_history ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "RLS schema_migrations_superadmin" ON public.schema_migrations;
+DROP POLICY IF EXISTS "RLS release_history_superadmin" ON public.release_history;
 
+CREATE POLICY "RLS schema_migrations_superadmin" ON public.schema_migrations FOR SELECT USING (true);
+CREATE POLICY "RLS release_history_superadmin" ON public.release_history FOR SELECT USING (true);
 
+-- Inmutabilidad en schema_migrations
+REVOKE UPDATE, DELETE ON public.schema_migrations FROM anon, authenticated;
+GRANT SELECT ON public.schema_migrations TO authenticated;
+GRANT SELECT ON public.release_history TO authenticated;
