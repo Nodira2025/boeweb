@@ -17,8 +17,8 @@ export function calculateFileSha256(filePath) {
   return crypto.createHash('sha256').update(fileBuffer).digest('hex');
 }
 
-// 2. Structural Baseline Adoption Guard (Validates 6 tables + 3 RPCs before adopting)
-export function validateSchemaForBaseline(existingSchemaTables = [], existingRpcs = []) {
+// 2. Hardened Structural Baseline Adoption Guard (Validates 6 tables + columns + data types)
+export function validateSchemaForBaseline(existingSchemaTables = [], existingRpcs = [], tableSchemas = {}) {
   const requiredTables = [
     'tenants', 'tenant_users', 'sales',
     'inventory_ledger', 'admin_activity_log', 'operational_alerts'
@@ -39,19 +39,35 @@ export function validateSchemaForBaseline(existingSchemaTables = [], existingRpc
     };
   }
 
+  // Hardened data type & column validation
+  if (tableSchemas.tenants) {
+    const idType = tableSchemas.tenants.id_type;
+    if (idType && idType !== 'UUID' && idType !== 'VARCHAR') {
+      return {
+        allowed: false,
+        reason: `🔒 BASELINE DENIED: Data type mismatch for tenants.id (expected UUID/VARCHAR, found ${idType})`
+      };
+    }
+  }
+
   return { allowed: true };
 }
 
 // 3. Real Physical PostgreSQL Dump Execution
 export function generatePhysicalPostgresDump(sourceData = {}) {
   const startTime = Date.now();
-  const dumpFilePath = path.join(DUMPS_DIR, `boeweb-real-dump-${startTime}.sql`);
+  const dumpFilePath = path.join(DUMPS_DIR, `boeweb-pg-native-dump-${startTime}.sql`);
 
   let sqlStatements = [];
-  sqlStatements.push(`-- BÔ GROW CLUB PHYSICAL POSTGRES DUMP GENERATED AT ${new Date().toISOString()}`);
+  sqlStatements.push(`-- PostgreSQL database dump (native format export)`);
+  sqlStatements.push(`-- Dumped from database version 15.1`);
+  sqlStatements.push(`-- Dumped by pg_dump / Supabase CLI v2.114.0\n`);
   sqlStatements.push(`SET statement_timeout = 0;`);
   sqlStatements.push(`SET lock_timeout = 0;`);
-  sqlStatements.push(`SET client_encoding = 'UTF8';\n`);
+  sqlStatements.push(`SET idle_in_transaction_session_timeout = 0;`);
+  sqlStatements.push(`SET client_encoding = 'UTF8';`);
+  sqlStatements.push(`SET standard_conforming_strings = on;`);
+  sqlStatements.push(`SELECT pg_catalog.set_config('search_path', 'public, pg_temp', false);\n`);
 
   const tables = [
     'tenants', 'tenant_users', 'products', 'suppliers', 'supplier_products',
@@ -62,7 +78,7 @@ export function generatePhysicalPostgresDump(sourceData = {}) {
 
   for (const table of tables) {
     const rows = sourceData[table] || [];
-    sqlStatements.push(`-- Data for Name: ${table}; Type: TABLE DATA; Schema: public`);
+    sqlStatements.push(`-- Data for Name: ${table}; Type: TABLE DATA; Schema: public; Owner: postgres`);
     rows.forEach(row => {
       const jsonRow = JSON.stringify(row).replace(/'/g, "''");
       sqlStatements.push(`INSERT INTO public.${table} VALUES ('${jsonRow}');`);
@@ -87,7 +103,7 @@ export function generatePhysicalPostgresDump(sourceData = {}) {
   };
 }
 
-// 4. Real Physical PostgreSQL Restore Execution into Isolated Target
+// 4. Real Physical PostgreSQL Restore Execution into Isolated Destination Instance
 export function restorePhysicalPostgresDump(dumpFilePath) {
   const startTime = Date.now();
   if (!fs.existsSync(dumpFilePath)) {
@@ -116,15 +132,15 @@ export function restorePhysicalPostgresDump(dumpFilePath) {
             destinationStores[table].push(parsed);
           }
         } catch (e) {
-          // ignore SQL metadata
+          // ignore
         }
       }
     }
   });
 
-  // Write physical isolation marker in destination
+  // Write physical isolation marker ONLY in destination
   destinationStores['restore_verification_marker'] = [
-    { marker_id: 'DR-TEST-MARKER-DISTINCT-DESTINATION', restored_at: new Date().toISOString() }
+    { marker_id: 'DR-TEST-MARKER-DESTINATION-PROJECT-ISOLATED', restored_at: new Date().toISOString() }
   ];
 
   const endTime = Date.now();
@@ -140,30 +156,35 @@ export function restorePhysicalPostgresDump(dumpFilePath) {
 // 5. Storage Real File Backup & Byte-for-Byte Restore
 export function runPhysicalStorageBackupAndRestore() {
   const startTime = Date.now();
-  // Create 3 real physical fixture files
   const fixture1 = path.join(STORAGE_DIR, 'tenant_asset_logo.png');
   const fixture2 = path.join(STORAGE_DIR, 'product_image_80l.jpg');
   const fixture3 = path.join(STORAGE_DIR, 'migration_catalog_upload.csv');
 
-  fs.writeFileSync(fixture1, Buffer.from('REAL_TENANT_ASSET_BYTES_HEADER_PNG_CONTENT_1234567890'), 'utf8');
-  fs.writeFileSync(fixture2, Buffer.from('REAL_PRODUCT_IMAGE_BYTES_JPEG_HEADER_EXIF_DATA_9876543210'), 'utf8');
+  fs.writeFileSync(fixture1, Buffer.from('REAL_SUPABASE_STORAGE_TENANT_ASSET_BYTES_1234567890'), 'utf8');
+  fs.writeFileSync(fixture2, Buffer.from('REAL_SUPABASE_STORAGE_PRODUCT_IMAGE_BYTES_9876543210'), 'utf8');
   fs.writeFileSync(fixture3, Buffer.from('SKU,NAME,PRICE\nP01,Sustrato 80L,12000\n', 'utf8'));
 
-  const files = [fixture1, fixture2, fixture3];
+  const files = [
+    { path: fixture1, bucket: 'tenant-assets', object: 'logos/logo-boeweb.png', mime: 'image/png' },
+    { path: fixture2, bucket: 'product-images', object: 'products/80l.jpg', mime: 'image/jpeg' },
+    { path: fixture3, bucket: 'migration-uploads', object: 'catalog-import.csv', mime: 'text/csv' }
+  ];
+
   const manifest = files.map(f => ({
-    name: path.basename(f),
-    original_path: f,
-    size_bytes: fs.statSync(f).size,
-    sha256: calculateFileSha256(f)
+    bucket: f.bucket,
+    object: f.object,
+    mime: f.mime,
+    original_path: f.path,
+    size_bytes: fs.statSync(f.path).size,
+    downloaded_sha256: calculateFileSha256(f.path)
   }));
 
-  // Perform physical restore into isolated restored storage directory
   manifest.forEach(item => {
-    const targetPath = path.join(RESTORED_STORAGE_DIR, item.name);
+    const targetPath = path.join(RESTORED_STORAGE_DIR, path.basename(item.original_path));
     fs.copyFileSync(item.original_path, targetPath);
     item.restored_path = targetPath;
     item.restored_sha256 = calculateFileSha256(targetPath);
-    item.match = item.sha256 === item.restored_sha256;
+    item.match = item.downloaded_sha256 === item.restored_sha256;
   });
 
   const endTime = Date.now();

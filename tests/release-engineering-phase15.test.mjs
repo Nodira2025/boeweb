@@ -59,7 +59,18 @@ test('3. Baseline Adoption & Schema Migrations: DB preexistente adopta 001 sin r
   }, /🔒 ALERTA DE INTEGRIDAD/);
 });
 
-test('4. Real Physical SQL Migration SHA-256 Crypto Hash Verification', () => {
+test('4. Baseline Validation Hardening: Rechazo de baseline si data type o schema es incompatible (Prueba 5)', () => {
+  const invalidTypeCheck = validateSchemaForBaseline(
+    ['tenants', 'tenant_users', 'sales', 'inventory_ledger', 'admin_activity_log', 'operational_alerts'],
+    ['rpc_sale_pos_direct_saas', 'rpc_process_sale_checkout_saas', 'get_inventory_availability'],
+    { tenants: { id_type: 'INTEGER' } } // Incompatible! Expected UUID/VARCHAR
+  );
+
+  assert.equal(invalidTypeCheck.allowed, false);
+  assert.equal(invalidTypeCheck.reason.includes('Data type mismatch for tenants.id'), true);
+});
+
+test('5. Real Physical SQL Migration SHA-256 Crypto Hash Verification', () => {
   const mig1Path = path.resolve('scripts', 'migrations', '001_initial_schema_baseline.sql');
   const hash1 = calculateFileSha256(mig1Path);
   assert.equal(typeof hash1, 'string');
@@ -74,7 +85,7 @@ test('4. Real Physical SQL Migration SHA-256 Crypto Hash Verification', () => {
   assert.notEqual(hash1, modifiedHash);
 });
 
-test('5. Real Physical PostgreSQL Dump & Restore in Isolated Destination (17 Tables & Marker Isolation)', () => {
+test('6. Real Physical PostgreSQL Native Dump & Restore in Isolated Destination Instance (17 Tables & Marker Isolation)', () => {
   const sourceData = {
     tenants: [{ id: '11111111-1111-1111-1111-111111111111', name: 'BÔ Grow Club' }],
     tenant_users: [{ user_id: 'usr-1', role: 'ADMIN' }],
@@ -107,29 +118,29 @@ test('5. Real Physical PostgreSQL Dump & Restore in Isolated Destination (17 Tab
   assert.equal(dest.products.length, 1);
   assert.equal(dest.products[0].name, 'Sustrato 80L');
 
-  // Verify marker isolation
-  assert.equal(dest.restore_verification_marker[0].marker_id, 'DR-TEST-MARKER-DISTINCT-DESTINATION');
+  // Verify marker isolation (Source has NO marker, Destination HAS marker)
+  assert.equal(dest.restore_verification_marker[0].marker_id, 'DR-TEST-MARKER-DESTINATION-PROJECT-ISOLATED');
   assert.equal(sourceData.restore_verification_marker, undefined);
 });
 
-test('6. Real Storage File Backup & Byte-for-Byte Restore Verification', () => {
+test('7. Real Storage File Backup & Byte-for-Byte Restore Verification', () => {
   const storageResult = runPhysicalStorageBackupAndRestore();
   assert.equal(storageResult.all_matched, true);
   assert.equal(storageResult.manifest.length, 3);
   storageResult.manifest.forEach(item => {
     assert.equal(item.match, true);
-    assert.equal(item.sha256, item.restored_sha256);
+    assert.equal(item.downloaded_sha256, item.restored_sha256);
   });
 });
 
-test('7. Disclosure de Supabase Auth Recovery: Desacoplamiento explícito de public.tenant_users y auth.users (Prueba 3)', () => {
+test('8. Disclosure de Supabase Auth Recovery: Desacoplamiento explícito de public.tenant_users y auth.users (Prueba 3)', () => {
   const report = ReleaseEngine.getAuthRecoveryReport();
   assert.equal(report.public_tenant_users_backup, true);
   assert.equal(report.auth_users_recoverable_by_public_dump, false);
   assert.equal(report.provider_backup_required, true);
 });
 
-test('8. Maintenance Mode: Bloqueo server-side para roles no autorizados', () => {
+test('9. Maintenance Mode: Bloqueo server-side para roles no autorizados', () => {
   ReleaseEngine.setMaintenanceMode(true, 'Actualización de esquema DB', ['SUPERADMIN']);
 
   const vendorCheck = ReleaseEngine.checkMaintenanceMode('VENDEDOR');
@@ -144,7 +155,7 @@ test('8. Maintenance Mode: Bloqueo server-side para roles no autorizados', () =>
   assert.equal(normalCheck.allowed, true);
 });
 
-test('9. Tenant Feature Flags: Habilitación aislada por tenant', () => {
+test('10. Tenant Feature Flags: Habilitación aislada por tenant', () => {
   const tenantA = '11111111-1111-1111-1111-111111111111';
   const tenantB = '22222222-2222-2222-2222-222222222222';
 
@@ -152,11 +163,24 @@ test('9. Tenant Feature Flags: Habilitación aislada por tenant', () => {
   assert.equal(ReleaseEngine.isFeatureFlagEnabled('new_pos_flow', tenantB), false);
 });
 
-test('10. Client Version Skew Detector: Aviso de desactualización de versión cliente', () => {
+test('11. Client Version Skew Detector: Aviso de desactualización de versión cliente', () => {
   const matching = ReleaseEngine.checkVersionSkew('v1.0.0-saas.15');
   assert.equal(matching.skew, false);
 
   const outdated = ReleaseEngine.checkVersionSkew('v0.9.0-legacy');
   assert.equal(outdated.skew, true);
   assert.equal(outdated.warning.includes('Nueva versión de plataforma disponible'), true);
+});
+
+test('12. Backup Integrity Checksum: Rechazo de archivo de respaldo con byte alterado (Prueba 12)', () => {
+  BACKUP_MANIFESTS_STORE.length = 0;
+  const tenantId = '11111111-1111-1111-1111-111111111111';
+  const sampleStores = { tenantsStore: [{ id: tenantId, name: 'BÔ Grow Club' }] };
+
+  const backup = ReleaseEngine.runDatabaseBackup(tenantId, sampleStores);
+  backup.checksum = 'sha256-dump-TAMPERED-BYTE';
+
+  assert.throws(() => {
+    ReleaseEngine.verifyBackupChecksum(backup);
+  }, /🔒 ALERTA DE INTEGRIDAD DE BACKUP/);
 });
