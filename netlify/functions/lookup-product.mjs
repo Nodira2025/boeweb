@@ -128,11 +128,22 @@ function mapCategory(...values) {
   return categoryRules.find(([, pattern]) => pattern.test(text))?.[0] || 'Otros';
 }
 
+function validateServerSideUrl(urlAddress) {
+  const urlStr = String(urlAddress || '').trim();
+  const forbiddenProtocols = /^(file|gopher|dict|ftp|ldap|ssh|smb|data):/i;
+  const privateIpPattern = /^https?:\/\/(localhost|127\.\d+\.\d+\.\d+|169\.254\.169\.254|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|::1|0\.0\.0\.0)/i;
+
+  if (forbiddenProtocols.test(urlStr) || privateIpPattern.test(urlStr)) {
+    throw new Error(`🔒 Bloqueo de Seguridad SSRF Server-Side: La URL solicitada (${urlStr}) apunta a un rango de red privada o protocolo restringido.`);
+  }
+}
+
 async function fetchWithTimeout(url, options = {}) {
+  validateServerSideUrl(url);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), EXTERNAL_TIMEOUT_MS);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    return await fetch(url, { ...options, signal: controller.signal, redirect: 'error' });
   } finally {
     clearTimeout(timeoutId);
   }

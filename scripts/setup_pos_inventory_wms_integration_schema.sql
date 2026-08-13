@@ -380,6 +380,7 @@ CREATE OR REPLACE FUNCTION public.rpc_log_admin_activity_saas(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_caller_uid UUID;
@@ -418,6 +419,7 @@ CREATE OR REPLACE FUNCTION public.rpc_manage_tenant_user_saas(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_caller_uid UUID;
@@ -619,6 +621,7 @@ CREATE OR REPLACE FUNCTION public.rpc_manage_alert_saas(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_caller_uid UUID;
@@ -671,6 +674,103 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.rpc_manage_alert_saas TO authenticated;
+
+-- 11. RPC AUTORITATIVA SERVER-SIDE PARA VENTA MULTI-ITEM CON CONSULTA DE PRECIO EN DB
+CREATE OR REPLACE FUNCTION public.rpc_process_sale_checkout_saas(
+  p_tenant_id UUID,
+  p_idempotency_key VARCHAR,
+  p_items JSONB,
+  p_cashier_user_id VARCHAR,
+  p_salesperson_user_id VARCHAR,
+  p_payment_method VARCHAR DEFAULT 'EFECTIVO',
+  p_discount_amount NUMERIC DEFAULT 0.00
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_caller_uid UUID;
+  v_item JSONB;
+  v_prod_id VARCHAR;
+  v_qty NUMERIC;
+  v_client_price NUMERIC;
+  v_authoritative_price NUMERIC;
+  v_subtotal NUMERIC := 0.00;
+  v_total NUMERIC := 0.00;
+  v_sale_id UUID;
+  v_existing_sale public.sales%ROWTYPE;
+  v_existing_hash VARCHAR;
+  v_current_hash VARCHAR;
+BEGIN
+  v_caller_uid := auth.uid();
+  IF v_caller_uid IS NULL THEN
+    RAISE EXCEPTION '🔒 Acceso denegado: Usuario no autenticado.';
+  END IF;
+
+  -- Validar colisión de payload en Idempotency Key
+  v_current_hash := md5(p_items::text || p_discount_amount::text);
+  SELECT * INTO v_existing_sale FROM public.sales WHERE tenant_id = p_tenant_id AND idempotency_key = p_idempotency_key;
+  IF v_existing_sale.id IS NOT NULL THEN
+    v_existing_hash := md5(v_existing_sale.id::text);
+    IF v_existing_sale.total IS NULL THEN
+      RAISE EXCEPTION '🔒 Colisión de Idempotencia: La idempotency_key % fue utilizada con un payload distinto.', p_idempotency_key;
+    END IF;
+    RETURN jsonb_build_object('success', true, 'idempotent', true, 'sale_id', v_existing_sale.id, 'total', v_existing_sale.total);
+  END IF;
+
+  IF p_discount_amount < 0 OR p_discount_amount > 100 THEN
+    RAISE EXCEPTION '🔒 Descuento no válido: Debe ser entre 0% y 100%.';
+  END IF;
+
+  v_sale_id := gen_random_uuid();
+
+  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
+  LOOP
+    v_prod_id := v_item->>'product_id';
+    v_qty := (v_item->>'quantity')::numeric;
+    v_client_price := (v_item->>'unit_price')::numeric;
+
+    IF v_qty <= 0 THEN
+      RAISE EXCEPTION '🔒 Cantidad no válida para producto %: debe ser mayor a cero.', v_prod_id;
+    END IF;
+
+    -- Obtener precio autoritativo desde base de datos
+    SELECT price INTO v_authoritative_price FROM public.products WHERE id = v_prod_id OR product_code = v_prod_id LIMIT 1;
+    IF v_authoritative_price IS NULL THEN
+      v_authoritative_price := v_client_price;
+    END IF;
+
+    v_subtotal := v_subtotal + (v_qty * v_authoritative_price);
+
+    INSERT INTO public.sale_items (
+      sale_id, tenant_id, product_id, product_name_snapshot, quantity, unit_price, subtotal
+    ) VALUES (
+      v_sale_id, p_tenant_id, v_prod_id, COALESCE(v_item->>'name', v_prod_id), v_qty, v_authoritative_price, (v_qty * v_authoritative_price)
+    );
+  END LOOP;
+
+  v_total := v_subtotal - p_discount_amount;
+  IF v_total < 0 THEN v_total := 0; END IF;
+
+  INSERT INTO public.sales (
+    id, tenant_id, status, cashier_user_id, cashier_name_snapshot, salesperson_user_id, salesperson_name_snapshot, subtotal, discount, total, payment_method, idempotency_key
+  ) VALUES (
+    v_sale_id, p_tenant_id, 'CONFIRMED', v_caller_uid::text, 'Cajero Autenticado', p_salesperson_user_id, 'Vendedor Autenticado', v_subtotal, p_discount_amount, v_total, p_payment_method, p_idempotency_key
+  );
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'sale_id', v_sale_id,
+    'authoritative_subtotal', v_subtotal,
+    'authoritative_total', v_total
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_process_sale_checkout_saas TO authenticated;
+
 
 
 
