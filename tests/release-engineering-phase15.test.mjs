@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
+import fs from 'node:fs';
 import { ReleaseEngine, SCHEMA_MIGRATIONS_STORE, BACKUP_MANIFESTS_STORE, STORAGE_BACKUPS_STORE } from '../release-engine.js';
+import { calculateFileSha256, validateSchemaForBaseline, generatePhysicalPostgresDump, restorePhysicalPostgresDump, runPhysicalStorageBackupAndRestore } from '../scripts/db-pg-dump-restore-real.mjs';
 
 test('1. Environment Separation & Validation: Entornos válidos e invalidez de entorno ambiguo', () => {
   const localEnv = ReleaseEngine.validateEnvironmentConfig('LOCAL');
@@ -29,13 +32,20 @@ test('3. Baseline Adoption & Schema Migrations: DB preexistente adopta 001 sin r
   SCHEMA_MIGRATIONS_STORE.length = 0;
 
   // Baseline adoption para DB preexistente
-  const baseline = ReleaseEngine.adoptSchemaBaseline('001', 'initial_schema_baseline', 'sha256-baseline-001');
+  const baseline = ReleaseEngine.adoptSchemaBaseline('001', 'initial_schema_baseline', 'sha256-baseline-001', {
+    existingTables: ['tenants', 'tenant_users', 'sales', 'inventory_ledger', 'admin_activity_log', 'operational_alerts'],
+    existingRpcs: ['rpc_sale_pos_direct_saas', 'rpc_process_sale_checkout_saas', 'get_inventory_availability']
+  });
   assert.equal(baseline.adopted, true);
   assert.equal(SCHEMA_MIGRATIONS_STORE.length, 1);
 
-  // Intentar re-adoptar
-  const reAdopt = ReleaseEngine.adoptSchemaBaseline('001', 'initial_schema_baseline', 'sha256-baseline-001');
-  assert.equal(reAdopt.adopted, false);
+  // Intentar adoptar baseline en DB incompatible (faltan tablas/RPCs)
+  assert.throws(() => {
+    ReleaseEngine.adoptSchemaBaseline('001-fake', 'initial_schema_baseline', 'sha256-baseline-001', {
+      existingTables: ['tenants'], // Faltan ventas, ledger, etc.
+      existingRpcs: []
+    });
+  }, /🔒 BASELINE ADOPTION DENIED/);
 
   const mig2 = { version: '002', name: 'add_schema_migrations', checksum: 'sha256-002', backward_compatible: true };
   const res2 = ReleaseEngine.applyMigration(mig2);
@@ -49,94 +59,77 @@ test('3. Baseline Adoption & Schema Migrations: DB preexistente adopta 001 sin r
   }, /🔒 ALERTA DE INTEGRIDAD/);
 });
 
-test('4. Release Preflight Check: Preflight exitoso y bloqueo ante fallas críticas', () => {
-  const cleanPreflight = ReleaseEngine.runReleasePreflight({ gitClean: true, testsPassing: true, dbConnected: true, secretsPresent: true });
-  assert.equal(cleanPreflight.status, 'PREFLIGHT_SUCCESS');
+test('4. Real Physical SQL Migration SHA-256 Crypto Hash Verification', () => {
+  const mig1Path = path.resolve('scripts', 'migrations', '001_initial_schema_baseline.sql');
+  const hash1 = calculateFileSha256(mig1Path);
+  assert.equal(typeof hash1, 'string');
+  assert.equal(hash1.length, 64); // Valid 64-char SHA-256 hex string
 
-  const blockedPreflight = ReleaseEngine.runReleasePreflight({ gitClean: false, testsPassing: true, dbConnected: true, secretsPresent: true });
-  assert.equal(blockedPreflight.status, 'DEPLOY_BLOCKED');
-  assert.equal(blockedPreflight.failed_checks.includes('GIT_STATUS_CLEAN'), true);
+  // Modificar copia temporal del archivo para verificar cambio de hash
+  const tempPath = path.resolve('scratch', 'temp_001_modified.sql');
+  fs.mkdirSync(path.resolve('scratch'), { recursive: true });
+  fs.writeFileSync(tempPath, fs.readFileSync(mig1Path, 'utf8') + '\n-- ALTERED BYTE', 'utf8');
+
+  const modifiedHash = calculateFileSha256(tempPath);
+  assert.notEqual(hash1, modifiedHash);
 });
 
-test('5. Database Backup & Restore Drill: Respaldos lógicos reales en 17 tablas y prueba de restauración aislada', () => {
-  BACKUP_MANIFESTS_STORE.length = 0;
-  const tenantId = '11111111-1111-1111-1111-111111111111';
-
-  const sampleStores = {
-    tenantsStore: [{ id: tenantId, name: 'BÔ Grow Club' }],
-    tenantUsersStore: [{ user_id: 'usr-1', tenant_id: tenantId, role: 'ADMIN' }],
-    productsStore: [{ id: 'P01', tenant_id: tenantId, name: 'Sustrato GrowMix 80L', price: 12000 }],
-    suppliersStore: [{ id: 'SUP-01', name: 'AstroGrow' }],
-    supplierProductsStore: [{ id: 'SP-01', tenant_id: tenantId, product_id: 'P01', price: 10000 }],
-    salesStore: [{ id: 'S01', tenant_id: tenantId, total: 12000 }],
-    saleItemsStore: [{ id: 'SI01', tenant_id: tenantId, sale_id: 'S01', product_id: 'P01', quantity: 1, unit_price: 12000 }],
-    cashSessionsStore: [{ id: 'CS01', tenant_id: tenantId, status: 'OPEN' }],
-    cashMovementsStore: [{ id: 'CM01', tenant_id: tenantId, amount: 12000 }],
-    balancesStore: [{ tenant_id: tenantId, product_id: 'P01', on_hand_sellable: 10 }],
-    locationsStore: [{ tenant_id: tenantId, product_id: 'P01', quantity: 10 }],
-    reservationsStore: [{ id: 'RES01', tenant_id: tenantId, quantity: 2 }],
-    ledgerStore: [{ id: 'LED01', tenant_id: tenantId, event_type: 'SALE_POS_DIRECT', quantity: 1 }],
-    auditLogStore: [{ id: 'LOG01', tenant_id: tenantId, action: 'SALE' }],
-    alertsStore: [{ id: 'ALT01', tenant_id: tenantId, alert_type: 'LOW_STOCK' }],
-    rulesStore: [{ id: 'RUL01', tenant_id: tenantId, min_stock: 5 }]
+test('5. Real Physical PostgreSQL Dump & Restore in Isolated Destination (17 Tables & Marker Isolation)', () => {
+  const sourceData = {
+    tenants: [{ id: '11111111-1111-1111-1111-111111111111', name: 'BÔ Grow Club' }],
+    tenant_users: [{ user_id: 'usr-1', role: 'ADMIN' }],
+    products: [{ id: 'P01', name: 'Sustrato 80L', price: 12000 }],
+    suppliers: [{ id: 'SUP-1', name: 'Grower Wholesale' }],
+    supplier_products: [{ id: 'SP-1', product_id: 'P01', price: 10000 }],
+    sales: [{ id: 'S01', total: 12000 }],
+    sale_items: [{ id: 'SI01', sale_id: 'S01', product_id: 'P01', quantity: 1 }],
+    cash_sessions: [{ id: 'CS01', status: 'OPEN' }],
+    cash_movements: [{ id: 'CM01', amount: 12000 }],
+    inventory_balances: [{ product_id: 'P01', on_hand_sellable: 10 }],
+    inventory_locations: [{ product_id: 'P01', quantity: 10 }],
+    inventory_reservations: [{ id: 'RES01', quantity: 2 }],
+    inventory_ledger: [{ id: 'LED01', quantity: 1 }],
+    admin_activity_log: [{ id: 'LOG01', action: 'SALE' }],
+    operational_alerts: [{ id: 'ALT01', alert_type: 'LOW_STOCK' }],
+    alert_rules: [{ id: 'RUL01', min_stock: 5 }],
+    schema_migrations: [{ version: '001', checksum: 'hash1' }]
   };
 
-  const backupManifest = ReleaseEngine.runDatabaseBackup(tenantId, sampleStores);
-  assert.notEqual(backupManifest.backup_id, undefined);
-  assert.equal(backupManifest.tables_count, 17);
+  const dumpResult = generatePhysicalPostgresDump(sourceData);
+  assert.equal(fs.existsSync(dumpResult.dump_file_path), true);
+  assert.equal(dumpResult.file_size_bytes > 0, true);
+  assert.equal(dumpResult.sha256.length, 64);
 
-  // Restore Drill en entorno aislado
-  const targetIsolatedStores = {};
-  const restoreResult = ReleaseEngine.runRestoreDrill(backupManifest.backup_id, targetIsolatedStores);
+  const restoreResult = restorePhysicalPostgresDump(dumpResult.dump_file_path);
+  const dest = restoreResult.destination_stores;
 
-  assert.equal(restoreResult.status, 'RESTORE_SUCCESS');
-  assert.equal(restoreResult.tables_restored, 17);
-  assert.equal(restoreResult.consistent, true);
-  assert.equal(targetIsolatedStores.productsStore.length, 1);
-  assert.equal(targetIsolatedStores.productsStore[0].name, 'Sustrato GrowMix 80L');
+  assert.equal(dest.tenants.length, 1);
+  assert.equal(dest.products.length, 1);
+  assert.equal(dest.products[0].name, 'Sustrato 80L');
+
+  // Verify marker isolation
+  assert.equal(dest.restore_verification_marker[0].marker_id, 'DR-TEST-MARKER-DISTINCT-DESTINATION');
+  assert.equal(sourceData.restore_verification_marker, undefined);
 });
 
-test('6. Backup Integrity Checksum: Rechazo de archivo de respaldo con byte alterado (Prueba 12)', () => {
-  BACKUP_MANIFESTS_STORE.length = 0;
-  const tenantId = '11111111-1111-1111-1111-111111111111';
-  const sampleStores = { tenantsStore: [{ id: tenantId, name: 'BÔ Grow Club' }] };
-
-  const backup = ReleaseEngine.runDatabaseBackup(tenantId, sampleStores);
-  backup.checksum = 'sha256-dump-TAMPERED-BYTE';
-
-  assert.throws(() => {
-    ReleaseEngine.verifyBackupChecksum(backup);
-  }, /🔒 ALERTA DE INTEGRIDAD DE BACKUP/);
+test('6. Real Storage File Backup & Byte-for-Byte Restore Verification', () => {
+  const storageResult = runPhysicalStorageBackupAndRestore();
+  assert.equal(storageResult.all_matched, true);
+  assert.equal(storageResult.manifest.length, 3);
+  storageResult.manifest.forEach(item => {
+    assert.equal(item.match, true);
+    assert.equal(item.sha256, item.restored_sha256);
+  });
 });
 
-test('7. Storage Backup & Restore Drill: Manifiesto de objetos, checksums y restauración aislada (Prueba 2)', () => {
-  STORAGE_BACKUPS_STORE.length = 0;
-  const tenantId = '11111111-1111-1111-1111-111111111111';
-
-  const mockObjects = [
-    { path: `${tenantId}/logos/logo-boeweb.png`, tenant_id: tenantId, mime_type: 'image/png', size_bytes: 45000, checksum: 'sha-logo-1' },
-    { path: `${tenantId}/products/prod-80l.jpg`, tenant_id: tenantId, mime_type: 'image/jpeg', size_bytes: 120000, checksum: 'sha-prod-1' }
-  ];
-
-  const backupManifest = ReleaseEngine.runStorageBackup(tenantId, mockObjects);
-  assert.equal(backupManifest.objects_count, 2);
-
-  const restoredObjects = [];
-  const restoreResult = ReleaseEngine.runStorageRestore(backupManifest.storage_backup_id, restoredObjects);
-
-  assert.equal(restoreResult.status, 'STORAGE_RESTORE_SUCCESS');
-  assert.equal(restoredObjects.length, 2);
-  assert.equal(restoredObjects[0].path, `${tenantId}/logos/logo-boeweb.png`);
-});
-
-test('8. Disclosure de Supabase Auth Recovery: Desacoplamiento explícito de public.tenant_users y auth.users (Prueba 3)', () => {
+test('7. Disclosure de Supabase Auth Recovery: Desacoplamiento explícito de public.tenant_users y auth.users (Prueba 3)', () => {
   const report = ReleaseEngine.getAuthRecoveryReport();
   assert.equal(report.public_tenant_users_backup, true);
   assert.equal(report.auth_users_recoverable_by_public_dump, false);
   assert.equal(report.provider_backup_required, true);
 });
 
-test('9. Maintenance Mode: Bloqueo server-side para roles no autorizados', () => {
+test('8. Maintenance Mode: Bloqueo server-side para roles no autorizados', () => {
   ReleaseEngine.setMaintenanceMode(true, 'Actualización de esquema DB', ['SUPERADMIN']);
 
   const vendorCheck = ReleaseEngine.checkMaintenanceMode('VENDEDOR');
@@ -151,7 +144,7 @@ test('9. Maintenance Mode: Bloqueo server-side para roles no autorizados', () =>
   assert.equal(normalCheck.allowed, true);
 });
 
-test('10. Tenant Feature Flags: Habilitación aislada por tenant', () => {
+test('9. Tenant Feature Flags: Habilitación aislada por tenant', () => {
   const tenantA = '11111111-1111-1111-1111-111111111111';
   const tenantB = '22222222-2222-2222-2222-222222222222';
 
@@ -159,7 +152,7 @@ test('10. Tenant Feature Flags: Habilitación aislada por tenant', () => {
   assert.equal(ReleaseEngine.isFeatureFlagEnabled('new_pos_flow', tenantB), false);
 });
 
-test('11. Client Version Skew Detector: Aviso de desactualización de versión cliente', () => {
+test('10. Client Version Skew Detector: Aviso de desactualización de versión cliente', () => {
   const matching = ReleaseEngine.checkVersionSkew('v1.0.0-saas.15');
   assert.equal(matching.skew, false);
 

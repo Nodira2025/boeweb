@@ -57,11 +57,25 @@ class ReleaseEngine {
   }
 
   // 3. Baseline Adoption para DB Preexistente
-  adoptSchemaBaseline(version = '001', name = 'initial_schema_baseline', checksum = 'sha256-baseline-001') {
+  adoptSchemaBaseline(version = '001', name = 'initial_schema_baseline', checksum = 'sha256-baseline-001', options = {}) {
     const existing = this.migrations.find(m => m.version === version);
     if (existing) {
       return { adopted: false, message: 'La migración baseline ya fue registrada precedentemente.' };
     }
+
+    // Structural baseline verification guard
+    if (options.existingTables && options.existingRpcs) {
+      const requiredTables = ['tenants', 'tenant_users', 'sales', 'inventory_ledger', 'admin_activity_log', 'operational_alerts'];
+      const requiredRpcs = ['rpc_sale_pos_direct_saas', 'rpc_process_sale_checkout_saas', 'get_inventory_availability'];
+      
+      const missingTables = requiredTables.filter(t => !options.existingTables.includes(t));
+      const missingRpcs = requiredRpcs.filter(r => !options.existingRpcs.includes(r));
+
+      if (missingTables.length > 0 || missingRpcs.length > 0) {
+        throw new Error(`🔒 BASELINE ADOPTION DENIED: La base de datos no posee las estructuras requeridas. Faltan tablas: [${missingTables.join(', ')}], Faltan RPCs: [${missingRpcs.join(', ')}]`);
+      }
+    }
+
     const baselineRecord = {
       version,
       name,
