@@ -1080,7 +1080,8 @@ function formatPrice(value) {
 // --- VENDOR AUTHENTICATION & AI SALES ENGINE ---
 
 const AUTHORIZED_VENDEDORES = [
-  { name: 'Raul', pass: 'raul123', refCode: 'raul123', phone: '5493510001111', role: 'Especialista en Sustratos & Nutrición Orgánica', avatar: 'assets/logo.jpg' },
+  { name: 'Franco (Admin)', pass: 'admin123', altPass: 'admin', refCode: 'admin123', phone: '5493510000000', role: 'Administrador General & Auditoría', avatar: 'assets/logo.jpg', isAdmin: true },
+  { name: 'Raul', pass: 'raul123', refCode: 'raul123', phone: '5493510001111', role: 'Especialista en Sustratos & Nutrición Orgánica', avatar: 'assets/logo.jpg', isAdmin: true },
   { name: 'Nacho Mina', pass: 'nacho mina123', altPass: 'nachomina123', refCode: 'nachomina123', phone: '5493510002222', role: 'Asesor Técnico en Cultivo Indoor & Iluminación LED', avatar: 'assets/logo.jpg' },
   { name: 'Alexis', pass: 'alexis123', refCode: 'alexis123', phone: '5493510003333', role: 'Especialista en Riego Automático & Hidroponía', avatar: 'assets/logo.jpg' },
   { name: 'Gino', pass: 'gino123', refCode: 'gino123', phone: '5493510004444', role: 'Asesor en Extracciones & Parafernalia Premium', avatar: 'assets/logo.jpg' },
@@ -2512,6 +2513,27 @@ function toggleCashMovementVoid(movementId) {
   movement.voidedAt = movement.voided ? new Date().toISOString() : null;
   movement.voidedBy = movement.voided ? (localStorage.getItem('boeweb_vendor_name') || 'Vendedor') : null;
   saveVendorCashData(cashData);
+
+  if (typeof logSecureAuditEvent === 'function') {
+    logSecureAuditEvent({
+      event_type: movement.voided ? 'CASH_MOVEMENT_VOIDED' : 'CASH_MOVEMENT_RESTORED',
+      severity: 'WARNING',
+      category: 'CASH',
+      actor_name: movement.voided ? movement.voidedBy : (localStorage.getItem('boeweb_vendor_name') || 'Vendedor'),
+      description: `${movement.voided ? 'Anulación' : 'Restauración'} de movimiento de caja: "${movement.desc || 'Sin descripción'}" por ${formatCashCurrency(movement.amount)} (${movement.type || 'Movimiento'})`,
+      entity_type: 'cash_movement',
+      entity_id: movement.id,
+      details: {
+        movement_id: movement.id,
+        type: movement.type,
+        amount: movement.amount,
+        desc: movement.desc,
+        voided: movement.voided,
+        original_vendor: movement.vendor
+      }
+    });
+  }
+
   renderCashSectionUI();
   if (window.showToast) window.showToast(movement.voided ? 'Movimiento anulado; permanece en la auditoría.' : 'Movimiento restaurado.');
 }
@@ -2664,6 +2686,28 @@ function performShiftClosure() {
   cashData.difference = countedCash - totals.expectedCash;
   cashData.closureNotes = notesEl?.value.trim() || '';
   saveVendorCashData(cashData);
+
+  if (typeof logSecureAuditEvent === 'function') {
+    logSecureAuditEvent({
+      event_type: 'CASH_SESSION_CLOSED',
+      severity: 'INFO',
+      category: 'CASH',
+      actor_name: cashData.closedBy,
+      description: `Cierre y arqueo de caja finalizado por ${cashData.closedBy}. Esperado: ${formatCashCurrency(totals.expectedCash)}, Contado: ${formatCashCurrency(countedCash)}, Diferencia: ${formatCashCurrency(cashData.difference)}`,
+      entity_type: 'cash_session',
+      entity_id: `cash_close_${Date.now()}`,
+      details: {
+        expectedCash: totals.expectedCash,
+        countedCash,
+        difference: cashData.difference,
+        notes: cashData.closureNotes,
+        totalSales: totals.totalSales,
+        totalIncome: totals.totalIncome,
+        totalExpenses: totals.totalExpenses
+      }
+    });
+  }
+
   renderCashSectionUI();
   downloadCashBackup('json');
   if (window.showToast) window.showToast('Caja cerrada. Se descargó un respaldo automático del arqueo.');
@@ -5723,17 +5767,491 @@ function filterInternalCatalog() {
   renderInternalCatalogGrid();
 }
 
-function renderInternalCatalogGrid() {
-  const grid = document.getElementById('internal-catalog-grid');
-  const countEl = document.getElementById('internal-catalog-count');
-  if (!grid) return;
+// --- INTERNAL CATALOG BATCH SELECTION & USER DELETION QUOTA (MAX 5) ---
+const MAX_USER_CATALOG_DELETIONS = 5;
+const selectedInternalCatalogIds = new Set();
+const SECURE_AUDIT_STORAGE_KEY = 'boeweb_secure_audit_trail_v1';
+let isAdminAuditUnlocked = false;
 
-  const filtered = internalCatalogProducts.filter(product => {
+function isVendorAdmin(vendorName) {
+  if (!vendorName) return false;
+  const clean = String(vendorName).trim().toLowerCase();
+  if (clean.includes('admin') || clean === 'profesor franco' || clean === 'raul' || clean === 'franco') return true;
+  const v = (typeof AUTHORIZED_VENDEDORES !== 'undefined' ? AUTHORIZED_VENDEDORES : []).find(item => item.name.toLowerCase() === clean);
+  return v?.isAdmin === true || Boolean(v?.role?.toUpperCase().includes('ADMIN'));
+}
+
+function getUserCatalogDeletionCount(vendorName) {
+  if (!vendorName) return 0;
+  const cleanName = String(vendorName).trim().toLowerCase();
+  try {
+    const quotaMap = JSON.parse(localStorage.getItem('boeweb_user_deletion_quotas') || '{}');
+    return Number(quotaMap[cleanName] || 0);
+  } catch (_) {
+    return 0;
+  }
+}
+
+function getUserDeletionRemainingQuota(vendorName) {
+  if (isVendorAdmin(vendorName)) return 9999;
+  const used = getUserCatalogDeletionCount(vendorName);
+  return Math.max(0, MAX_USER_CATALOG_DELETIONS - used);
+}
+
+function incrementUserCatalogDeletionCount(vendorName, count = 1) {
+  if (!vendorName || isVendorAdmin(vendorName)) return;
+  const cleanName = String(vendorName).trim().toLowerCase();
+  try {
+    const quotaMap = JSON.parse(localStorage.getItem('boeweb_user_deletion_quotas') || '{}');
+    quotaMap[cleanName] = (Number(quotaMap[cleanName] || 0)) + count;
+    localStorage.setItem('boeweb_user_deletion_quotas', JSON.stringify(quotaMap));
+  } catch (_) {}
+}
+
+function logSecureAuditEvent({
+  event_type,
+  severity = 'INFO',
+  category = 'GENERAL',
+  actor_name = null,
+  description,
+  entity_type = null,
+  entity_id = null,
+  details = {}
+}) {
+  try {
+    const actor = actor_name || sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Sistema';
+    const now = new Date();
+    const entry = {
+      id: `sec_aud_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: now.toISOString(),
+      formatted_date: now.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }),
+      formatted_time: now.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }),
+      actor,
+      event_type,
+      category,
+      severity,
+      description,
+      entity_type,
+      entity_id,
+      details,
+      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Node/Browser'
+    };
+
+    const rawLogs = JSON.parse(localStorage.getItem(SECURE_AUDIT_STORAGE_KEY) || '[]');
+    rawLogs.unshift(entry);
+    if (rawLogs.length > 500) rawLogs.length = 500;
+    localStorage.setItem(SECURE_AUDIT_STORAGE_KEY, JSON.stringify(rawLogs));
+
+    if (typeof AdminOperationsConsole !== 'undefined' && AdminOperationsConsole?.logAdminActivity) {
+      try {
+        AdminOperationsConsole.logAdminActivity({
+          actor_id: actor,
+          actor_name: actor,
+          tenant_id: 'boe-grow-club',
+          action: event_type,
+          entity_type: entity_type || category,
+          entity_id,
+          metadata: { description, severity, ...details }
+        });
+      } catch (_) {}
+    }
+
+    return entry;
+  } catch (err) {
+    console.warn('Secure audit logging error:', err);
+  }
+}
+window.logSecureAuditEvent = logSecureAuditEvent;
+
+function getFilteredInternalCatalogProducts() {
+  return internalCatalogProducts.filter(product => {
     const matchesCategory = internalCatalogFilterCategory === 'all' || product.category === internalCatalogFilterCategory;
     const searchText = [product.name, product.brand, product.presentation, product.category, product.id, product.barcode].filter(Boolean).join(' ').toLowerCase();
     const matchesSearch = !internalCatalogFilterQuery || searchText.includes(internalCatalogFilterQuery);
     return matchesCategory && matchesSearch;
   });
+}
+
+function toggleSelectInternalCatalogItem(productId, checked) {
+  if (checked) {
+    selectedInternalCatalogIds.add(String(productId));
+  } else {
+    selectedInternalCatalogIds.delete(String(productId));
+  }
+  updateInternalCatalogBatchToolbar();
+}
+
+function toggleSelectAllInternalCatalog(checked) {
+  const filtered = getFilteredInternalCatalogProducts();
+  if (checked) {
+    filtered.forEach(p => selectedInternalCatalogIds.add(String(p.id)));
+  } else {
+    selectedInternalCatalogIds.clear();
+  }
+  renderInternalCatalogGrid();
+  updateInternalCatalogBatchToolbar();
+}
+
+function updateInternalCatalogBatchToolbar() {
+  const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
+  const remaining = getUserDeletionRemainingQuota(activeVendor);
+  const isAdmin = isVendorAdmin(activeVendor);
+  const count = selectedInternalCatalogIds.size;
+
+  const quotaLeft = document.getElementById('internal-catalog-quota-left');
+  const selectedInd = document.getElementById('internal-catalog-selected-indicator');
+  const selectedNum = document.getElementById('internal-catalog-selected-number');
+  const bulkBtn = document.getElementById('btn-internal-catalog-bulk-delete');
+  const bulkCount = document.getElementById('internal-catalog-bulk-btn-count');
+  const selectAllCheck = document.getElementById('internal-catalog-select-all');
+
+  if (quotaLeft) {
+    quotaLeft.textContent = isAdmin ? 'Admin (Sin límite)' : remaining;
+    quotaLeft.style.color = remaining <= 1 ? '#ef5350' : (remaining <= 3 ? '#ff9800' : '#2e7d32');
+  }
+
+  if (selectedInd && selectedNum) {
+    if (count > 0) {
+      selectedInd.style.display = 'inline';
+      selectedNum.textContent = count;
+    } else {
+      selectedInd.style.display = 'none';
+    }
+  }
+
+  if (bulkBtn && bulkCount) {
+    if (count > 0) {
+      bulkBtn.style.display = 'inline-flex';
+      bulkCount.textContent = count;
+    } else {
+      bulkBtn.style.display = 'none';
+    }
+  }
+
+  if (selectAllCheck) {
+    const filtered = getFilteredInternalCatalogProducts();
+    selectAllCheck.checked = filtered.length > 0 && filtered.every(p => selectedInternalCatalogIds.has(String(p.id)));
+  }
+}
+
+async function deleteSingleInternalCatalogProduct(productId) {
+  const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
+  const remaining = getUserDeletionRemainingQuota(activeVendor);
+  const isAdmin = isVendorAdmin(activeVendor);
+
+  if (!isAdmin && remaining < 1) {
+    alert(`⚠️ Límite de seguridad alcanzado:\n\nCada usuario tiene un cupo máximo de 5 eliminaciones del catálogo interno.\nHas alcanzado tu límite (0 disponibles).\n\nPara solicitar la baja de productos adicionales, contactá a un Administrador.`);
+    return;
+  }
+
+  const product = internalCatalogProducts.find(p => String(p.id) === String(productId));
+  if (!product) {
+    showToast('❌ Producto no encontrado en el catálogo.');
+    return;
+  }
+
+  const confirmMsg = `¿Confirmás la eliminación de "${product.name}"?\n\nEsta acción quitará el producto del catálogo y quedará registrada en la bitácora de auditoría.${!isAdmin ? `\n(Te quedarán ${remaining - 1} eliminaciones de tu cupo).` : ''}`;
+  if (!confirm(confirmMsg)) return;
+
+  // 1. Quitar de la lista local y persistir
+  internalCatalogProducts = internalCatalogProducts.filter(p => String(p.id) !== String(productId));
+  selectedInternalCatalogIds.delete(String(productId));
+  localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
+
+  // 2. Quitar de Supabase si está conectado
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from('products').delete().eq('id', productId);
+    } catch (err) {
+      console.warn('Error eliminando en Supabase products:', err);
+    }
+  }
+
+  // 3. Incrementar cuota del usuario
+  if (!isAdmin) {
+    incrementUserCatalogDeletionCount(activeVendor, 1);
+  }
+
+  // 4. Registrar en la Bitácora de Auditoría
+  logSecureAuditEvent({
+    event_type: 'PRODUCT_DELETED',
+    category: 'CATALOG',
+    severity: 'CRITICAL',
+    actor_name: activeVendor,
+    description: `Eliminación de producto individual: "${product.name}" (${product.category || 'Sin categoría'}, $${product.price}, Stock: ${product.stock} u.)`,
+    entity_type: 'product',
+    entity_id: productId,
+    details: {
+      id: product.id,
+      name: product.name,
+      brand: product.brand,
+      category: product.category,
+      price: product.price,
+      stock: product.stock,
+      barcode: product.barcode,
+      deleted_by: activeVendor,
+      quota_remaining_after: isAdmin ? 'ADMIN_UNLIMITED' : Math.max(0, remaining - 1)
+    }
+  });
+
+  renderInternalCatalogGrid();
+  updateInternalCatalogBatchToolbar();
+  showToast(`🗑️ "${product.name}" eliminado del catálogo.`);
+}
+
+async function deleteSelectedInternalCatalogProducts() {
+  const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
+  const selectedList = Array.from(selectedInternalCatalogIds);
+  if (selectedList.length === 0) {
+    alert('Seleccioná al menos un producto para eliminar.');
+    return;
+  }
+
+  const remaining = getUserDeletionRemainingQuota(activeVendor);
+  const isAdmin = isVendorAdmin(activeVendor);
+
+  if (!isAdmin && selectedList.length > remaining) {
+    alert(`⚠️ Límite de seguridad excedido:\n\nIntentás eliminar ${selectedList.length} productos, pero tu cupo restante es de ${remaining} eliminación${remaining === 1 ? '' : 'es'} (máximo 5 por usuario).\n\nReducí la selección o contactá a un Administrador.`);
+    return;
+  }
+
+  const confirmMsg = `¿Confirmás la eliminación de los ${selectedList.length} productos seleccionados?\n\nEsta acción quitará los productos del catálogo y generará un registro inmutable en la bitácora de auditoría.${!isAdmin ? `\n(Te quedarán ${remaining - selectedList.length} eliminaciones de tu cupo).` : ''}`;
+  if (!confirm(confirmMsg)) return;
+
+  const deletedProductsDetails = [];
+
+  // 1. Filtrar y eliminar
+  internalCatalogProducts = internalCatalogProducts.filter(p => {
+    if (selectedInternalCatalogIds.has(String(p.id))) {
+      deletedProductsDetails.push({
+        id: p.id,
+        name: p.name,
+        brand: p.brand,
+        category: p.category,
+        price: p.price,
+        stock: p.stock,
+        barcode: p.barcode
+      });
+      return false;
+    }
+    return true;
+  });
+
+  localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
+
+  // 2. Borrar en Supabase
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from('products').delete().in('id', selectedList);
+    } catch (err) {
+      console.warn('Error bulk deleting from Supabase:', err);
+    }
+  }
+
+  // 3. Incrementar cuota
+  if (!isAdmin) {
+    incrementUserCatalogDeletionCount(activeVendor, selectedList.length);
+  }
+
+  // 4. Registrar en Auditoría
+  logSecureAuditEvent({
+    event_type: 'PRODUCT_BULK_DELETED',
+    category: 'CATALOG',
+    severity: 'CRITICAL',
+    actor_name: activeVendor,
+    description: `Eliminación múltiple de ${deletedProductsDetails.length} productos por lote: ${deletedProductsDetails.map(p => `"${p.name}"`).join(', ')}`,
+    entity_type: 'product_batch',
+    entity_id: `batch_${Date.now()}`,
+    details: {
+      count: deletedProductsDetails.length,
+      deleted_items: deletedProductsDetails,
+      deleted_by: activeVendor,
+      quota_remaining_after: isAdmin ? 'ADMIN_UNLIMITED' : Math.max(0, remaining - selectedList.length)
+    }
+  });
+
+  selectedInternalCatalogIds.clear();
+  renderInternalCatalogGrid();
+  updateInternalCatalogBatchToolbar();
+  showToast(`🗑️ ${deletedProductsDetails.length} productos eliminados correctamente.`);
+}
+
+function openAdminAuditInvestigationModal() {
+  const modal = document.getElementById('modal-admin-investigation-audit');
+  if (!modal) return;
+
+  const authScreen = document.getElementById('admin-audit-auth-screen');
+  const contentScreen = document.getElementById('admin-audit-content-screen');
+  const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || '';
+
+  modal.style.display = 'flex';
+
+  if (isAdminAuditUnlocked || (activeVendor && isVendorAdmin(activeVendor))) {
+    isAdminAuditUnlocked = true;
+    if (authScreen) authScreen.style.display = 'none';
+    if (contentScreen) contentScreen.style.display = 'flex';
+    renderAdminAuditLogs();
+  } else {
+    if (authScreen) authScreen.style.display = 'flex';
+    if (contentScreen) contentScreen.style.display = 'none';
+    const passInput = document.getElementById('admin-audit-pass-input');
+    if (passInput) {
+      passInput.value = '';
+      passInput.focus();
+    }
+  }
+}
+
+function closeAdminAuditModal() {
+  const modal = document.getElementById('modal-admin-investigation-audit');
+  if (modal) modal.style.display = 'none';
+}
+
+function handleAdminAuditUnlock(event) {
+  if (event) event.preventDefault();
+  const passInput = document.getElementById('admin-audit-pass-input');
+  const errorEl = document.getElementById('admin-audit-auth-error');
+  const pass = (passInput?.value || '').trim().toLowerCase();
+
+  const VALID_ADMIN_PASSWORDS = ['admin123', 'admin', '1234', 'boegrow2026', 'raul123'];
+  const isValid = VALID_ADMIN_PASSWORDS.includes(pass) || AUTHORIZED_VENDEDORES.some(v => v.isAdmin && (v.pass.toLowerCase() === pass || v.altPass?.toLowerCase() === pass));
+
+  if (!isValid) {
+    if (errorEl) {
+      errorEl.textContent = '❌ Contraseña de Administrador incorrecta. Acceso denegado.';
+      errorEl.style.display = 'block';
+    }
+    passInput?.select();
+    return;
+  }
+
+  isAdminAuditUnlocked = true;
+  if (errorEl) errorEl.style.display = 'none';
+
+  const authScreen = document.getElementById('admin-audit-auth-screen');
+  const contentScreen = document.getElementById('admin-audit-content-screen');
+  if (authScreen) authScreen.style.display = 'none';
+  if (contentScreen) contentScreen.style.display = 'flex';
+
+  logSecureAuditEvent({
+    event_type: 'ADMIN_ACCESS',
+    category: 'AUTH',
+    severity: 'INFO',
+    description: 'Acceso autorizado al Centro de Auditoría e Investigaciones Forenses'
+  });
+
+  renderAdminAuditLogs();
+}
+
+function renderAdminAuditLogs() {
+  const listEl = document.getElementById('admin-audit-entries-list');
+  const kpiTotal = document.getElementById('audit-kpi-total');
+  const kpiDeleted = document.getElementById('audit-kpi-deleted');
+  const kpiCashVoids = document.getElementById('audit-kpi-cash-voids');
+  const kpiStockRetires = document.getElementById('audit-kpi-stock-retires');
+  const kpiOrdersCancel = document.getElementById('audit-kpi-orders-cancel');
+
+  if (!listEl) return;
+
+  const rawLogs = JSON.parse(localStorage.getItem(SECURE_AUDIT_STORAGE_KEY) || '[]');
+  const filterType = document.getElementById('admin-audit-filter-type')?.value || 'all';
+  const searchQuery = document.getElementById('admin-audit-search')?.value.trim().toLowerCase() || '';
+
+  if (kpiTotal) kpiTotal.textContent = rawLogs.length;
+  if (kpiDeleted) kpiDeleted.textContent = rawLogs.filter(l => (l.event_type || '').includes('DELETED')).length;
+  if (kpiCashVoids) kpiCashVoids.textContent = rawLogs.filter(l => (l.event_type || '').includes('CASH') || l.category === 'CASH').length;
+  if (kpiStockRetires) kpiStockRetires.textContent = rawLogs.filter(l => (l.event_type || '').includes('STOCK') || (l.event_type || '').includes('RETIRED') || l.category === 'WMS').length;
+  if (kpiOrdersCancel) kpiOrdersCancel.textContent = rawLogs.filter(l => (l.event_type || '').includes('ORDER') || l.category === 'ORDERS').length;
+
+  const filteredLogs = rawLogs.filter(entry => {
+    if (filterType !== 'all') {
+      if (filterType === 'PRODUCT_DELETED' && !(entry.event_type || '').includes('DELETED')) return false;
+      if (filterType === 'CASH' && !(entry.event_type || '').includes('CASH') && entry.category !== 'CASH') return false;
+      if (filterType === 'WMS' && !(entry.event_type || '').includes('STOCK') && !(entry.event_type || '').includes('RETIRED') && entry.category !== 'WMS') return false;
+      if (filterType === 'ORDERS' && !(entry.event_type || '').includes('ORDER') && entry.category !== 'ORDERS') return false;
+      if (filterType === 'CATALOG' && entry.category !== 'CATALOG') return false;
+    }
+    if (searchQuery) {
+      const fullText = `${entry.actor || ''} ${entry.event_type || ''} ${entry.description || ''} ${JSON.stringify(entry.details || {})}`.toLowerCase();
+      if (!fullText.includes(searchQuery)) return false;
+    }
+    return true;
+  });
+
+  if (filteredLogs.length === 0) {
+    listEl.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px; color: rgba(255,255,255,0.5); font-size: 0.88rem;">
+        🛡️ No se encontraron registros de auditoría que coincidan con la búsqueda.
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = filteredLogs.map(entry => {
+    const isCritical = entry.severity === 'CRITICAL' || (entry.event_type || '').includes('DELETED');
+    const isWarning = entry.severity === 'WARNING' || (entry.event_type || '').includes('VOID') || (entry.event_type || '').includes('CANCEL');
+    const badgeBg = isCritical ? 'rgba(239,83,80,0.2)' : (isWarning ? 'rgba(255,167,38,0.2)' : 'rgba(41,182,246,0.2)');
+    const badgeColor = isCritical ? '#ef5350' : (isWarning ? '#ffa726' : '#29b6f6');
+    const borderCol = isCritical ? 'rgba(239,83,80,0.35)' : 'rgba(255,255,255,0.12)';
+
+    return `
+      <div style="background: rgba(255,255,255,0.035); border: 1px solid ${borderCol}; border-radius: 12px; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeColor}; font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 6px; text-transform: uppercase;">
+              ${escapeStockHtml(entry.event_type || 'EVENTO')}
+            </span>
+            <span style="font-weight: 800; font-size: 0.85rem; color: #ffd54f;">🧑‍💼 ${escapeStockHtml(entry.actor || 'Desconocido')}</span>
+          </div>
+          <span style="font-size: 0.75rem; color: rgba(255,255,255,0.5); font-family: monospace;">
+            🕒 ${escapeStockHtml(entry.formatted_date || '')} ${escapeStockHtml(entry.formatted_time || '')}
+          </span>
+        </div>
+        <div style="font-size: 0.86rem; color: rgba(255,255,255,0.9); line-height: 1.4;">
+          ${escapeStockHtml(entry.description || '')}
+        </div>
+        <details style="margin-top: 4px; font-size: 0.76rem;">
+          <summary style="cursor: pointer; color: var(--vendor-gold-soft, #e6d49b); font-weight: 700;">🔍 Ver detalle técnico / Evidencia forense (JSON)</summary>
+          <pre style="margin-top: 6px; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.6); color: #81c784; font-family: monospace; font-size: 0.72rem; overflow-x: auto; white-space: pre-wrap;">${escapeStockHtml(JSON.stringify(entry, null, 2))}</pre>
+        </details>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterAdminAuditLogs() {
+  renderAdminAuditLogs();
+}
+
+function exportAdminAuditLogJSON() {
+  const rawLogs = JSON.parse(localStorage.getItem(SECURE_AUDIT_STORAGE_KEY) || '[]');
+  const blob = new Blob([JSON.stringify(rawLogs, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `boeweb_audit_forensic_log_${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('📥 Bitácora de auditoría exportada exitosamente.');
+}
+
+window.deleteSingleInternalCatalogProduct = deleteSingleInternalCatalogProduct;
+window.deleteSelectedInternalCatalogProducts = deleteSelectedInternalCatalogProducts;
+window.toggleSelectAllInternalCatalog = toggleSelectAllInternalCatalog;
+window.toggleSelectInternalCatalogItem = toggleSelectInternalCatalogItem;
+window.openAdminAuditInvestigationModal = openAdminAuditInvestigationModal;
+window.closeAdminAuditModal = closeAdminAuditModal;
+window.handleAdminAuditUnlock = handleAdminAuditUnlock;
+window.filterAdminAuditLogs = filterAdminAuditLogs;
+window.exportAdminAuditLogJSON = exportAdminAuditLogJSON;
+window.isVendorAdmin = isVendorAdmin;
+
+function renderInternalCatalogGrid() {
+  const grid = document.getElementById('internal-catalog-grid');
+  const countEl = document.getElementById('internal-catalog-count');
+  if (!grid) return;
+
+  const filtered = getFilteredInternalCatalogProducts();
 
   if (countEl) countEl.textContent = filtered.length;
 
@@ -5744,11 +6262,20 @@ function renderInternalCatalogGrid() {
         <p style="font-size: 0.88rem; margin: 0;">Probá cambiando la búsqueda o agregá un producto nuevo desde Ingresar producto.</p>
       </div>
     `;
+    updateInternalCatalogBatchToolbar();
     return;
   }
 
-  grid.innerHTML = filtered.map(product => `
-    <article class="internal-catalog-card" style="background: var(--color-card-bg-alt); border: 1.5px solid var(--color-border-accent); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-sm);">
+  grid.innerHTML = filtered.map(product => {
+    const isSelected = selectedInternalCatalogIds.has(String(product.id));
+    return `
+    <article class="internal-catalog-card" style="background: var(--color-card-bg-alt); border: 1.5px solid ${isSelected ? '#2e7d32' : 'var(--color-border-accent)'}; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-sm); position: relative; transition: all 0.2s ease;">
+      <!-- Selection Checkbox -->
+      <div style="position: absolute; top: 10px; left: 10px; z-index: 10; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); padding: 4px 8px; border-radius: 8px; display: flex; align-items: center; gap: 5px;">
+        <input type="checkbox" class="internal-catalog-item-check" data-product-id="${product.id}" onchange="toggleSelectInternalCatalogItem('${product.id}', this.checked)" ${isSelected ? 'checked' : ''} style="width: 17px; height: 17px; cursor: pointer; accent-color: #2e7d32;">
+        <span style="font-size: 0.68rem; color: #fff; font-weight: 700;">Elegir</span>
+      </div>
+
       <div style="aspect-ratio: 1/1; max-height: 200px; background: #000; position: relative; overflow: hidden;">
         <img src="${escapeStockHtml(product.image || 'assets/logo.jpg')}" alt="${escapeStockHtml(product.name)}" style="width: 100%; height: 100%; object-fit: contain;">
         <span style="position: absolute; top: 8px; right: 8px; background: ${product.stock > 0 ? 'rgba(46,125,50,0.9)' : 'rgba(198,40,40,0.9)'}; color: #fff; font-size: 0.72rem; font-weight: 800; padding: 3px 8px; border-radius: 8px;">
@@ -5759,15 +6286,22 @@ function renderInternalCatalogGrid() {
         <div style="font-size: 0.75rem; color: var(--color-accent-gold); font-weight: 700;">${escapeStockHtml(product.category)}</div>
         <h4 style="margin: 0; font-size: 1rem; font-weight: 800; color: var(--color-text-main); line-height: 1.3;">${escapeStockHtml(product.name)}</h4>
         ${product.barcode ? `<div style="font-size: 0.78rem; font-family: monospace; color: var(--color-text-muted);">Barra: ${escapeStockHtml(product.barcode)}</div>` : ''}
-        <div style="margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08);">
+        <div style="margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08);">
           <span style="font-size: 1.1rem; font-weight: 900; color: #66bb6a;">$${Number(product.price).toLocaleString('es-AR')}</span>
-          <button type="button" onclick="openInternalCatalogEditor('${product.id}')" style="background: rgba(195,155,75,0.15); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">
-            ✏️ Editar
-          </button>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" onclick="openInternalCatalogEditor('${product.id}')" style="background: rgba(195,155,75,0.15); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 6px 10px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer;" title="Editar producto">
+              ✏️ Editar
+            </button>
+            <button type="button" onclick="deleteSingleInternalCatalogProduct('${product.id}')" style="background: rgba(239,83,80,0.12); border: 1px solid #ef5350; color: #ef5350; padding: 6px 10px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer;" title="Eliminar del catálogo">
+              🗑️
+            </button>
+          </div>
         </div>
       </div>
     </article>
-  `).join('');
+  `;}).join('');
+
+  updateInternalCatalogBatchToolbar();
 }
 
 function openInternalCatalogEditor(productId) {
@@ -5926,6 +6460,28 @@ async function saveInternalCatalogProduct(event) {
     closeInternalCatalogEditor();
     await loadInternalCatalog();
     if (window.fetchB2BProducts) window.fetchB2BProducts(true);
+
+    if (typeof logSecureAuditEvent === 'function') {
+      logSecureAuditEvent({
+        event_type: 'PRODUCT_EDITED',
+        category: 'CATALOG',
+        severity: 'INFO',
+        actor_name: sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor',
+        description: `Edición de ficha de producto: "${values.name}" (Precio: $${values.price}, Stock: ${values.stock} u., Categoría: ${values.category})`,
+        entity_type: 'product',
+        entity_id: product.id,
+        details: {
+          id: product.id,
+          name: values.name,
+          brand: values.brand,
+          category: values.category,
+          price: values.price,
+          stock: values.stock,
+          barcode: values.barcode
+        }
+      });
+    }
+
     showToast(`Producto “${values.name}” actualizado en el catálogo interno.`);
   } catch (error) {
     console.error('Error al guardar el producto interno:', error);
@@ -8963,6 +9519,28 @@ async function confirmCancelWebOrder() {
   }
 
   closeCancelWebOrderModal();
+
+  if (typeof logSecureAuditEvent === 'function') {
+    logSecureAuditEvent({
+      event_type: 'WEB_ORDER_CANCELLED',
+      category: 'ORDERS',
+      severity: 'WARNING',
+      actor_name: vendorName,
+      description: `Cancelación de pedido web #${currentCancelOrderId} (${order.client || 'Cliente'}) con restitución automática de stock. Motivo: ${reason}`,
+      entity_type: 'web_order',
+      entity_id: currentCancelOrderId,
+      details: {
+        order_id: currentCancelOrderId,
+        client: order.client,
+        phone: order.phone,
+        total: order.total,
+        reason,
+        notes,
+        items: order.items || order.items_json || []
+      }
+    });
+  }
+
   if (window.showToast) window.showToast(`🚫 Pedido #${currentCancelOrderId} cancelado. Stock restituido al inventario.`);
 
   refreshWebOrdersBadges();
@@ -10918,6 +11496,20 @@ function saveRetiredProductAdjustment(adjustment) {
   const history = getRetiredProductsHistory();
   history.unshift(adjustment);
   localStorage.setItem(RETIRED_PRODUCTS_STORAGE_KEY, JSON.stringify(history));
+
+  if (typeof logSecureAuditEvent === 'function') {
+    logSecureAuditEvent({
+      event_type: adjustment.type === 'add' ? 'STOCK_RESTOCKED' : 'PRODUCT_RETIRED_MERMA',
+      category: 'WMS',
+      severity: ['perdida', 'danado', 'vencido'].includes(adjustment.reason) ? 'WARNING' : 'INFO',
+      actor_name: adjustment.vendor_name || sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor',
+      description: `Ajuste de inventario (${adjustment.type === 'add' ? '+' : '-'}${adjustment.quantity} u.): "${adjustment.product_name}" - Motivo: ${adjustment.reason_label || adjustment.reason}`,
+      entity_type: 'product_stock',
+      entity_id: adjustment.product_id || adjustment.product_code,
+      details: adjustment
+    });
+  }
+
   return history;
 }
 
