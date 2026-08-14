@@ -1030,7 +1030,7 @@
     }
   </style>
   <link rel="stylesheet" href="vendedor-caja.css?v=camera_pos_v23">
-  <link rel="stylesheet" href="vendedor-portal.css?v=flow_order_v28">
+  <link rel="stylesheet" href="vendedor-portal.css?v=flow_order_v29">
   <link rel="stylesheet" href="vendedor-stock.css?v=mobile_gba_v1">
   <style id="vendor-rescue-critical-styles">
     .saas-prototype-only,
@@ -1038,8 +1038,12 @@
       display: none !important;
     }
 
-    @media (max-width: 768px) {
+    @media (max-width: 1099px) {
       .b2b-header-container .theme-toggle-btn {
+        display: none !important;
+      }
+
+      .vendor-header-sell-action {
         display: none !important;
       }
 
@@ -1047,6 +1051,15 @@
         display: flex !important;
         align-items: center !important;
         gap: 4px !important;
+      }
+
+      .b2b-header-container #vendor-user-status #active-vendor-display-name {
+        max-width: 105px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        font-size: 0.72rem !important;
+        padding: 4px 7px !important;
       }
 
       /* En celulares, la pantalla de inicio muestra ÚNICAMENTE el flujo de trabajo (1 al 13) */
@@ -1068,19 +1081,50 @@
       }
 
       .b2b-header {
-        min-height: 58px;
-        padding: 8px 0;
+        min-height: 56px !important;
+        padding: 6px 0 !important;
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 10000 !important;
       }
 
       .b2b-header-container {
-        min-height: 42px;
-        flex-wrap: nowrap;
+        min-height: 42px !important;
+        flex-wrap: nowrap !important;
+        padding: 0 10px !important;
+        gap: 6px !important;
+      }
+
+      .b2b-logo-text h1 {
+        font-size: 0.95rem !important;
+      }
+
+      .b2b-logo-text p {
+        font-size: 0.62rem !important;
+      }
+
+      .vendor-mobile-bottom-nav {
+        display: flex !important;
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        height: 60px !important;
+        background: var(--vendor-paper, #ffffff) !important;
+        border-top: 1.5px solid var(--color-border-accent, #e5d7a8) !important;
+        box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.14) !important;
+        z-index: 9999999 !important;
+      }
+
+      #vendedor-portal-app {
+        padding-bottom: 84px !important;
       }
 
       .vendor-dashboard-home,
       .vendor-workspace-section,
       .b2b-main-layout {
-        min-width: 0;
+        min-width: 0 !important;
+        padding-bottom: 84px !important;
       }
     }
   </style>
@@ -3994,6 +4038,9 @@
       <div id="pinfo-modal-footer" style="display: flex; gap: 10px; margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">
         <!-- Populated dynamically -->
       </div>
+    </div>
+  </div>
+
   <!-- Modal Cancelar Pedido Web y Restituir Stock -->
   <div id="modal-cancel-web-order" style="display: none; position: fixed !important; inset: 0 !important; z-index: 999999999 !important; background: rgba(0,0,0,0.85) !important; backdrop-filter: blur(6px) !important; -webkit-backdrop-filter: blur(6px) !important; align-items: center !important; justify-content: center !important; padding: 16px !important; box-sizing: border-box !important;">
     <div style="max-width: 520px; width: 100%; border-radius: 22px; border: 2px solid #ef5350; background: #1a1e1b; color: #ffffff; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,0.85); margin: auto; position: relative; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box;">
@@ -4213,6 +4260,6 @@
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=pos_mobile_v45"></script>
+  <script src="vendedor.js?v=pos_mobile_v46"></script>
 </body>
 </html>
