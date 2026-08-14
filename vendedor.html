@@ -1029,7 +1029,7 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="vendedor-caja.css?v=camera_pos_v21">
+  <link rel="stylesheet" href="vendedor-caja.css?v=camera_pos_v22">
   <link rel="stylesheet" href="vendedor-portal.css?v=flow_order_v25">
   <link rel="stylesheet" href="vendedor-stock.css?v=mobile_gba_v1">
   <style id="vendor-rescue-critical-styles">
@@ -1627,9 +1627,19 @@
         <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
       </header>
 
-      <div style="display: grid; grid-template-columns: 1fr 390px; gap: 20px;">
+      <!-- Selector de pestañas móvil para POS (Catálogo vs Ticket) -->
+      <div id="pos-mobile-tabs-nav" class="pos-mobile-nav-switcher" role="tablist" aria-label="Vistas del mostrador POS">
+        <button type="button" id="pos-tab-btn-catalog" class="pos-mobile-nav-btn active" onclick="switchPosMobileView('catalog')" role="tab" aria-selected="true">
+          <span>🔍 1. Catálogo & Escáner</span>
+        </button>
+        <button type="button" id="pos-tab-btn-ticket" class="pos-mobile-nav-btn" onclick="switchPosMobileView('ticket')" role="tab" aria-selected="false">
+          <span>🛒 2. Ticket & Cobrar (<strong id="pos-mobile-tab-count">0</strong>)</span>
+        </button>
+      </div>
+
+      <div id="pos-workspace-grid" class="pos-workspace-grid" data-mobile-view="catalog">
         <!-- Columna Izquierda: Búsqueda Unificada, Dictado y Selección de Productos -->
-        <div>
+        <div id="pos-catalog-column" class="pos-workspace-column">
           <!-- Barra de Búsqueda Unificada -->
           <div class="pos-unified-search-box">
             <div class="pos-search-input-wrapper">
@@ -1660,9 +1670,14 @@
         </div>
 
         <!-- Columna Derecha: Ítems del Carrito POS & Formulario de Cierre Draft -->
-        <div style="background: var(--color-card-bg); padding: 20px; border-radius: 16px; border: 1.5px solid var(--color-accent-gold); display: flex; flex-direction: column; justify-content: space-between;">
+        <div id="pos-ticket-column" class="pos-workspace-column pos-ticket-column">
           <div>
-            <h3 style="font-size: 1.1rem; margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 8px; color: var(--color-text-main);">🛒 Ticket de Venta</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 8px;">
+              <h3 style="font-size: 1.15rem; margin: 0; color: var(--color-text-main);">🛒 Ticket de Venta</h3>
+              <button type="button" onclick="switchPosMobileView('catalog')" class="btn btn-secondary" style="display: none; padding: 4px 10px; font-size: 0.75rem; border-radius: 8px;" id="pos-back-to-catalog-btn">
+                + Agregar más productos
+              </button>
+            </div>
 
             <!-- Selección de Vendedor e Identidad -->
             <div style="margin-bottom: 15px; background: rgba(21,45,36,0.04); padding: 12px; border-radius: 10px; border: 1px solid var(--color-border-subtle);">
@@ -1734,11 +1749,22 @@
             </div>
 
             <!-- Botón de Confirmación Borrador Draft -->
-            <button type="button" id="pos-create-draft-btn" class="b2b-checkout-btn" onclick="submitPosSaleDraft()" style="width: 100%; font-size: 1rem; font-weight: 800; padding: 14px;">
+            <button type="button" id="pos-create-draft-btn" class="b2b-checkout-btn" onclick="submitPosSaleDraft()" style="width: 100%; font-size: 1rem; font-weight: 800; padding: 14px; background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: #fff; border: 1.5px solid #81c784; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 14px rgba(46,125,50,0.3);">
               📄 Confirmar Venta / Generar Borrador
             </button>
           </div>
         </div>
+      </div>
+
+      <!-- Barra flotante de cobro rápido para celulares -->
+      <div id="pos-mobile-floating-bar" class="pos-mobile-floating-bar" style="display: none;" onclick="switchPosMobileView('ticket')">
+        <div class="pos-mobile-floating-info">
+          <span class="pos-mobile-floating-badge" id="pos-floating-items-count">0 ítems</span>
+          <strong class="pos-mobile-floating-total" id="pos-floating-total">$0,00</strong>
+        </div>
+        <button type="button" class="pos-mobile-floating-action-btn">
+          <span>Finalizar Venta ➔</span>
+        </button>
       </div>
 
       <!-- MODAL DE CONFIRMACIÓN PREVIA ANTES DE AGREGAR AL TICKET -->
@@ -4042,6 +4068,6 @@
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=retired_products_v40"></script>
+  <script src="vendedor.js?v=pos_mobile_v41"></script>
 </body>
 </html>

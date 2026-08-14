@@ -7371,6 +7371,7 @@ async function initPosWorkspace() {
 
   renderPosCartItems();
   renderPosSearchResults('');
+  switchPosMobileView('catalog');
 }
 
 function populatePosSalespeople() {
@@ -7749,6 +7750,46 @@ function addPosProductToCart(product) {
   }
 }
 
+let currentPosMobileView = 'catalog';
+
+function switchPosMobileView(view) {
+  currentPosMobileView = view || 'catalog';
+  const grid = document.getElementById('pos-workspace-grid');
+  const btnCatalog = document.getElementById('pos-tab-btn-catalog');
+  const btnTicket = document.getElementById('pos-tab-btn-ticket');
+  const floatingBar = document.getElementById('pos-mobile-floating-bar');
+  const backToCatalogBtn = document.getElementById('pos-back-to-catalog-btn');
+
+  if (grid) {
+    grid.dataset.mobileView = currentPosMobileView;
+  }
+  if (btnCatalog) {
+    btnCatalog.classList.toggle('active', currentPosMobileView === 'catalog');
+    btnCatalog.setAttribute('aria-selected', currentPosMobileView === 'catalog' ? 'true' : 'false');
+  }
+  if (btnTicket) {
+    btnTicket.classList.toggle('active', currentPosMobileView === 'ticket');
+    btnTicket.setAttribute('aria-selected', currentPosMobileView === 'ticket' ? 'true' : 'false');
+  }
+  if (backToCatalogBtn) {
+    backToCatalogBtn.style.display = (window.innerWidth <= 991 && currentPosMobileView === 'ticket') ? 'inline-block' : 'none';
+  }
+
+  if (floatingBar) {
+    const cart = typeof getPosCartEngine === 'function' ? getPosCartEngine() : null;
+    const count = cart ? cart.getItemCount() : 0;
+    floatingBar.style.display = (window.innerWidth <= 991 && count > 0 && currentPosMobileView === 'catalog')
+      ? 'flex'
+      : 'none';
+  }
+
+  const posSection = document.getElementById('vendor-pos-section');
+  if (posSection && window.innerWidth <= 991) {
+    posSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+window.switchPosMobileView = switchPosMobileView;
+
 function renderPosCartItems() {
   const cart = getPosCartEngine();
   const body = document.getElementById('pos-cart-items-body');
@@ -7758,10 +7799,19 @@ function renderPosCartItems() {
   const discountLabelEl = document.getElementById('pos-summary-discount-label');
   const discountEl = document.getElementById('pos-summary-discount');
   const totalEl = document.getElementById('pos-summary-total');
+  const tabCountEl = document.getElementById('pos-mobile-tab-count');
+  const floatingItemsCount = document.getElementById('pos-floating-items-count');
+  const floatingTotal = document.getElementById('pos-floating-total');
+  const floatingBar = document.getElementById('pos-mobile-floating-bar');
+  const backToCatalogBtn = document.getElementById('pos-back-to-catalog-btn');
 
   if (!cart || !body) return;
 
   const items = cart.getItems();
+  const itemCount = cart.getItemCount();
+
+  if (tabCountEl) tabCountEl.textContent = itemCount;
+  if (floatingItemsCount) floatingItemsCount.textContent = `${itemCount} ${itemCount === 1 ? 'ítem' : 'ítems'}`;
 
   if (items.length === 0) {
     if (emptyState) emptyState.style.display = 'block';
@@ -7769,6 +7819,8 @@ function renderPosCartItems() {
     if (subtotalEl) subtotalEl.textContent = '$0,00';
     if (discountRow) discountRow.style.display = 'none';
     if (totalEl) totalEl.textContent = '$0,00';
+    if (floatingTotal) floatingTotal.textContent = '$0,00';
+    if (floatingBar) floatingBar.style.display = 'none';
     return;
   }
 
@@ -7813,6 +7865,16 @@ function renderPosCartItems() {
   }
 
   if (totalEl) totalEl.textContent = `$${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+  if (floatingTotal) floatingTotal.textContent = `$${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+
+  if (floatingBar) {
+    floatingBar.style.display = (window.innerWidth <= 991 && itemCount > 0 && currentPosMobileView === 'catalog')
+      ? 'flex'
+      : 'none';
+  }
+  if (backToCatalogBtn) {
+    backToCatalogBtn.style.display = (window.innerWidth <= 991 && currentPosMobileView === 'ticket') ? 'inline-block' : 'none';
+  }
 }
 
 function updatePosCartItemQty(id, qty) {
