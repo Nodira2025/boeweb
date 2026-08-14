@@ -1039,9 +1039,32 @@
     }
 
     @media (max-width: 768px) {
-      .b2b-header-container .theme-toggle-btn,
-      .b2b-header-container #vendor-user-status {
+      .b2b-header-container .theme-toggle-btn {
         display: none !important;
+      }
+
+      .b2b-header-container #vendor-user-status {
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+      }
+
+      /* En celulares, la pantalla de inicio muestra ÚNICAMENTE el flujo de trabajo (1 al 13) */
+      .vendor-dashboard-home .vendor-home-hero,
+      .vendor-dashboard-home .vendor-home-kpis,
+      .vendor-dashboard-home #vendor-reports-title,
+      .vendor-dashboard-home .vendor-home-operational-grid {
+        display: none !important;
+      }
+
+      .vendor-dashboard-home #vendor-flow-title {
+        margin-top: 4px !important;
+        margin-bottom: 10px !important;
+      }
+
+      .vendor-dashboard-home .vendor-2col-grid {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
       }
 
       .b2b-header {
@@ -1250,12 +1273,15 @@
             🌙 Modo Oscuro
           </button>
 
-          <div id="vendor-user-status" style="display: flex; align-items: center; gap: 8px;">
-            <span id="active-vendor-display-name" style="background: rgba(195,155,75,0.2); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 6px 12px; border-radius: 12px; font-weight: 700; font-size: 0.82rem;">
+          <div id="vendor-user-status" style="display: flex; align-items: center; gap: 6px;">
+            <span id="active-vendor-display-name" style="background: rgba(195,155,75,0.2); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 5px 10px; border-radius: 10px; font-weight: 700; font-size: 0.8rem;">
               🧑‍💼 Vendedor: Sin Iniciar
             </span>
-            <button type="button" onclick="vendorLogout()" class="btn btn-secondary" style="font-size: 0.78rem; border-color: #ef5350; color: #ef5350; padding: 6px 10px; border-radius: 10px; cursor: pointer;">
-              🔒 Salir
+            <button type="button" onclick="openVendorPasswordModal()" title="Cambiar mi contraseña" style="background: rgba(194,162,70,0.18); border: 1px solid var(--color-accent-gold, #c2a246); color: #c2a246; padding: 5px 9px; border-radius: 9px; font-size: 0.85rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" aria-label="Cambiar contraseña">
+              🔑 <span class="no-mobile" style="font-size: 0.76rem;">Clave</span>
+            </button>
+            <button type="button" onclick="vendorLogout()" class="btn btn-secondary" style="font-size: 0.76rem; border-color: #ef5350; color: #ef5350; padding: 5px 8px; border-radius: 9px; cursor: pointer;" title="Cerrar sesión">
+              🔒 <span class="no-mobile">Salir</span>
             </button>
           </div>
 
@@ -3623,6 +3649,47 @@
     </div>
   </div>
 
+  <!-- Modal Cambiar Contraseña de Vendedor -->
+  <div id="modal-vendor-change-password" style="display: none; position: fixed !important; inset: 0 !important; z-index: 99999999 !important; background: rgba(0,0,0,0.85) !important; backdrop-filter: blur(6px) !important; -webkit-backdrop-filter: blur(6px) !important; align-items: center !important; justify-content: center !important; padding: 16px !important; box-sizing: border-box !important;">
+    <div style="max-width: 420px; width: 100%; border-radius: 22px; border: 2px solid var(--color-accent-gold, #c2a246); background: #152d24; color: #ffffff; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.8); margin: auto; position: relative;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.4rem;" aria-hidden="true">🔑</span>
+          <h3 style="margin: 0; font-size: 1.15rem; color: #c2a246; font-weight: 800;">Cambiar Contraseña</h3>
+        </div>
+        <button type="button" onclick="closeVendorPasswordModal()" style="background: rgba(255,255,255,0.15); border: none; color: #fff; font-size: 1.2rem; border-radius: 50%; width: 34px; height: 34px; cursor: pointer; display: flex; align-items: center; justify-content: center;" aria-label="Cerrar">✕</button>
+      </div>
+
+      <p style="font-size: 0.85rem; color: rgba(247,246,242,0.85); margin: 0 0 16px 0;">
+        Usuario actual: <strong id="change-password-vendor-name" style="color: #c2a246;">Vendedor</strong>
+      </p>
+
+      <form id="vendor-change-password-form" onsubmit="handleVendorChangePassword(event)">
+        <div style="margin-bottom: 12px; text-align: left;">
+          <label for="vendor-old-password" style="display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 5px; color: #e0e0e0;">Contraseña Actual</label>
+          <input type="password" id="vendor-old-password" required placeholder="Ingresá tu contraseña actual" style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1.5px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.35); color: #fff; font-size: 0.9rem; box-sizing: border-box;">
+        </div>
+
+        <div style="margin-bottom: 12px; text-align: left;">
+          <label for="vendor-new-password" style="display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 5px; color: #e0e0e0;">Nueva Contraseña</label>
+          <input type="password" id="vendor-new-password" required minlength="4" placeholder="Mínimo 4 caracteres" style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1.5px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.35); color: #fff; font-size: 0.9rem; box-sizing: border-box;">
+        </div>
+
+        <div style="margin-bottom: 16px; text-align: left;">
+          <label for="vendor-confirm-password" style="display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 5px; color: #e0e0e0;">Confirmar Nueva Contraseña</label>
+          <input type="password" id="vendor-confirm-password" required minlength="4" placeholder="Repetí la nueva contraseña" style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1.5px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.35); color: #fff; font-size: 0.9rem; box-sizing: border-box;">
+        </div>
+
+        <div id="vendor-change-password-msg" style="display: none; padding: 10px 12px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; margin-bottom: 14px;"></div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button type="button" onclick="closeVendorPasswordModal()" class="btn btn-secondary" style="padding: 9px 16px; font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: #fff; border-radius: 10px; cursor: pointer;">Cancelar</button>
+          <button type="submit" class="btn btn-primary" style="padding: 9px 18px; font-size: 0.85rem; background: #2e7d32; border: 1.5px solid #81c784; color: #fff; font-weight: 800; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 12px rgba(46,125,50,0.4);">Guardar Contraseña</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="mapa-local.js?v=gba_leafgreen_v1"></script>
@@ -3637,6 +3704,6 @@
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=flow_order_v25"></script>
+  <script src="vendedor.js?v=mobile_clean_v26"></script>
 </body>
 </html>

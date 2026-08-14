@@ -1077,7 +1077,7 @@ function checkVendorAuth() {
   if (activeVendor) {
     if (loginScreen) loginScreen.style.display = 'none';
     if (portalApp) portalApp.style.display = 'block';
-    if (vendorNameHeader) vendorNameHeader.textContent = `🧑‍💼 Vendedor: ${activeVendor}`;
+    if (vendorNameHeader) vendorNameHeader.innerHTML = `🧑‍💼 <span style="font-weight: 800; color: #fff;">${activeVendor}</span>`;
     if (vendorCheckoutInput) vendorCheckoutInput.value = activeVendor;
     if (sidebarName) sidebarName.textContent = activeVendor;
     if (sidebarAvatar) sidebarAvatar.textContent = activeVendor.charAt(0).toUpperCase();
@@ -1118,7 +1118,9 @@ function handleVendorLogin(e) {
   const vendorData = AUTHORIZED_VENDEDORES.find(v => v.name.toLowerCase() === selectedName.toLowerCase());
 
   if (vendorData) {
-    const isPassValid = (typedPass === vendorData.pass.toLowerCase()) || 
+    const customPass = localStorage.getItem('boeweb_vendor_password_' + vendorData.name.toLowerCase());
+    const isPassValid = (customPass && typedPass === customPass.toLowerCase()) ||
+                        (typedPass === vendorData.pass.toLowerCase()) || 
                         (vendorData.altPass && typedPass === vendorData.altPass.toLowerCase());
 
     if (isPassValid) {
@@ -1135,6 +1137,98 @@ function handleVendorLogin(e) {
   } else {
     setVendorLoginMessage('No pudimos validar esta identidad. Contactá al responsable del local.');
   }
+}
+
+function openVendorPasswordModal() {
+  const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name');
+  if (!activeVendor) {
+    showToast('⚠️ Debés iniciar sesión como vendedor primero.');
+    return;
+  }
+  const modal = document.getElementById('modal-vendor-change-password');
+  const nameEl = document.getElementById('change-password-vendor-name');
+  const oldPass = document.getElementById('vendor-old-password');
+  const newPass = document.getElementById('vendor-new-password');
+  const confirmPass = document.getElementById('vendor-confirm-password');
+  const msgEl = document.getElementById('vendor-change-password-msg');
+
+  if (nameEl) nameEl.textContent = activeVendor;
+  if (oldPass) oldPass.value = '';
+  if (newPass) newPass.value = '';
+  if (confirmPass) confirmPass.value = '';
+  if (msgEl) {
+    msgEl.style.display = 'none';
+    msgEl.textContent = '';
+  }
+
+  if (modal) modal.style.display = 'flex';
+  if (oldPass) oldPass.focus();
+}
+
+function closeVendorPasswordModal() {
+  const modal = document.getElementById('modal-vendor-change-password');
+  if (modal) modal.style.display = 'none';
+}
+
+function handleVendorChangePassword(e) {
+  if (e) e.preventDefault();
+  const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name');
+  if (!activeVendor) return;
+
+  const oldPassEl = document.getElementById('vendor-old-password');
+  const newPassEl = document.getElementById('vendor-new-password');
+  const confirmPassEl = document.getElementById('vendor-confirm-password');
+  const msgEl = document.getElementById('vendor-change-password-msg');
+
+  const oldPass = (oldPassEl?.value || '').trim();
+  const newPass = (newPassEl?.value || '').trim();
+  const confirmPass = (confirmPassEl?.value || '').trim();
+
+  const showModalMsg = (text, isError = true) => {
+    if (!msgEl) return;
+    msgEl.style.display = 'block';
+    msgEl.style.background = isError ? 'rgba(239, 83, 80, 0.25)' : 'rgba(76, 175, 80, 0.25)';
+    msgEl.style.border = isError ? '1px solid #ef5350' : '1px solid #4caf50';
+    msgEl.style.color = isError ? '#ff8a80' : '#a5d6a7';
+    msgEl.textContent = text;
+  };
+
+  const vendorData = AUTHORIZED_VENDEDORES.find(v => v.name.toLowerCase() === activeVendor.toLowerCase());
+  if (!vendorData) {
+    showModalMsg('Vendedor no encontrado en el sistema.');
+    return;
+  }
+
+  const customStored = localStorage.getItem('boeweb_vendor_password_' + activeVendor.toLowerCase());
+  const validCurrent = customStored || vendorData.pass;
+
+  if (oldPass.toLowerCase() !== validCurrent.toLowerCase() && (!vendorData.altPass || oldPass.toLowerCase() !== vendorData.altPass.toLowerCase())) {
+    showModalMsg('La contraseña actual ingresada es incorrecta.');
+    oldPassEl?.select();
+    return;
+  }
+
+  if (newPass.length < 4) {
+    showModalMsg('La nueva contraseña debe tener al menos 4 caracteres.');
+    newPassEl?.focus();
+    return;
+  }
+
+  if (newPass !== confirmPass) {
+    showModalMsg('La nueva contraseña y la confirmación no coinciden.');
+    confirmPassEl?.select();
+    return;
+  }
+
+  // Guardar nueva contraseña en localStorage
+  localStorage.setItem('boeweb_vendor_password_' + activeVendor.toLowerCase(), newPass);
+  
+  showModalMsg('¡Contraseña actualizada con éxito!', false);
+  showToast(`🔑 Contraseña actualizada correctamente para ${activeVendor}.`);
+
+  setTimeout(() => {
+    closeVendorPasswordModal();
+  }, 900);
 }
 
 function vendorLogout() {
@@ -9490,6 +9584,10 @@ window.closeCcDetailsModal = closeCcDetailsModal;
 window.generateAndPrintCcPdf = generateAndPrintCcPdf;
 window.handlePosPaymentMethodChange = handlePosPaymentMethodChange;
 window.updatePosCurrentAccountInfo = updatePosCurrentAccountInfo;
+
+window.openVendorPasswordModal = openVendorPasswordModal;
+window.closeVendorPasswordModal = closeVendorPasswordModal;
+window.handleVendorChangePassword = handleVendorChangePassword;
 
 
 
