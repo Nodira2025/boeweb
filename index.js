@@ -196,184 +196,168 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- INITIALIZE & FETCH CATALOG ---
   async function loadCatalog() {
+    let initialLoaded = false;
+
+    // 1. Instant Load from Local/Cached Storage or products.json
     try {
-      let fetchedSuccessfully = false;
+      const cached = localStorage.getItem('boeweb_internal_catalog');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          products = parsed;
+          filteredProducts = [...products];
+          if (totalCountEl) totalCountEl.textContent = products.length;
+          applyFiltersAndRender(true);
+          updateCartBadge();
+          initialLoaded = true;
+        }
+      }
+    } catch (_) {}
 
-      // 1. Priority A: Fetch Internal Store Catalog from Supabase
-      if (window.supabase) {
-        try {
-          const supabaseUrl = 'https://sxbhrgvizqylnfcqzhin.supabase.co';
-          const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4YmhyZ3ZpenF5bG5mY3F6aGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMjM1MzEsImV4cCI6MjA5Njg5OTUzMX0.UUOwXsHXKNCjlJKdxMUlAuCtNAnNWgAroBwMlWAdTag';
-          const client = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+    if (!initialLoaded) {
+      try {
+        const response = await fetch('products.json');
+        if (response.ok) {
+          const rawJson = await response.json();
+          if (Array.isArray(rawJson) && rawJson.length > 0) {
+            products = rawJson.filter(p => p && p.id && p.name);
+            filteredProducts = [...products];
+            if (totalCountEl) totalCountEl.textContent = products.length;
+            applyFiltersAndRender(true);
+            updateCartBadge();
+            initialLoaded = true;
+          }
+        }
+      } catch (jsonErr) {
+        console.warn('Instant local products.json load failed, will rely on Supabase:', jsonErr);
+      }
+    }
 
-          // 1.1 Fetch products from supplier_products (both local_store and external suppliers)
-          const { data: allSupplierRows, error: suppErr } = await client
-            .from('supplier_products')
-            .select('*')
-            .order('name', { ascending: true });
+    // 2. Fetch live data from Supabase and Unify
+    if (window.supabase) {
+      try {
+        const supabaseUrl = 'https://sxbhrgvizqylnfcqzhin.supabase.co';
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4YmhyZ3ZpenF5bG5mY3F6aGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMjM1MzEsImV4cCI6MjA5Njg5OTUzMX0.UUOwXsHXKNCjlJKdxMUlAuCtNAnNWgAroBwMlWAdTag';
+        const client = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
 
-          if (!suppErr && allSupplierRows && allSupplierRows.length > 0) {
-            const productIds = [...new Set(allSupplierRows.map(r => r.mapped_product_id || r.supplier_product_id).filter(Boolean))];
-            let metadataMap = new Map();
-            if (productIds.length > 0) {
-              const { data: prodMeta } = await client.from('products').select('*').in('id', productIds);
-              if (prodMeta) {
-                prodMeta.forEach(pm => metadataMap.set(String(pm.id), pm));
-              }
+        const { data: allSupplierRows, error: suppErr } = await client
+          .from('supplier_products')
+          .select('*')
+          .order('name', { ascending: true });
+
+        if (!suppErr && allSupplierRows && allSupplierRows.length > 0) {
+          const productIds = [...new Set(allSupplierRows.map(r => r.mapped_product_id || r.supplier_product_id).filter(Boolean))];
+          let metadataMap = new Map();
+          if (productIds.length > 0) {
+            const { data: prodMeta } = await client.from('products').select('*').in('id', productIds);
+            if (prodMeta) {
+              prodMeta.forEach(pm => metadataMap.set(String(pm.id), pm));
             }
+          }
 
-            // Local Stock Overrides (para reflejar bajas y retiros inmediatamente)
-            let localCatalogMap = new Map();
-            try {
-              const cachedCat = JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
-              if (Array.isArray(cachedCat)) {
-                cachedCat.forEach(item => {
-                  const code = String(item.product_code || item.id || '').toUpperCase();
-                  if (code) localCatalogMap.set(code, item);
-                });
-              }
-            } catch (_) {}
-
-            const ownRows = allSupplierRows.filter(r => r.supplier_id === 'local_store' || r.supplier_id === 'propio' || !r.supplier_id);
-            const b2bRows = allSupplierRows.filter(r => r.supplier_id && r.supplier_id !== 'local_store' && r.supplier_id !== 'propio');
-
-            const ownParsed = ownRows.map(r => {
-              const pid = String(r.mapped_product_id || r.supplier_product_id || r.id);
-              const meta = metadataMap.get(pid) || {};
-              const localOverride = localCatalogMap.get(pid.toUpperCase());
-              const finalStock = localOverride !== undefined && localOverride.stock !== undefined
-                ? Math.max(0, Number(localOverride.stock) || 0)
-                : Math.max(0, Number(r.stock) || 0);
-              const isAvail = r.available !== false && finalStock > 0;
-              return {
-                id: pid,
-                product_code: pid,
-                name: meta.name || r.name || 'Producto BÔ',
-                price: Number(r.price) || 0,
-                image: meta.image || r.image || 'assets/logo.jpg',
-                link: r.link || '',
-                slug: (meta.name || r.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-                stock: finalStock,
-                own_stock: finalStock,
-                available: isAvail,
-                category: meta.category || 'Otros',
-                description: meta.description || r.description || ''
-              };
-            });
-
-            const b2bParsed = b2bRows.map(r => {
-              const pid = String(r.mapped_product_id || r.supplier_product_id || r.id);
-              const meta = metadataMap.get(pid) || {};
-              return {
-                id: pid,
-                product_code: pid,
-                name: meta.name || r.name || 'Producto B2B',
-                price: Number(r.price) || 0,
-                image: meta.image || r.image || 'assets/logo.jpg',
-                link: r.link || '',
-                slug: (meta.name || r.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-                stock: 0,
-                own_stock: 0,
-                available: true,
-                category: meta.category || 'Otros',
-                description: meta.description || r.description || '',
-                supplier_code: r.supplier_id,
-                supplier_name: r.supplier_id
-              };
-            });
-
-            // Local Stores Products (Otras Tiendas Cerca)
-            let localStores = [];
-            try {
-              const cachedLocalStores = localStorage.getItem('boeweb_nearby_stores_catalog');
-              if (cachedLocalStores) localStores = JSON.parse(cachedLocalStores);
-            } catch (_) {}
-
-            if (typeof window.PublicCatalogUnifier !== 'undefined') {
-              products = window.PublicCatalogUnifier.unifyProducts(ownParsed, b2bParsed, {
-                localStoresProducts: localStores
+          let localCatalogMap = new Map();
+          try {
+            const cachedCat = JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
+            if (Array.isArray(cachedCat)) {
+              cachedCat.forEach(item => {
+                const code = String(item.product_code || item.id || '').toUpperCase();
+                if (code) localCatalogMap.set(code, item);
               });
-            } else {
-              products = [...ownParsed, ...b2bParsed];
             }
+          } catch (_) {}
 
-            products = products.filter(p => p.id && p.name);
-            if (products.length > 0) {
-              fetchedSuccessfully = true;
-              try {
-                localStorage.setItem('boeweb_internal_catalog', JSON.stringify(products));
-              } catch (_) {}
-            }
-          }
+          const ownRows = allSupplierRows.filter(r => r.supplier_id === 'local_store' || r.supplier_id === 'propio' || !r.supplier_id);
+          const b2bRows = allSupplierRows.filter(r => r.supplier_id && r.supplier_id !== 'local_store' && r.supplier_id !== 'propio');
 
-          // 1.2 Fallback to safe public_catalog_products view
-          if (!fetchedSuccessfully) {
-            const { data: viewData, error: viewErr } = await client
-              .from('public_catalog_products')
-              .select('*')
-              .order('name', { ascending: true });
+          const ownParsed = ownRows.map(r => {
+            const pid = String(r.mapped_product_id || r.supplier_product_id || r.id);
+            const meta = metadataMap.get(pid) || {};
+            const localOverride = localCatalogMap.get(pid.toUpperCase());
+            const finalStock = localOverride !== undefined && localOverride.stock !== undefined
+              ? Math.max(0, Number(localOverride.stock) || 0)
+              : Math.max(0, Number(r.stock) || 0);
+            const isAvail = r.available !== false && finalStock > 0;
+            return {
+              id: pid,
+              product_code: pid,
+              name: meta.name || r.name || 'Producto BÔ',
+              price: Number(r.price) || 0,
+              image: meta.image || r.image || 'assets/logo.jpg',
+              link: r.link || '',
+              slug: (meta.name || r.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+              stock: finalStock,
+              own_stock: finalStock,
+              available: isAvail,
+              category: meta.category || 'Otros',
+              description: meta.description || r.description || ''
+            };
+          });
 
-            if (!viewErr && viewData && viewData.length > 0) {
-              const viewParsed = viewData.map(p => ({
-                id: String(p.product_id || p.id),
-                product_code: String(p.sku || p.id),
-                name: p.name || 'Producto BÔ',
-                price: Number(p.public_price || p.price) || 0,
-                image: p.image_url || p.image || 'assets/logo.jpg',
-                link: '',
-                slug: (p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-                stock: 10,
-                own_stock: 10,
-                available: p.is_available !== false,
-                availability: 'EN_STOCK',
-                badge_text: '🟢 EN STOCK',
-                category: p.category || 'Otros',
-                description: p.public_description || p.description || ''
-              }));
-              products = viewParsed.filter(p => p.id && p.name);
-              if (products.length > 0) {
-                fetchedSuccessfully = true;
+          // Also include products from products.json as own products if not already in ownParsed
+          if (Array.isArray(products) && products.length > 0) {
+            products.forEach(p => {
+              if (p.stock > 0 && !ownParsed.some(op => op.id === p.id || op.name === p.name)) {
+                ownParsed.push(p);
               }
-            }
+            });
           }
-        } catch (spErr) {
-          console.warn('Supabase catalog fetch failed:', spErr);
+
+          const b2bParsed = b2bRows.map(r => {
+            const pid = String(r.mapped_product_id || r.supplier_product_id || r.id);
+            const meta = metadataMap.get(pid) || {};
+            return {
+              id: pid,
+              product_code: pid,
+              name: meta.name || r.name || 'Producto B2B',
+              price: Number(r.price) || 0,
+              image: meta.image || r.image || 'assets/logo.jpg',
+              link: r.link || '',
+              slug: (meta.name || r.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+              stock: 0,
+              own_stock: 0,
+              available: true,
+              category: meta.category || 'Otros',
+              description: meta.description || r.description || '',
+              supplier_code: r.supplier_id,
+              supplier_name: r.supplier_id
+            };
+          });
+
+          let localStores = [];
+          try {
+            const cachedLocalStores = localStorage.getItem('boeweb_nearby_stores_catalog');
+            if (cachedLocalStores) localStores = JSON.parse(cachedLocalStores);
+          } catch (_) {}
+
+          let unified = [];
+          if (typeof window.PublicCatalogUnifier !== 'undefined') {
+            unified = window.PublicCatalogUnifier.unifyProducts(ownParsed, b2bParsed, {
+              localStoresProducts: localStores
+            });
+          } else {
+            unified = [...ownParsed, ...b2bParsed];
+          }
+
+          unified = unified.filter(p => p.id && p.name);
+          if (unified.length > 0) {
+            products = unified;
+            try {
+              localStorage.setItem('boeweb_internal_catalog', JSON.stringify(products));
+            } catch (_) {}
+            if (totalCountEl) totalCountEl.textContent = products.length;
+            applyFiltersAndRender(false);
+            updateCartBadge();
+            initialLoaded = true;
+          }
         }
+      } catch (spErr) {
+        console.warn('Supabase catalog fetch failed:', spErr);
       }
+    }
 
-      // 2. Fallback to cached local internal catalog
-      if (!fetchedSuccessfully) {
-        try {
-          const cached = localStorage.getItem('boeweb_internal_catalog');
-          if (cached) {
-            const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              products = parsed;
-              fetchedSuccessfully = true;
-            }
-          }
-        } catch (_) {}
-      }
-
-      // 3. Fallback to local products.json if no internal products found yet
-      if (!fetchedSuccessfully) {
-        try {
-          const response = await fetch('products.json');
-          if (response.ok) {
-            products = await response.json();
-            products = products.filter(p => p && p.id && p.name);
-            if (products.length > 0) {
-              fetchedSuccessfully = true;
-            }
-          }
-        } catch (jsonErr) {
-          console.warn('Local products.json fetch failed, trying Supabase fallback...', jsonErr);
-        }
-      }
-
-      if (!fetchedSuccessfully) {
-        throw new Error('No se pudo establecer conexión con el catálogo de productos.');
-      }
+    if (!initialLoaded && products.length === 0) {
+      throw new Error('No se pudo establecer conexión con el catálogo de productos.');
+    }
 
       // Default Sort Order: Relevance (relevance matches index order)
       filteredProducts = [...products];

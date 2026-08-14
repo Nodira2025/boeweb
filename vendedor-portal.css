@@ -1093,6 +1093,8 @@
   .vendor-dashboard-home .vendor-launchpad-card {
     min-height: 118px;
   }
+}
+
 /* Fixed Mobile Bottom Navigation Footer Bar */
 .vendor-mobile-bottom-nav {
   display: none;
