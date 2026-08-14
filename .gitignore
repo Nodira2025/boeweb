@@ -15,3 +15,5 @@ desktop.ini
 # Environment and dependency files
 .env
 node_modules/
+scratch/dumps/
+scratch/temp_*.sql

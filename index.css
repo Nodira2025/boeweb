@@ -1014,6 +1014,26 @@ button, input, select, textarea {
   background-color: #721c24;
 }
 
+.stock-tag.tag-in-stock {
+  background-color: #1b5e20;
+  color: #ffffff;
+  border: 1px solid #4caf50;
+}
+
+.stock-tag.tag-local-store {
+  background: linear-gradient(135deg, #0d47a1 0%, #1565c0 100%);
+  color: #ffffff;
+  border: 1px solid #42a5f5;
+  font-weight: 700;
+}
+
+.stock-tag.tag-on-demand {
+  background: linear-gradient(135deg, #e65100 0%, #ef6c00 100%);
+  color: #ffffff;
+  border: 1px solid #ffb74d;
+  font-weight: 700;
+}
+
 /* Card Visual/Image wrapper */
 .product-card-img-wrapper {
   position: relative;

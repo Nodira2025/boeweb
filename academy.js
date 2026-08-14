@@ -690,7 +690,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const titleEl = document.getElementById('trichome-stage-title');
     const textEl = document.getElementById('trichome-effect-text');
 
-    if (!range) return;
+    if (!range || !headGraphic || !titleEl || !textEl) return;
 
     range.addEventListener('input', () => {
       const val = parseInt(range.value);

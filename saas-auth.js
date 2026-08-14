@@ -128,6 +128,20 @@ class SaasAuthEngine {
     return true;
   }
 
+  async signInWithSupabase(client, email, password) {
+    if (!client?.auth || typeof client.auth.signInWithPassword !== 'function') {
+      return { success: false, error: 'Cliente de Supabase no disponible' };
+    }
+    try {
+      const { data, error } = await client.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      const hydrated = await this.hydrateFromSupabase(client);
+      return { success: true, user: data?.user, hydrated };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
   loginAsUser() {
     console.warn('Inicio SaaS local deshabilitado: la identidad debe provenir de Supabase Auth.');
     return false;

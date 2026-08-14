@@ -1213,22 +1213,28 @@
   background: var(--vendor-gold);
 }
 
+/* ==========================================================================
+   MAPA DE ESTANTES ESTILO GAME BOY ADVANCE (POKÉMON VERDE HOJA / FIRERED)
+   ========================================================================== */
+
 .store-map-searchbar {
   margin: 16px 0;
-  padding: 14px 16px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  border: 1px solid var(--vendor-line);
-  border-radius: 16px;
-  background: var(--vendor-paper);
+  gap: 16px;
+  border: 3px solid #1a3b2b;
+  border-radius: 14px;
+  background: #f4fbf5;
+  box-shadow: 0 4px 0 #12281d, inset 0 2px 0 rgba(255, 255, 255, 0.8);
 }
 
 .store-map-searchbar > label {
-  color: var(--vendor-forest);
-  font-size: 0.76rem;
-  font-weight: 800;
+  color: #1a3b2b;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.5px;
 }
 
 .store-map-searchbar > div {
@@ -1236,414 +1242,873 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .store-map-searchbar > div > span {
-  color: var(--vendor-muted);
-  font-size: 1.25rem;
+  font-size: 1.2rem;
 }
 
 .store-map-searchbar input {
-  min-height: 48px;
-  padding: 0 14px;
-  border: 1px solid var(--vendor-line);
-  border-radius: 12px;
-  background: #fffef9;
-  color: var(--vendor-ink);
-  font: inherit;
-  font-size: 0.78rem;
-}
-
-.store-map-searchbar button,
-.store-map-action-btn,
-.store-map-floor-btn,
-.map-shelf-level,
-.map-product-action,
-.map-editor-button,
-.map-photo-button {
   min-height: 44px;
-  padding: 0 15px;
-  border: 1px solid var(--vendor-line);
-  border-radius: 12px;
-  background: var(--vendor-paper);
-  color: var(--vendor-forest);
+  padding: 0 14px;
+  border: 2px solid #2e6b4d;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #1a3b2b;
   font: inherit;
-  font-size: 0.72rem;
-  font-weight: 800;
+  font-size: 0.88rem;
+  font-weight: 600;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);
+}
+
+.store-map-searchbar button {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 2px solid #12281d;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #4caf50 0%, #2e7d32 100%);
+  color: #ffffff;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.65rem;
   cursor: pointer;
+  box-shadow: 0 3px 0 #12281d;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
 
-.store-map-searchbar button,
-.store-map-action-btn.primary {
-  border-color: var(--vendor-forest);
-  background: var(--vendor-forest);
-  color: var(--vendor-cream);
+.store-map-searchbar button:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #12281d;
 }
 
-.store-map-dashboard {
-  padding: 20px;
-  border: 1px solid var(--vendor-line);
-  border-radius: 22px;
-  background: var(--vendor-paper);
-  box-shadow: 0 12px 34px rgba(21, 45, 36, 0.055);
+/* GBA Console Chassis */
+.gba-map-shell {
+  padding: 16px;
+  border: 4px solid #142e20;
+  border-radius: 24px;
+  background: linear-gradient(165deg, #27593f 0%, #173826 100%);
+  box-shadow: 0 16px 36px rgba(10, 26, 17, 0.4), inset 0 3px 0 rgba(255, 255, 255, 0.25), inset 0 -4px 0 rgba(0, 0, 0, 0.4);
+  color: #e8f5e9;
 }
 
-.store-map-toolbar,
-.store-map-kpis {
+/* GBA Screen Topbar */
+.gba-screen-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+  background: #0f2318;
+  border: 2px solid #2e6b4d;
+  border-radius: 12px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.62rem;
+}
+
+.gba-topbar-left,
+.gba-topbar-right {
   display: flex;
   align-items: center;
+  gap: 10px;
+}
+
+.gba-led-light {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #76ff03;
+  box-shadow: 0 0 8px #76ff03;
+  animation: gba-led-pulse 2s infinite ease-in-out;
+}
+
+@keyframes gba-led-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.65; transform: scale(0.92); }
+}
+
+.gba-title-logo {
+  color: #a5d6a7;
+  font-weight: bold;
+}
+
+.gba-version-tag {
+  background: #2e7d32;
+  color: #fff;
+  padding: 3px 7px;
+  border-radius: 6px;
+  font-size: 0.54rem;
+}
+
+.gba-battery-tag {
+  color: #ffeb3b;
+}
+
+.gba-sync-tag {
+  color: #81c784;
+  font-size: 0.55rem;
+}
+
+/* Toolbar & Room Tabs */
+.gba-map-toolbar {
+  display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  margin-bottom: 14px;
 }
 
-.store-map-floor-tabs {
+.gba-room-tabs,
+.gba-hardware-buttons {
   display: flex;
-  gap: 7px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-.store-map-floor-btn.active,
-.map-shelf-level.active {
-  border-color: var(--vendor-gold);
-  background: #efe7d3;
-  color: var(--vendor-forest);
+.gba-room-btn,
+.gba-pad-btn {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 2px solid #0d1e14;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #3d7e57 0%, #27593f 100%);
+  color: #e8f5e9;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.58rem;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #0d1e14;
+  transition: all 0.12s ease;
 }
 
-.store-map-sync {
-  color: var(--vendor-muted);
-  font-size: 0.67rem;
+.gba-room-btn:hover,
+.gba-pad-btn:hover {
+  background: linear-gradient(180deg, #4f9d6e 0%, #326e4e 100%);
 }
 
-.store-map-main-grid {
-  margin-top: 16px;
+.gba-room-btn.active,
+.gba-pad-btn.active {
+  background: linear-gradient(180deg, #c2a246 0%, #8c7128 100%);
+  color: #ffffff;
+  border-color: #5c4915;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+  transform: translateY(2px);
+}
+
+/* Main Grid Layout */
+.gba-main-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(320px, 0.7fr);
-  align-items: start;
+  grid-template-columns: minmax(0, 1.65fr) minmax(330px, 0.85fr);
   gap: 16px;
+  align-items: start;
 }
 
-.store-map-canvas-wrap {
-  min-width: 0;
-  padding: 14px;
-  border: 1px solid rgba(107, 78, 46, 0.22);
-  border-radius: 18px;
-  background: #eee6d2;
+/* GBA Screen Viewport */
+.gba-screen-viewport {
+  border: 4px solid #0d1e14;
+  border-radius: 16px;
+  background: #102619;
+  padding: 10px;
   overflow: auto;
+  box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.7);
 }
 
-.architectural-map-canvas {
+/* PokéMart Retro Canvas */
+.gba-pokemart-canvas {
   min-width: 660px;
   min-height: 520px;
   position: relative;
   overflow: hidden;
-  border: 8px solid #6b4e2e;
-  border-radius: 12px;
-  background-color: #f8f3e5;
-  background-image: radial-gradient(rgba(107, 78, 46, 0.16) 1.2px, transparent 1.2px);
-  background-size: 18px 18px;
+  border: 4px solid #3c2a1e;
+  border-radius: 10px;
+  background-color: #ecdcc1;
   transform-origin: center center;
   transition: transform 180ms ease;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
 }
 
-.map-entrance,
-.map-depot-label {
+/* Floor Tile Textures */
+.gba-floor-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.gba-floor-wood {
+  background-color: #ecdcc1;
+  background-image: 
+    linear-gradient(rgba(189, 164, 131, 0.45) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(189, 164, 131, 0.45) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.gba-floor-warehouse {
+  background-color: #d2dbd3;
+  background-image: 
+    linear-gradient(rgba(141, 163, 145, 0.4) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(141, 163, 145, 0.4) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.gba-floor-coffee {
+  background-color: #e5d4be;
+  background-image: 
+    radial-gradient(rgba(145, 114, 82, 0.25) 1.5px, transparent 1.5px);
+  background-size: 20px 20px;
+}
+
+/* Architectural Props */
+.gba-prop {
   position: absolute;
   z-index: 3;
-  color: var(--vendor-forest);
-  font-size: 0.66rem;
-  font-weight: 850;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  user-select: none;
 }
 
-.map-entrance {
-  top: 42%;
-  left: 10px;
-  padding: 5px 9px;
-  border: 1px solid var(--vendor-gold);
+.gba-prop-pos {
+  top: 14px;
+  left: 14px;
+  padding: 8px 12px;
+  border: 3px solid #5c3b1e;
   border-radius: 8px;
-  background: rgba(255, 253, 246, 0.93);
+  background: #d4a373;
+  box-shadow: 0 4px 0 #3a2310;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.map-depot-label {
-  right: 0;
+.gba-npc-sprite {
+  font-size: 1.5rem;
+}
+
+.gba-prop-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.55rem;
+  color: #3a2310;
+  font-weight: bold;
+}
+
+.gba-prop-entrance {
   bottom: 0;
-  width: 150px;
-  height: 108px;
-  display: grid;
-  place-items: center;
-  border-top: 6px solid #6b4e2e;
-  border-left: 6px solid #6b4e2e;
-  background: #e4dac1;
-  text-align: center;
+  left: 40%;
+  width: 140px;
+  height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
 }
 
-.map-shelf-block {
-  min-width: 64px;
-  min-height: 48px;
-  padding: 6px;
+.gba-mat-red {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 28px;
+  background: #d32f2f;
+  border: 2px solid #b71c1c;
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+  box-shadow: inset 0 2px 0 #ff8a80;
+}
+
+.gba-mat-text {
+  position: relative;
+  z-index: 2;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.44rem;
+  color: #ffffff;
+  padding-bottom: 6px;
+  text-shadow: 0 1px 2px #000;
+}
+
+.gba-plant-tl {
+  top: 12px;
+  right: 14px;
+  font-size: 1.6rem;
+}
+
+.gba-plant-tr {
+  bottom: 12px;
+  left: 14px;
+  font-size: 1.6rem;
+}
+
+.gba-prop-tv {
+  top: 12px;
+  left: 60%;
+  padding: 4px 8px;
+  background: #263238;
+  color: #80d8ff;
+  border: 2px solid #000;
+  border-radius: 6px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.48rem;
+}
+
+.gba-prop-pallet {
+  padding: 8px 12px;
+  background: #a1887f;
+  border: 2px dashed #4e342e;
+  border-radius: 8px;
+  color: #3e2723;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.52rem;
+  font-weight: bold;
+}
+
+/* Shelf Blocks & Modules */
+.gba-shelf-wrapper {
   position: absolute;
   z-index: 5;
-  display: grid;
-  place-items: center;
-  border: 2px solid rgba(21, 45, 36, 0.38);
-  border-radius: 9px;
-  color: var(--vendor-forest);
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 900;
-  cursor: pointer;
-  box-shadow: 0 4px 10px rgba(21, 45, 36, 0.12);
-  transition: transform 160ms ease, box-shadow 160ms ease;
 }
 
-.map-shelf-position {
-  position: absolute;
-  z-index: 5;
-}
-
-.map-shelf-position .map-shelf-block {
+.gba-shelf-block {
   width: 100%;
   height: 100%;
   position: relative;
-  inset: auto;
-}
-
-.map-shelf-position:has(.map-shelf-block.selected) {
-  z-index: 8;
-}
-
-.map-editor-controls {
-  position: absolute;
-  top: -13px;
-  right: -8px;
-  z-index: 10;
   display: flex;
-  gap: 3px;
-}
-
-.map-editor-controls button {
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--vendor-line);
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 4px;
+  border: 3px solid #2d4a22;
   border-radius: 8px;
-  background: var(--vendor-paper);
-  color: var(--vendor-forest);
+  background: linear-gradient(180deg, #7cb342 0%, #558b2f 100%);
+  color: #ffffff;
+  font: inherit;
   cursor: pointer;
+  box-shadow: 0 4px 0 #1b3014, inset 0 2px 0 rgba(255,255,255,0.4);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  user-select: none;
 }
 
-.map-shelf-block[data-zone="A"],
-.map-shelf-block[data-zone="E"] {
-  background: #d9bd6a;
+.gba-shelf-block[data-zone="A"] {
+  background: linear-gradient(180deg, #42a5f5 0%, #1e88e5 100%);
+  border-color: #0d47a1;
+  box-shadow: 0 4px 0 #08285c;
 }
 
-.map-shelf-block[data-zone="B"],
-.map-shelf-block[data-zone="C"] {
-  background: #b8cc8b;
+.gba-shelf-block[data-zone="B"] {
+  background: linear-gradient(180deg, #66bb6a 0%, #388e3c 100%);
+  border-color: #1b5e20;
+  box-shadow: 0 4px 0 #0e3813;
 }
 
-.map-shelf-block[data-zone="D"] {
-  background: #c7aa88;
+.gba-shelf-block[data-zone="C"] {
+  background: linear-gradient(180deg, #ffa726 0%, #f57c00 100%);
+  border-color: #e65100;
+  box-shadow: 0 4px 0 #8c3200;
 }
 
-.map-shelf-block:hover,
-.map-shelf-block:focus-visible,
-.map-shelf-block.selected {
-  z-index: 8;
-  border-color: var(--vendor-forest);
-  box-shadow: 0 0 0 4px rgba(194, 162, 70, 0.34), 0 9px 20px rgba(21, 45, 36, 0.18);
-  transform: scale(1.05);
-  outline: none;
+.gba-shelf-block[data-zone="D"] {
+  background: linear-gradient(180deg, #8d6e63 0%, #5d4037 100%);
+  border-color: #3e2723;
+  box-shadow: 0 4px 0 #241411;
 }
 
-.map-shelf-block small {
-  display: block;
-  color: rgba(21, 45, 36, 0.72);
-  font-size: 0.56rem;
+.gba-shelf-block[data-zone="E"] {
+  background: linear-gradient(180deg, #ab47bc 0%, #7b1fa2 100%);
+  border-color: #4a148c;
+  box-shadow: 0 4px 0 #2c0957;
 }
 
-.map-empty-floor {
-  min-height: 500px;
-  display: grid;
-  place-items: center;
-  color: var(--vendor-muted);
-  font-size: 0.8rem;
-  text-align: center;
+.gba-shelf-block:hover {
+  transform: translateY(-3px) scale(1.04);
+  z-index: 10;
+  outline: 3px solid #ffeb3b;
 }
 
-.store-map-side {
+.gba-shelf-block.selected {
+  outline: 4px solid #ffff00;
+  box-shadow: 0 0 16px rgba(255, 235, 59, 0.8), 0 6px 0 #000;
+  transform: translateY(-4px) scale(1.06);
+  z-index: 12;
+}
+
+.gba-shelf-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.gba-shelf-icon {
+  font-size: 0.9rem;
+}
+
+.gba-shelf-code {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.62rem;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+.gba-hp-track {
+  width: 85%;
+  height: 6px;
+  background: #1a1a1a;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #000;
+  margin: 2px 0;
+}
+
+.gba-hp-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.gba-shelf-count {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.48rem;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.gba-cursor-tag {
+  position: absolute;
+  top: -18px;
+  color: #ffeb3b;
+  font-size: 1rem;
+  animation: gba-bounce 0.8s infinite alternate ease-in-out;
+}
+
+@keyframes gba-bounce {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-5px); }
+}
+
+.gba-editor-arrows {
+  position: absolute;
+  top: -14px;
+  right: -8px;
+  z-index: 15;
+  display: flex;
+  gap: 2px;
+}
+
+.gba-editor-arrows button {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #000;
+  border-radius: 6px;
+  background: #ffeb3b;
+  color: #000;
+  font-size: 0.6rem;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+/* Computadora Central como Brújula / Punto Cardinal */
+.gba-anchor-pc-wrapper {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.gba-anchor-pc {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #1a3b2b;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #d4c5a9 0%, #b89758 100%);
+  box-shadow: 0 6px 0 #152d24, inset 0 2px 0 rgba(255,255,255,0.6);
+  user-select: none;
+}
+
+.gba-pc-screen {
+  font-size: 1.4rem;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+.gba-pc-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.52rem;
+  color: #152d24;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.8);
+  margin-top: 2px;
+}
+
+.gba-pc-sub {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.38rem;
+  color: #5c3b1e;
+  letter-spacing: 0.5px;
+}
+
+.gba-compass-arrow {
+  position: absolute;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.42rem;
+  background: rgba(21, 45, 36, 0.92);
+  color: #c2a246;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid #c2a246;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+.gba-compass-north {
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.gba-compass-south {
+  bottom: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.gba-compass-east {
+  right: -72px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.gba-compass-west {
+  left: -76px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+
+/* Inspector Side Panel */
+.gba-inspector-side {
   display: grid;
   gap: 14px;
 }
 
-.map-detail-card,
-.map-products-card,
-.map-kpi {
-  padding: 18px;
-  border: 1px solid var(--vendor-line);
-  border-radius: 17px;
-  background: #faf6e9;
+/* Retro GBA Dialog Box */
+.gba-dialog-box {
+  padding: 16px;
+  border: 4px solid #142e20;
+  outline: 3px solid #d4b45a;
+  outline-offset: -2px;
+  border-radius: 18px;
+  background: #ffffff;
+  color: #1a3b2b;
+  box-shadow: 0 8px 0 #0c1c13;
 }
 
-.map-detail-card h3,
-.map-products-card h3 {
-  margin: 4px 0 4px;
-  color: var(--vendor-forest);
-  font-family: "Playfair Display", serif;
-  font-size: 1.35rem;
+.gba-dialog-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
-.map-detail-meta {
-  color: var(--vendor-muted);
-  font-size: 0.69rem;
+.gba-dialog-kicker {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.54rem;
+  color: #2e7d32;
+  letter-spacing: 0.5px;
 }
 
-.map-shelf-photo {
+.gba-shelf-title {
+  margin: 4px 0 6px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.76rem;
+  color: #1a3b2b;
+  line-height: 1.4;
+}
+
+.gba-dialog-meta {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.54rem;
+  color: #558b2f;
+  margin-bottom: 12px;
+}
+
+.gba-photo-frame {
   width: 100%;
-  height: 180px;
-  margin: 14px 0 10px;
+  height: 160px;
+  margin-bottom: 10px;
+  border: 3px solid #142e20;
+  border-radius: 12px;
+  background: #e8f5e9;
   overflow: hidden;
   display: grid;
   place-items: center;
-  border: 1px dashed rgba(194, 162, 70, 0.64);
-  border-radius: 13px;
-  background: #efe7d3;
-  color: var(--vendor-muted);
-  font-size: 0.72rem;
-  text-align: center;
 }
 
-.map-shelf-photo img {
+.gba-photo-frame img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.map-photo-actions,
-.map-level-actions {
-  display: flex;
-  gap: 7px;
-  flex-wrap: wrap;
+.gba-photo-empty {
+  text-align: center;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.52rem;
+  color: #2e7d32;
+  padding: 12px;
+  line-height: 1.6;
 }
 
-.map-photo-button {
-  min-height: 44px;
-  padding: 0 15px;
+.gba-photo-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.gba-action-btn-green,
+.gba-action-btn-gold {
+  flex: 1;
+  min-height: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border: 2px solid #12281d;
+  border-radius: 8px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.54rem;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #12281d;
+  transition: transform 0.1s ease;
 }
 
-.map-level-actions {
-  margin-top: 12px;
+.gba-action-btn-green {
+  background: linear-gradient(180deg, #4caf50 0%, #2e7d32 100%);
+  color: #fff;
 }
 
-.store-map-map-actions {
+.gba-action-btn-gold {
+  background: linear-gradient(180deg, #ffd54f 0%, #ffa000 100%);
+  color: #3e2723;
+  border-color: #4e342e;
+  box-shadow: 0 3px 0 #4e342e;
+}
+
+.gba-action-btn-green:active,
+.gba-action-btn-gold:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #000;
+}
+
+.gba-levels-row {
+  margin-top: 10px;
+  border-top: 2px dashed #c8e6c9;
+  padding-top: 10px;
+}
+
+.gba-levels-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.52rem;
+  color: #2e7d32;
+  margin-bottom: 8px;
+}
+
+.gba-levels-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.gba-level-btn {
+  padding: 6px 2px;
+  border: 2px solid #1b5e20;
+  border-radius: 6px;
+  background: #f1f8e9;
+  color: #1b5e20;
+  font: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.1s ease;
+}
+
+.gba-level-btn.active {
+  background: #2e7d32;
+  color: #ffffff;
+  border-color: #0d2c0e;
+  box-shadow: inset 0 2px 3px rgba(0,0,0,0.3);
+}
+
+.gba-lvl-num {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.5rem;
+  display: block;
+}
+
+.gba-lvl-qty {
+  font-size: 0.65rem;
+  font-weight: 800;
+  display: block;
+}
+
+/* Retro Bag / Products Box */
+.gba-bag-box {
+  padding: 16px;
+  border: 4px solid #142e20;
+  outline: 3px solid #d4b45a;
+  outline-offset: -2px;
+  border-radius: 18px;
+  background: #ffffff;
+  color: #1a3b2b;
+  box-shadow: 0 8px 0 #0c1c13;
+}
+
+.gba-bag-header {
   display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  border-bottom: 2px solid #c8e6c9;
+  padding-bottom: 8px;
 }
 
-.map-products-list {
-  margin-top: 12px;
+.gba-bag-icon {
+  font-size: 1.2rem;
+}
+
+.gba-bag-title {
+  margin: 0;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.62rem;
+  color: #1a3b2b;
+}
+
+.gba-bag-list {
   display: grid;
   gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
 }
 
-.map-product-row {
-  min-height: 66px;
-  padding: 8px;
+.gba-item-row {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 9px;
-  border: 1px solid var(--vendor-line);
-  border-radius: 12px;
-  background: var(--vendor-paper);
+  gap: 8px;
+  padding: 6px 8px;
+  border: 2px solid #a5d6a7;
+  border-radius: 8px;
+  background: #f9fbf9;
 }
 
-.map-product-row img {
-  width: 48px;
-  height: 48px;
-  border-radius: 9px;
-  background: #efe7d3;
+.gba-item-thumb {
+  width: 44px;
+  height: 44px;
+  border: 2px solid #81c784;
+  border-radius: 6px;
+  background: #e8f5e9;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.gba-item-thumb img {
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 
-.map-product-placeholder {
-  width: 48px;
-  height: 48px;
-  display: grid;
-  place-items: center;
-  border-radius: 9px;
-  background: #efe7d3;
-  color: var(--vendor-muted);
+.gba-item-icon-ph {
+  font-size: 1.2rem;
 }
 
-.map-product-row strong,
-.map-product-row small {
+.gba-item-info strong {
   display: block;
-}
-
-.map-product-row strong {
-  overflow: hidden;
-  color: var(--vendor-ink);
-  font-size: 0.72rem;
-  text-overflow: ellipsis;
+  font-size: 0.78rem;
+  color: #1a3b2b;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.map-product-row small {
-  margin-top: 3px;
-  color: var(--vendor-muted);
-  font-size: 0.61rem;
-}
-
-.map-product-action {
-  width: 44px;
-  padding: 0;
-}
-
-.map-products-empty {
-  padding: 22px 12px;
-  border: 1px dashed var(--vendor-line);
-  border-radius: 12px;
-  color: var(--vendor-muted);
-  font-size: 0.72rem;
-  text-align: center;
-}
-
-.store-map-kpis {
-  margin-top: 16px;
-  justify-content: flex-start;
-}
-
-.map-kpi {
-  min-width: 150px;
-  padding: 11px 14px;
-}
-
-.map-kpi span,
-.map-kpi strong {
+.gba-item-info small {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.48rem;
+  color: #558b2f;
   display: block;
-}
-
-.map-kpi span {
-  color: var(--vendor-muted);
-  font-size: 0.61rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.map-kpi strong {
   margin-top: 2px;
-  color: var(--vendor-forest);
-  font-family: "Playfair Display", serif;
-  font-size: 1.18rem;
 }
 
+.gba-stock-pill {
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.gba-badge-ok {
+  background: #c8e6c9;
+  color: #1b5e20;
+}
+
+.gba-badge-low {
+  background: #fff9c4;
+  color: #f57f17;
+}
+
+.gba-badge-zero {
+  background: #ffcdd2;
+  color: #b71c1c;
+}
+
+.gba-qr-btn {
+  padding: 6px 10px;
+  border: 2px solid #1b5e20;
+  border-radius: 6px;
+  background: #e8f5e9;
+  color: #1b5e20;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.54rem;
+  cursor: pointer;
+}
+
+.gba-qr-btn:hover {
+  background: #2e7d32;
+  color: #fff;
+}
+
+.gba-bag-empty {
+  padding: 24px;
+  text-align: center;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.54rem;
+  color: #81c784;
+  border: 2px dashed #c8e6c9;
+  border-radius: 10px;
+}
+
+/* Retro Bottom HUD */
+.gba-bottom-hud {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 10px 14px;
+  border: 2px solid #2e6b4d;
+  border-radius: 12px;
+  background: #0f2318;
+  flex-wrap: wrap;
+}
+
+.gba-hud-stat {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.55rem;
+  color: #a5d6a7;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.gba-hud-stat strong {
+  color: #ffeb3b;
+}
+
+@media (max-width: 900px) {
+  .gba-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
 @media (max-width: 1180px) {
   .stock-entry-primary-grid,
   .store-map-main-grid {

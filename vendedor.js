@@ -722,10 +722,10 @@ function handleCheckout(e) {
 
   msg += `\n------------------------------------------\n`;
   msg += `💰 *TOTAL ESTIMADO COMPRA:* $${formatPrice(overallTotal)}\n\n`;
-  msg += `¡Pedido listo para procesar compra! 🌿`;
+  msg += `¡Pedido de reposición listo para procesar! 🌿`;
 
-  // Encargado de compras WhatsApp Number: +54 9 381 302-3185 (5493813023185)
-  const purchaseManagerPhone = "5493813023185";
+  // Administrador Mariano WhatsApp Number: +54 9 343 467-5428 (5493434675428)
+  const purchaseManagerPhone = "5493434675428";
   const waUrl = `https://wa.me/${purchaseManagerPhone}?text=${encodeURIComponent(msg)}`;
 
   // Clear cart
@@ -1117,11 +1117,13 @@ function switchVendorTab(tab) {
   const locationAssistantSection = document.getElementById('vendor-location-assistant-section');
   const draftsReviewSection = document.getElementById('vendor-drafts-review-section');
   const internalCatalogSection = document.getElementById('vendor-internal-catalog-section');
+  const webOrdersSection = document.getElementById('vendor-web-orders-section');
 
   const btnCatalog = document.getElementById('tab-btn-catalog');
   const btnMap = document.getElementById('tab-btn-map');
   const btnScan = document.getElementById('tab-btn-scan');
 
+  const vcardPos = document.getElementById('vcard-pos');
   const vcardCatalog = document.getElementById('vcard-catalog');
   const vcardPortfolio = document.getElementById('vcard-portfolio');
   const vcardCash = document.getElementById('vcard-cash');
@@ -1131,11 +1133,14 @@ function switchVendorTab(tab) {
   const vcardLocationAssistant = document.getElementById('vcard-locationassistant');
   const vcardDraftsReview = document.getElementById('vcard-draftsreview');
   const vcardInternalCatalog = document.getElementById('vcard-internalcatalog');
+  const vcardWebOrders = document.getElementById('vcard-weborders');
+  const vcardExpirations = document.getElementById('vcard-expirations');
+  const vcardNearbyStores = document.getElementById('vcard-nearbystores');
 
   const allBtns = [btnCatalog, btnMap, btnScan];
   allBtns.forEach(btn => { if (btn) btn.classList.remove('active'); });
 
-  const allCards = [vcardCatalog, vcardPortfolio, vcardCash, vcardMap, vcardScan, vcardFastUpload, vcardLocationAssistant, vcardDraftsReview, vcardInternalCatalog];
+  const allCards = [vcardPos, vcardCatalog, vcardPortfolio, vcardCash, vcardMap, vcardScan, vcardFastUpload, vcardLocationAssistant, vcardDraftsReview, vcardInternalCatalog, vcardWebOrders, vcardExpirations, vcardNearbyStores];
   allCards.forEach(card => {
     if (card) {
       card.style.borderColor = 'rgba(255,255,255,0.15)';
@@ -1153,6 +1158,11 @@ function switchVendorTab(tab) {
   if (locationAssistantSection) locationAssistantSection.style.display = 'none';
   if (draftsReviewSection) draftsReviewSection.style.display = 'none';
   if (internalCatalogSection) internalCatalogSection.style.display = 'none';
+  if (webOrdersSection) webOrdersSection.style.display = 'none';
+  const expirationsSection = document.getElementById('vendor-expirations-section');
+  if (expirationsSection) expirationsSection.style.display = 'none';
+  const nearbyStoresSection = document.getElementById('vendor-nearby-stores-section');
+  if (nearbyStoresSection) nearbyStoresSection.style.display = 'none';
   const wmsSection = document.getElementById('vendor-wms-inventory-section');
   if (wmsSection) wmsSection.style.display = 'none';
   const tenantProfileSection = document.getElementById('vendor-tenant-profile-section');
@@ -1200,7 +1210,7 @@ function switchVendorTab(tab) {
       vcardCash.style.transform = 'scale(1.02)';
     }
     renderCashSectionUI();
-  } else if (tab === 'map') {
+  } else if (tab === 'map' || tab === 'estanteria') {
     if (mapSection) {
       mapSection.style.display = 'block';
       targetSection = mapSection;
@@ -1221,7 +1231,7 @@ function switchVendorTab(tab) {
       vcardScan.style.borderColor = '#66bb6a';
       vcardScan.style.transform = 'scale(1.02)';
     }
-  } else if (tab === 'fast-upload') {
+  } else if (tab === 'fast-upload' || tab === 'ingresar-producto' || tab === 'ingreso') {
     if (fastUploadSection) {
       fastUploadSection.style.display = 'block';
       targetSection = fastUploadSection;
@@ -1232,7 +1242,7 @@ function switchVendorTab(tab) {
     }
     initializeFastUploadForm();
     startMobileProductAssistant();
-  } else if (tab === 'location-assistant') {
+  } else if (tab === 'location-assistant' || tab === 'ubicar' || tab === 'ubicar-producto') {
     if (locationAssistantSection) {
       locationAssistantSection.style.display = 'block';
       targetSection = locationAssistantSection;
@@ -1252,11 +1262,15 @@ function switchVendorTab(tab) {
       vcardDraftsReview.style.transform = 'scale(1.02)';
     }
     loadPendingProductDrafts();
-  } else if (tab === 'pos' || tab === 'new-sale') {
+  } else if (tab === 'pos' || tab === 'new-sale' || tab === 'vender' || tab === 'vender-producto') {
     const posSection = document.getElementById('vendor-pos-section');
     if (posSection) {
       posSection.style.display = 'block';
       targetSection = posSection;
+    }
+    if (vcardPos) {
+      vcardPos.style.borderColor = 'var(--color-accent-gold)';
+      vcardPos.style.transform = 'scale(1.02)';
     }
     initPosWorkspace();
   } else if (tab === 'internal-catalog') {
@@ -1269,6 +1283,38 @@ function switchVendorTab(tab) {
       vcardInternalCatalog.style.transform = 'scale(1.02)';
     }
     loadInternalCatalog();
+  } else if (tab === 'web-orders' || tab === 'orders' || tab === 'pedidos') {
+    if (webOrdersSection) {
+      webOrdersSection.style.display = 'block';
+      targetSection = webOrdersSection;
+    }
+    if (vcardWebOrders) {
+      vcardWebOrders.style.borderColor = '#29b6f6';
+      vcardWebOrders.style.transform = 'scale(1.02)';
+    }
+    loadWebOrders();
+  } else if (tab === 'expirations' || tab === 'vencimientos') {
+    const expSection = document.getElementById('vendor-expirations-section');
+    if (expSection) {
+      expSection.style.display = 'block';
+      targetSection = expSection;
+    }
+    if (vcardExpirations) {
+      vcardExpirations.style.borderColor = '#e65100';
+      vcardExpirations.style.transform = 'scale(1.02)';
+    }
+    renderExpirationsSection();
+  } else if (tab === 'nearby-stores' || tab === 'tiendas-cerca') {
+    const nearbySection = document.getElementById('vendor-nearby-stores-section');
+    if (nearbySection) {
+      nearbySection.style.display = 'block';
+      targetSection = nearbySection;
+    }
+    if (vcardNearbyStores) {
+      vcardNearbyStores.style.borderColor = '#1565c0';
+      vcardNearbyStores.style.transform = 'scale(1.02)';
+    }
+    renderNearbyStoresSection();
   } else if (tab === 'wms-inventory' || tab === 'wms') {
     if (wmsSection) {
       wmsSection.style.display = 'block';
@@ -1296,7 +1342,12 @@ function switchVendorTab(tab) {
     startNewTenantOnboardingWizard();
   }
 
-  const activeSidebarTab = tab === 'reposicion' ? 'catalog' : tab;
+  let activeSidebarTab = tab;
+  if (tab === 'reposicion') activeSidebarTab = 'catalog';
+  if (tab === 'estanteria') activeSidebarTab = 'map';
+  if (tab === 'ubicar' || tab === 'ubicar-producto') activeSidebarTab = 'location-assistant';
+  if (tab === 'ingreso' || tab === 'ingresar-producto') activeSidebarTab = 'fast-upload';
+  if (tab === 'new-sale' || tab === 'vender' || tab === 'vender-producto') activeSidebarTab = 'pos';
   document.querySelectorAll('.vendor-side-nav-item').forEach(button => {
     button.classList.toggle('active', button.dataset.vendorTab === activeSidebarTab);
   });
@@ -1352,6 +1403,7 @@ function renderVendorHomeUI() {
   setText('vendor-header-date', formattedDate);
   setText('vendor-header-shift', cashData.closed ? 'Caja cerrada' : 'Turno en curso');
   setText('vendor-sidebar-shift-copy', cashData.closed ? 'Caja cerrada' : 'Turno activo');
+  if (typeof refreshWebOrdersBadges === 'function') refreshWebOrdersBadges();
 
   const shiftPill = document.getElementById('vendor-home-shift-pill');
   if (shiftPill) {
@@ -2155,34 +2207,69 @@ const STOCK_SCANNER_KEY_GAP_MS = 110;
 const HEIC_CONVERTER_URL = 'https://cdn.jsdelivr.net/npm/heic-to@1.5.2/dist/iife/heic-to.js';
 const HEIC_BRANDS = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1']);
 const MOBILE_PRODUCT_ASSISTANT_STEPS = ['method', 'identify', 'details', 'review'];
-const LOCATION_ASSISTANT_STEP_ORDER = ['list', 'area', 'wall', 'shelf', 'level', 'position', 'photo', 'review'];
-const LOCATION_AREA_OPTIONS = [
-  { id: 'reception', label: 'Recepción', help: 'Vitrinas y mostrador de entrada', shelves: ['A-1', 'A-2'] },
-  { id: 'sales-floor', label: 'Salón', help: 'Pasillos y módulos de venta', shelves: ['B-1', 'B-2', 'C-1', 'C-2'] },
-  { id: 'storage', label: 'Depósito', help: 'Reserva y guardado de insumos', shelves: ['D-1', 'D-2'] },
-  { id: 'coffee', label: 'Coffee', help: 'Muebles del Coffee Lounge', shelves: ['E-1', 'E-2'] }
+const LOCATION_ASSISTANT_STEP_ORDER = ['list', 'zone', 'type', 'compass', 'wall', 'shelf', 'level', 'sector', 'review'];
+
+const LOCATION_ZONE_OPTIONS = [
+  { id: 'TI', label: '🏬 Tienda / Salón', help: 'Salón de ventas y mostrador de atención (PC al centro)', prefix: 'TI', floor_level: 1 },
+  { id: 'DP', label: '📦 Depósito General', help: 'Área de guardado, reserva y stock general (PC al centro)', prefix: 'DP', floor_level: 2 }
 ];
+
+const LOCATION_TYPE_OPTIONS = [
+  { id: 'EP', label: '🪜 Estante de pared', help: 'Módulos adosados a la pared perimetral' },
+  { id: 'HEL', label: '❄️ Heladera / Frío', help: 'Refrigeración para semillas y bioinsumos' },
+  { id: 'VIT', label: '💎 Vitrina / Mostrador', help: 'Exhibición cerrada de valor o semillas' },
+  { id: 'EST', label: '📦 Estantería / Góndola', help: 'Módulos de pasillo o góndolas' },
+  { id: 'PIS', label: '🧱 Piso / Pallet', help: 'Bolsas de sustrato o bultos pesados en piso' }
+];
+
+const LOCATION_COMPASS_OPTIONS = [
+  { id: 'D', label: '➡️ Derecha de la PC', help: 'Hacia el lateral derecho desde la computadora', compass: 'Derecha' },
+  { id: 'I', label: '⬅️ Izquierda de la PC', help: 'Hacia el lateral izquierdo desde la computadora', compass: 'Izquierda' },
+  { id: 'F', label: '⬆️ Frente de la PC', help: 'Hacia adelante / frente desde la computadora', compass: 'Frente' },
+  { id: 'A', label: '⬇️ Atrás de la PC', help: 'Hacia la parte posterior / fondo desde la computadora', compass: 'Atrás' }
+];
+
 const LOCATION_WALL_OPTIONS = [
-  { id: 'left', label: 'Pared izquierda', help: 'Mirando desde la entrada' },
-  { id: 'right', label: 'Pared derecha', help: 'Mirando desde la entrada' },
-  { id: 'center', label: 'Sector central', help: 'Isla o mueble del centro' }
+  { id: 'P1', label: 'Pared 1 (Frente / Norte)', help: 'Pared frontal respecto a la PC central' },
+  { id: 'P2', label: 'Pared 2 (Fondo / Sur)', help: 'Pared posterior o fondo respecto a la PC' },
+  { id: 'P3', label: 'Pared 3 (Derecha / Este)', help: 'Lateral derecho respecto a la PC' },
+  { id: 'P4', label: 'Pared 4 (Izquierda / Oeste)', help: 'Lateral izquierdo respecto a la PC' }
 ];
+
+const LOCATION_SHELF_OPTIONS = [
+  { id: 'E1', label: 'Estante 1', help: 'Primer módulo de la pared' },
+  { id: 'E2', label: 'Estante 2', help: 'Segundo módulo de la pared' },
+  { id: 'E3', label: 'Estante 3', help: 'Tercer módulo de la pared' },
+  { id: 'E4', label: 'Estante 4', help: 'Cuarto módulo de la pared' },
+  { id: 'E5', label: 'Estante 5', help: 'Quinto módulo de la pared' },
+  { id: 'HEL1', label: '❄️ Heladera 1', help: 'Equipo refrigerado de la pared' },
+  { id: 'VIT1', label: '💎 Vitrina 1', help: 'Vitrina vidriada de la pared' }
+];
+
 const LOCATION_LEVEL_OPTIONS = [
-  { id: 1, label: 'Inferior', help: 'Nivel bajo del estante' },
-  { id: 2, label: 'Medio', help: 'A la altura de las manos' },
-  { id: 3, label: 'Superior', help: 'Nivel alto del estante' }
+  { id: 1, label: '1️⃣ Nivel 1 (Piso / Base)', help: 'N1 siempre es abajo' },
+  { id: 2, label: '2️⃣ Nivel 2 (Bajo)', help: 'Segunda balda desde abajo' },
+  { id: 3, label: '3️⃣ Nivel 3 (Medio)', help: 'A la altura de las manos y vista' },
+  { id: 4, label: '4️⃣ Nivel 4 (Medio-Alto)', help: 'Balda superior media' },
+  { id: 5, label: '5️⃣ Nivel 5 (Alto)', help: 'Balda superior' },
+  { id: 6, label: '6️⃣ Nivel 6 (Tope / Arriba)', help: 'Arriba del todo' }
 ];
-const LOCATION_POSITION_OPTIONS = [
-  { id: 'left', label: 'Izquierda', help: 'Lado izquierdo del nivel' },
-  { id: 'middle', label: 'Medio', help: 'Centro del nivel' },
-  { id: 'right', label: 'Derecha', help: 'Lado derecho del nivel' }
+
+const LOCATION_SECTOR_OPTIONS = [
+  { id: 'I', label: '⬅️ Izquierda (I)', help: 'Sector izquierdo de la balda' },
+  { id: 'C', label: '⏺️ Centro (C)', help: 'Sector centro de la balda' },
+  { id: 'D', label: '➡️ Derecha (D)', help: 'Sector derecho de la balda' }
 ];
+
 const LOCATION_SHELF_LABELS = {
-  'A-1': 'Vitrina principal', 'A-2': 'Vitrina secundaria',
-  'B-1': 'Pasillo botánico norte', 'B-2': 'Pasillo botánico sur',
-  'C-1': 'Módulo indoor superior', 'C-2': 'Módulo indoor inferior',
-  'D-1': 'Semillas y reservados', 'D-2': 'Depósito de insumos',
-  'E-1': 'Coffee Lounge 1', 'E-2': 'Coffee Lounge 2'
+  'E1': 'Estante 1',
+  'E2': 'Estante 2',
+  'E3': 'Estante 3',
+  'E4': 'Estante 4',
+  'E5': 'Estante 5',
+  'HEL1': 'Heladera 1',
+  'VIT1': 'Vitrina 1',
+  'PIS1': 'Pallet 1'
 };
 
 let mobileProductAssistantStep = 'method';
@@ -2194,16 +2281,19 @@ function createEmptyLocationAssistantState() {
   return {
     step: 'list',
     product: null,
-    area: null,
+    zone: null,
+    type: null,
+    compass: null,
     wall: null,
-    shelfCode: '',
+    shelfCode: 'E1',
     level: null,
-    position: null,
+    sector: null,
     photoBlob: null,
     photoPreviewUrl: '',
     photoPath: null
   };
 }
+
 
 function escapeStockHtml(value) {
   return String(value ?? '')
@@ -3461,6 +3551,7 @@ async function submitProductDraft(event) {
       market_reference_url: marketResult.search_url || null,
       market_average_price: Number(document.getElementById('fastupload-market-price-input').value) || null,
       sale_price: salePriceVal,
+      expiration_date: document.getElementById('fastupload-expiry-input')?.value || null,
       floor_level: floorVal,
       shelf_code: shelfVal || null,
       shelf_level: shelfLevelVal,
@@ -3651,59 +3742,155 @@ function renderLocationChoiceCards(question, help, choices, handlerName) {
     </div>`;
 }
 
-function getLocationAreaById(areaId) {
-  return LOCATION_AREA_OPTIONS.find(option => option.id === areaId) || null;
+function getLocationZoneById(zoneId) {
+  return LOCATION_ZONE_OPTIONS.find(option => option.id === zoneId) || null;
 }
 
 function getLocationShelfChoices() {
-  const area = locationAssistantState.area;
-  if (!area) return [];
-  return area.shelves.map((shelfCode, index) => ({
-    id: shelfCode,
-    label: `Estante ${index + 1} · ${shelfCode}`,
-    help: LOCATION_SHELF_LABELS[shelfCode] || 'Estante del sector'
-  }));
+  return LOCATION_SHELF_OPTIONS;
 }
 
 function getLocationRouteLabels() {
   const state = locationAssistantState;
   return [
-    state.area?.label,
+    state.zone?.label,
+    state.type?.label,
+    state.compass?.label,
     state.wall?.label,
-    state.shelfCode ? `${state.shelfCode} · ${LOCATION_SHELF_LABELS[state.shelfCode] || 'Estante'}` : null,
-    state.level?.label ? `Nivel ${state.level.label.toLowerCase()}` : null,
-    state.position?.label
+    state.shelfCode ? (LOCATION_SHELF_LABELS[state.shelfCode] || `Estante ${state.shelfCode}`) : null,
+    state.level?.label || (state.level?.id ? `Nivel ${state.level.id}` : null),
+    state.sector?.label
   ].filter(Boolean);
 }
 
-function renderLocationPhotoStep() {
-  const state = locationAssistantState;
-  return `
-    ${renderLocationAssistantProductHeader()}
-    <p class="assistant-question">Agregá una foto de cómo quedó ubicado</p>
-    <p class="assistant-help">Mostrá el producto y parte del estante. La imagen se comprime automáticamente.</p>
-    ${state.photoPreviewUrl ? `<img class="location-photo-preview" src="${escapeStockHtml(state.photoPreviewUrl)}" alt="Vista previa de la ubicación">` : ''}
-    <div class="assistant-choice-grid">
-      <button type="button" class="assistant-choice-card" onclick="openLocationAssistantPhotoPicker('location-assistant-camera-input')">
-        <span class="assistant-choice-icon" aria-hidden="true">◉</span><strong>Sacar foto</strong><small>Usar la cámara del teléfono</small>
-      </button>
-      <button type="button" class="assistant-choice-card" onclick="openLocationAssistantPhotoPicker('location-assistant-gallery-input')">
-        <span class="assistant-choice-icon" aria-hidden="true">▣</span><strong>Elegir de galería</strong><small>Seleccionar una imagen guardada</small>
-      </button>
-      ${state.product?.image_url ? `<button type="button" class="assistant-choice-card" onclick="useExistingProductPhotoForLocation()"><span class="assistant-choice-icon" aria-hidden="true">↺</span><strong>Usar foto actual</strong><small>No sacar una imagen nueva</small></button>` : ''}
-    </div>`;
+function printLocationQrLabel(wmsCode, locationLabel) {
+  const qrSvgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(wmsCode)}`;
+  const win = window.open('', '_blank', 'width=450,height=550');
+  if (!win) {
+    showToast('Habilitá las ventanas emergentes para imprimir la etiqueta.');
+    return;
+  }
+  win.document.write(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="utf-8">
+      <title>Etiqueta WMS · ${escapeStockHtml(wmsCode)}</title>
+      <style>
+        @page { size: 60mm 60mm; margin: 4mm; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; margin: 0; padding: 6px; }
+        .label-card { border: 2.5px solid #152d24; border-radius: 10px; padding: 8px; }
+        .brand { font-size: 0.75rem; font-weight: 800; color: #152d24; text-transform: uppercase; letter-spacing: 0.5px; }
+        .wms-code { font-size: 1.25rem; font-weight: 900; color: #152d24; margin: 6px 0; font-family: monospace; letter-spacing: 1px; border: 1.5px dashed #c2a246; padding: 4px; border-radius: 6px; background: #fdfbf7; }
+        .qr-img { width: 130px; height: 130px; display: block; margin: 6px auto; }
+        .loc-desc { font-size: 0.75rem; font-weight: 600; color: #5c3b1e; margin-top: 4px; line-height: 1.2; }
+      </style>
+    </head>
+    <body onload="window.print();">
+      <div class="label-card">
+        <div class="brand">🌿 BÔ GROW CLUB · ESTANTERÍAS</div>
+        <div class="wms-code">${escapeStockHtml(wmsCode)}</div>
+        <img class="qr-img" src="${qrSvgUrl}" alt="QR ${escapeStockHtml(wmsCode)}">
+        <div class="loc-desc">${escapeStockHtml(locationLabel)}</div>
+      </div>
+    </body>
+    </html>
+  `);
+  win.document.close();
 }
 
 function renderLocationReviewStep() {
   const state = locationAssistantState;
-  const route = getLocationRouteLabels();
+  const zone = state.zone || LOCATION_ZONE_OPTIONS[0];
+  const type = state.type || LOCATION_TYPE_OPTIONS[0];
+  const compass = state.compass || LOCATION_COMPASS_OPTIONS[0];
+  const wall = state.wall || LOCATION_WALL_OPTIONS[0];
+  const shelf = state.shelfCode || 'E1';
+  const level = state.level || LOCATION_LEVEL_OPTIONS[0];
+  const sector = state.sector || LOCATION_SECTOR_OPTIONS[0];
+
+  const zonePrefix = zone.prefix || 'TI';
+  const compassCode = compass.id || 'D';
+  const wallCode = wall.id || 'P1';
+  const levelNum = Number(level.id) || 1;
+  const sectorCode = sector.id || 'C';
+
+  // Código estándar: TI-D-P1-E2-N3-C
+  const wmsCode = `${zonePrefix}-${compassCode}-${wallCode}-${shelf}-N${levelNum}-${sectorCode}`;
+  const shelfName = LOCATION_SHELF_LABELS[shelf] || shelf;
+  const locationLabel = `📍 ${zone.label} · ${compass.compass} de la PC · ${wall.label} · ${shelfName} · Nivel ${levelNum} · Sector ${sector.label}`;
+  
+  const zoneNoun = zonePrefix === 'DP' ? 'el depósito' : 'la tienda';
+  const voicePhrase = `Está en ${zoneNoun}, a la ${compass.compass.toLowerCase()} de la PC, ${wall.label.toLowerCase()}, ${shelfName.toLowerCase()}, nivel ${levelNum}, sector ${sector.label.toLowerCase()}.`;
+
   return `
     ${renderLocationAssistantProductHeader()}
-    <p class="assistant-question">Confirmá la ubicación</p>
-    <p class="assistant-help">Al guardar, desaparecerá de pendientes y quedará disponible en el mapa.</p>
-    ${state.photoPreviewUrl ? `<img class="location-photo-preview" src="${escapeStockHtml(state.photoPreviewUrl)}" alt="Foto elegida para la ubicación">` : ''}
-    <div class="assistant-route-card">
-      ${route.map((label, index) => `<div class="assistant-review-row"><span>Paso ${index + 1}</span><strong>${escapeStockHtml(label)}</strong></div>`).join('')}
+    <p class="assistant-question">Paso 6: El sistema generó el código</p>
+    <p class="assistant-help">Ubicación estructurada con la PC central como punto de referencia. Código para QR y respuesta guiada por voz.</p>
+    
+    <div style="background: rgba(255, 253, 246, 0.98); border: 2px solid var(--vendor-gold); border-radius: 16px; padding: 18px; margin-bottom: 16px; box-shadow: 0 4px 14px rgba(92,59,30,0.08);">
+      
+      <!-- Código WMS Destacado -->
+      <div style="text-align: center; padding: 14px; background: #152d24; border-radius: 12px; margin-bottom: 14px; border: 2px solid var(--vendor-gold);">
+        <small style="color: var(--vendor-gold); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px;">Código de Estantería Generado</small>
+        <span style="font-size: 1.5rem; font-family: monospace; font-weight: 900; color: #ffffff; letter-spacing: 2px;">${escapeStockHtml(wmsCode)}</span>
+      </div>
+
+      <!-- Cuadrícula Desglosada -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 14px;">
+        <div style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3);">
+          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">1. Zona</small>
+          <strong style="color: var(--vendor-forest); font-size: 0.85rem;">${escapeStockHtml(zone.label || '-')}</strong>
+        </div>
+        <div style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3);">
+          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">2. Tipo</small>
+          <strong style="color: var(--vendor-forest); font-size: 0.85rem;">${escapeStockHtml(type.label || '-')}</strong>
+        </div>
+        <div style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3);">
+          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">3. Brújula PC</small>
+          <strong style="color: var(--vendor-forest); font-size: 0.85rem;">${escapeStockHtml(compass.label || '-')}</strong>
+        </div>
+        <div style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3);">
+          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">4. Pared</small>
+          <strong style="color: var(--vendor-forest); font-size: 0.85rem;">${escapeStockHtml(wall.label || '-')}</strong>
+        </div>
+        <div style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3);">
+          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">5. Mueble</small>
+          <strong style="color: var(--vendor-forest); font-size: 0.85rem;">${escapeStockHtml(shelfName)}</strong>
+        </div>
+        <div style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3);">
+          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">6. Nivel</small>
+          <strong style="color: var(--vendor-forest); font-size: 0.85rem;">Nivel ${levelNum}</strong>
+        </div>
+        <div style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3);">
+          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">7. Sector</small>
+          <strong style="color: var(--vendor-forest); font-size: 0.85rem;">${escapeStockHtml(sector.label || '-')}</strong>
+        </div>
+      </div>
+
+      <!-- Tarjeta Guía por Voz (Panel 8) -->
+      <div style="padding: 12px; background: rgba(30, 70, 32, 0.08); border-radius: 12px; border-left: 4px solid var(--vendor-forest); margin-bottom: 12px;">
+        <span style="font-size: 0.75rem; color: var(--vendor-forest); font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; display: block;">🎙️ Búsqueda por Voz / Guía Asistente</span>
+        <strong style="font-size: 0.95rem; color: var(--vendor-ink); display: block; margin: 4px 0; font-style: italic;">“${escapeStockHtml(voicePhrase)}”</strong>
+      </div>
+
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <button type="button" class="mobile-assistant-primary" onclick="persistLocationAssistant()" style="width: 100%; padding: 16px; font-size: 1.05rem; font-weight: 800; border-radius: 14px; background: var(--vendor-forest); color: #ffffff; cursor: pointer; border: none; box-shadow: 0 4px 14px rgba(21,45,36,0.2);">
+        💾 Guardar Ubicación
+      </button>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <button type="button" class="assistant-choice-card" onclick="printLocationQrLabel('${escapeStockHtml(wmsCode)}', '${escapeStockHtml(locationLabel)}')" style="padding: 10px; justify-content: center; align-items: center; text-align: center; background: #fffdfa; border: 1.5px solid var(--vendor-gold);">
+          <span style="font-size: 1.2rem;">🖨️</span>
+          <strong style="font-size: 0.82rem; color: var(--vendor-forest);">Imprimir Etiqueta QR</strong>
+        </button>
+        <button type="button" class="assistant-choice-card" onclick="openLocationAssistantPhotoPicker('location-assistant-camera-input')" style="padding: 10px; justify-content: center; align-items: center; text-align: center;">
+          <span style="font-size: 1.2rem;">📸</span>
+          <strong style="font-size: 0.82rem; color: var(--vendor-forest);">Foto de Referencia</strong>
+        </button>
+      </div>
     </div>`;
 }
 
@@ -3714,38 +3901,41 @@ function renderLocationAssistant() {
   const nav = document.getElementById('location-assistant-nav');
   if (!content) return;
   const step = locationAssistantState.step;
-  const choiceSteps = ['area', 'wall', 'shelf', 'level', 'position'];
+  const choiceSteps = ['zone', 'type', 'compass', 'wall', 'shelf', 'level', 'sector'];
   const primaryButton = nav?.querySelector('.mobile-assistant-primary');
   if (count) count.textContent = `${pendingLocationProducts.length} pendiente${pendingLocationProducts.length === 1 ? '' : 's'}`;
-  if (nav) nav.hidden = step === 'list';
+  if (nav) nav.hidden = step === 'list' || step === 'review';
   if (primaryButton) {
     primaryButton.hidden = choiceSteps.includes(step);
     primaryButton.textContent = step === 'review' ? 'Guardar ubicación' : 'Continuar';
   }
 
   if (step === 'list') {
-    if (title) title.textContent = 'Elegí un producto';
+    if (title) title.textContent = 'Elegí un producto a ubicar';
     content.innerHTML = renderPendingLocationList();
-  } else if (step === 'area') {
-    if (title) title.textContent = 'Sector del local';
-    content.innerHTML = renderLocationChoiceCards('¿En qué sector estás?', 'Elegí el sector donde vas a guardar el producto.', LOCATION_AREA_OPTIONS, 'chooseLocationAssistantArea');
+  } else if (step === 'zone') {
+    if (title) title.textContent = 'Paso 1: ¿Está en TIENDA o en DEPÓSITO?';
+    content.innerHTML = renderLocationChoiceCards('1. Elegí la zona', '¿Está en TIENDA o en DEPÓSITO? (Ambos tienen la PC al centro)', LOCATION_ZONE_OPTIONS, 'chooseLocationAssistantZone');
+  } else if (step === 'type') {
+    if (title) title.textContent = 'Paso 2: ¿Dónde lo guardaste? (Tipo de ubicación)';
+    content.innerHTML = renderLocationChoiceCards('2. Elegí el tipo de ubicación', '¿Dónde lo guardaste? (Estante, Heladera, Vitrina, Góndola o Piso)', LOCATION_TYPE_OPTIONS, 'chooseLocationAssistantType');
+  } else if (step === 'compass') {
+    if (title) title.textContent = 'Paso 3: La PC es la brújula';
+    content.innerHTML = renderLocationChoiceCards('3. La PC es la brújula', '¿Está a la derecha, izquierda, frente o atrás de la PC central?', LOCATION_COMPASS_OPTIONS, 'chooseLocationAssistantCompass');
   } else if (step === 'wall') {
-    if (title) title.textContent = 'Pared o sector';
-    content.innerHTML = renderLocationChoiceCards('¿De qué lado está el mueble?', 'Tomá como referencia la entrada principal.', LOCATION_WALL_OPTIONS, 'chooseLocationAssistantWall');
+    if (title) title.textContent = 'Paso 4: Elegí la pared';
+    content.innerHTML = renderLocationChoiceCards('4. Elegí la pared', 'Pared 1 (Frente), Pared 2 (Fondo), Pared 3 (Derecha) o Pared 4 (Izquierda)', LOCATION_WALL_OPTIONS, 'chooseLocationAssistantWall');
   } else if (step === 'shelf') {
-    if (title) title.textContent = 'Elegir estante';
-    content.innerHTML = renderLocationChoiceCards('¿En qué estante?', 'Los códigos coinciden con el mapa del local.', getLocationShelfChoices(), 'chooseLocationAssistantShelf');
+    if (title) title.textContent = 'Paso 4b: Elegí el mueble o estante';
+    content.innerHTML = renderLocationChoiceCards('4b. Elegí el mueble', '¿Qué número de estante o módulo específico es?', LOCATION_SHELF_OPTIONS, 'chooseLocationAssistantShelf');
   } else if (step === 'level') {
-    if (title) title.textContent = 'Nivel del estante';
-    content.innerHTML = renderLocationChoiceCards('¿En qué nivel?', 'Elegí la altura donde queda el producto.', LOCATION_LEVEL_OPTIONS, 'chooseLocationAssistantLevel');
-  } else if (step === 'position') {
-    if (title) title.textContent = 'Posición exacta';
-    content.innerHTML = renderLocationChoiceCards('¿En qué parte del nivel?', 'Esto ayuda a encontrarlo sin revisar todo el estante.', LOCATION_POSITION_OPTIONS, 'chooseLocationAssistantPosition');
-  } else if (step === 'photo') {
-    if (title) title.textContent = 'Foto de referencia';
-    content.innerHTML = renderLocationPhotoStep();
+    if (title) title.textContent = 'Paso 5: Elegí el nivel de altura (N1 al N6)';
+    content.innerHTML = renderLocationChoiceCards('5. Elegí el nivel (N1 siempre es abajo)', 'Desde Nivel 1 (Piso/Base) hasta Nivel 6 (Tope superior)', LOCATION_LEVEL_OPTIONS, 'chooseLocationAssistantLevel');
+  } else if (step === 'sector') {
+    if (title) title.textContent = 'Paso 5b: Elegí el sector dentro del nivel';
+    content.innerHTML = renderLocationChoiceCards('5b. Elegí el sector horizontal', 'En cada nivel elegí el sector: Izquierda (I), Centro (C) o Derecha (D)', LOCATION_SECTOR_OPTIONS, 'chooseLocationAssistantSector');
   } else {
-    if (title) title.textContent = 'Revisar y guardar';
+    if (title) title.textContent = 'Paso 6: El sistema genera el código';
     content.innerHTML = renderLocationReviewStep();
   }
 }
@@ -3779,14 +3969,30 @@ function selectPendingLocationProduct(draftId) {
     showToast('Ese producto ya no está pendiente. Actualizá la lista.');
     return;
   }
-  locationAssistantState = { ...createEmptyLocationAssistantState(), step: 'area', product };
+  locationAssistantState = { ...createEmptyLocationAssistantState(), step: 'zone', product };
   renderLocationAssistant();
 }
 
-function chooseLocationAssistantArea(areaId) {
-  const area = getLocationAreaById(areaId);
-  if (!area) return;
-  locationAssistantState.area = area;
+function chooseLocationAssistantZone(zoneId) {
+  const zone = getLocationZoneById(zoneId);
+  if (!zone) return;
+  locationAssistantState.zone = zone;
+  locationAssistantState.step = 'type';
+  renderLocationAssistant();
+}
+
+function chooseLocationAssistantType(typeId) {
+  const type = LOCATION_TYPE_OPTIONS.find(option => option.id === typeId);
+  if (!type) return;
+  locationAssistantState.type = type;
+  locationAssistantState.step = 'compass';
+  renderLocationAssistant();
+}
+
+function chooseLocationAssistantCompass(compassId) {
+  const compass = LOCATION_COMPASS_OPTIONS.find(option => option.id === compassId);
+  if (!compass) return;
+  locationAssistantState.compass = compass;
   locationAssistantState.step = 'wall';
   renderLocationAssistant();
 }
@@ -3800,8 +4006,9 @@ function chooseLocationAssistantWall(wallId) {
 }
 
 function chooseLocationAssistantShelf(shelfCode) {
-  if (!getLocationShelfChoices().some(option => option.id === shelfCode)) return;
-  locationAssistantState.shelfCode = shelfCode;
+  const shelf = LOCATION_SHELF_OPTIONS.find(option => option.id === shelfCode);
+  if (!shelf) return;
+  locationAssistantState.shelfCode = shelf.id;
   locationAssistantState.step = 'level';
   renderLocationAssistant();
 }
@@ -3810,15 +4017,15 @@ function chooseLocationAssistantLevel(levelId) {
   const level = LOCATION_LEVEL_OPTIONS.find(option => String(option.id) === String(levelId));
   if (!level) return;
   locationAssistantState.level = level;
-  locationAssistantState.step = 'position';
+  locationAssistantState.step = 'sector';
   renderLocationAssistant();
 }
 
-function chooseLocationAssistantPosition(positionId) {
-  const position = LOCATION_POSITION_OPTIONS.find(option => option.id === positionId);
-  if (!position) return;
-  locationAssistantState.position = position;
-  locationAssistantState.step = 'photo';
+function chooseLocationAssistantSector(sectorId) {
+  const sector = LOCATION_SECTOR_OPTIONS.find(option => option.id === sectorId);
+  if (!sector) return;
+  locationAssistantState.sector = sector;
+  locationAssistantState.step = 'review';
   renderLocationAssistant();
 }
 
@@ -3906,9 +4113,6 @@ async function uploadLocationAssistantPhoto(productCode) {
 }
 
 async function upsertProductLocationWithFallback(location) {
-  // La instalación actual persiste la ubicación dentro del borrador aprobado.
-  // Conservamos además una copia local para que el mapa responda de inmediato,
-  // sin consultar la tabla opcional product_locations cuando todavía no existe.
   saveLocalProductLocation(location);
   return null;
 }
@@ -3936,7 +4140,7 @@ async function persistLocationAssistant() {
   const state = locationAssistantState;
   const draft = state.product;
   const status = document.getElementById('location-assistant-status');
-  if (!draft || !state.area || !state.wall || !state.shelfCode || !state.level || !state.position || !state.photoPreviewUrl) {
+  if (!draft || !state.zone || !state.compass || !state.wall || !state.shelfCode || !state.level || !state.sector) {
     showToast('Completá todos los pasos antes de guardar.');
     return;
   }
@@ -3944,20 +4148,39 @@ async function persistLocationAssistant() {
     if (status) {
       status.hidden = false;
       status.dataset.state = 'loading';
-      status.textContent = 'Guardando la ubicación y actualizando el mapa…';
+      status.textContent = 'Guardando la ubicación y actualizando el stock…';
     }
     const productCode = draft.product_code || draft.id;
     const photo = await uploadLocationAssistantPhoto(productCode);
-    const routeLabels = getLocationRouteLabels();
-    const locationLabel = routeLabels.join(' → ');
+
+    const zone = state.zone;
+    const type = state.type || LOCATION_TYPE_OPTIONS[0];
+    const compass = state.compass;
+    const wall = state.wall;
+    const shelf = state.shelfCode;
+    const level = state.level;
+    const sector = state.sector;
+    const levelNum = Number(level.id) || 1;
+    const floorLevel = zone.floor_level || (zone.id === 'DP' ? 2 : 1);
+
+    const zonePrefix = zone.prefix || 'TI';
+    const compassCode = compass.id || 'D';
+    const wallCode = wall.id || 'P1';
+    const sectorCode = sector.id || 'C';
+    const shelfLabel = LOCATION_SHELF_LABELS[shelf] || shelf;
+
+    // Código estándar oficial: TI-D-P1-E2-N3-C
+    const wmsCode = `${zonePrefix}-${compassCode}-${wallCode}-${shelf}-N${levelNum}-${sectorCode}`;
+    const locationLabel = `📍 ${zone.label} · ${compass.compass} de la PC · ${wall.label} · ${shelfLabel} · Nivel ${levelNum} · Sector ${sector.label}`;
+
     const updatedAt = new Date().toISOString();
     const overrides = {
-      floor_level: 1,
-      shelf_code: state.shelfCode,
-      shelf_level: Number(state.level.id),
-      location_area: state.area.label,
-      location_wall: state.wall.label,
-      shelf_position: state.position.label,
+      floor_level: floorLevel,
+      shelf_code: `${wallCode}-${shelf}`,
+      shelf_level: levelNum,
+      location_area: zone.label,
+      location_wall: wall.label,
+      shelf_position: sector.label,
       placement_photo_url: photo.url,
       placement_photo_path: photo.path,
       location_label: locationLabel,
@@ -3967,44 +4190,51 @@ async function persistLocationAssistant() {
     const observations = serializeLocationDraftObservations(draft, metadata);
     const draftUpdate = {
       location: locationLabel,
-      floor_level: 1,
-      shelf_code: state.shelfCode,
-      shelf_level: Number(state.level.id),
+      floor_level: floorLevel,
+      shelf_code: `${wallCode}-${shelf}`,
+      shelf_level: levelNum,
       observations,
       updated_at: updatedAt
     };
     await updateDraftLocationWithFallback(draft, draftUpdate, observations);
 
-    if (draft.status === 'APPROVED') {
-      const productLocation = {
-        product_id: productCode,
-        product_code: productCode,
-        name: draft.name || productCode,
-        image_url: draft.image_url || photo.url,
-        barcode: draft.barcode || null,
-        floor_level: 1,
-        shelf_code: state.shelfCode,
-        shelf_level: Number(state.level.id),
-        stock: Math.max(0, Number(draft.stock) || 0),
-        qr_payload: draft.qr_payload || buildProductQrPayload(productCode),
-        area_name: state.area.label,
-        wall_side: state.wall.label,
-        shelf_position: state.position.label,
-        placement_photo_url: photo.url,
-        placement_photo_path: photo.path,
-        location_label: locationLabel,
-        updated_at: updatedAt
-      };
-      const locationError = await upsertProductLocationWithFallback(productLocation);
-      if (locationError) console.warn('La ubicación quedó local hasta sincronizar la tabla:', locationError.message);
+    const productLocation = {
+      product_id: productCode,
+      product_code: productCode,
+      name: draft.name || productCode,
+      image_url: draft.image_url || photo.url,
+      barcode: draft.barcode || null,
+      floor_level: floorLevel,
+      shelf_code: `${wallCode}-${shelf}`,
+      shelf_level: levelNum,
+      stock: Math.max(0, Number(draft.stock) || 0),
+      qr_payload: draft.qr_payload || buildProductQrPayload(productCode),
+      area_name: zone.label,
+      wall_side: wall.label,
+      shelf_position: sector.label,
+      placement_photo_url: photo.url,
+      placement_photo_path: photo.path,
+      location_label: locationLabel,
+      updated_at: updatedAt
+    };
+    saveLocalProductLocation(productLocation);
+
+    if (Array.isArray(internalCatalogProducts)) {
+      const internalItem = internalCatalogProducts.find(p => p.id === draft.id || p.product_code === productCode || p.barcode === draft.barcode);
+      if (internalItem) {
+        internalItem.location = locationLabel;
+        internalItem.location_label = locationLabel;
+        internalItem.shelf_code = `${wallCode}-${shelf}`;
+        internalItem.shelf_level = levelNum;
+      }
     }
 
     storeMapDataLoaded = false;
-    showToast(`Ubicación guardada: ${locationLabel}.`);
+    showToast(`✅ Ubicación guardada: ${wmsCode}`);
     if (status) {
       status.hidden = false;
       status.dataset.state = 'success';
-      status.textContent = 'Producto ubicado correctamente. Cargando el siguiente pendiente…';
+      status.textContent = 'Producto ubicado correctamente. Cargando siguientes…';
     }
     await loadPendingLocationProducts();
   } catch (error) {
@@ -4019,13 +4249,10 @@ async function persistLocationAssistant() {
 
 function continueLocationAssistant() {
   if (locationAssistantState.step === 'photo') {
-    if (!locationAssistantState.photoPreviewUrl) {
-      showToast('Sacá, elegí o reutilizá una foto antes de continuar.');
-      return;
-    }
     locationAssistantState.step = 'review';
     renderLocationAssistant();
   } else if (locationAssistantState.step === 'review') {
+
     persistLocationAssistant();
   }
 }
@@ -4080,7 +4307,7 @@ async function loadPendingProductDrafts() {
     container.innerHTML = normalizedDrafts.map(draft => {
       const dateStr = new Date(draft.created_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
       return `
-        <div style="background: var(--color-card-bg-alt); border: 1.5px solid var(--color-border-accent); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-sm);">
+        <div style="background: #ffffff; border: 1.5px solid #d4c5a9; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 4px 14px rgba(92,59,30,0.08);">
           <div style="aspect-ratio: 1/1; max-height: 200px; background: #000; position: relative; overflow: hidden;">
             <img src="${escapeStockHtml(draft.image_url)}" alt="${escapeStockHtml(draft.name || 'Foto del producto')}" style="width: 100%; height: 100%; object-fit: contain;">
             <span style="position: absolute; top: 8px; left: 8px; background: rgba(21,45,36,0.9); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 8px;">
@@ -4089,37 +4316,37 @@ async function loadPendingProductDrafts() {
           </div>
 
           <div style="padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 10px;">
-            <div style="background: rgba(195,155,75,0.1); border: 1px solid rgba(195,155,75,0.3); border-radius: 10px; padding: 8px 12px; font-size: 0.8rem;">
-              <p style="margin: 0 0 4px 0; color: #fff;"><strong>📦 Stock Cargado:</strong> ${draft.stock} unidades</p>
-              <p style="margin: 0 0 4px 0; color: #fff;"><strong>📍 Ubicación:</strong> ${escapeStockHtml(draft.location || 'No especificada')}</p>
-              ${draft.product_code ? `<p style="margin: 0 0 4px; color: #fff;"><strong>QR BÔ:</strong> ${escapeStockHtml(draft.product_code)}</p>` : ''}
-              ${draft.barcode ? `<p style="margin: 0 0 4px; color: #fff;"><strong>Barra:</strong> ${escapeStockHtml(draft.barcode)}</p>` : ''}
-              ${draft.market_average_price ? `<p style="margin: 0 0 4px; color: #fff;"><strong>Promedio ML:</strong> $${Number(draft.market_average_price).toLocaleString('es-AR')}</p>` : ''}
-              ${draft.observations ? `<p style="margin: 0; color: rgba(247,246,242,0.8); font-style: italic;">${escapeStockHtml(draft.observations)}</p>` : ''}
+            <div style="background: #f7f4ea; border: 1px solid rgba(194,162,70,0.4); border-radius: 12px; padding: 10px 14px; font-size: 0.82rem; color: #5c3b1e;">
+              <p style="margin: 0 0 4px 0; color: #5c3b1e;"><strong>📦 Stock Cargado:</strong> ${draft.stock} unidades</p>
+              <p style="margin: 0 0 4px 0; color: #5c3b1e;"><strong>📍 Ubicación:</strong> ${escapeStockHtml(draft.location || 'No especificada')}</p>
+              ${draft.product_code ? `<p style="margin: 0 0 4px; color: #5c3b1e;"><strong>QR BÔ:</strong> ${escapeStockHtml(draft.product_code)}</p>` : ''}
+              ${draft.barcode ? `<p style="margin: 0 0 4px; color: #5c3b1e;"><strong>Barra:</strong> ${escapeStockHtml(draft.barcode)}</p>` : ''}
+              ${draft.market_average_price ? `<p style="margin: 0 0 4px; color: #5c3b1e;"><strong>Promedio ML:</strong> $${Number(draft.market_average_price).toLocaleString('es-AR')}</p>` : ''}
+              ${draft.observations ? `<p style="margin: 0; color: #6b4e2e; font-style: italic;">${escapeStockHtml(draft.observations)}</p>` : ''}
             </div>
 
             <div>
-              <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--color-accent-gold); margin-bottom: 2px;">Nombre del Producto (Requerido) *</label>
-              <input type="text" id="draft-name-${draft.id}" value="${escapeStockHtml(draft.name || '')}" placeholder="Ej: Sustrato Klasmann 50L" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.9rem; border-radius: 8px;">
+              <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #5c3b1e; margin-bottom: 2px;">Nombre del Producto (Requerido) *</label>
+              <input type="text" id="draft-name-${draft.id}" value="${escapeStockHtml(draft.name || '')}" placeholder="Ej: Sustrato Klasmann 50L" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.9rem; border-radius: 8px; color: #3e2723; background: #fffdfa; border: 1.5px solid #d4c5a9;">
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
               <div>
-                <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--color-accent-gold); margin-bottom: 2px;">Categoría *</label>
-                <select id="draft-cat-${draft.id}" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.85rem; border-radius: 8px;">
+                <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #5c3b1e; margin-bottom: 2px;">Categoría *</label>
+                <select id="draft-cat-${draft.id}" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.85rem; border-radius: 8px; color: #3e2723; background: #fffdfa; border: 1.5px solid #d4c5a9;">
                   ${categoriesList.map(cat => `<option value="${cat}" ${draft.category === cat ? 'selected' : ''}>${cat}</option>`).join('')}
                 </select>
               </div>
 
               <div>
-                <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--color-accent-gold); margin-bottom: 2px;">Costo de Compra ($)</label>
-                <input type="number" step="0.01" id="draft-cost-${draft.id}" placeholder="Ej: 15000" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.85rem; border-radius: 8px;">
+                <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #5c3b1e; margin-bottom: 2px;">Costo de Compra ($)</label>
+                <input type="number" step="0.01" id="draft-cost-${draft.id}" placeholder="Ej: 15000" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.85rem; border-radius: 8px; color: #3e2723; background: #fffdfa; border: 1.5px solid #d4c5a9;">
               </div>
             </div>
 
             <div>
-              <label style="display: block; font-size: 0.78rem; font-weight: 800; color: #66bb6a; margin-bottom: 2px;">PRECIO FINAL AL PÚBLICO ($ ARS) *</label>
-              <input type="number" step="0.01" id="draft-price-${draft.id}" value="${Number(draft.sale_price) || ''}" placeholder="Ej: 22500" required class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 1rem; font-weight: 800; border-radius: 8px; border-color: #66bb6a;">
+              <label style="display: block; font-size: 0.78rem; font-weight: 800; color: #2e7d32; margin-bottom: 2px;">PRECIO FINAL AL PÚBLICO ($ ARS) *</label>
+              <input type="number" step="0.01" id="draft-price-${draft.id}" value="${Number(draft.sale_price) || ''}" placeholder="Ej: 22500" required class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 1rem; font-weight: 800; border-radius: 8px; border-color: #2e7d32; color: #1b5e20; background: #f1f8e9;">
             </div>
 
             <div style="display: flex; gap: 8px; margin-top: 6px;">
@@ -4504,40 +4731,66 @@ function normalizeInternalCatalogProduct(supplier, product, draft, location) {
 
 async function loadInternalCatalog() {
   const grid = document.getElementById('internal-catalog-grid');
-  if (!grid || !supabaseClient) return;
-  setInternalCatalogStatus('Cargando los productos propios de la tienda…', 'loading');
-  grid.innerHTML = '';
+  if (grid) {
+    setInternalCatalogStatus('Cargando los productos propios de la tienda…', 'loading');
+    grid.innerHTML = '';
+  }
   try {
-    const { data: supplierRows, error } = await supabaseClient
-      .from('supplier_products')
-      .select('*')
-      .eq('supplier_id', 'local_store')
-      .order('name', { ascending: true });
-    if (error) throw new Error(error.message);
+    if (supabaseClient) {
+      const { data: supplierRows, error } = await supabaseClient
+        .from('supplier_products')
+        .select('*')
+        .eq('supplier_id', 'local_store')
+        .order('name', { ascending: true });
+      if (error) throw new Error(error.message);
 
-    const rows = supplierRows || [];
-    const productIds = internalCatalogProductIds(rows);
-    const related = await fetchInternalCatalogRelations(productIds);
-    const productsById = new Map(related.products.map(product => [String(product.id), product]));
-    const draftsByCode = new Map(related.drafts.map(draft => [String(draft.product_code), draft]));
-    const locationsByCode = new Map(readLocalProductLocations().map(location => [String(location.product_code), location]));
+      const rows = supplierRows || [];
+      const productIds = internalCatalogProductIds(rows);
+      const related = await fetchInternalCatalogRelations(productIds);
+      const productsById = new Map(related.products.map(product => [String(product.id), product]));
+      const draftsByCode = new Map(related.drafts.map(draft => [String(draft.product_code), draft]));
+      const locationsByCode = new Map(readLocalProductLocations().map(location => [String(location.product_code), location]));
 
-    internalCatalogProducts = rows.map(supplier => {
-      const productId = String(supplier.mapped_product_id || supplier.supplier_product_id);
-      return normalizeInternalCatalogProduct(
-        supplier,
-        productsById.get(productId),
-        draftsByCode.get(productId),
-        locationsByCode.get(productId)
-      );
-    });
+      internalCatalogProducts = rows.map(supplier => {
+        const productId = String(supplier.mapped_product_id || supplier.supplier_product_id);
+        return normalizeInternalCatalogProduct(
+          supplier,
+          productsById.get(productId),
+          draftsByCode.get(productId),
+          locationsByCode.get(productId)
+        );
+      });
 
-    populateInternalCatalogCategoryFilter();
-    renderInternalCatalogGrid();
-    setInternalCatalogStatus('');
+      try {
+        localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
+      } catch (_) {}
+    } else {
+      const cached = localStorage.getItem('boeweb_internal_catalog');
+      if (cached) {
+        try {
+          internalCatalogProducts = JSON.parse(cached);
+        } catch (_) {}
+      }
+    }
+
+    if (grid) {
+      populateInternalCatalogCategoryFilter();
+      renderInternalCatalogGrid();
+      setInternalCatalogStatus('');
+    }
   } catch (error) {
     console.error('Error al cargar el catálogo interno:', error);
-    setInternalCatalogStatus(`No se pudieron cargar los productos propios: ${error.message}`, 'error');
+    const cached = localStorage.getItem('boeweb_internal_catalog');
+    if (cached) {
+      try {
+        internalCatalogProducts = JSON.parse(cached);
+      } catch (_) {}
+    }
+    if (grid) {
+      populateInternalCatalogCategoryFilter();
+      renderInternalCatalogGrid();
+      setInternalCatalogStatus(`No se pudieron cargar los productos propios: ${error.message}`, 'error');
+    }
   }
 }
 
@@ -6090,6 +6343,201 @@ function navigateOnboardingStep(delta) {
     const name = document.getElementById('onb-input-name')?.value;
     const slug = document.getElementById('onb-input-slug')?.value;
     const email = document.getElementById('onb-input-email')?.value;
+  } else {
+    showToast(`🚨 Error al importar: ${res.error}`);
+  }
+}
+
+function triggerDemoRollback(versionId) {
+  const catalog = typeof currentProducts !== 'undefined' ? currentProducts : [];
+  const ctx = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : { tenantId: '11111111-1111-1111-1111-111111111111' };
+  const res = MigrationRollback.executeRollback(versionId, ctx.tenantId, catalog);
+
+  if (res.success) {
+    showToast(`↩️ Rollback ejecutado correctamente para la versión ${versionId}`);
+  } else {
+    showToast(`ℹ️ ${res.error}`);
+  }
+}
+
+window.startNewMigrationWizard = startNewMigrationWizard;
+window.selectMigrationType = selectMigrationType;
+window.navigateWizardStep = navigateWizardStep;
+window.handleMigrationSourceFile = handleMigrationSourceFile;
+window.demoSampleCsvImport = demoSampleCsvImport;
+window.executeMigrationImportApproved = executeMigrationImportApproved;
+window.triggerDemoRollback = triggerDemoRollback;
+
+/* ==========================================================================
+   BÔ GROW CLUB / PLATAFORMA SAAS — FASE 10 UI INTEGRATION (ONBOARDING WIZARD)
+   ========================================================================== */
+
+function startNewTenantOnboardingWizard() {
+  if (typeof TenantOnboarding === 'undefined') return;
+  const ctx = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : { userName: 'Profesor Franco' };
+  TenantOnboarding.initSession(ctx.userName);
+  renderOnboardingWizardStep(1);
+}
+
+function autoGenerateOnboardingSlug(val) {
+  const slugInput = document.getElementById('onb-input-slug');
+  if (slugInput) {
+    slugInput.value = String(val || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+  }
+}
+
+function renderOnboardingWizardStep(step) {
+  if (typeof TenantOnboarding === 'undefined') return;
+  const sess = TenantOnboarding.activeSession;
+  if (!sess) return;
+
+  sess.step_current = step;
+
+  const badgeEl = document.getElementById('onb-step-badge');
+  const titleEl = document.getElementById('onb-step-title');
+  const bodyEl = document.getElementById('onb-step-body');
+  const prevBtn = document.getElementById('onb-btn-prev');
+
+  if (badgeEl) badgeEl.textContent = `PASO ${step} DE 10`;
+  if (prevBtn) prevBtn.style.display = step > 1 ? 'inline-block' : 'none';
+
+  if (!bodyEl) return;
+
+  if (step === 1) {
+    if (titleEl) titleEl.textContent = 'Paso 1: Datos de la Empresa';
+    bodyEl.innerHTML = `
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <label class="b2b-field-label">Nombre Comercial del Negocio *</label>
+          <input type="text" id="onb-input-name" class="b2b-search-input" value="${sess.company_data.name || ''}" placeholder="Ej: Ferretería San Martín" oninput="autoGenerateOnboardingSlug(this.value)">
+        </div>
+        <div>
+          <label class="b2b-field-label">Slug Comercial (Único) *</label>
+          <input type="text" id="onb-input-slug" class="b2b-search-input" value="${sess.company_data.slug || ''}" placeholder="ferreteria-san-martin">
+        </div>
+        <div>
+          <label class="b2b-field-label">Email de Contacto *</label>
+          <input type="email" id="onb-input-email" class="b2b-search-input" value="${sess.company_data.email || ''}" placeholder="contacto@ferreteriasanmartin.com">
+        </div>
+        <div>
+          <label class="b2b-field-label">Moneda Principal</label>
+          <select id="onb-input-currency" class="b2b-search-input">
+            <option value="ARS" ${sess.company_data.currency === 'ARS' ? 'selected' : ''}>Pesos Argentinos (ARS $)</option>
+            <option value="USD" ${sess.company_data.currency === 'USD' ? 'selected' : ''}>Dólares Estadounidenses (USD $)</option>
+          </select>
+        </div>
+      </div>
+    `;
+  } else if (step === 2) {
+    if (titleEl) titleEl.textContent = 'Paso 2: Selección de Rubro (Business Vertical)';
+    bodyEl.innerHTML = `
+      <p style="font-size: 0.9rem; color: var(--vendor-muted); margin-bottom: 16px;">Seleccioná el rubro comercial almacenado dinámicamente en PostgreSQL:</p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div style="border: 2px solid ${sess.vertical_data.code === 'growshop' ? 'var(--vendor-gold)' : 'var(--vendor-line)'}; border-radius: 14px; padding: 18px; cursor: pointer; background: #faf8f2;" onclick="setOnboardingVertical('growshop', 'Growshop')">
+          <div style="font-size: 1.8rem; margin-bottom: 8px;">🌱</div>
+          <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">Growshop & Cultivo</h4>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Medición en Watts, Volts, volumen L/ml y compatibilidad con semillas/sustratos.</p>
+        </div>
+        <div style="border: 2px solid ${sess.vertical_data.code === 'ferreteria' ? 'var(--vendor-gold)' : 'var(--vendor-line)'}; border-radius: 14px; padding: 18px; cursor: pointer;" onclick="setOnboardingVertical('ferreteria', 'Ferretería')">
+          <div style="font-size: 1.8rem; margin-bottom: 8px;">🔧</div>
+          <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">Ferretería & Herramientas</h4>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Medición en mm/pulgadas, torque Nm, voltaje y marcas industriales.</p>
+        </div>
+      </div>
+    `;
+  } else if (step === 3) {
+    if (titleEl) titleEl.textContent = 'Paso 3: Branding & Perfil White-Label';
+    bodyEl.innerHTML = `
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <label class="b2b-field-label">Slogan o Subtítulo del Negocio</label>
+          <input type="text" id="onb-input-slogan" class="b2b-search-input" value="${sess.identity_data.slogan || ''}" placeholder="Ej: Calidad y precisión profesional">
+        </div>
+        <div>
+          <label class="b2b-field-label">Color Primario de la Marca</label>
+          <input type="color" id="onb-input-color" class="b2b-search-input" value="${sess.identity_data.theme_color || '#152d24'}" style="height: 42px; padding: 4px;">
+        </div>
+      </div>
+    `;
+  } else if (step === 4) {
+    if (titleEl) titleEl.textContent = 'Paso 4: Carga de Catálogo Inicial';
+    bodyEl.innerHTML = `
+      <p style="font-size: 0.9rem; color: var(--vendor-muted); margin-bottom: 16px;">Elegí cómo querés inicializar el catálogo de productos:</p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div style="border: 1px solid var(--vendor-line); border-radius: 14px; padding: 18px; cursor: pointer;" onclick="setOnboardingCatalogMode('EMPTY')">
+          <div style="font-size: 1.8rem; margin-bottom: 8px;">📝</div>
+          <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">Empezar Catálogo Vacío</h4>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Crear productos manualmente más adelante.</p>
+        </div>
+        <div style="border: 2px solid var(--vendor-gold); border-radius: 14px; padding: 18px; cursor: pointer; background: #faf8f2;" onclick="switchVendorTab('migration-center')">
+          <div style="font-size: 1.8rem; margin-bottom: 8px;">🤖</div>
+          <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">Importar con Migration Center IA</h4>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Usar CSV, XLSX, PDF o Imágenes escaneadas.</p>
+        </div>
+      </div>
+    `;
+  } else if (step === 7) {
+    if (titleEl) titleEl.textContent = 'Paso 7: Provisión de Usuarios & Roles RBAC';
+    bodyEl.innerHTML = `
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <label class="b2b-field-label">Nombre del Administrador Principal *</label>
+          <input type="text" id="onb-input-admin-name" class="b2b-search-input" value="${sess.users_data.admin_name || ''}" placeholder="Ej: Juan Pérez">
+        </div>
+        <div>
+          <label class="b2b-field-label">Email del Administrador Principal *</label>
+          <input type="email" id="onb-input-admin-email" class="b2b-search-input" value="${sess.users_data.admin_email || ''}" placeholder="admin@empresa.com">
+        </div>
+      </div>
+    `;
+  } else if (step === 8) {
+    if (titleEl) titleEl.textContent = 'Paso 8: Configuración del WMS & Depósito Físico';
+    bodyEl.innerHTML = `
+      <p style="font-size: 0.9rem; color: var(--vendor-muted); margin-bottom: 16px;">¿Este comercio requiere gestión de ubicaciones físicas por estantería / módulo / nivel?</p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div style="border: 2px solid ${!sess.wms_data.enabled ? 'var(--vendor-gold)' : 'var(--vendor-line)'}; border-radius: 14px; padding: 18px; cursor: pointer;" onclick="setOnboardingWmsToggle(false)">
+          <div style="font-size: 1.8rem; margin-bottom: 8px;">🏬</div>
+          <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">NO (Sin WMS Físico)</h4>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Operación comercial simple sin mapa de depósito.</p>
+        </div>
+        <div style="border: 2px solid ${sess.wms_data.enabled ? 'var(--vendor-gold)' : 'var(--vendor-line)'}; border-radius: 14px; padding: 18px; cursor: pointer; background: #faf8f2;" onclick="setOnboardingWmsToggle(true)">
+          <div style="font-size: 1.8rem; margin-bottom: 8px;">📦</div>
+          <h4 style="margin: 0 0 6px 0; color: var(--vendor-forest);">SÍ (Habilitar WMS Físico)</h4>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--vendor-muted);">Crear depósitos, sectores, módulos y niveles físicos.</p>
+        </div>
+      </div>
+    `;
+  } else if (step === 9 || step === 10) {
+    if (titleEl) titleEl.textContent = 'Paso 9 & 10: Checklist Pre-Activación & Confirmación Idempotente';
+    const checkRes = TenantOnboarding.runPreactivationChecklist(typeof window.saasTenants !== 'undefined' ? window.saasTenants : []);
+    
+    bodyEl.innerHTML = `
+      <div style="background: ${checkRes.valid ? '#e8f5e9' : '#ffebee'}; border: 2px solid ${checkRes.valid ? '#4caf50' : '#ef5350'}; border-radius: 14px; padding: 20px; text-align: center;">
+        <div style="font-size: 2.5rem; margin-bottom: 8px;">${checkRes.valid ? '✅' : '🚨'}</div>
+        <h4 style="margin: 0 0 8px 0; color: ${checkRes.valid ? '#2e7d32' : '#c62828'};">${checkRes.valid ? 'Checklist de Activación Exitoso' : 'Se encontraron bloqueos para activar'}</h4>
+        <p style="font-size: 0.88rem; color: var(--vendor-muted); margin-bottom: 16px;">
+          ${checkRes.valid ? 'El negocio está 100% configurado y listo para pasar de SETUP a ACTIVE.' : checkRes.errors.join('<br>')}
+        </p>
+        ${checkRes.valid ? `
+          <button type="button" class="wms-btn wms-btn-primary" style="padding: 12px 24px; font-size: 1rem;" onclick="executeTenantActivationApproved()">
+            🚀 ACTIVAR NEGOCIO EN PRODUCCIÓN
+          </button>
+        ` : ''}
+      </div>
+    `;
+  }
+}
+
+function navigateOnboardingStep(delta) {
+  if (typeof TenantOnboarding === 'undefined') return;
+  const sess = TenantOnboarding.activeSession;
+  if (!sess) return;
+
+  // Recoger inputs del paso actual
+  if (sess.step_current === 1) {
+    const name = document.getElementById('onb-input-name')?.value;
+    const slug = document.getElementById('onb-input-slug')?.value;
+    const email = document.getElementById('onb-input-email')?.value;
     const currency = document.getElementById('onb-input-currency')?.value;
     TenantOnboarding.saveStepData(1, { name, slug, email, currency });
   } else if (sess.step_current === 3) {
@@ -6162,8 +6610,9 @@ window.saveOnboardingDraft = saveOnboardingDraft;
 window.executeTenantActivationApproved = executeTenantActivationApproved;
 window.impersonateTenantSuperadmin = impersonateTenantSuperadmin;
 
-// --- POS ITEMIZADO (FASE 11A) ---
+// --- POS ITEMIZADO (VENDER UN PRODUCTO · CATÁLOGO INTERNO) ---
 let globalPosCart = null;
+let posScanPendingProduct = null;
 
 function getPosCartEngine() {
   if (!globalPosCart) {
@@ -6175,7 +6624,7 @@ function getPosCartEngine() {
   return globalPosCart;
 }
 
-function initPosWorkspace() {
+async function initPosWorkspace() {
   populatePosSalespeople();
 
   const cashierDisplay = document.getElementById('pos-cashier-display');
@@ -6184,28 +6633,42 @@ function initPosWorkspace() {
     cashierDisplay.textContent = `${ctx.userName} (${ctx.roleName})`;
   }
 
-  const barcodeInput = document.getElementById('pos-barcode-input');
-  if (barcodeInput && !barcodeInput.dataset.listenerAttached) {
-    barcodeInput.dataset.listenerAttached = 'true';
-    barcodeInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        handlePosBarcodeScan(barcodeInput.value.trim());
-      }
-    });
+  // Carga previa o reactiva del catálogo interno
+  if (!internalCatalogProducts || internalCatalogProducts.length === 0) {
+    await loadInternalCatalog();
   }
 
-  const searchInput = document.getElementById('pos-product-search');
-  if (searchInput && !searchInput.dataset.listenerAttached) {
-    searchInput.dataset.listenerAttached = 'true';
-    let timeout;
-    searchInput.addEventListener('input', (e) => {
-      clearTimeout(timeout);
-      const query = e.target.value.trim();
-      timeout = setTimeout(() => {
-        renderPosSearchResults(query);
-      }, 300);
-    });
+  const unifiedInput = document.getElementById('pos-unified-search');
+  if (unifiedInput) {
+    if (!unifiedInput.dataset.listenerAttached) {
+      unifiedInput.dataset.listenerAttached = 'true';
+
+      let inputDebounce;
+      unifiedInput.addEventListener('input', (e) => {
+        clearTimeout(inputDebounce);
+        const query = e.target.value;
+        const clearBtn = document.getElementById('pos-search-clear-btn');
+        if (clearBtn) clearBtn.style.display = query ? 'block' : 'none';
+
+        inputDebounce = setTimeout(() => {
+          renderPosSearchResults(query.trim());
+        }, 150);
+      });
+
+      unifiedInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handlePosBarcodeOrDirectSearch(unifiedInput.value.trim());
+        }
+      });
+    }
+
+    unifiedInput.value = '';
+    const clearBtn = document.getElementById('pos-search-clear-btn');
+    if (clearBtn) clearBtn.style.display = 'none';
+    setTimeout(() => {
+      unifiedInput.focus();
+    }, 100);
   }
 
   renderPosCartItems();
@@ -6234,35 +6697,83 @@ function populatePosSalespeople() {
   }).join('');
 }
 
-function focusPosBarcode() {
-  const input = document.getElementById('pos-barcode-input');
-  if (input) {
-    input.focus();
-    input.select();
+function clearPosUnifiedSearch() {
+  const unifiedInput = document.getElementById('pos-unified-search');
+  const clearBtn = document.getElementById('pos-search-clear-btn');
+  if (unifiedInput) {
+    unifiedInput.value = '';
+    unifiedInput.focus();
   }
+  if (clearBtn) clearBtn.style.display = 'none';
+  renderPosSearchResults('');
 }
 
-function handlePosBarcodeScan(barcode) {
-  if (!barcode) return;
-  const input = document.getElementById('pos-barcode-input');
+function handlePosBarcodeOrDirectSearch(rawQuery) {
+  if (!rawQuery) return;
+  const clean = String(rawQuery).trim().toLowerCase();
 
-  const match = baseProducts.find(p => p.barcode === barcode || p.product_code === barcode || p.id === barcode);
-  if (match) {
-    addPosProductToCart(match);
-    if (input) input.value = '';
-    if (window.showToast) window.showToast(`Agregado: ${match.name}`);
+  const prods = (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) && internalCatalogProducts.length > 0)
+    ? internalCatalogProducts
+    : JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
+
+  // 1. Coincidencia exacta por código de barras, SKU o ID
+  const exactMatch = prods.find(p =>
+    (p.barcode && String(p.barcode).trim().toLowerCase() === clean) ||
+    (p.product_code && String(p.product_code).trim().toLowerCase() === clean) ||
+    (p.id && String(p.id).trim().toLowerCase() === clean)
+  );
+
+  if (exactMatch) {
+    if (Number(exactMatch.stock || 0) <= 0) {
+      alert(`⚠️ El producto "${exactMatch.name}" está AGOTADO (Stock: 0). No se puede vender.`);
+      return;
+    }
+    showPosProductConfirmModal(exactMatch);
+    const unifiedInput = document.getElementById('pos-unified-search');
+    if (unifiedInput) {
+      unifiedInput.value = '';
+      const clearBtn = document.getElementById('pos-search-clear-btn');
+      if (clearBtn) clearBtn.style.display = 'none';
+      renderPosSearchResults('');
+    }
+    return;
+  }
+
+  // 2. Si no hay coincidencia exacta de código pero hay una sola coincidencia en la búsqueda activa
+  const matches = prods.filter(p => {
+    const text = [p.name, p.brand, p.presentation, p.category, p.id, p.barcode, p.product_code].filter(Boolean).join(' ').toLowerCase();
+    return text.includes(clean);
+  });
+
+  if (matches.length === 1) {
+    const singleMatch = matches[0];
+    if (Number(singleMatch.stock || 0) <= 0) {
+      alert(`⚠️ El producto "${singleMatch.name}" está AGOTADO (Stock: 0). No se puede vender.`);
+      return;
+    }
+    showPosProductConfirmModal(singleMatch);
+    const unifiedInput = document.getElementById('pos-unified-search');
+    if (unifiedInput) {
+      unifiedInput.value = '';
+      const clearBtn = document.getElementById('pos-search-clear-btn');
+      if (clearBtn) clearBtn.style.display = 'none';
+      renderPosSearchResults('');
+    }
+  } else if (matches.length === 0) {
+    alert(`Producto no encontrado en el catálogo interno para el código o búsqueda "${rawQuery}".`);
   } else {
-    alert(`Producto con código '${barcode}' no encontrado en el catálogo.`);
+    renderPosSearchResults(rawQuery);
   }
 }
 
 function togglePosVoiceSearch() {
   const statusEl = document.getElementById('pos-voice-status');
-  const searchInput = document.getElementById('pos-product-search');
+  const voiceBtn = document.getElementById('pos-voice-search-btn');
+  const unifiedInput = document.getElementById('pos-unified-search');
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
-    alert('Tu navegador no soporta dictado por voz.');
+    alert('Tu navegador no soporta dictado por voz. Podés usar el teclado o la máquina escaneadora.');
     return;
   }
 
@@ -6271,18 +6782,32 @@ function togglePosVoiceSearch() {
   recognition.interimResults = false;
 
   if (statusEl) statusEl.textContent = '🎙️ Escuchando dictado... Hablá ahora.';
+  if (voiceBtn) voiceBtn.classList.add('recording');
 
   recognition.onresult = (event) => {
     const transcript = event.results[0][0].transcript;
-    if (statusEl) statusEl.textContent = `Dictado capturado: "${transcript}"`;
-    if (searchInput) {
-      searchInput.value = transcript;
+    if (statusEl) statusEl.textContent = `Dictado: "${transcript}"`;
+    if (voiceBtn) voiceBtn.classList.remove('recording');
+    if (unifiedInput) {
+      unifiedInput.value = transcript;
+      const clearBtn = document.getElementById('pos-search-clear-btn');
+      if (clearBtn) clearBtn.style.display = 'block';
       renderPosSearchResults(transcript);
     }
   };
 
   recognition.onerror = () => {
     if (statusEl) statusEl.textContent = '⚠️ Error en dictado por voz.';
+    if (voiceBtn) voiceBtn.classList.remove('recording');
+  };
+
+  recognition.onend = () => {
+    if (voiceBtn) voiceBtn.classList.remove('recording');
+    setTimeout(() => {
+      if (statusEl && statusEl.textContent.includes('Escuchando')) {
+        statusEl.textContent = '';
+      }
+    }, 3000);
   };
 
   recognition.start();
@@ -6290,26 +6815,232 @@ function togglePosVoiceSearch() {
 
 function renderPosSearchResults(query = '') {
   const grid = document.getElementById('pos-search-results-grid');
+  const countBadge = document.getElementById('pos-search-count-badge');
   if (!grid) return;
 
-  const filtered = baseProducts.filter(p => {
-    if (!query) return true;
-    const q = query.toLowerCase();
-    return (p.name || '').toLowerCase().includes(q) || (p.product_code || '').toLowerCase().includes(q) || (p.brand || '').toLowerCase().includes(q);
-  }).slice(0, 8);
+  const prods = (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) && internalCatalogProducts.length > 0)
+    ? internalCatalogProducts
+    : JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
+
+  const cleanQuery = (query || '').toLowerCase().trim();
+
+  const filtered = prods.filter(p => {
+    if (!cleanQuery) return true;
+    const text = [p.name, p.brand, p.presentation, p.category, p.id, p.barcode, p.product_code].filter(Boolean).join(' ').toLowerCase();
+    return text.includes(cleanQuery);
+  });
+
+  if (countBadge) {
+    countBadge.textContent = cleanQuery
+      ? `${filtered.length} coincidencias (Catálogo interno)`
+      : `${prods.length} productos en catálogo interno`;
+  }
 
   if (filtered.length === 0) {
-    grid.innerHTML = `<div style="grid-column: 1 / -1; color: #888; font-size: 0.85rem;">Sin coincidencias</div>`;
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 30px 15px; color: var(--color-text-muted); background: rgba(21,45,36,0.02); border-radius: 12px; border: 1px dashed var(--color-border-subtle);">
+        <span style="font-size: 2rem; display: block; margin-bottom: 6px;">🔍</span>
+        <strong style="display: block; font-size: 0.95rem; margin-bottom: 4px; color: var(--color-text-main);">Sin coincidencias en el catálogo interno</strong>
+        <p style="margin: 0; font-size: 0.8rem;">Verificá el código o nombre. Recordá que sólo podés vender productos propios registrados en la tienda.</p>
+      </div>
+    `;
     return;
   }
 
-  grid.innerHTML = filtered.map(p => `
-    <div style="background: rgba(255,255,255,0.8); border: 1px solid var(--color-border-subtle); padding: 10px; border-radius: 10px; font-size: 0.85rem; display: flex; flex-direction: column; justify-content: space-between;">
-      <strong>${p.name}</strong>
-      <span style="color: var(--color-accent-gold); font-weight: 800; margin: 4px 0;">$${Number(p.price || 0).toLocaleString('es-AR')}</span>
-      <button type="button" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; margin-top: 4px;" onclick='addPosProductToCart(${JSON.stringify(p).replace(/'/g, "&apos;")})'>+ Agregar</button>
-    </div>
-  `).join('');
+  grid.innerHTML = filtered.map(p => {
+    const stockVal = Number(p.stock !== undefined ? p.stock : (p.own_stock || 0));
+    const isOutOfStock = stockVal <= 0;
+    const prodImg = p.image || p.image_url || 'assets/logo.jpg';
+    const prodPrice = Number(p.price || 0);
+    const prodId = escapeStockHtml(String(p.id || p.product_code));
+    const safeName = escapeStockHtml(p.name || 'Producto');
+    const safeCat = escapeStockHtml(p.category || 'Venta mostrador');
+
+    return `
+      <div class="pos-product-card ${isOutOfStock ? 'pos-product-card-out' : ''}">
+        <div>
+          <img src="${prodImg}" alt="${safeName}" class="pos-product-img" loading="lazy" onerror="this.src='assets/logo.jpg'">
+          <span class="pos-product-category">${safeCat}</span>
+          <strong class="pos-product-name" title="${safeName}">${safeName}</strong>
+          <div class="pos-product-meta">
+            ${p.barcode ? `<span>Cód: ${p.barcode}</span>` : `<span>ID: ${prodId}</span>`}
+          </div>
+        </div>
+
+        <div>
+          <div class="pos-product-price">$${prodPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+          <div class="pos-stock-badge ${isOutOfStock ? 'pos-stock-badge-out' : 'pos-stock-badge-available'}">
+            ${isOutOfStock ? '🔴 Agotado / Sin stock' : `🟢 ${stockVal} u. disponibles`}
+          </div>
+
+          <button type="button" 
+                  class="pos-add-btn" 
+                  ${isOutOfStock ? 'disabled' : ''} 
+                  onclick="openPosProductModalById('${prodId}')">
+            ${isOutOfStock ? '✕ Sin Stock' : '+ Seleccionar'}
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openPosProductModalById(productId) {
+  const prods = (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) && internalCatalogProducts.length > 0)
+    ? internalCatalogProducts
+    : JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
+
+  const product = prods.find(p => String(p.id) === String(productId) || String(p.product_code) === String(productId));
+  if (product) {
+    showPosProductConfirmModal(product);
+  }
+}
+
+function showPosProductConfirmModal(product) {
+  if (!product) return;
+  posScanPendingProduct = product;
+
+  const stockVal = Number(product.stock !== undefined ? product.stock : (product.own_stock || 0));
+  if (stockVal <= 0) {
+    alert(`⚠️ El producto "${product.name}" está agotado en el stock interno.`);
+    return;
+  }
+
+  const modal = document.getElementById('pos-scan-confirm-modal');
+  if (!modal) {
+    addPosProductToCart(product);
+    return;
+  }
+
+  const imgEl = document.getElementById('pos-scan-confirm-img');
+  const catEl = document.getElementById('pos-scan-confirm-category');
+  const nameEl = document.getElementById('pos-scan-confirm-name');
+  const codeEl = document.getElementById('pos-scan-confirm-code');
+  const stockEl = document.getElementById('pos-scan-confirm-stock');
+  const locationEl = document.getElementById('pos-scan-confirm-location');
+  const priceEl = document.getElementById('pos-scan-confirm-price');
+  const qtyInput = document.getElementById('pos-scan-confirm-qty');
+  const qtyError = document.getElementById('pos-modal-qty-error');
+
+  if (imgEl) imgEl.src = product.image || product.image_url || 'assets/logo.jpg';
+  if (catEl) catEl.textContent = product.category || 'Catálogo Interno';
+  if (nameEl) nameEl.textContent = product.name || 'Producto';
+  if (codeEl) codeEl.textContent = product.barcode || product.product_code || product.id || 'N/A';
+  if (stockEl) {
+    stockEl.textContent = `${stockVal} u. disponibles`;
+    stockEl.className = 'pos-stock-badge pos-stock-badge-available';
+  }
+  if (priceEl) priceEl.textContent = `$${Number(product.price || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+  if (qtyInput) {
+    qtyInput.value = '1';
+    qtyInput.max = stockVal;
+  }
+  if (qtyError) {
+    qtyError.style.display = 'none';
+    qtyError.textContent = '';
+  }
+
+  let locLabel = '📍 Sin ubicación asignada';
+  if (typeof readLocalProductLocations === 'function') {
+    const locs = readLocalProductLocations();
+    const found = locs.find(l => l.product_code === product.id || l.product_code === product.product_code || l.barcode === product.barcode);
+    if (found && found.shelf_code) {
+      locLabel = `📍 Estante: ${found.shelf_code} (Piso ${found.floor_level || 1}, Nivel ${found.shelf_level || 2})`;
+    }
+  }
+  if (locationEl) locationEl.textContent = locLabel;
+
+  modal.style.display = 'flex';
+  if (qtyInput) {
+    setTimeout(() => {
+      qtyInput.focus();
+      qtyInput.select();
+    }, 100);
+  }
+}
+
+function stepPosModalQty(delta) {
+  if (!posScanPendingProduct) return;
+  const qtyInput = document.getElementById('pos-scan-confirm-qty');
+  if (!qtyInput) return;
+
+  const current = parseInt(qtyInput.value, 10) || 1;
+  const maxStock = Number(posScanPendingProduct.stock !== undefined ? posScanPendingProduct.stock : (posScanPendingProduct.own_stock || 1));
+  const nextVal = Math.min(maxStock, Math.max(1, current + delta));
+
+  qtyInput.value = nextVal;
+  validatePosModalQty(qtyInput);
+}
+
+function validatePosModalQty(input) {
+  if (!posScanPendingProduct || !input) return;
+  const maxStock = Number(posScanPendingProduct.stock !== undefined ? posScanPendingProduct.stock : (posScanPendingProduct.own_stock || 1));
+  const qtyError = document.getElementById('pos-modal-qty-error');
+  const confirmBtn = document.getElementById('pos-confirm-add-btn');
+  const current = parseInt(input.value, 10);
+
+  if (isNaN(current) || current < 1) {
+    if (qtyError) {
+      qtyError.textContent = 'La cantidad mínima es 1 unidad.';
+      qtyError.style.display = 'block';
+    }
+    if (confirmBtn) confirmBtn.disabled = true;
+    return;
+  }
+
+  if (current > maxStock) {
+    if (qtyError) {
+      qtyError.textContent = `Stock insuficiente. Máximo disponible: ${maxStock} u.`;
+      qtyError.style.display = 'block';
+    }
+    if (confirmBtn) confirmBtn.disabled = true;
+    return;
+  }
+
+  if (qtyError) {
+    qtyError.style.display = 'none';
+    qtyError.textContent = '';
+  }
+  if (confirmBtn) confirmBtn.disabled = false;
+}
+
+function closePosScanConfirmModal() {
+  const modal = document.getElementById('pos-scan-confirm-modal');
+  if (modal) modal.style.display = 'none';
+  posScanPendingProduct = null;
+
+  const unifiedInput = document.getElementById('pos-unified-search');
+  if (unifiedInput) unifiedInput.focus();
+}
+
+function confirmAddPosProductToCart() {
+  if (!posScanPendingProduct) return;
+  const qtyInput = document.getElementById('pos-scan-confirm-qty');
+  const maxStock = Number(posScanPendingProduct.stock !== undefined ? posScanPendingProduct.stock : (posScanPendingProduct.own_stock || 1));
+  const qty = Math.min(maxStock, Math.max(1, parseInt(qtyInput?.value, 10) || 1));
+
+  const cart = getPosCartEngine();
+  if (cart) {
+    cart.addItem({
+      ...posScanPendingProduct,
+      quantity: qty
+    });
+    renderPosCartItems();
+    if (typeof showToast === 'function') {
+      showToast(`✓ Agregado al ticket: ${qty}x ${posScanPendingProduct.name}`);
+    }
+  }
+
+  closePosScanConfirmModal();
+
+  const unifiedInput = document.getElementById('pos-unified-search');
+  if (unifiedInput) {
+    unifiedInput.value = '';
+    const clearBtn = document.getElementById('pos-search-clear-btn');
+    if (clearBtn) clearBtn.style.display = 'none';
+    renderPosSearchResults('');
+    unifiedInput.focus();
+  }
 }
 
 function addPosProductToCart(product) {
@@ -6325,6 +7056,9 @@ function renderPosCartItems() {
   const body = document.getElementById('pos-cart-items-body');
   const emptyState = document.getElementById('pos-cart-empty-state');
   const subtotalEl = document.getElementById('pos-summary-subtotal');
+  const discountRow = document.getElementById('pos-summary-discount-row');
+  const discountLabelEl = document.getElementById('pos-summary-discount-label');
+  const discountEl = document.getElementById('pos-summary-discount');
   const totalEl = document.getElementById('pos-summary-total');
 
   if (!cart || !body) return;
@@ -6335,6 +7069,7 @@ function renderPosCartItems() {
     if (emptyState) emptyState.style.display = 'block';
     body.innerHTML = '';
     if (subtotalEl) subtotalEl.textContent = '$0,00';
+    if (discountRow) discountRow.style.display = 'none';
     if (totalEl) totalEl.textContent = '$0,00';
     return;
   }
@@ -6342,24 +7077,43 @@ function renderPosCartItems() {
   if (emptyState) emptyState.style.display = 'none';
 
   body.innerHTML = items.map(item => `
-    <li style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--color-border-subtle); font-size: 0.85rem;">
-      <div style="flex: 1;">
-        <strong style="display: block;">${item.name}</strong>
-        <small style="color: #666;">$${Number(item.price).toLocaleString('es-AR')} c/u · ${item.availability === 'EN_STOCK' ? '🟢 EN STOCK' : '📦 A PEDIDO'}</small>
+    <li style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--color-border-subtle); font-size: 0.88rem;">
+      <div style="flex: 1; min-width: 0; padding-right: 8px;">
+        <strong style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--color-text-main);">${escapeStockHtml(item.name)}</strong>
+        <small style="color: var(--color-text-muted);">$${Number(item.price).toLocaleString('es-AR', { minimumFractionDigits: 2 })} c/u</small>
       </div>
       <div style="display: flex; align-items: center; gap: 6px;">
-        <button type="button" onclick="updatePosCartItemQty('${item.id}', ${item.quantity - 1})" style="padding: 2px 6px; font-weight: 800;">-</button>
-        <span>${item.quantity}</span>
-        <button type="button" onclick="updatePosCartItemQty('${item.id}', ${item.quantity + 1})" style="padding: 2px 6px; font-weight: 800;">+</button>
-        <button type="button" onclick="removePosCartItem('${item.id}')" style="color: #c62828; margin-left: 6px; background: none; border: none; cursor: pointer;">✕</button>
+        <button type="button" onclick="updatePosCartItemQty('${item.id}', ${item.quantity - 1})" style="min-width: 28px; min-height: 28px; border-radius: 6px; border: 1px solid var(--color-border-accent); background: #fff; font-weight: 800; cursor: pointer;">-</button>
+        <span style="font-weight: 800; min-width: 20px; text-align: center;">${item.quantity}</span>
+        <button type="button" onclick="updatePosCartItemQty('${item.id}', ${item.quantity + 1})" style="min-width: 28px; min-height: 28px; border-radius: 6px; border: 1px solid var(--color-border-accent); background: #fff; font-weight: 800; cursor: pointer;">+</button>
+        <button type="button" onclick="removePosCartItem('${item.id}')" style="color: #c62828; margin-left: 4px; background: none; border: none; font-size: 1.1rem; cursor: pointer; padding: 4px;" aria-label="Quitar item">✕</button>
       </div>
     </li>
   `).join('');
 
   const subtotal = cart.getSubtotal();
+  const discountAmount = cart.getDiscountAmount();
   const total = cart.getTotal();
+  const discountInfo = cart.getDiscount();
 
   if (subtotalEl) subtotalEl.textContent = `$${subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+
+  if (discountRow) {
+    if (discountAmount > 0) {
+      discountRow.style.display = 'flex';
+      if (discountLabelEl) {
+        discountLabelEl.textContent = discountInfo.type === 'PERCENT'
+          ? `Descuento (${discountInfo.value}%):`
+          : 'Descuento ($ fijo):';
+      }
+      if (discountEl) {
+        discountEl.textContent = `-$${discountAmount.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+      }
+    } else {
+      discountRow.style.display = 'none';
+    }
+  }
+
   if (totalEl) totalEl.textContent = `$${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
 }
 
@@ -6380,10 +7134,35 @@ function removePosPosCartItem(id) {
 }
 window.removePosCartItem = removePosPosCartItem;
 
+function handlePosDiscountChange() {
+  const cart = getPosCartEngine();
+  if (!cart) return;
+
+  const typeSelect = document.getElementById('pos-discount-type');
+  const valueInput = document.getElementById('pos-discount-value');
+
+  const discType = typeSelect?.value || 'PERCENT';
+  const discValue = Math.max(0, parseFloat(valueInput?.value) || 0);
+
+  cart.setDiscount(discType, discValue);
+  renderPosCartItems();
+}
+
+function clearPosDiscount() {
+  const cart = getPosCartEngine();
+  if (!cart) return;
+
+  const valueInput = document.getElementById('pos-discount-value');
+  if (valueInput) valueInput.value = '';
+
+  cart.setDiscount('PERCENT', 0);
+  renderPosCartItems();
+}
+
 async function submitPosSaleDraft() {
   const cart = getPosCartEngine();
   if (!cart || cart.getItemCount() === 0) {
-    alert('Agregá al menos un producto al carrito antes de generar el borrador de venta.');
+    alert('Agregá al menos un producto al ticket antes de confirmar la venta.');
     return;
   }
 
@@ -6404,74 +7183,1826 @@ async function submitPosSaleDraft() {
     notes: notesInput?.value || ''
   });
 
-  const saveLocalDraft = () => {
-    const existingDrafts = JSON.parse(localStorage.getItem('boeweb_pos_sale_drafts') || '[]');
-    existingDrafts.unshift(draft);
-    localStorage.setItem('boeweb_pos_sale_drafts', JSON.stringify(existingDrafts));
-  };
+  if (draft.payment_method === 'CUENTA_CORRIENTE') {
+    const ccSelect = document.getElementById('pos-current-account-select');
+    const ccId = ccSelect?.value;
+    if (!ccId) {
+      alert('⚠️ Debés seleccionar un cliente de la lista de Cuenta Corriente para confirmar la venta fiada.');
+      return;
+    }
+    const accounts = typeof getCurrentAccounts === 'function' ? getCurrentAccounts() : [];
+    const account = accounts.find(a => a.id === ccId);
+    if (!account) {
+      alert('⚠️ La cuenta corriente seleccionada no existe.');
+      return;
+    }
+    const dueDateInput = document.getElementById('pos-cc-due-date');
+    if (dueDateInput?.value) {
+      account.first_payment_due = dueDateInput.value;
+    }
+    const saleConcept = `Venta Mostrador #${draft.draft_id} (${draft.items.map(i => `${i.quantity}x ${i.name}`).join(', ')})`;
+    account.current_balance = (account.current_balance || 0) + draft.total;
+    if (!account.ledger) account.ledger = [];
+
+    const recordedItems = draft.items.map(item => {
+      let img = item.image_url || item.image || '';
+      if (!img && typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts)) {
+        const match = internalCatalogProducts.find(p => String(p.id) === String(item.product_id || item.id) || String(p.product_code) === String(item.product_id || item.id) || p.barcode === String(item.product_id || item.id));
+        if (match) img = match.image || match.image_url || '';
+      }
+      return {
+        id: item.product_id || item.id,
+        product_code: item.product_code || item.sku || item.id,
+        name: item.name,
+        quantity: Number(item.quantity) || 1,
+        unit_price: Number(item.price || item.unit_price) || 0,
+        subtotal: (Number(item.price || item.unit_price) || 0) * (Number(item.quantity) || 1),
+        image: img || 'assets/logo.jpg'
+      };
+    });
+
+    account.ledger.push({
+      id: 'MOV-' + Date.now(),
+      date: new Date().toISOString().slice(0, 10),
+      concept: saleConcept,
+      amount: draft.total,
+      type: 'DEBIT',
+      balance_after: account.current_balance,
+      sale_draft_id: draft.draft_id,
+      items: recordedItems
+    });
+    if (typeof saveCurrentAccount === 'function') {
+      saveCurrentAccount(account);
+    }
+    draft.customer_account_id = account.id;
+    draft.customer_account_name = account.customer_name;
+    draft.customer_account_due = account.first_payment_due || null;
+  }
+
+  const stockChanges = [];
+  draft.items.forEach(soldItem => {
+    const code = String(soldItem.product_id || soldItem.id);
+    const qty = soldItem.quantity;
+
+    if (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts)) {
+      const intP = internalCatalogProducts.find(prod => String(prod.id) === code || String(prod.product_code) === code || prod.barcode === code);
+      if (intP) {
+        const prev = Number(intP.stock || 0);
+        intP.stock = Math.max(0, prev - qty);
+        stockChanges.push(`${intP.name}: de ${prev} u. a ${intP.stock} u.`);
+      }
+    }
+
+    if (typeof readLocalProductLocations === 'function' && typeof saveLocalProductLocation === 'function') {
+      const locs = readLocalProductLocations();
+      const loc = locs.find(l => String(l.product_code) === code || l.barcode === code);
+      if (loc) {
+        loc.stock = Math.max(0, Number(loc.stock || 0) - qty);
+        saveLocalProductLocation(loc);
+      }
+    }
+  });
+
+  try {
+    localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
+  } catch (_) {}
+
+  try {
+    const today = getTodayDateKey();
+    const cashData = getVendorCashData(today);
+    cashData.sales.push({
+      id: draft.draft_id,
+      amount: draft.total,
+      time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+      paymentMethod: draft.payment_method,
+      seller: draft.salesperson_name_snapshot,
+      itemsSummary: draft.items.map(i => `${i.quantity}x ${i.name}`).join(', ')
+    });
+    saveVendorCashData(cashData, today);
+  } catch (cashErr) {
+    console.warn('Aviso registrando caja local:', cashErr);
+  }
+
+  const existingDrafts = JSON.parse(localStorage.getItem('boeweb_pos_sale_drafts') || '[]');
+  existingDrafts.unshift(draft);
+  localStorage.setItem('boeweb_pos_sale_drafts', JSON.stringify(existingDrafts));
 
   const authContext = typeof SaasAuth !== 'undefined'
     ? SaasAuth.getTenantContext()
     : { isVerified: false };
 
   if (!supabaseClient || !authContext.isVerified) {
+    alert(`💾 Venta registrada en este dispositivo (Modo Mostrador Offline).\nLa venta todavía NO fue confirmada en la nube porque falta una sesión segura de Supabase.\n\nComprobante: ${draft.draft_id}\nTotal: $${Number(draft.total || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}\nDescuento: $${Number(draft.discount || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}\n\n📦 Stock local actualizado:\n${stockChanges.join('\n') || 'Stock descontado correctamente.'}\n\n💰 Caja BÔ: Dinero ingresado al arqueo del turno.`);
+  } else {
     try {
-      saveLocalDraft();
-      alert('Borrador guardado en este dispositivo. La venta todavía NO fue confirmada porque falta una sesión segura de Supabase.');
-    } catch (error) {
-      console.error('No se pudo guardar el borrador de venta:', error);
-      alert('No pudimos guardar el borrador. Revisá el espacio disponible del navegador.');
+      const rpcItems = draft.items.map(item => ({
+        product_id: item.product_code || item.id,
+        quantity: item.quantity,
+        unit_price: item.price
+      }));
+      const { data, error } = await supabaseClient.rpc('rpc_process_sale_checkout_saas', {
+        p_tenant_id: draft.tenant_id,
+        p_idempotency_key: draft.idempotency_key,
+        p_items: rpcItems,
+        p_cashier_user_id: draft.cashier_user_id,
+        p_salesperson_user_id: draft.salesperson_user_id,
+        p_payment_method: draft.payment_method,
+        p_discount_amount: draft.discount || 0
+      });
+      if (error) throw error;
+      alert(`✅ ¡Venta confirmada en la base de datos!\n\nN.º: ${data?.sale_id || draft.draft_id}\nTotal: $${Number(draft.total || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}\n\n📦 Stock interno actualizado:\n${stockChanges.join('\n') || 'Stock descontado correctamente.'}`);
+    } catch (rpcErr) {
+      console.warn('Aviso sincronizando venta remota en Supabase:', rpcErr);
+      alert(`Venta registrada localmente. Pendiente sincronizar en la nube:\n${rpcErr.message}`);
     }
-    return;
   }
 
-  try {
-    const rpcItems = draft.items.map(item => ({
-      product_id: item.product_code || item.id,
-      quantity: item.quantity,
-      unit_price: item.price
-    }));
-    const { data, error } = await supabaseClient.rpc('rpc_process_sale_checkout_saas', {
-      p_tenant_id: draft.tenant_id,
-      p_idempotency_key: draft.idempotency_key,
-      p_items: rpcItems,
-      p_cashier_user_id: draft.cashier_user_id,
-      p_salesperson_user_id: draft.salesperson_user_id,
-      p_payment_method: draft.payment_method,
-      p_discount_amount: 0
-    });
-
-    if (error) throw error;
-    if (!data?.success) throw new Error(data?.error || 'Supabase no confirmó la operación.');
-
-    alert(`Venta confirmada en la base de datos.\n\nN.º: ${data.sale_id}\nTotal: $${Number(data.total || draft.total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`);
-    cart.clear();
-    renderPosCartItems();
-    if (typeof renderCashSectionUI === 'function') renderCashSectionUI();
-    switchVendorTab('home');
-  } catch (error) {
-    console.error('Error al confirmar la venta en Supabase:', error);
-    try {
-      saveLocalDraft();
-    } catch (storageError) {
-      console.error('Tampoco se pudo guardar el borrador local:', storageError);
-    }
-    alert(`La venta NO fue confirmada. Guardamos un borrador para no perder el trabajo.\n\nDetalle: ${error.message}`);
-  }
+  cart.clear();
+  clearPosDiscount();
+  renderPosCartItems();
+  renderPosSearchResults('');
+  if (typeof renderStockProducts === 'function') renderStockProducts();
+  if (typeof renderInternalCatalogGrid === 'function') renderInternalCatalogGrid();
+  if (typeof renderVendorHomeUI === 'function') renderVendorHomeUI();
+  switchVendorTab('home');
 }
 
 window.initPosWorkspace = initPosWorkspace;
-window.focusPosBarcode = focusPosBarcode;
+window.clearPosUnifiedSearch = clearPosUnifiedSearch;
+window.handlePosBarcodeOrDirectSearch = handlePosBarcodeOrDirectSearch;
 window.togglePosVoiceSearch = togglePosVoiceSearch;
+window.renderPosSearchResults = renderPosSearchResults;
+window.openPosProductModalById = openPosProductModalById;
 window.addPosProductToCart = addPosProductToCart;
 window.updatePosCartItemQty = updatePosCartItemQty;
 window.submitPosSaleDraft = submitPosSaleDraft;
+window.showPosProductConfirmModal = showPosProductConfirmModal;
+window.closePosScanConfirmModal = closePosScanConfirmModal;
+window.confirmAddPosProductToCart = confirmAddPosProductToCart;
+window.stepPosModalQty = stepPosModalQty;
+window.validatePosModalQty = validatePosModalQty;
+window.handlePosDiscountChange = handlePosDiscountChange;
+window.clearPosDiscount = clearPosDiscount;
 
+/* ==========================================================================
+   BÔ GROW CLUB — MEDIACIÓN DE PEDIDOS WEB & E-COMMERCE (WEB + VENDEDOR)
+   ========================================================================== */
 
+let webOrdersList = [];
+let webOrdersFilterStatus = 'all';
+let webOrdersFilterQuery = '';
 
+function setWebOrdersStatus(message, state = 'info') {
+  const statusEl = document.getElementById('web-orders-status');
+  if (!statusEl) return;
+  statusEl.hidden = !message;
+  statusEl.dataset.state = state;
+  statusEl.textContent = message || '';
+}
 
+function refreshWebOrdersBadges() {
+  const rawStored = JSON.parse(localStorage.getItem('boeweb_web_orders') || localStorage.getItem('boeweb_order_history') || '[]');
+  const combined = (webOrdersList.length > 0 ? webOrdersList : rawStored);
+  const pendingCount = combined.filter(o => {
+    const st = String(o.status || '').toLowerCase();
+    return !st.includes('completado') && !st.includes('entregado') && !st.includes('cancelado');
+  }).length;
 
+  const kpiCountEl = document.getElementById('vendor-kpi-web-orders-count');
+  const navBadge = document.getElementById('vendor-sidebar-web-orders-badge');
+  const actionBadge = document.getElementById('vendor-pending-web-orders-badge-action');
 
+  if (kpiCountEl) kpiCountEl.textContent = `${pendingCount} ${pendingCount === 1 ? 'pendiente' : 'pendientes'}`;
+  if (navBadge) {
+    navBadge.textContent = pendingCount;
+    navBadge.hidden = pendingCount === 0;
+  }
+  if (actionBadge) {
+    actionBadge.textContent = pendingCount;
+    actionBadge.hidden = pendingCount === 0;
+  }
+}
+
+async function loadWebOrders(forceReload = false) {
+  const listEl = document.getElementById('web-orders-list');
+  if (!listEl) return;
+
+  setWebOrdersStatus('Cargando pedidos de la tienda online...', 'loading');
+
+  let localOrders = [];
+  try {
+    const w1 = JSON.parse(localStorage.getItem('boeweb_web_orders') || '[]');
+    const w2 = JSON.parse(localStorage.getItem('boeweb_order_history') || '[]');
+    localOrders = [...w1, ...w2];
+  } catch (_) {
+    localOrders = [];
+  }
+
+  let remoteOrders = [];
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!error && Array.isArray(data)) {
+        remoteOrders = data.map(r => ({
+          id: r.order_id || r.id,
+          order_id: r.order_id || r.id,
+          customer_name: r.customer_name || 'Cliente Web',
+          customer_phone: r.customer_phone || '',
+          delivery_type: r.delivery_type || 'store_pickup',
+          payment_method: r.payment_method || 'Efectivo / Transferencia',
+          total: Number(r.total_amount || r.total || 0),
+          total_amount: Number(r.total_amount || r.total || 0),
+          status: r.status || 'Pendiente Vendedor',
+          notes: r.notes || '',
+          items: r.items_json || r.items || [],
+          created_at: r.created_at || new Date().toISOString(),
+          date: r.created_at || new Date().toISOString()
+        }));
+      }
+    } catch (sbErr) {
+      console.warn('Aviso al leer pedidos de Supabase:', sbErr);
+    }
+  }
+
+  // Merge and deduplicate by ID
+  const map = new Map();
+  remoteOrders.forEach(o => map.set(String(o.order_id || o.id), o));
+  localOrders.forEach(o => {
+    const key = String(o.order_id || o.id);
+    if (!map.has(key)) {
+      map.set(key, o);
+    }
+  });
+
+  webOrdersList = Array.from(map.values()).sort((a, b) => {
+    return new Date(b.created_at || b.date || 0) - new Date(a.created_at || a.date || 0);
+  });
+
+  try {
+    localStorage.setItem('boeweb_web_orders', JSON.stringify(webOrdersList));
+  } catch (_) {}
+
+  refreshWebOrdersBadges();
+  renderWebOrders();
+  setWebOrdersStatus('');
+}
+
+function filterWebOrders() {
+  const searchInput = document.getElementById('web-orders-search');
+  const statusSelect = document.getElementById('web-orders-filter-status');
+  webOrdersFilterQuery = searchInput?.value.trim().toLowerCase() || '';
+  webOrdersFilterStatus = statusSelect?.value || 'all';
+  renderWebOrders();
+}
+
+function renderWebOrders() {
+  const listEl = document.getElementById('web-orders-list');
+  const countEl = document.getElementById('web-orders-count');
+  if (!listEl) return;
+
+  const locations = typeof readLocalProductLocations === 'function' ? readLocalProductLocations() : [];
+
+  const filtered = webOrdersList.filter(order => {
+    const query = webOrdersFilterQuery;
+    const matchesQuery = !query ||
+      String(order.id || order.order_id || '').toLowerCase().includes(query) ||
+      String(order.customer_name || order.name || '').toLowerCase().includes(query) ||
+      String(order.customer_phone || order.phone || '').toLowerCase().includes(query);
+
+    const st = String(order.status || '').toLowerCase();
+    let matchesStatus = true;
+    if (webOrdersFilterStatus === 'PENDING') {
+      matchesStatus = st.includes('pendiente');
+    } else if (webOrdersFilterStatus === 'IN_PREPARATION') {
+      matchesStatus = st.includes('preparaci');
+    } else if (webOrdersFilterStatus === 'READY') {
+      matchesStatus = st.includes('listo') || st.includes('retiro');
+    } else if (webOrdersFilterStatus === 'COMPLETED') {
+      matchesStatus = st.includes('completado') || st.includes('entregado');
+    }
+
+    return matchesQuery && matchesStatus;
+  });
+
+  if (countEl) countEl.textContent = filtered.length;
+
+  if (filtered.length === 0) {
+    listEl.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 48px 20px; background: rgba(0,0,0,0.2); border: 1px dashed var(--color-border-accent); border-radius: 16px; color: var(--color-text-muted);">
+        <p style="font-weight: 700; font-size: 1.1rem; color: var(--color-accent-gold); margin: 0 0 6px 0;">No se encontraron pedidos web</p>
+        <p style="font-size: 0.88rem; margin: 0;">Cuando un cliente compre desde la tienda online aparecerá acá automáticamente para su preparación y cobro.</p>
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = filtered.map(order => {
+    const orderId = order.id || order.order_id || 'BO-000000';
+    const customerName = order.customer_name || order.name || 'Cliente Anónimo';
+    const customerPhone = order.customer_phone || order.phone || '';
+    const cleanPhone = customerPhone.replace(/\D/g, '');
+    const delivery = order.delivery_type === 'shipping' || order.deliveryType === 'shipping'
+      ? `🚚 Envío a domicilio: ${order.address || 'Sin dirección'}`
+      : '🏬 Retiro por el local';
+    const payment = order.payment_method || order.paymentMethod || 'Efectivo / Transferencia';
+    const total = Number(order.total_amount || order.total || 0);
+    const dateStr = order.created_at || order.date
+      ? new Date(order.created_at || order.date).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })
+      : 'Reciente';
+    const status = order.status || 'Pendiente Vendedor';
+
+    let statusBadgeColor = '#ffb74d';
+    let statusBg = 'rgba(255,183,77,0.15)';
+    const statusLower = status.toLowerCase();
+    if (statusLower.includes('comprobado') || statusLower.includes('pago aprobado') || statusLower.includes('pago verificado') || statusLower.includes('pagado')) {
+      statusBadgeColor = '#25d366';
+      statusBg = 'rgba(37,211,102,0.18)';
+    } else if (statusLower.includes('completado') || statusLower.includes('entregado')) {
+      statusBadgeColor = '#66bb6a';
+      statusBg = 'rgba(102,187,106,0.15)';
+    } else if (statusLower.includes('preparaci')) {
+      statusBadgeColor = '#42a5f5';
+      statusBg = 'rgba(66,165,245,0.15)';
+    } else if (statusLower.includes('listo')) {
+      statusBadgeColor = '#ab47bc';
+      statusBg = 'rgba(171,71,188,0.15)';
+    }
+
+    const items = order.items || order.items_json || [];
+
+    const itemsHtml = items.map(item => {
+      const pCode = item.product_code || item.id || '';
+      const foundLoc = locations.find(l => String(l.product_code) === String(pCode) || String(l.barcode) === String(pCode));
+      const locText = foundLoc && foundLoc.shelf_code
+        ? `📍 ${foundLoc.shelf_code} (Nivel ${foundLoc.shelf_level || 1})`
+        : '📍 Sin ubicación asignada';
+
+      return `
+        <li style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,0.08); font-size: 0.85rem;">
+          <div style="flex: 1;">
+            <strong>${item.quantity}x ${item.name}</strong>
+            <div style="font-size: 0.74rem; color: #42a5f5; margin-top: 2px;">${locText}</div>
+          </div>
+          <span style="font-weight: 700; color: var(--color-accent-gold);">$${Number((item.price || 0) * (item.quantity || 1)).toLocaleString('es-AR')}</span>
+        </li>
+      `;
+    }).join('');
+
+    const waLink = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(`¡Hola ${customerName}! Te escribimos de BÔ Grow Club respecto a tu pedido #${orderId}.`)}` : '#';
+
+    return `
+      <article class="web-order-card" style="background: var(--color-card-bg); border: 1.5px solid var(--color-border-subtle); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; box-shadow: var(--shadow-sm); transition: transform 0.2s ease;">
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+            <div>
+              <span style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 700;">ORDEN WEB</span>
+              <h3 style="margin: 0; font-size: 1.15rem; color: var(--color-accent-gold); font-family: var(--font-display);">${orderId}</h3>
+              <small style="color: var(--color-text-muted); font-size: 0.75rem;">📅 ${dateStr}</small>
+            </div>
+            <span style="font-size: 0.75rem; font-weight: 800; color: ${statusBadgeColor}; background: ${statusBg}; border: 1px solid ${statusBadgeColor}; padding: 4px 10px; border-radius: 12px; text-transform: uppercase;">
+              ${status}
+            </span>
+          </div>
+
+          <div style="background: rgba(0,0,0,0.15); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 0.85rem; line-height: 1.4;">
+            <div>👤 <strong>${customerName}</strong></div>
+            ${customerPhone ? `<div>📞 <a href="${waLink}" target="_blank" style="color: #25d366; text-decoration: none; font-weight: 700;">${customerPhone} (WhatsApp)</a></div>` : ''}
+            <div>${delivery}</div>
+            <div>💳 Método: <strong>${payment}</strong></div>
+            ${order.notes ? `<div style="margin-top: 4px; color: var(--color-accent-gold); font-style: italic;">💬 "${order.notes}"</div>` : ''}
+          </div>
+
+          <div style="margin-bottom: 10px;">
+            <span style="font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--color-accent-gold); display: block; margin-bottom: 4px;">📦 Artículos & Picking:</span>
+            <ul style="list-style: none; padding: 0; margin: 0;">
+              ${itemsHtml}
+            </ul>
+          </div>
+        </div>
+
+        <div style="border-top: 1px solid var(--color-border-accent); padding-top: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span style="font-size: 0.9rem; font-weight: 700;">Total a Cobrar:</span>
+            <strong style="font-size: 1.3rem; color: var(--color-accent-gold); font-weight: 900;">$${total.toLocaleString('es-AR')}</strong>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <button type="button" class="btn btn-primary" onclick="loadWebOrderToPos('${orderId}')" style="grid-column: 1 / -1; padding: 10px; font-weight: 800; font-size: 0.88rem; background: #2e7d32; border-color: #2e7d32; color: #fff; border-radius: 10px; cursor: pointer;">
+              💳 Pasar a Caja POS / Cobrar
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="updateWebOrderStatus('${orderId}', 'Pago Comprobado')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #25d366; border-color: #25d366; font-weight: 700;">
+              ✅ Pago Comprobado
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="updateWebOrderStatus('${orderId}', 'En Preparación')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer;">
+              📋 En Preparación
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="updateWebOrderStatus('${orderId}', 'Listo para Retiro')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #ab47bc; border-color: #ab47bc;">
+              🟢 Listo para Retiro
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="updateWebOrderStatus('${orderId}', 'Completado')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #66bb6a; border-color: #66bb6a;">
+              ✓ Completado
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="sendWebOrderWhatsApp('${orderId}')" style="grid-column: 1 / -1; padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #25d366; border-color: #25d366;">
+              💬 Notificar WhatsApp
+            </button>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+function loadWebOrderToPos(orderId) {
+  const order = webOrdersList.find(o => (o.id || o.order_id) === orderId);
+  if (!order) {
+    alert(`Pedido #${orderId} no encontrado.`);
+    return;
+  }
+
+  const cart = typeof getPosCartEngine === 'function' ? getPosCartEngine() : null;
+  if (!cart) {
+    alert('Motor de carrito POS no disponible.');
+    return;
+  }
+
+  cart.clear();
+  const items = order.items || order.items_json || [];
+  items.forEach(item => {
+    cart.addItem({
+      id: item.id || item.product_code,
+      product_code: item.product_code || item.id,
+      name: item.name,
+      price: Number(item.price) || 0,
+      quantity: Number(item.quantity) || 1
+    });
+  });
+
+  const notesInput = document.getElementById('pos-notes-input');
+  if (notesInput) {
+    notesInput.value = `Pedido Web #${orderId} (${order.customer_name || order.name || 'Cliente'})`;
+  }
+
+  switchVendorTab('pos');
+  renderPosCartItems();
+  if (window.showToast) window.showToast(`✓ Pedido #${orderId} cargado en Caja POS para cobrar.`);
+}
+
+async function updateWebOrderStatus(orderId, newStatus) {
+  const order = webOrdersList.find(o => (o.id || o.order_id) === orderId);
+  if (order) {
+    order.status = newStatus;
+    try {
+      localStorage.setItem('boeweb_web_orders', JSON.stringify(webOrdersList));
+    } catch (_) {}
+
+    if (supabaseClient) {
+      try {
+        await supabaseClient
+          .from('orders')
+          .update({ status: newStatus })
+          .eq('order_id', orderId);
+      } catch (err) {
+        console.warn('Aviso al actualizar estado remoto:', err);
+      }
+    }
+
+    refreshWebOrdersBadges();
+    renderWebOrders();
+    if (window.showToast) window.showToast(`✓ Estado actualizado: ${newStatus}`);
+  }
+}
+
+function sendWebOrderWhatsApp(orderId) {
+  const order = webOrdersList.find(o => (o.id || o.order_id) === orderId);
+  if (!order) return;
+
+  const phone = (order.customer_phone || order.phone || '').replace(/\D/g, '');
+  if (!phone) {
+    alert('Este pedido no cuenta con número de teléfono registrado.');
+    return;
+  }
+
+  const name = order.customer_name || order.name || 'Cliente';
+  const status = order.status || 'Listo para Retiro';
+  const total = Number(order.total_amount || order.total || 0).toLocaleString('es-AR');
+
+  const msg = `🌿 *BÔ Grow Club — Estado de tu Pedido*\n\n¡Hola ${name}! Te avisamos que tu pedido *#${orderId}* está en estado: *${status}*.\n\n💰 Total: *$${total}*\n📍 Dirección del local: BÔ Grow Club\n\n¡Cualquier duda avisanos por este medio! 🙏`;
+
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+window.loadWebOrders = loadWebOrders;
+window.filterWebOrders = filterWebOrders;
+window.renderWebOrders = renderWebOrders;
+window.loadWebOrderToPos = loadWebOrderToPos;
+window.updateWebOrderStatus = updateWebOrderStatus;
+window.sendWebOrderWhatsApp = sendWebOrderWhatsApp;
+window.refreshWebOrdersBadges = refreshWebOrdersBadges;
+
+/* ==========================================================================
+   BÔ GROW CLUB / PLATAFORMA SAAS — MÓDULO 1: VENCIMIENTOS & ROTACIÓN DE STOCK
+   ==========================================================================
+   Monitoreo de caducidad desde 3 meses (90 días), 1 mes (30 días), 1 semana (7 días)
+   y días críticos (<= 3 días o vencidos).
+   ========================================================================== */
+
+let currentExpirationsFilter = 'all';
+
+function calculateExpirationStatus(expirationDateStr) {
+  if (!expirationDateStr) {
+    return { status: 'NONE', daysLeft: null, label: 'Sin fecha', badgeClass: '', level: 0 };
+  }
+  const expDate = new Date(expirationDateStr + 'T00:00:00');
+  if (isNaN(expDate.getTime())) {
+    return { status: 'NONE', daysLeft: null, label: 'Fecha inválida', badgeClass: '', level: 0 };
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const diffTime = expDate.getTime() - today.getTime();
+  const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (daysLeft <= 0) {
+    return { status: 'EXPIRED', daysLeft, label: '🔴 VENCIDO', badgeClass: 'exp-badge-critical', level: 4 };
+  } else if (daysLeft <= 3) {
+    return { status: 'CRITICAL', daysLeft, label: `🔴 Vence en ${daysLeft}d (Crítico)`, badgeClass: 'exp-badge-critical', level: 4 };
+  } else if (daysLeft <= 7) {
+    return { status: 'WEEK', daysLeft, label: `🟠 Vence en ${daysLeft}d (1 semana)`, badgeClass: 'exp-badge-week', level: 3 };
+  } else if (daysLeft <= 30) {
+    return { status: 'MONTH', daysLeft, label: `🟡 Vence en ${daysLeft}d (1 mes)`, badgeClass: 'exp-badge-month', level: 2 };
+  } else if (daysLeft <= 90) {
+    return { status: 'THREE_MONTHS', daysLeft, label: `🟢 Vence en ${daysLeft}d (3 meses)`, badgeClass: 'exp-badge-three-months', level: 1 };
+  } else {
+    return { status: 'OK', daysLeft, label: `Vence en ${daysLeft}d`, badgeClass: 'exp-badge-ok', level: 0 };
+  }
+}
+
+function getAllProductsWithExpirations() {
+  const list = [];
+  const ownList = typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts)
+    ? internalCatalogProducts
+    : [];
+
+  ownList.forEach(p => {
+    const exp = p.expiration_date || p.expiry_date;
+    if (exp) {
+      const statusObj = calculateExpirationStatus(exp);
+      list.push({
+        ...p,
+        expirationStatus: statusObj
+      });
+    }
+  });
+
+  // Sort by days left ascending (most urgent first)
+  list.sort((a, b) => (a.expirationStatus.daysLeft || 999) - (b.expirationStatus.daysLeft || 999));
+  return list;
+}
+
+function renderExpirationsSection() {
+  const tableBody = document.getElementById('vendor-expirations-table-body');
+  if (!tableBody) return;
+
+  const allExpirations = getAllProductsWithExpirations();
+  const badgeSidebar = document.getElementById('vendor-sidebar-expirations-badge');
+  const badgeKpi = document.getElementById('expirations-badge-kpi');
+
+  const alertCount = allExpirations.filter(p => p.expirationStatus.level >= 1).length;
+  if (badgeSidebar) {
+    badgeSidebar.textContent = alertCount;
+    badgeSidebar.hidden = alertCount === 0;
+  }
+  if (badgeKpi) {
+    badgeKpi.textContent = alertCount;
+    badgeKpi.style.display = alertCount > 0 ? 'inline-block' : 'none';
+  }
+
+  let filtered = allExpirations;
+  if (currentExpirationsFilter === 'critical') {
+    filtered = allExpirations.filter(p => p.expirationStatus.level === 4);
+  } else if (currentExpirationsFilter === 'week') {
+    filtered = allExpirations.filter(p => p.expirationStatus.level === 3 || p.expirationStatus.level === 4);
+  } else if (currentExpirationsFilter === 'month') {
+    filtered = allExpirations.filter(p => p.expirationStatus.level >= 2);
+  } else if (currentExpirationsFilter === 'three-months') {
+    filtered = allExpirations.filter(p => p.expirationStatus.level >= 1);
+  }
+
+  if (filtered.length === 0) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align: center; padding: 24px; color: var(--color-text-muted);">
+          No se encontraron productos en el rango de vencimiento seleccionado. ¡Inventario al día! 🌿
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tableBody.innerHTML = filtered.map(p => {
+    const exp = p.expirationStatus;
+    let badgeColor = '#4caf50';
+    let badgeBg = 'rgba(76,175,80,0.15)';
+    if (exp.level === 4) { badgeColor = '#ef5350'; badgeBg = 'rgba(239,83,80,0.18)'; }
+    else if (exp.level === 3) { badgeColor = '#ff9800'; badgeBg = 'rgba(255,152,0,0.18)'; }
+    else if (exp.level === 2) { badgeColor = '#fbc02d'; badgeBg = 'rgba(251,192,45,0.18)'; }
+
+    return `
+      <tr style="border-bottom: 1px solid var(--color-border-subtle);">
+        <td style="padding: 12px 10px;">
+          <strong style="color: var(--color-text-main); font-weight: 700;">${escapeStockHtml(p.name)}</strong>
+          <span style="display: block; font-size: 0.72rem; color: var(--color-text-muted);">SKU: ${escapeStockHtml(p.product_code || p.id)}</span>
+        </td>
+        <td style="padding: 12px 10px;">
+          <span style="background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 8px; font-size: 0.75rem;">${escapeStockHtml(p.category || 'Varios')}</span>
+        </td>
+        <td style="padding: 12px 10px; font-weight: 700;">
+          ${Number(p.stock || 0)} u.
+        </td>
+        <td style="padding: 12px 10px; color: #2e7d32; font-weight: 600;">
+          📍 ${escapeStockHtml(p.location || 'Salón')}
+        </td>
+        <td style="padding: 12px 10px; font-family: monospace; font-weight: 700;">
+          ${p.expiration_date || p.expiry_date}
+        </td>
+        <td style="padding: 12px 10px;">
+          <span style="background: ${badgeBg}; border: 1px solid ${badgeColor}; color: ${badgeColor}; padding: 4px 10px; border-radius: 10px; font-size: 0.75rem; font-weight: 800;">
+            ${exp.label}
+          </span>
+        </td>
+        <td style="padding: 12px 10px; text-align: right;">
+          <button type="button" class="btn btn-secondary" onclick="applyPromoForExpiringProduct('${p.id}')" style="padding: 6px 12px; font-size: 0.78rem; border-color: var(--color-accent-gold); color: var(--color-accent-gold); border-radius: 8px; font-weight: 700;">
+            🏷️ Liquidar / Promo
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function filterExpirationsByTime(timeframe) {
+  currentExpirationsFilter = timeframe;
+  const chipIds = ['all', 'critical', 'week', 'month', 'three-months'];
+  chipIds.forEach(id => {
+    const chip = document.getElementById(`exp-filter-${id}`);
+    if (chip) {
+      if (id === timeframe) chip.classList.add('active');
+      else chip.classList.remove('active');
+    }
+  });
+  renderExpirationsSection();
+}
+
+function applyPromoForExpiringProduct(productId) {
+  const p = (internalCatalogProducts || []).find(prod => String(prod.id) === String(productId));
+  if (!p) return;
+  const promoDiscount = 20; // 20% liquidación
+  const originalPrice = Number(p.price || 0);
+  const newPrice = Math.round(originalPrice * (1 - promoDiscount / 100));
+
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : { isSuperadmin: false };
+  const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
+  const quota = canVendorAdjustPrice(activeVendor, authContext.isSuperadmin);
+
+  if (!quota.allowed) {
+    alert(`⚠️ Límite de modificaciones de precio diario alcanzado (5 de 5 hoy).\nPara este turno se mantendrá el precio fijado.`);
+    return;
+  }
+
+  if (confirm(`¿Aplicar descuento de liquidación por vencimiento del ${promoDiscount}% a "${p.name}"?\nPrecio actual: $${originalPrice} -> Nuevo precio: $${newPrice}`)) {
+    p.price = newPrice;
+    recordVendorPriceAdjustment(activeVendor, authContext.isSuperadmin);
+    try {
+      localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
+    } catch (_) {}
+    renderExpirationsSection();
+    if (window.showToast) window.showToast(`✓ Promo liquidación aplicada ($${newPrice})`);
+  }
+}
+
+/* ==========================================================================
+   BÔ GROW CLUB / PLATAFORMA SAAS — MÓDULO 2: OTRAS TIENDAS CERCA & INGESTA IA
+   ==========================================================================
+   Red de alianzas con growshops y proveedores locales para entregas en 2 días.
+   ========================================================================== */
+
+function getNearbyStores() {
+  try {
+    const stored = localStorage.getItem('boeweb_nearby_stores');
+    if (stored) return JSON.parse(stored);
+  } catch (_) {}
+  return [
+    {
+      id: 'store_local_1',
+      name: 'Growshop Paraná Centro',
+      phone: '5493434675428',
+      address: 'Urquiza y San Martín, Paraná',
+      markup: 30,
+      catalog: [
+        { id: 'loc_1', product_code: 'LOC-BIO-01', name: 'BioBizz Bio Bloom 500 ml', price: 16000, public_price: 20800, stock: 4, category: 'Fertilizantes' },
+        { id: 'loc_2', product_code: 'LOC-SUS-50', name: 'Sustrato Growers Original 50 L', price: 12500, public_price: 16250, stock: 12, category: 'Sustratos' }
+      ]
+    }
+  ];
+}
+
+function saveNearbyStore(store) {
+  const stores = getNearbyStores();
+  const existingIdx = stores.findIndex(s => s.id === store.id);
+  if (existingIdx >= 0) {
+    stores[existingIdx] = store;
+  } else {
+    stores.push(store);
+  }
+  localStorage.setItem('boeweb_nearby_stores', JSON.stringify(stores));
+
+  // Sync unified nearby products
+  const flatCatalog = [];
+  stores.forEach(s => {
+    (s.catalog || []).forEach(item => {
+      flatCatalog.push({
+        ...item,
+        store_id: s.id,
+        store_name: s.name,
+        phone: s.phone,
+        delivery_days: 2
+      });
+    });
+  });
+  localStorage.setItem('boeweb_nearby_stores_catalog', JSON.stringify(flatCatalog));
+}
+
+let activeNearbyStoreFilter = 'all';
+
+function renderNearbyStoresSection() {
+  const tabsContainer = document.getElementById('nearby-stores-tabs-container');
+  const grid = document.getElementById('nearby-stores-products-grid');
+  if (!grid) return;
+
+  const stores = getNearbyStores();
+
+  if (tabsContainer) {
+    tabsContainer.innerHTML = `
+      <button type="button" class="b2b-filter-chip ${activeNearbyStoreFilter === 'all' ? 'active' : ''}" onclick="filterNearbyProductsByStore('all')">
+        Todas las Tiendas (${stores.length})
+      </button>
+      ${stores.map(s => `
+        <button type="button" class="b2b-filter-chip ${activeNearbyStoreFilter === s.id ? 'active' : ''}" onclick="filterNearbyProductsByStore('${s.id}')">
+          🏪 ${escapeStockHtml(s.name)}
+        </button>
+      `).join('')}
+    `;
+  }
+
+  let products = [];
+  stores.forEach(s => {
+    if (activeNearbyStoreFilter === 'all' || activeNearbyStoreFilter === s.id) {
+      (s.catalog || []).forEach(p => {
+        products.push({ ...p, storeName: s.name, storePhone: s.phone });
+      });
+    }
+  });
+
+  if (products.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--color-text-muted);">
+        <span style="font-size: 2.5rem; display: block; margin-bottom: 8px;">🏪</span>
+        <p>No hay productos cargados en esta tienda cercana aún.</p>
+        <button type="button" class="btn btn-secondary" onclick="openAddNearbyStoreModal()" style="margin-top: 10px;">
+          ＋ Cargar Lista con Ingesta IA
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = products.map(p => `
+    <article class="b2b-product-card" style="border: 1.5px solid #1565c0; border-radius: 16px; padding: 16px; background: var(--color-card-bg);">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+        <span style="background: rgba(21,101,192,0.15); border: 1px solid #1565c0; color: #1565c0; font-size: 0.72rem; font-weight: 800; padding: 3px 8px; border-radius: 8px;">
+          📦 LLEGA EN 2 DÍAS
+        </span>
+        <small style="color: var(--color-text-muted); font-size: 0.72rem;">🏪 ${escapeStockHtml(p.storeName)}</small>
+      </div>
+      <h4 style="margin: 0 0 6px 0; font-size: 1rem; color: var(--color-text-main); line-height: 1.3;">${escapeStockHtml(p.name)}</h4>
+      <div style="font-size: 0.82rem; color: var(--color-text-muted); margin-bottom: 12px;">
+        <span>Costo Tienda: <strong>$${Number(p.price || 0).toLocaleString('es-AR')}</strong></span> · 
+        <span>Público Web: <strong style="color: var(--color-accent-gold);">$${Number(p.public_price || 0).toLocaleString('es-AR')}</strong></span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.8rem; color: #2e7d32; font-weight: 700;">Stock: ${p.stock || 0} u.</span>
+        <button type="button" class="btn btn-secondary" onclick="orderNearbyProductViaWa('${p.id}', '${p.storePhone}', '${escapeStockHtml(p.name)}')" style="padding: 6px 12px; font-size: 0.78rem; border-color: #25d366; color: #25d366; font-weight: 700; border-radius: 8px;">
+          💬 Pedir por WA
+        </button>
+      </div>
+    </article>
+  `).join('');
+}
+
+function filterNearbyProductsByStore(storeId) {
+  activeNearbyStoreFilter = storeId;
+  renderNearbyStoresSection();
+}
+
+function openAddNearbyStoreModal() {
+  const modal = document.getElementById('modal-add-nearby-store');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeAddNearbyStoreModal() {
+  const modal = document.getElementById('modal-add-nearby-store');
+  if (modal) modal.style.display = 'none';
+}
+
+function handleSaveNearbyStore(event) {
+  event.preventDefault();
+  const name = document.getElementById('nearby-store-name').value.trim();
+  const phone = document.getElementById('nearby-store-phone').value.replace(/\D/g, '');
+  const address = document.getElementById('nearby-store-address').value.trim();
+  const markup = Number(document.getElementById('nearby-store-markup').value) || 30;
+  const rawText = document.getElementById('nearby-store-raw-catalog').value.trim();
+
+  const storeId = 'store_' + Date.now();
+  const parsedCatalog = parseNearbyStoreCatalogWithAi(rawText, markup, storeId, name, phone);
+
+  const newStore = {
+    id: storeId,
+    name,
+    phone,
+    address,
+    markup,
+    catalog: parsedCatalog
+  };
+
+  saveNearbyStore(newStore);
+  closeAddNearbyStoreModal();
+  renderNearbyStoresSection();
+  if (window.showToast) window.showToast(`✓ Tienda "${name}" agregada con ${parsedCatalog.length} productos`);
+}
+
+function parseNearbyStoreCatalogWithAi(rawText, markupPercent, storeId, storeName, phone) {
+  if (!rawText) return [];
+  const lines = rawText.split(/\r?\n/).filter(l => l.trim().length > 0);
+  const products = [];
+
+  lines.forEach((line, idx) => {
+    // Parser inteligente: busca nombre, precio ($123 o 12300) y stock opcional (Stock: 5 o 5 u)
+    const priceMatch = line.match(/\$?(\d{1,3}(?:\.\d{3})*(?:,\d+)?|\d+)/g);
+    let price = 10000;
+    if (priceMatch && priceMatch.length > 0) {
+      const cleanPrice = priceMatch[priceMatch.length - 1].replace(/\./g, '').replace(/,/g, '.');
+      price = parseFloat(cleanPrice) || 10000;
+    }
+
+    const stockMatch = line.match(/stock[:\s]+(\d+)/i) || line.match(/(\d+)\s*(?:u|unidades|disp)/i);
+    const stock = stockMatch ? Number.parseInt(stockMatch[1], 10) : 5;
+
+    // Limpiar nombre
+    let prodName = line
+      .replace(/stock[:\s]+\d+/i, '')
+      .replace(/(\d+)\s*(?:u|unidades|disp)/i, '')
+      .replace(/\$?(\d{1,3}(?:\.\d{3})*(?:,\d+)?|\d+)/g, '')
+      .replace(/[-–—]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!prodName || prodName.length < 3) {
+      prodName = `Producto Aliado #${idx + 1}`;
+    }
+
+    const publicPrice = Math.round(price * (1 + markupPercent / 100));
+
+    products.push({
+      id: `loc_p_${storeId}_${idx + 1}`,
+      product_code: `LOC-${idx + 1}`,
+      name: prodName,
+      price,
+      public_price: publicPrice,
+      stock,
+      category: 'Otros'
+    });
+  });
+
+  return products;
+}
+
+function orderNearbyProductViaWa(productId, storePhone, productName) {
+  const cleanPhone = (storePhone || '5493434675428').replace(/\D/g, '');
+  const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'BÔ Grow Club';
+  const msg = `¡Hola! 👋 Te escribo de *BÔ Grow Club* (${activeVendor}). Queremos hacer un pedido rápido del producto: *${productName}* para coordinar entrega en 2 días. ¿Tienen disponibilidad confirmada? ¡Muchas gracias! 🌿`;
+  window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+/* ==========================================================================
+   BÔ GROW CLUB / PLATAFORMA SAAS — MÓDULO 3: LÍMITE DIARIO DE PRECIOS
+   ==========================================================================
+   El vendedor puede ajustar/descontar precios hasta 5 veces por día.
+   ========================================================================== */
+
+function getVendorPriceAdjustmentKey(vendorName) {
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const safeName = (vendorName || 'vendedor').toLowerCase().replace(/\s+/g, '_');
+  return `boeweb_price_adjustments_${safeName}_${dateStr}`;
+}
+
+function getVendorPriceAdjustmentCount(vendorName) {
+  const key = getVendorPriceAdjustmentKey(vendorName);
+  return Number.parseInt(localStorage.getItem(key) || '0', 10);
+}
+
+function canVendorAdjustPrice(vendorName, isSuperadmin = false) {
+  if (isSuperadmin) return { allowed: true, count: 0, max: Infinity, remaining: Infinity };
+  const count = getVendorPriceAdjustmentCount(vendorName);
+  const max = 5;
+  return {
+    allowed: count < max,
+    count,
+    max,
+    remaining: Math.max(0, max - count)
+  };
+}
+
+function recordVendorPriceAdjustment(vendorName, isSuperadmin = false) {
+  if (isSuperadmin) return true;
+  const key = getVendorPriceAdjustmentKey(vendorName);
+  const count = getVendorPriceAdjustmentCount(vendorName);
+  localStorage.setItem(key, String(count + 1));
+  return count + 1;
+}
+
+/* ==========================================================================
+   BÔ GROW CLUB / PLATAFORMA SAAS — MÓDULO 4: CUENTAS CORRIENTES & FIADOS EN POS
+   ==========================================================================
+   Gestión de crédito comercial, libro mayor de deudas y vencimiento de pagos.
+   ========================================================================== */
+
+function getCurrentAccounts() {
+  let accounts = null;
+  try {
+    const stored = localStorage.getItem('boeweb_current_accounts');
+    if (stored) accounts = JSON.parse(stored);
+  } catch (_) {}
+
+  if (!accounts || !Array.isArray(accounts) || accounts.length === 0) {
+    accounts = [
+      {
+        id: 'CC-001',
+        customer_name: 'Juan Pérez Cultivador',
+        dni: '34567890',
+        phone: '5493434675428',
+        credit_limit: 400000,
+        current_balance: 65000,
+        first_payment_due: '2026-09-01',
+        ledger: [
+          {
+            id: 'MOV-1',
+            date: '2026-08-10',
+            concept: 'Venta Mostrador #POS-9812',
+            amount: 65000,
+            type: 'DEBIT',
+            balance_after: 65000,
+            sale_draft_id: 'POS-9812',
+            items: [
+              { id: 'PROD-BIO-1', product_code: 'BIO-GROW-1L', name: 'BioBizz Bio Grow 1L', quantity: 2, unit_price: 22500, subtotal: 45000, image: 'assets/logo.jpg' },
+              { id: 'PROD-SUST-1', product_code: 'SUST-GROW-20L', name: 'Sustrato Growers Original 20L', quantity: 1, unit_price: 20000, subtotal: 20000, image: 'assets/logo.jpg' }
+            ]
+          }
+        ]
+      },
+      {
+        id: 'CC-002',
+        customer_name: 'María González Indoor',
+        dni: '38123456',
+        phone: '5493434112233',
+        credit_limit: 600000,
+        current_balance: 140000,
+        first_payment_due: '2026-08-25',
+        ledger: [
+          {
+            id: 'MOV-2',
+            date: '2026-08-01',
+            concept: 'Venta Mostrador #POS-9740',
+            amount: 140000,
+            type: 'DEBIT',
+            balance_after: 140000,
+            sale_draft_id: 'POS-9740',
+            items: [
+              { id: 'PROD-LED-1', product_code: 'LED-CITIZEN-150', name: 'Panel LED 150W Citizen CLU048', quantity: 1, unit_price: 140000, subtotal: 140000, image: 'assets/logo.jpg' }
+            ]
+          }
+        ]
+      }
+    ];
+  } else {
+    // Ensure existing mock entries have items
+    accounts.forEach(acc => {
+      if (Array.isArray(acc.ledger)) {
+        acc.ledger.forEach(m => {
+          if (m.type === 'DEBIT' && (!m.items || m.items.length === 0)) {
+            m.items = [
+              { id: 'PROD-1', product_code: 'PROD-GEN', name: m.concept || 'Productos Varios BÔ', quantity: 1, unit_price: m.amount || 0, subtotal: m.amount || 0, image: 'assets/logo.jpg' }
+            ];
+          }
+        });
+      }
+    });
+  }
+  return accounts;
+}
+
+function saveCurrentAccount(account) {
+  const accounts = getCurrentAccounts();
+  const idx = accounts.findIndex(a => a.id === account.id);
+  if (idx >= 0) {
+    accounts[idx] = account;
+  } else {
+    accounts.push(account);
+  }
+  localStorage.setItem('boeweb_current_accounts', JSON.stringify(accounts));
+}
+
+function switchPortfolioSubtab(subtab) {
+  const btnCc = document.getElementById('portfolio-subtab-btn-cc');
+  const btnGeneral = document.getElementById('portfolio-subtab-btn-general');
+  const panelCc = document.getElementById('portfolio-subtab-cc');
+  const panelGeneral = document.getElementById('portfolio-subtab-general');
+
+  if (subtab === 'cc') {
+    if (btnCc) btnCc.classList.add('active');
+    if (btnGeneral) btnGeneral.classList.remove('active');
+    if (panelCc) panelCc.style.display = 'block';
+    if (panelGeneral) panelGeneral.style.display = 'none';
+    renderCurrentAccountsUI();
+  } else {
+    if (btnCc) btnCc.classList.remove('active');
+    if (btnGeneral) btnGeneral.classList.add('active');
+    if (panelCc) panelCc.style.display = 'none';
+    if (panelGeneral) panelGeneral.style.display = 'block';
+    renderVendorPortfolioUI();
+  }
+}
+
+function renderCurrentAccountsUI() {
+  const tableBody = document.getElementById('vendor-cc-table-body');
+  const totalDebtEl = document.getElementById('cc-total-debt');
+  const activeCountEl = document.getElementById('cc-active-count');
+  const dueAlertsEl = document.getElementById('cc-due-alerts');
+  if (!tableBody) return;
+
+  const accounts = getCurrentAccounts();
+  const search = (document.getElementById('cc-search-input')?.value || '').toLowerCase();
+
+  const totalDebt = accounts.reduce((sum, a) => sum + (Number(a.current_balance) || 0), 0);
+  const activeCount = accounts.filter(a => (a.current_balance || 0) > 0).length;
+
+  // Due alerts: accounts with balance > 0 and due date within 7 days
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let dueAlertCount = 0;
+  accounts.forEach(a => {
+    if ((a.current_balance || 0) > 0 && a.first_payment_due) {
+      const dueDate = new Date(a.first_payment_due + 'T00:00:00');
+      const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays <= 7) dueAlertCount++;
+    }
+  });
+
+  if (totalDebtEl) totalDebtEl.textContent = `$${totalDebt.toLocaleString('es-AR')}`;
+  if (activeCountEl) activeCountEl.textContent = activeCount;
+  if (dueAlertsEl) dueAlertsEl.textContent = dueAlertCount;
+
+  const filtered = accounts.filter(a =>
+    a.customer_name.toLowerCase().includes(search) ||
+    (a.dni && a.dni.includes(search)) ||
+    (a.phone && a.phone.includes(search))
+  );
+
+  if (filtered.length === 0) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align: center; padding: 20px; color: var(--color-text-muted);">
+          No se encontraron cuentas corrientes con ese criterio.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tableBody.innerHTML = filtered.map(a => {
+    const debt = Number(a.current_balance || 0);
+    const limit = Number(a.credit_limit || 0);
+    let dueHtml = `<span style="color: var(--color-text-muted);">Sin vencimiento</span>`;
+
+    if (a.first_payment_due) {
+      const dueDate = new Date(a.first_payment_due + 'T00:00:00');
+      const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays < 0) {
+        dueHtml = `<span style="background: rgba(239,83,80,0.18); color: #ef5350; border: 1px solid #ef5350; padding: 3px 8px; border-radius: 8px; font-weight: 800; font-size: 0.75rem;">🔴 VENCIDO (${Math.abs(diffDays)}d)</span>`;
+      } else if (diffDays <= 7) {
+        dueHtml = `<span style="background: rgba(255,152,0,0.18); color: #ff9800; border: 1px solid #ff9800; padding: 3px 8px; border-radius: 8px; font-weight: 800; font-size: 0.75rem;">🟠 Vence en ${diffDays}d (${a.first_payment_due})</span>`;
+      } else {
+        dueHtml = `<span style="color: #2e7d32; font-weight: 700; font-size: 0.8rem;">🟢 ${a.first_payment_due} (${diffDays}d)</span>`;
+      }
+    }
+
+    return `
+      <tr style="border-bottom: 1px solid var(--color-border-subtle);">
+        <td style="padding: 12px 10px;">
+          <strong style="color: var(--color-text-main); font-weight: 700;">${escapeStockHtml(a.customer_name)}</strong>
+          <span style="display: block; font-size: 0.72rem; color: var(--color-text-muted);">DNI/CUIT: ${escapeStockHtml(a.dni || '-')}</span>
+        </td>
+        <td style="padding: 12px 10px;">
+          <a href="https://wa.me/${a.phone}" target="_blank" style="color: #25d366; font-weight: 700; text-decoration: none;">
+            💬 ${a.phone}
+          </a>
+        </td>
+        <td style="padding: 12px 10px; font-size: 1.05rem; font-weight: 800; color: ${debt > 0 ? '#ef5350' : '#2e7d32'};">
+          $${debt.toLocaleString('es-AR')}
+        </td>
+        <td style="padding: 12px 10px; font-size: 0.85rem; color: var(--color-text-muted);">
+          $${limit.toLocaleString('es-AR')}
+        </td>
+        <td style="padding: 12px 10px;">
+          ${dueHtml}
+        </td>
+        <td style="padding: 12px 10px; text-align: right; white-space: nowrap;">
+          <button type="button" class="btn btn-secondary" onclick="openCcDetailsModal('${a.id}')" title="Ver detalle de productos con fotos" style="padding: 6px 10px; font-size: 0.75rem; border-color: var(--vendor-forest); color: var(--vendor-forest); border-radius: 8px; font-weight: 700; margin-right: 4px;">
+            🔍 Detalle
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="generateAndPrintCcPdf('${a.id}')" title="Descargar / Imprimir PDF con fotos" style="padding: 6px 10px; font-size: 0.75rem; border-color: #1565c0; color: #1565c0; border-radius: 8px; font-weight: 700; margin-right: 4px;">
+            📄 PDF
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="openRecordCcPaymentModal('${a.id}')" title="Registrar Cobro" style="padding: 6px 10px; font-size: 0.75rem; border-color: #4caf50; color: #4caf50; border-radius: 8px; font-weight: 700; margin-right: 4px;">
+            💵 Cobrar
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="sendCcDetailedWhatsApp('${a.id}')" title="Enviar recordatorio y detalle por WhatsApp" style="padding: 6px 10px; font-size: 0.75rem; border-color: #25d366; color: #25d366; border-radius: 8px; font-weight: 700;">
+            💬 WA
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+let currentSelectedCcId = null;
+
+function openCcDetailsModal(ccId) {
+  currentSelectedCcId = ccId;
+  const accounts = getCurrentAccounts();
+  const account = accounts.find(a => a.id === ccId);
+  if (!account) return;
+
+  const headerEl = document.getElementById('cc-details-customer-header');
+  const debtEl = document.getElementById('cc-details-debt-badge');
+  const limitEl = document.getElementById('cc-details-limit-badge');
+  const dueEl = document.getElementById('cc-details-due-badge');
+
+  if (headerEl) headerEl.textContent = `${account.customer_name} · DNI: ${account.dni || '-'} · Tel: ${account.phone || '-'}`;
+  if (debtEl) debtEl.textContent = `$${Number(account.current_balance || 0).toLocaleString('es-AR')}`;
+  if (limitEl) limitEl.textContent = `$${Number(account.credit_limit || 0).toLocaleString('es-AR')}`;
+  if (dueEl) dueEl.textContent = account.first_payment_due || 'Sin fecha fijada';
+
+  renderCcDetailsMovements(account);
+
+  const modal = document.getElementById('modal-cc-details');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeCcDetailsModal() {
+  const modal = document.getElementById('modal-cc-details');
+  if (modal) modal.style.display = 'none';
+}
+
+function renderCcDetailsMovements(account) {
+  const container = document.getElementById('cc-details-movements-container');
+  if (!container) return;
+
+  const ledger = Array.isArray(account.ledger) ? [...account.ledger].reverse() : [];
+
+  if (ledger.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 30px; color: var(--color-text-muted);">
+        No hay compras ni pagos registrados aún en esta cuenta corriente.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = ledger.map((mov, idx) => {
+    const isDebit = mov.type === 'DEBIT';
+    const movDate = mov.date || '-';
+    const amountFormatted = Number(mov.amount || 0).toLocaleString('es-AR');
+    const balanceAfterFormatted = Number(mov.balance_after || 0).toLocaleString('es-AR');
+
+    if (isDebit) {
+      const items = Array.isArray(mov.items) && mov.items.length > 0
+        ? mov.items
+        : [
+            { name: mov.concept || 'Productos varios', quantity: 1, unit_price: mov.amount || 0, subtotal: mov.amount || 0, image: 'assets/logo.jpg' }
+          ];
+
+      return `
+        <div style="border: 1px solid var(--color-border-subtle); border-radius: 12px; padding: 14px; background: rgba(255,255,255,0.02);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px dashed var(--color-border-subtle); padding-bottom: 8px;">
+            <div>
+              <span style="background: rgba(239,83,80,0.15); color: #ef5350; border: 1px solid #ef5350; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 800; margin-right: 6px;">
+                📦 COMPRA FIADA (${movDate})
+              </span>
+              <strong style="color: var(--color-text-main); font-size: 0.9rem;">${escapeStockHtml(mov.concept)}</strong>
+            </div>
+            <div style="text-align: right;">
+              <strong style="color: #ef5350; font-size: 1.1rem;">+$${amountFormatted}</strong>
+              <span style="display: block; font-size: 0.72rem; color: var(--color-text-muted);">Saldo posterior: $${balanceAfterFormatted}</span>
+            </div>
+          </div>
+
+          <!-- Product Details with Photos -->
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${items.map(item => {
+              const imgUrl = item.image || 'assets/logo.jpg';
+              const itemQty = Number(item.quantity) || 1;
+              const unitPrice = Number(item.unit_price) || 0;
+              const itemSub = Number(item.subtotal) || (unitPrice * itemQty);
+
+              return `
+                <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(21,45,36,0.03); border: 1px solid var(--color-border-subtle); border-radius: 10px; padding: 8px 12px;">
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <img src="${imgUrl}" alt="${escapeStockHtml(item.name)}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid var(--color-border-subtle); background: #fff;" onerror="this.src='assets/logo.jpg'">
+                    <div>
+                      <strong style="color: var(--color-text-main); font-size: 0.88rem; display: block;">${escapeStockHtml(item.name)}</strong>
+                      <span style="font-size: 0.75rem; color: var(--color-text-muted);">
+                        ${itemQty} u. × $${unitPrice.toLocaleString('es-AR')}
+                      </span>
+                    </div>
+                  </div>
+                  <strong style="color: var(--vendor-forest); font-size: 0.95rem;">
+                    $${itemSub.toLocaleString('es-AR')}
+                  </strong>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    } else {
+      // CREDIT / PAYMENT
+      return `
+        <div style="border: 1px solid rgba(76,175,80,0.3); border-radius: 12px; padding: 14px; background: rgba(76,175,80,0.04);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span style="background: rgba(76,175,80,0.18); color: #2e7d32; border: 1px solid #4caf50; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 800; margin-right: 6px;">
+                💵 COBRO / PAGO (${movDate})
+              </span>
+              <strong style="color: var(--color-text-main); font-size: 0.9rem;">${escapeStockHtml(mov.concept)}</strong>
+            </div>
+            <div style="text-align: right;">
+              <strong style="color: #2e7d32; font-size: 1.1rem;">-$${amountFormatted}</strong>
+              <span style="display: block; font-size: 0.72rem; color: var(--color-text-muted);">Saldo posterior: $${balanceAfterFormatted}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }).join('');
+}
+
+function generateAndPrintCcPdf(ccId = null) {
+  const targetId = ccId || currentSelectedCcId;
+  const accounts = getCurrentAccounts();
+  const account = accounts.find(a => a.id === targetId);
+  if (!account) {
+    alert('Seleccioná una cuenta corriente válida para generar el comprobante PDF.');
+    return;
+  }
+
+  const vendorName = localStorage.getItem('boeweb_vendor_name') || 'BÔ Grow Club';
+  const emitDate = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const balance = Number(account.current_balance || 0).toLocaleString('es-AR');
+  const limit = Number(account.credit_limit || 0).toLocaleString('es-AR');
+  const dueDate = account.first_payment_due || 'A convenir';
+
+  // Gather all items from DEBIT movements
+  const allDebits = (account.ledger || []).filter(m => m.type === 'DEBIT');
+  const allCredits = (account.ledger || []).filter(m => m.type === 'CREDIT');
+
+  const totalPurchases = allDebits.reduce((s, m) => s + Number(m.amount || 0), 0);
+  const totalPaid = allCredits.reduce((s, m) => s + Number(m.amount || 0), 0);
+
+  const printWindow = window.open('', '_blank', 'width=900,height=850');
+  if (!printWindow) {
+    alert('El navegador bloqueó la ventana emergente para imprimir el PDF. Por favor habilitala.');
+    return;
+  }
+
+  const printHtml = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Estado de Cuenta Corriente — ${escapeStockHtml(account.customer_name)}</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm 15mm 15mm 15mm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #1a2e26;
+      background: #fff;
+      margin: 0;
+      padding: 10px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #152D24;
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+    }
+    .brand-title {
+      font-size: 22px;
+      font-weight: 900;
+      color: #152D24;
+      letter-spacing: 0.5px;
+      margin: 0;
+    }
+    .brand-sub {
+      font-size: 11px;
+      color: #555;
+      margin: 2px 0 0 0;
+    }
+    .doc-badge {
+      text-align: right;
+    }
+    .doc-badge h2 {
+      margin: 0;
+      font-size: 16px;
+      color: #C2A246;
+    }
+    .customer-card {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      background: #fbf9f4;
+      border: 1px solid #e0d8c3;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+    .customer-card h4 {
+      margin: 0 0 6px 0;
+      font-size: 13px;
+      color: #152D24;
+    }
+    .table-products {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+    }
+    .table-products th {
+      background: #152D24;
+      color: #fff;
+      text-align: left;
+      padding: 8px 10px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .table-products td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #eee;
+      vertical-align: middle;
+    }
+    .prod-img {
+      width: 46px;
+      height: 46px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      background: #fff;
+      display: block;
+    }
+    .financial-summary {
+      display: flex;
+      justify-content: space-between;
+      background: #fbf9f4;
+      border: 1.5px solid #152D24;
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+    .balance-highlight {
+      font-size: 20px;
+      font-weight: 900;
+      color: #d32f2f;
+    }
+    .payment-instructions {
+      border: 1px dashed #1565c0;
+      background: #f0f7ff;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      font-size: 11px;
+    }
+    .footer-note {
+      text-align: center;
+      font-size: 10px;
+      color: #888;
+      margin-top: 15px;
+      border-top: 1px solid #eee;
+      padding-top: 8px;
+    }
+    @media print {
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print" style="background: #152D24; color: #fff; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
+    <span>📄 Vista Previa de Impresión / Guardar como PDF</span>
+    <button onclick="window.print()" style="background: #C2A246; color: #152D24; border: none; font-weight: 800; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+      🖨️ IMPRIMIR / GUARDAR PDF
+    </button>
+  </div>
+
+  <div class="header">
+    <div>
+      <h1 class="brand-title">🌿 BÔ GROW CLUB</h1>
+      <p class="brand-sub">Cultivo Indoor · Nutrición Orgánica · Asesoramiento Profesional</p>
+      <p class="brand-sub">Paraná, Entre Ríos · Tel: +54 9 343 467-5428</p>
+    </div>
+    <div class="doc-badge">
+      <h2>ESTADO DE CUENTA CORRIENTE</h2>
+      <p style="margin: 3px 0 0 0; font-size: 11px; color: #666;">Fecha de Emisión: <strong>${emitDate}</strong></p>
+      <p style="margin: 2px 0 0 0; font-size: 11px; color: #666;">Asesor: <strong>${escapeStockHtml(vendorName)}</strong></p>
+    </div>
+  </div>
+
+  <div class="customer-card">
+    <div>
+      <h4>👤 Datos del Cliente</h4>
+      <p style="margin: 2px 0;"><strong>Nombre:</strong> ${escapeStockHtml(account.customer_name)}</p>
+      <p style="margin: 2px 0;"><strong>DNI / CUIT:</strong> ${escapeStockHtml(account.dni || 'No registrado')}</p>
+      <p style="margin: 2px 0;"><strong>WhatsApp / Tel:</strong> ${escapeStockHtml(account.phone || '-')}</p>
+    </div>
+    <div>
+      <h4>📋 Condiciones del Crédito</h4>
+      <p style="margin: 2px 0;"><strong>Límite de Crédito:</strong> $${limit}</p>
+      <p style="margin: 2px 0;"><strong>Fecha Límite 1.° Pago:</strong> <strong style="color: #d32f2f;">${dueDate}</strong></p>
+      <p style="margin: 2px 0;"><strong>Estado:</strong> ${Number(account.current_balance || 0) > 0 ? '⚠️ Saldo Pendiente de Pago' : '🟢 Al día'}</p>
+    </div>
+  </div>
+
+  <h3 style="color: #152D24; font-size: 13px; margin: 0 0 8px 0;">📦 Detalle de Productos Retirados de la Tienda</h3>
+  <table class="table-products">
+    <thead>
+      <tr>
+        <th style="width: 55px;">Foto</th>
+        <th>Fecha / Comprobante</th>
+        <th>Producto / Descripción</th>
+        <th style="text-align: center;">Cant.</th>
+        <th style="text-align: right;">P. Unitario</th>
+        <th style="text-align: right;">Subtotal</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${allDebits.flatMap(mov => {
+        const items = Array.isArray(mov.items) && mov.items.length > 0
+          ? mov.items
+          : [{ name: mov.concept, quantity: 1, unit_price: mov.amount, subtotal: mov.amount, image: 'assets/logo.jpg' }];
+
+        return items.map((item, i) => `
+          <tr>
+            <td>
+              <img class="prod-img" src="${item.image || 'assets/logo.jpg'}" alt="${escapeStockHtml(item.name)}" onerror="this.src='assets/logo.jpg'">
+            </td>
+            <td style="font-size: 11px;">
+              <strong>${mov.date}</strong>
+              <span style="display: block; color: #777; font-size: 10px;">${escapeStockHtml(mov.concept || '')}</span>
+            </td>
+            <td>
+              <strong style="color: #152D24; font-size: 12px;">${escapeStockHtml(item.name)}</strong>
+              ${item.product_code ? `<span style="display: block; font-size: 10px; color: #888;">SKU: ${escapeStockHtml(item.product_code)}</span>` : ''}
+            </td>
+            <td style="text-align: center; font-weight: 700;">${item.quantity} u.</td>
+            <td style="text-align: right;">$${Number(item.unit_price || 0).toLocaleString('es-AR')}</td>
+            <td style="text-align: right; font-weight: 700; color: #152D24;">$${Number(item.subtotal || 0).toLocaleString('es-AR')}</td>
+          </tr>
+        `);
+      }).join('')}
+    </tbody>
+  </table>
+
+  <div class="financial-summary">
+    <div>
+      <span style="font-size: 11px; color: #666; display: block;">Total Compras Realizadas:</span>
+      <strong style="font-size: 14px;">$${totalPurchases.toLocaleString('es-AR')}</strong>
+      <span style="font-size: 11px; color: #2e7d32; display: block; margin-top: 4px;">Total Pagos / Entregas:</span>
+      <strong style="font-size: 14px; color: #2e7d32;">-$${totalPaid.toLocaleString('es-AR')}</strong>
+    </div>
+    <div style="text-align: right;">
+      <span style="font-size: 12px; color: #555; display: block;">TOTAL SALDO PENDIENTE A ABONAR:</span>
+      <div class="balance-highlight">$${balance}</div>
+      <small style="color: #e65100; font-weight: 700;">Vencimiento acordado: ${dueDate}</small>
+    </div>
+  </div>
+
+  <div class="payment-instructions">
+    <strong style="color: #1565c0; font-size: 12px; display: block; margin-bottom: 4px;">🏦 Datos Bancarios para Cancelación / Transferencia:</strong>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+      <div>• <strong>Alias:</strong> BOGROWCLUB.OFICIAL</div>
+      <div>• <strong>CBU:</strong> 0000003100012345678901</div>
+      <div>• <strong>Titular:</strong> BÔ Grow Club</div>
+      <div>• <strong>Banco:</strong> Banco de Entre Ríos / Santander</div>
+    </div>
+    <small style="display: block; margin-top: 6px; color: #555;">Una vez realizada la transferencia, enviar el comprobante a este WhatsApp para asentar la acreditación de saldo.</small>
+  </div>
+
+  <div class="footer-note">
+    Documento informativo no válido como factura fiscal. BÔ Grow Club — Pasión por el Cultivo y la Excelencia.
+  </div>
+
+  <script>
+    window.onload = function() {
+      // Auto-trigger print dialog after images render
+      setTimeout(function() {
+        window.print();
+      }, 400);
+    };
+  </script>
+</body>
+</html>
+  `;
+
+  printWindow.document.open();
+  printWindow.document.write(printHtml);
+  printWindow.document.close();
+}
+
+function sendCcDetailedWhatsApp(ccId) {
+  const accounts = getCurrentAccounts();
+  const account = accounts.find(a => a.id === ccId);
+  if (!account) return;
+
+  const phone = (account.phone || '').replace(/\D/g, '');
+  if (!phone) {
+    alert('Esta cuenta corriente no tiene un teléfono celular registrado.');
+    return;
+  }
+
+  const balance = Number(account.current_balance || 0).toLocaleString('es-AR');
+  const dueDate = account.first_payment_due || 'a convenir';
+  const vendorName = localStorage.getItem('boeweb_vendor_name') || 'BÔ Grow Club';
+
+  // Extract products taken
+  const allDebits = (account.ledger || []).filter(m => m.type === 'DEBIT');
+  const itemsSummary = allDebits.flatMap(m => {
+    if (Array.isArray(m.items) && m.items.length > 0) {
+      return m.items.map(it => `• ${it.quantity}x *${it.name}* — $${Number(it.subtotal || 0).toLocaleString('es-AR')}`);
+    }
+    return [`• 1x *${m.concept}* — $${Number(m.amount || 0).toLocaleString('es-AR')}`];
+  });
+
+  const msg = `🌿 *BÔ Grow Club — Resumen de Cuenta Corriente*\n\n¡Hola ${account.customer_name}! 👋 Te saluda ${vendorName} de *BÔ Grow Club*.\n\nTe compartimos el detalle de los productos retirados de la tienda y el saldo pendiente:\n\n📦 *Productos Retirados:*\n${itemsSummary.slice(0, 10).join('\n')}\n\n💰 *Total Saldo Adeudado:* *$${balance}*\n📅 *Fecha Límite Acordada:* *${dueDate}*\n\n💳 *Datos para Transferencia:*\n• Alias: *BOGROWCLUB.OFICIAL*\n• CBU: *0000003100012345678901*\n• Titular: *BÔ Grow Club*\n\n*(Podés solicitar el comprobante PDF con fotos de tus productos por este medio)*. ¡Muchas gracias por tu confianza! 🙏`;
+
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+function sendCcDetailedWhatsAppFromModal() {
+  if (currentSelectedCcId) {
+    sendCcDetailedWhatsApp(currentSelectedCcId);
+  }
+}
+
+function openNewCurrentAccountModal() {
+  const modal = document.getElementById('modal-new-current-account');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeNewCurrentAccountModal() {
+  const modal = document.getElementById('modal-new-current-account');
+  if (modal) modal.style.display = 'none';
+}
+
+function handleCreateCurrentAccount(event) {
+  event.preventDefault();
+  const name = document.getElementById('cc-new-name').value.trim();
+  const dni = document.getElementById('cc-new-dni').value.trim();
+  const phone = document.getElementById('cc-new-phone').value.replace(/\D/g, '');
+  const limit = Number(document.getElementById('cc-new-limit').value) || 300000;
+  const dueDate = document.getElementById('cc-new-due-date').value || null;
+
+  const newAccount = {
+    id: 'CC-' + Date.now(),
+    customer_name: name,
+    dni,
+    phone,
+    credit_limit: limit,
+    current_balance: 0,
+    first_payment_due: dueDate,
+    ledger: []
+  };
+
+  saveCurrentAccount(newAccount);
+  closeNewCurrentAccountModal();
+  renderCurrentAccountsUI();
+  populatePosCurrentAccountDropdown();
+  if (window.showToast) window.showToast(`✓ Cuenta Corriente de "${name}" creada`);
+}
+
+function openRecordCcPaymentModal(ccId) {
+  const accounts = getCurrentAccounts();
+  const account = accounts.find(a => a.id === ccId);
+  if (!account) return;
+
+  document.getElementById('cc-pay-account-id').value = ccId;
+  document.getElementById('cc-pay-customer-name').textContent = account.customer_name;
+  document.getElementById('cc-pay-current-debt').textContent = `$${Number(account.current_balance || 0).toLocaleString('es-AR')}`;
+  document.getElementById('cc-pay-amount').value = account.current_balance || '';
+
+  const modal = document.getElementById('modal-record-cc-payment');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeRecordCcPaymentModal() {
+  const modal = document.getElementById('modal-record-cc-payment');
+  if (modal) modal.style.display = 'none';
+}
+
+function handleRecordCcPaymentSubmit(event) {
+  event.preventDefault();
+  const ccId = document.getElementById('cc-pay-account-id').value;
+  const amount = Number(document.getElementById('cc-pay-amount').value);
+  const method = document.getElementById('cc-pay-method').value;
+  const note = document.getElementById('cc-pay-note').value.trim();
+
+  if (!amount || amount <= 0) {
+    alert('Ingresá un monto válido para el cobro.');
+    return;
+  }
+
+  const accounts = getCurrentAccounts();
+  const account = accounts.find(a => a.id === ccId);
+  if (!account) return;
+
+  const newBalance = Math.max(0, (account.current_balance || 0) - amount);
+  account.current_balance = newBalance;
+  if (!account.ledger) account.ledger = [];
+  account.ledger.push({
+    id: 'PAG-' + Date.now(),
+    date: new Date().toISOString().slice(0, 10),
+    concept: `Cobro Cuenta Corriente (${method}) - ${note || 'Pago a cuenta'}`,
+    amount,
+    type: 'CREDIT',
+    balance_after: newBalance
+  });
+
+  saveCurrentAccount(account);
+
+  // If paid in cash, add to Caja BÔ shift
+  if (method === 'EFECTIVO') {
+    try {
+      const today = getTodayDateKey();
+      const cashData = getVendorCashData(today);
+      cashData.sales.push({
+        id: 'CC-PAY-' + Date.now(),
+        amount: amount,
+        time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+        paymentMethod: 'EFECTIVO',
+        seller: localStorage.getItem('boeweb_vendor_name') || 'Vendedor',
+        itemsSummary: `Cobro CC: ${account.customer_name}`
+      });
+      saveVendorCashData(cashData, today);
+    } catch (_) {}
+  }
+
+  closeRecordCcPaymentModal();
+  renderCurrentAccountsUI();
+  if (modalCcDetailsIsOpen()) {
+    renderCcDetailsMovements(account);
+    const debtEl = document.getElementById('cc-details-debt-badge');
+    if (debtEl) debtEl.textContent = `$${newBalance.toLocaleString('es-AR')}`;
+  }
+  if (window.showToast) window.showToast(`✓ Pago de $${amount.toLocaleString('es-AR')} registrado con éxito`);
+}
+
+function modalCcDetailsIsOpen() {
+  const modal = document.getElementById('modal-cc-details');
+  return modal && modal.style.display !== 'none';
+}
+
+function sendCcWhatsAppReminder(ccId) {
+  sendCcDetailedWhatsApp(ccId);
+}
+
+function handlePosPaymentMethodChange() {
+  const methodSelect = document.getElementById('pos-payment-method-select');
+  const ccContainer = document.getElementById('pos-current-account-container');
+  if (methodSelect && ccContainer) {
+    if (methodSelect.value === 'CUENTA_CORRIENTE') {
+      ccContainer.style.display = 'block';
+      populatePosCurrentAccountDropdown();
+    } else {
+      ccContainer.style.display = 'none';
+    }
+  }
+}
+
+function populatePosCurrentAccountDropdown() {
+  const select = document.getElementById('pos-current-account-select');
+  if (!select) return;
+  const accounts = getCurrentAccounts();
+  select.innerHTML = `
+    <option value="">-- Elegir cliente registrado --</option>
+    ${accounts.map(a => `
+      <option value="${a.id}">
+        ${escapeStockHtml(a.customer_name)} (Saldo: $${Number(a.current_balance || 0).toLocaleString('es-AR')})
+      </option>
+    `).join('')}
+  `;
+}
+
+function updatePosCurrentAccountInfo() {
+  const select = document.getElementById('pos-current-account-select');
+  const infoEl = document.getElementById('pos-current-account-info');
+  const dueDateInput = document.getElementById('pos-cc-due-date');
+  if (!select || !infoEl) return;
+
+  const ccId = select.value;
+  if (!ccId) {
+    infoEl.innerHTML = '';
+    return;
+  }
+
+  const accounts = getCurrentAccounts();
+  const account = accounts.find(a => a.id === ccId);
+  if (!account) return;
+
+  const debt = Number(account.current_balance || 0);
+  const limit = Number(account.credit_limit || 300000);
+  const available = Math.max(0, limit - debt);
+
+  infoEl.innerHTML = `
+    <span>💳 Límite total: <strong>$${limit.toLocaleString('es-AR')}</strong></span>
+    <span>🔴 Saldo adeudado actual: <strong style="color: #ef5350;">$${debt.toLocaleString('es-AR')}</strong></span>
+    <span>🟢 Crédito disponible: <strong style="color: #2e7d32;">$${available.toLocaleString('es-AR')}</strong></span>
+  `;
+
+  if (dueDateInput && account.first_payment_due) {
+    dueDateInput.value = account.first_payment_due;
+  }
+}
+
+// Exports
+window.calculateExpirationStatus = calculateExpirationStatus;
+window.getAllProductsWithExpirations = getAllProductsWithExpirations;
+window.renderExpirationsSection = renderExpirationsSection;
+window.filterExpirationsByTime = filterExpirationsByTime;
+window.applyPromoForExpiringProduct = applyPromoForExpiringProduct;
+
+window.getNearbyStores = getNearbyStores;
+window.saveNearbyStore = saveNearbyStore;
+window.renderNearbyStoresSection = renderNearbyStoresSection;
+window.filterNearbyProductsByStore = filterNearbyProductsByStore;
+window.openAddNearbyStoreModal = openAddNearbyStoreModal;
+window.closeAddNearbyStoreModal = closeAddNearbyStoreModal;
+window.handleSaveNearbyStore = handleSaveNearbyStore;
+window.orderNearbyProductViaWa = orderNearbyProductViaWa;
+
+window.getVendorPriceAdjustmentCount = getVendorPriceAdjustmentCount;
+window.canVendorAdjustPrice = canVendorAdjustPrice;
+window.recordVendorPriceAdjustment = recordVendorPriceAdjustment;
+
+window.getCurrentAccounts = getCurrentAccounts;
+window.saveCurrentAccount = saveCurrentAccount;
+window.switchPortfolioSubtab = switchPortfolioSubtab;
+window.renderCurrentAccountsUI = renderCurrentAccountsUI;
+window.openNewCurrentAccountModal = openNewCurrentAccountModal;
+window.closeNewCurrentAccountModal = closeNewCurrentAccountModal;
+window.handleCreateCurrentAccount = handleCreateCurrentAccount;
+window.openRecordCcPaymentModal = openRecordCcPaymentModal;
+window.closeRecordCcPaymentModal = closeRecordCcPaymentModal;
+window.handleRecordCcPaymentSubmit = handleRecordCcPaymentSubmit;
+window.sendCcWhatsAppReminder = sendCcWhatsAppReminder;
+window.sendCcDetailedWhatsApp = sendCcDetailedWhatsApp;
+window.sendCcDetailedWhatsAppFromModal = sendCcDetailedWhatsAppFromModal;
+window.openCcDetailsModal = openCcDetailsModal;
+window.closeCcDetailsModal = closeCcDetailsModal;
+window.generateAndPrintCcPdf = generateAndPrintCcPdf;
+window.handlePosPaymentMethodChange = handlePosPaymentMethodChange;
+window.updatePosCurrentAccountInfo = updatePosCurrentAccountInfo;
 
 
 

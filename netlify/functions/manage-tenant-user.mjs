@@ -54,3 +54,34 @@ export async function handler(event) {
     return { statusCode: 400, body: JSON.stringify({ error: err.message }) };
   }
 }
+
+function jsonResponse(status, payload) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff'
+    }
+  });
+}
+
+export default async function (request, context) {
+  if (request.method !== 'POST') {
+    return jsonResponse(405, { error: 'Method Not Allowed' });
+  }
+
+  try {
+    const rawBody = await request.text();
+    const body = rawBody ? JSON.parse(rawBody) : {};
+    const event = {
+      httpMethod: request.method,
+      body: JSON.stringify(body)
+    };
+    const result = await handler(event, context);
+    return jsonResponse(result.statusCode, JSON.parse(result.body));
+  } catch (err) {
+    return jsonResponse(400, { error: err.message });
+  }
+}
+

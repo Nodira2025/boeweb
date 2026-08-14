@@ -2,6 +2,19 @@
    BO growclub E-commerce Logic Engine
    ========================================================================== */
 
+// Supabase Initialization for storefront
+const SUPABASE_URL = 'https://sxbhrgvizqylnfcqzhin.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4YmhyZ3ZpenF5bG5mY3F6aGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMjM1MzEsImV4cCI6MjA5Njg5OTUzMX0.UUOwXsHXKNCjlJKdxMUlAuCtNAnNWgAroBwMlWAdTag';
+
+let supabaseClient = null;
+if (window.supabase) {
+  try {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } catch (sbInitErr) {
+    console.warn('Supabase initialization in storefront:', sbInitErr);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // --- STATE MANAGEMENT ---
   let products = [];
@@ -186,69 +199,160 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       let fetchedSuccessfully = false;
 
-      // 1. Try local JSON first
-      try {
-        const response = await fetch('products.json');
-        if (response.ok) {
-          products = await response.json();
-          products = products.filter(p => p && p.id && p.name);
-          if (products.length > 0) {
-            fetchedSuccessfully = true;
-          }
-        }
-      } catch (jsonErr) {
-        console.warn('Local products.json fetch failed, trying Supabase fallback...', jsonErr);
-      }
-
-      // 2. Fallback to Supabase if products.json failed or was blocked by CORS
-      if (!fetchedSuccessfully && window.supabase) {
+      // 1. Priority A: Fetch Internal Store Catalog from Supabase
+      if (window.supabase) {
         try {
           const supabaseUrl = 'https://sxbhrgvizqylnfcqzhin.supabase.co';
           const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4YmhyZ3ZpenF5bG5mY3F6aGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMjM1MzEsImV4cCI6MjA5Njg5OTUzMX0.UUOwXsHXKNCjlJKdxMUlAuCtNAnNWgAroBwMlWAdTag';
           const client = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
-          
-          const { data, error } = await client.from('products').select(`
-            id,
-            name,
-            image,
-            category,
-            description,
-            supplier_products (
-              id,
-              price,
-              stock,
-              available,
-              link
-            )
-          `).order('name', { ascending: true });
 
-          if (!error && data && data.length > 0) {
-            products = data.map(p => {
-              const suppliers = p.supplier_products || [];
-              const validPrices = suppliers.map(s => Number(s.price)).filter(pr => !isNaN(pr) && pr > 0);
-              const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
-              const totalStock = suppliers.reduce((acc, s) => acc + (s.stock || 0), 0);
-              const isAvailable = suppliers.length === 0 || suppliers.some(s => s.available);
+          // 1.1 Fetch products from supplier_products (both local_store and external suppliers)
+          const { data: allSupplierRows, error: suppErr } = await client
+            .from('supplier_products')
+            .select('*')
+            .order('name', { ascending: true });
+
+          if (!suppErr && allSupplierRows && allSupplierRows.length > 0) {
+            const productIds = [...new Set(allSupplierRows.map(r => r.mapped_product_id || r.supplier_product_id).filter(Boolean))];
+            let metadataMap = new Map();
+            if (productIds.length > 0) {
+              const { data: prodMeta } = await client.from('products').select('*').in('id', productIds);
+              if (prodMeta) {
+                prodMeta.forEach(pm => metadataMap.set(String(pm.id), pm));
+              }
+            }
+
+            const ownRows = allSupplierRows.filter(r => r.supplier_id === 'local_store');
+            const b2bRows = allSupplierRows.filter(r => r.supplier_id !== 'local_store');
+
+            const ownParsed = ownRows.map(r => {
+              const pid = String(r.mapped_product_id || r.supplier_product_id || r.id);
+              const meta = metadataMap.get(pid) || {};
+              const qty = Math.max(0, Number(r.stock) || 0);
+              const isAvail = r.available !== false && (qty > 0 || r.stock === null);
               return {
-                id: String(p.id),
-                name: p.name || 'Producto sin nombre',
-                price: minPrice,
-                image: p.image || 'assets/logo.jpg',
-                link: suppliers[0]?.link || '',
-                slug: (p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-                stock: totalStock,
-                available: isAvailable,
-                category: p.category || 'Otros',
-                description: p.description || ''
+                id: pid,
+                product_code: pid,
+                name: meta.name || r.name || 'Producto BÔ',
+                price: Number(r.price) || 0,
+                image: meta.image || r.image || 'assets/logo.jpg',
+                link: r.link || '',
+                slug: (meta.name || r.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+                stock: qty,
+                own_stock: qty,
+                available: isAvail,
+                category: meta.category || 'Otros',
+                description: meta.description || r.description || ''
               };
             });
+
+            const b2bParsed = b2bRows.map(r => {
+              const pid = String(r.mapped_product_id || r.supplier_product_id || r.id);
+              const meta = metadataMap.get(pid) || {};
+              return {
+                id: pid,
+                product_code: pid,
+                name: meta.name || r.name || 'Producto B2B',
+                price: Number(r.price) || 0,
+                image: meta.image || r.image || 'assets/logo.jpg',
+                link: r.link || '',
+                slug: (meta.name || r.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+                stock: 0,
+                own_stock: 0,
+                available: true,
+                category: meta.category || 'Otros',
+                description: meta.description || r.description || '',
+                supplier_code: r.supplier_id,
+                supplier_name: r.supplier_id
+              };
+            });
+
+            // Local Stores Products (Otras Tiendas Cerca)
+            let localStores = [];
+            try {
+              const cachedLocalStores = localStorage.getItem('boeweb_nearby_stores_catalog');
+              if (cachedLocalStores) localStores = JSON.parse(cachedLocalStores);
+            } catch (_) {}
+
+            if (typeof window.PublicCatalogUnifier !== 'undefined') {
+              products = window.PublicCatalogUnifier.unifyProducts(ownParsed, b2bParsed, {
+                localStoresProducts: localStores
+              });
+            } else {
+              products = [...ownParsed, ...b2bParsed];
+            }
+
             products = products.filter(p => p.id && p.name);
             if (products.length > 0) {
               fetchedSuccessfully = true;
+              try {
+                localStorage.setItem('boeweb_internal_catalog', JSON.stringify(products));
+              } catch (_) {}
+            }
+          }
+
+          // 1.2 Fallback to safe public_catalog_products view
+          if (!fetchedSuccessfully) {
+            const { data: viewData, error: viewErr } = await client
+              .from('public_catalog_products')
+              .select('*')
+              .order('name', { ascending: true });
+
+            if (!viewErr && viewData && viewData.length > 0) {
+              const viewParsed = viewData.map(p => ({
+                id: String(p.product_id || p.id),
+                product_code: String(p.sku || p.id),
+                name: p.name || 'Producto BÔ',
+                price: Number(p.public_price || p.price) || 0,
+                image: p.image_url || p.image || 'assets/logo.jpg',
+                link: '',
+                slug: (p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+                stock: 10,
+                own_stock: 10,
+                available: p.is_available !== false,
+                availability: 'EN_STOCK',
+                badge_text: '🟢 EN STOCK',
+                category: p.category || 'Otros',
+                description: p.public_description || p.description || ''
+              }));
+              products = viewParsed.filter(p => p.id && p.name);
+              if (products.length > 0) {
+                fetchedSuccessfully = true;
+              }
             }
           }
         } catch (spErr) {
           console.warn('Supabase catalog fetch failed:', spErr);
+        }
+      }
+
+      // 2. Fallback to cached local internal catalog
+      if (!fetchedSuccessfully) {
+        try {
+          const cached = localStorage.getItem('boeweb_internal_catalog');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              products = parsed;
+              fetchedSuccessfully = true;
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 3. Fallback to local products.json if no internal products found yet
+      if (!fetchedSuccessfully) {
+        try {
+          const response = await fetch('products.json');
+          if (response.ok) {
+            products = await response.json();
+            products = products.filter(p => p && p.id && p.name);
+            if (products.length > 0) {
+              fetchedSuccessfully = true;
+            }
+          }
+        } catch (jsonErr) {
+          console.warn('Local products.json fetch failed, trying Supabase fallback...', jsonErr);
         }
       }
 
@@ -686,10 +790,16 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Stock warning tags
       let stockTag = '';
-      if (!product.available) {
+      if (product.availability === 'LOCAL_2_DAYS' || product.badge_text?.includes('2 DÍAS')) {
+        stockTag = '<span class="stock-tag tag-local-store">📦 Llega en 2 días</span>';
+      } else if (product.availability === 'A_PEDIDO' || product.badge_text?.includes('5 días') || product.badge_text?.includes('PEDIDO')) {
+        stockTag = '<span class="stock-tag tag-on-demand">📦 Solo por pedido · 5 días</span>';
+      } else if (!product.available) {
         stockTag = '<span class="stock-tag tag-out">Sin Stock</span>';
       } else if (product.stock && product.stock <= 5) {
         stockTag = `<span class="stock-tag">Últimos ${product.stock}</span>`;
+      } else {
+        stockTag = '<span class="stock-tag tag-in-stock">🟢 En Stock</span>';
       }
 
       // Fallback image if empty
@@ -1156,23 +1266,58 @@ document.addEventListener('DOMContentLoaded', () => {
     const orderId = 'BO-' + Math.floor(100000 + Math.random() * 900000);
 
     // Save order history locally
-    const orderHistory = JSON.parse(localStorage.getItem('boeweb_order_history')) || [];
-    const currentMember = JSON.parse(localStorage.getItem('boeweb_member'));
+    let orderHistory = [];
+    try {
+      orderHistory = JSON.parse(localStorage.getItem('boeweb_order_history')) || [];
+    } catch (e) {
+      orderHistory = [];
+    }
+    let currentMember = null;
+    try {
+      currentMember = JSON.parse(localStorage.getItem('boeweb_member'));
+    } catch (e) {
+      currentMember = null;
+    }
     const newOrder = {
       id: orderId,
+      order_id: orderId,
       date: new Date().toISOString(),
+      created_at: new Date().toISOString(),
       email: currentMember ? currentMember.email : '',
       phone: phone,
       name: name,
-      items: cart.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, price: i.price })),
+      customer_name: name,
+      customer_phone: phone,
+      deliveryType: deliveryType,
+      delivery_type: deliveryType,
+      address: deliveryType === 'shipping' ? (address || '') : 'Retiro por el local',
+      notes: notes || '',
+      items: cart.map(i => ({
+        id: i.id,
+        product_code: i.product_code || i.id,
+        name: i.name,
+        quantity: i.quantity,
+        price: i.price,
+        image: i.image || i.image_url || 'assets/logo.jpg'
+      })),
       subtotal: subtotal,
       discount: discount,
       total: total,
+      total_amount: total,
       paymentMethod: payment,
-      status: payment.includes('Mercado') ? 'Pendiente Mercado Pago' : 'Confirmado'
+      payment_method: payment,
+      status: payment.includes('Mercado') ? 'Pendiente Mercado Pago' : 'Pendiente Vendedor',
+      source: 'WEB'
     };
     orderHistory.unshift(newOrder);
     localStorage.setItem('boeweb_order_history', JSON.stringify(orderHistory));
+
+    // Save for store vendor mediation
+    try {
+      let webOrders = JSON.parse(localStorage.getItem('boeweb_web_orders') || '[]');
+      webOrders.unshift(newOrder);
+      localStorage.setItem('boeweb_web_orders', JSON.stringify(webOrders));
+    } catch (_) {}
 
     // Save to Supabase orders table if client available
     if (window.supabase) {
@@ -1186,6 +1331,7 @@ document.addEventListener('DOMContentLoaded', () => {
           payment_method: payment,
           total_amount: total,
           items_json: newOrder.items,
+          notes: notes || '',
           status: newOrder.status,
           created_at: new Date().toISOString()
         }]);
@@ -1194,12 +1340,21 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Load admin payment gateway config
-    const config = JSON.parse(localStorage.getItem('boeweb_payment_config')) || {};
+    // Load admin payment gateway config (with Supabase store_config cloud sync)
+    let config = JSON.parse(localStorage.getItem('boeweb_payment_config')) || {};
+    if (!config.mpAccessToken && typeof supabaseClient !== 'undefined' && supabaseClient) {
+      try {
+        const { data: scData } = await supabaseClient.from('store_config').select('*').eq('id', 'main_config').maybeSingle();
+        if (scData && scData.config_json) {
+          config = { ...config, ...scData.config_json };
+          try { localStorage.setItem('boeweb_payment_config', JSON.stringify(config)); } catch (_) {}
+        }
+      } catch (_) {}
+    }
 
     // 1. MERCADO PAGO AUTOMATED CHECKOUT
     if (payment.includes('Mercado Pago')) {
-      const mpToken = config.mpAccessToken || '';
+      const mpToken = (config.mpAccessToken || '').trim();
       if (!mpToken) {
         alert('⚠️ El Administrador aún no configuró el Access Token de Mercado Pago. Podés ingresar a admin-config.html para configurarlo o seleccionar otro método de pago.');
         return;
@@ -1208,6 +1363,22 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const submitBtn = checkoutForm.querySelector('button[type="submit"]');
         if (submitBtn) submitBtn.textContent = '⏳ Conectando con Mercado Pago...';
+
+        // Guardar detalles del pedido para mostrarlos al volver de Mercado Pago
+        try {
+          localStorage.setItem('boeweb_last_mp_order', JSON.stringify({
+            orderId: orderId,
+            customerName: name,
+            customerPhone: phone,
+            items: cart.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, price: i.price })),
+            subtotal: subtotal,
+            discount: discount,
+            total: total,
+            address: address,
+            deliveryType: deliveryType,
+            timestamp: new Date().toISOString()
+          }));
+        } catch (_) {}
 
         const pref = await window.createMercadoPagoPreference({
           orderId: orderId,
@@ -1341,7 +1512,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // If they already spun today, show result directly
     if (lastSpinDate === today) {
-      const savedCoupon = JSON.parse(localStorage.getItem('boeweb_applied_coupon'));
+      let savedCoupon = null;
+      try {
+        savedCoupon = JSON.parse(localStorage.getItem('boeweb_applied_coupon'));
+      } catch (e) {
+        savedCoupon = null;
+      }
       if (savedCoupon) {
         showWheelResult(savedCoupon, false);
       } else {
@@ -1921,6 +2097,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initZenLeaves();
   checkReferralURL();
   renderTeamShowcaseUI();
+  checkPaymentReturnStatus();
 });
 
 // --- TEAM SHOWCASE & REFERRAL LISTENER ---
@@ -2007,3 +2184,90 @@ function initZenLeaves() {
     container.appendChild(leaf);
   }
 }
+
+// --- MERCADO PAGO RETURN & WHATSAPP NOTIFICATION ENGINE ---
+function checkPaymentReturnStatus() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const paymentStatus = urlParams.get('payment');
+  const collectionStatus = urlParams.get('collection_status') || urlParams.get('status');
+  const collectionId = urlParams.get('collection_id') || urlParams.get('payment_id') || urlParams.get('preference_id');
+  const externalRef = urlParams.get('external_reference');
+
+  if (paymentStatus === 'success' || collectionStatus === 'approved') {
+    // Vaciar carrito
+    try {
+      localStorage.removeItem('boeweb_cart');
+      localStorage.removeItem('boeweb_applied_coupon');
+    } catch (_) {}
+
+    let lastOrder = null;
+    try {
+      lastOrder = JSON.parse(localStorage.getItem('boeweb_last_mp_order') || 'null');
+    } catch (_) {}
+
+    showPaymentSuccessModal({
+      collectionId: collectionId || 'Acreditado',
+      orderId: externalRef || (lastOrder?.orderId) || 'ORD-' + Math.floor(100000 + Math.random() * 900000),
+      customerName: lastOrder?.customerName || '',
+      customerPhone: lastOrder?.customerPhone || '',
+      total: lastOrder?.total || null,
+      items: lastOrder?.items || []
+    });
+
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  } else if (paymentStatus === 'failure' || collectionStatus === 'rejected') {
+    alert('⚠️ El pago en Mercado Pago fue rechazado o cancelado. Podés volver a intentar o seleccionar otro método de pago.');
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }
+}
+
+function showPaymentSuccessModal(data) {
+  const modal = document.getElementById('payment-result-modal');
+  if (!modal) return;
+
+  const orderIdEl = document.getElementById('mp-res-order-id');
+  const collectionIdEl = document.getElementById('mp-res-collection-id');
+  const totalEl = document.getElementById('mp-res-total');
+  const waBtn = document.getElementById('mp-res-whatsapp-btn');
+
+  if (orderIdEl) orderIdEl.textContent = data.orderId || 'ORD-BOE';
+  if (collectionIdEl) collectionIdEl.textContent = `#${data.collectionId || '172791026753'}`;
+  if (totalEl) {
+    if (data.total !== null && data.total !== undefined) {
+      totalEl.textContent = `$${Number(data.total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+    } else {
+      totalEl.textContent = 'Pago confirmado';
+    }
+  }
+
+  // Armar mensaje directo de WhatsApp
+  const waPhone = "5493813023185";
+  let waMsg = `✨ *Comprobante de Pago Acreditado - BO growclub* ✨\n\n`;
+  waMsg += `📦 *Pedido:* ${data.orderId}\n`;
+  waMsg += `💳 *Operación Mercado Pago:* #${data.collectionId}\n`;
+  if (data.customerName) waMsg += `👤 *Cliente:* ${data.customerName}\n`;
+  if (data.customerPhone) waMsg += `📞 *Teléfono:* ${data.customerPhone}\n`;
+  if (data.total) waMsg += `💰 *Monto Abonado:* $${Number(data.total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}\n`;
+  waMsg += `✅ *Estado:* Pago Aprobado en Mercado Pago\n\n`;
+  waMsg += `¡Hola equipo BÔ Grow Club! Ya completé el pago de mi pedido por Mercado Pago. Les comparto el comprobante para coordinar la entrega. 🙏🌿`;
+
+  if (waBtn) {
+    waBtn.href = `https://wa.me/${waPhone}?text=${encodeURIComponent(waMsg)}`;
+  }
+
+  modal.classList.add('active');
+}
+
+function closePaymentResultModal() {
+  const modal = document.getElementById('payment-result-modal');
+  if (modal) {
+    modal.classList.remove('active');
+  }
+}
+
+window.closePaymentResultModal = closePaymentResultModal;
+

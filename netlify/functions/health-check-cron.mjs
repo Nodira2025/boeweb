@@ -41,3 +41,23 @@ export async function handler(event, context) {
     };
   }
 }
+
+function jsonResponse(status, payload) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff'
+    }
+  });
+}
+
+export default async function (request, context) {
+  const event = {
+    httpMethod: request.method
+  };
+  const result = await handler(event, context);
+  return jsonResponse(result.statusCode, JSON.parse(result.body));
+}
+

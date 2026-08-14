@@ -21,6 +21,9 @@ test('portal vendedor conserva sus secciones dentro del contenedor autenticado',
 
 test('navegación lateral y barra móvil están cerradas correctamente', () => {
   assert.match(html, /<nav class="vendor-side-nav"[\s\S]*?<\/nav>[\s\S]*?<div class="vendor-sidebar-tools"/);
+  assert.match(html, /data-vendor-tab="fast-upload"[\s\S]*?Ingresar producto/);
+  assert.match(html, /data-vendor-tab="location-assistant"[\s\S]*?Ubicar producto/);
+  assert.match(html, /data-vendor-tab="map"[\s\S]*?Estantería/);
   assert.match(html, /id="b2b-mobile-home-btn"[\s\S]*?<\/button>[\s\S]*?id="b2b-mobile-cart-btn"/);
   assert.match(html, /id="b2b-mobile-cart-btn"[\s\S]*?<\/button>[\s\S]*?<\/div>[\s\S]*?<!-- Toast Notification -->/);
 });

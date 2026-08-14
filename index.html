@@ -1590,12 +1590,57 @@
       <button class="btn btn-primary btn-apply-mobile-filters" onclick="applyMobileFilterDrawer()" style="width: 100%; font-weight: 800; padding: 14px; font-size: 1.05rem;">
         Ver Resultados (<span id="mobile-apply-count">0</span>)
       </button>
+  <!-- PAYMENT RESULT MODAL (Mercado Pago Post-Checkout & WhatsApp Notification) -->
+  <div class="modal-backdrop" id="payment-result-modal">
+    <div class="modal-card" style="max-width: 480px; text-align: center; border-color: var(--color-accent-gold);">
+      <div class="modal-header" style="justify-content: flex-end; border: none; padding: 16px 20px 0 20px;">
+        <button class="close-modal-btn" onclick="closePaymentResultModal()" aria-label="Cerrar ventana">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 0 24px 28px 24px;">
+        <div style="font-size: 3.5rem; line-height: 1; margin-bottom: 12px;">🎉</div>
+        <h2 style="font-family: var(--font-display); color: var(--color-accent-gold); font-size: 1.5rem; margin-bottom: 6px;">¡Pago Acreditado con Éxito!</h2>
+        <p style="font-size: 0.92rem; color: var(--color-text-secondary); margin-bottom: 20px;">Tu pago fue procesado correctamente a través de Mercado Pago.</p>
+
+        <!-- Receipt Box -->
+        <div style="background: rgba(21, 45, 36, 0.6); border: 1px solid rgba(194, 162, 70, 0.3); border-radius: var(--border-radius-md); padding: 16px; margin-bottom: 20px; text-align: left; font-size: 0.88rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: var(--color-text-secondary);">N.º de Pedido:</span>
+            <strong id="mp-res-order-id" style="color: var(--color-text-primary); font-family: monospace;">ORD-XXXXX</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: var(--color-text-secondary);">Operación MP:</span>
+            <strong id="mp-res-collection-id" style="color: var(--color-accent-gold); font-family: monospace;">#XXXXXXXXXX</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: var(--color-text-secondary);">Estado:</span>
+            <span style="color: #25D366; font-weight: 700;">🟢 Aprobado</span>
+          </div>
+          <div id="mp-res-total-row" style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.15);">
+            <span style="color: var(--color-text-secondary);">Total Abonado:</span>
+            <strong id="mp-res-total" style="color: var(--color-accent-gold); font-size: 1.05rem;">$0.00</strong>
+          </div>
+        </div>
+
+        <p style="font-size: 0.86rem; color: var(--color-text-secondary); margin-bottom: 18px;">
+          Para coordinar la entrega o retiro inmediato de tus productos, avisale a nuestro equipo haciendo clic en el botón a continuación:
+        </p>
+
+        <a id="mp-res-whatsapp-btn" href="#" target="_blank" class="btn" style="display: flex; align-items: center; justify-content: center; gap: 8px; background: #25D366; color: #fff; text-decoration: none; font-weight: 700; font-size: 1rem; padding: 14px 20px; border-radius: var(--border-radius-full); box-shadow: 0 4px 15px rgba(37, 211, 102, 0.4); margin-bottom: 12px; transition: transform 0.2s ease;">
+          <svg style="width: 22px; height: 22px;" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2z"/></svg>
+          <span>Notificar / Enviar Comprobante</span>
+        </a>
+
+        <button type="button" onclick="closePaymentResultModal()" class="btn btn-secondary" style="width: 100%; border-radius: var(--border-radius-full); font-size: 0.9rem; padding: 10px; cursor: pointer;">
+          ← Volver a la Tienda
+        </button>
+      </div>
     </div>
   </div>
 
   <!-- Main JavaScript Files -->
+  <script src="public-catalog-unification.js?v=cat_v2"></script>
   <script src="mercadopago-checkout.js?v=1.0"></script>
-  <script src="index.js?v=2.5"></script>
+  <script src="index.js?v=2.6"></script>
   <script src="memberPortal.js?v=2.4"></script>
   <script src="academy.js?v=2.4"></script>
   <script src="drbo.js?v=2.5"></script>

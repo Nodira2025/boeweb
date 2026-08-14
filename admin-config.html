@@ -226,8 +226,12 @@
         </div>
 
         <div style="margin-bottom: 20px;">
-          <label class="admin-label" for="mp-access-token">Mercado Pago Access Token *</label>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label class="admin-label" for="mp-access-token" style="margin: 0;">Mercado Pago Access Token *</label>
+            <button type="button" onclick="testCurrentMpToken()" class="btn btn-secondary" style="font-size: 0.76rem; padding: 4px 12px; border-color: var(--color-accent-gold); cursor: pointer;">⚡ Probar Token</button>
+          </div>
           <input type="text" id="mp-access-token" class="admin-input" placeholder="Ej: APP_USR-1234567890123456-abcdef..." autocomplete="off">
+          <small id="mp-test-status" style="display: none; margin-top: 6px; font-weight: 700; font-size: 0.82rem;"></small>
         </div>
 
         <div style="margin-bottom: 20px;">
@@ -303,6 +307,7 @@
     </div>
   </div>
 
-  <script src="admin-config.js?v=1.0"></script>
+  <script src="mercadopago-checkout.js"></script>
+  <script src="admin-config.js?v=1.1"></script>
 </body>
 </html>

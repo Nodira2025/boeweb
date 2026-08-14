@@ -92,6 +92,41 @@ async function saveAdminConfig() {
   setTimeout(() => { saveMsg.style.display = 'none'; }, 3500);
 }
 
+async function testCurrentMpToken() {
+  const tokenInput = document.getElementById('mp-access-token');
+  const statusEl = document.getElementById('mp-test-status');
+  if (!tokenInput || !statusEl) return;
+
+  const token = tokenInput.value.trim();
+  if (!token) {
+    statusEl.style.display = 'block';
+    statusEl.style.color = '#ff6b6b';
+    statusEl.textContent = '⚠️ Por favor pegá el Access Token antes de probar.';
+    return;
+  }
+
+  statusEl.style.display = 'block';
+  statusEl.style.color = 'var(--color-accent-gold)';
+  statusEl.textContent = '⏳ Conectando con Mercado Pago...';
+
+  if (typeof window.testMercadoPagoCredentials !== 'function') {
+    statusEl.style.color = '#ff6b6b';
+    statusEl.textContent = '⚠️ Módulo de checkout no cargado.';
+    return;
+  }
+
+  const res = await window.testMercadoPagoCredentials(token);
+  if (res.ok) {
+    statusEl.style.color = '#25D366';
+    statusEl.textContent = '✅ ¡Conexión exitosa! El Access Token es válido y está listo para recibir pagos.';
+  } else {
+    statusEl.style.color = '#ff6b6b';
+    statusEl.textContent = `❌ Error en Mercado Pago: ${res.error || 'Token inválido o no autorizado'}`;
+  }
+}
+
 // Global Exposure
 window.checkAdminPasscode = checkAdminPasscode;
 window.saveAdminConfig = saveAdminConfig;
+window.testCurrentMpToken = testCurrentMpToken;
+

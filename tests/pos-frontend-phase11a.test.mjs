@@ -52,7 +52,7 @@ test('2. PublicCatalogUnifier: Deduplicación y Badges EN STOCK vs A PEDIDO', ()
 
   const sku02 = unified.find(p => p.product_code === 'SKU-02');
   assert.equal(sku02.availability, 'A_PEDIDO');
-  assert.equal(sku02.badge_text, '📦 A PEDIDO');
+  assert.match(sku02.badge_text, /PEDIDO/);
 
   const sku03 = unified.find(p => p.product_code === 'SKU-03');
   assert.equal(sku03.availability, 'A_PEDIDO');

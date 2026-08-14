@@ -104,18 +104,41 @@ class PosCartEngine {
     return this.items.reduce((sum, item) => sum + ((Number(item.price) || 0) * (Number(item.quantity) || 0)), 0);
   }
 
-  getTotal(discountPercent = 0) {
+  setDiscount(type = 'PERCENT', value = 0) {
+    const normType = String(type).toUpperCase() === 'FIXED' || String(type).toUpperCase() === 'AMOUNT' ? 'FIXED' : 'PERCENT';
+    const numVal = Math.max(0, Number(value) || 0);
+    this.discount = { type: normType, value: numVal };
+  }
+
+  getDiscount() {
+    return { ...(this.discount || { type: 'PERCENT', value: 0 }) };
+  }
+
+  getDiscountAmount(customDiscount = null) {
     const subtotal = this.getSubtotal();
-    const discount = (subtotal * (Number(discountPercent) || 0)) / 100;
-    return Math.max(0, subtotal - discount);
+    if (customDiscount !== null && typeof customDiscount === 'number') {
+      return (subtotal * customDiscount) / 100;
+    }
+    const disc = this.discount || { type: 'PERCENT', value: 0 };
+    if (disc.type === 'PERCENT') {
+      return (subtotal * (disc.value || 0)) / 100;
+    }
+    return Math.min(subtotal, disc.value || 0);
+  }
+
+  getTotal(discountPercent = null) {
+    const subtotal = this.getSubtotal();
+    const discountAmount = this.getDiscountAmount(discountPercent);
+    return Math.max(0, subtotal - discountAmount);
   }
 
   createSaleDraft(options = {}) {
     const cashierUser = options.cashierUser || { id: 'anonymous', name: 'Cajero' };
     const salespersonUser = options.salespersonUser || { id: 'anonymous', name: 'Vendedor' };
     const subtotal = this.getSubtotal();
-    const discount = options.discount || 0;
-    const total = this.getTotal(discount);
+    const discountAmount = options.discount !== undefined ? Number(options.discount) : this.getDiscountAmount();
+    const discountType = options.discountType || (this.discount ? this.discount.type : 'PERCENT');
+    const total = options.total !== undefined ? Number(options.total) : Math.max(0, subtotal - discountAmount);
     const dateNow = new Date();
 
     return {
@@ -134,7 +157,8 @@ class PosCartEngine {
         availability: i.availability || 'EN_STOCK'
       })),
       subtotal,
-      discount,
+      discount: discountAmount,
+      discount_type: discountType,
       total,
       payment_method: options.paymentMethod || 'EFECTIVO',
       notes: options.notes || '',

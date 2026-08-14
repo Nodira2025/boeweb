@@ -9,7 +9,7 @@
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Press+Start+2P&display=swap" rel="stylesheet">
   
   <!-- Favicon -->
   <link rel="icon" type="image/jpeg" href="assets/logo.jpg">
@@ -1029,9 +1029,9 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="vendedor-caja.css?v=legado_v1">
-  <link rel="stylesheet" href="vendedor-portal.css?v=desktop_v2_crema">
-  <link rel="stylesheet" href="vendedor-stock.css?v=rescate_estabilizacion_v11">
+  <link rel="stylesheet" href="vendedor-caja.css?v=legado_v2">
+  <link rel="stylesheet" href="vendedor-portal.css?v=desktop_v4_6cols">
+  <link rel="stylesheet" href="vendedor-stock.css?v=gba_leafgreen_v1">
   <style id="vendor-rescue-critical-styles">
     .saas-prototype-only,
     #saas-login-modal {
@@ -1159,17 +1159,40 @@
         <button type="button" class="vendor-side-nav-item active" data-vendor-tab="home" onclick="switchVendorTab('home')">
           <span class="vendor-side-nav-icon" aria-hidden="true">⌂</span><span>Inicio</span>
         </button>
+        <button type="button" class="vendor-side-nav-item vendor-side-nav-featured" data-vendor-tab="pos" onclick="switchVendorTab('pos')" style="color: #2e7d32; font-weight: 800;">
+          <span class="vendor-side-nav-icon" aria-hidden="true">🏷️</span><span>Vender producto</span>
+        </button>
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="catalog" onclick="switchVendorTab('catalog')">
           <span class="vendor-side-nav-icon" aria-hidden="true">▦</span><span>Catálogo B2B</span>
         </button>
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="internal-catalog" onclick="switchVendorTab('internal-catalog')">
           <span class="vendor-side-nav-icon" aria-hidden="true">▤</span><span>Catálogo interno</span>
         </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="web-orders" onclick="switchVendorTab('web-orders')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">📦</span><span>Pedidos Web</span>
+          <span class="vendor-pending-web-orders-count" id="vendor-sidebar-web-orders-badge" hidden style="margin-left: auto; background: #e53935; color: white; border-radius: 10px; padding: 2px 6px; font-size: 0.7rem; font-weight: 800;">0</span>
+        </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="fast-upload" onclick="switchVendorTab('fast-upload')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">＋</span><span>Ingresar producto</span>
+        </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="location-assistant" onclick="switchVendorTab('location-assistant')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">⌖</span><span>Ubicar producto</span>
+        </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="map" onclick="switchVendorTab('map')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">🗺️</span><span>Estantería</span>
+        </button>
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="cash" onclick="switchVendorTab('cash')">
           <span class="vendor-side-nav-icon" aria-hidden="true">$</span><span>Caja & Arqueo</span>
         </button>
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="portfolio" onclick="switchVendorTab('portfolio')">
-          <span class="vendor-side-nav-icon" aria-hidden="true">♙</span><span>Clientes</span>
+          <span class="vendor-side-nav-icon" aria-hidden="true">♙</span><span>Clientes & CC</span>
+        </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="expirations" onclick="switchVendorTab('expirations')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">⏳</span><span>Vencimientos</span>
+          <span class="vendor-pending-expirations-count" id="vendor-sidebar-expirations-badge" hidden style="margin-left: auto; background: #e65100; color: white; border-radius: 10px; padding: 2px 6px; font-size: 0.7rem; font-weight: 800;">0</span>
+        </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="nearby-stores" onclick="switchVendorTab('nearby-stores')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">🏪</span><span>Tiendas Cerca</span>
         </button>
         <button type="button" class="vendor-side-nav-item saas-prototype-only" data-vendor-tab="tenant-profile" onclick="switchVendorTab('tenant-profile')">
           <span class="vendor-side-nav-icon" aria-hidden="true">🎨</span><span>Perfil & Marca</span>
@@ -1236,6 +1259,10 @@
             </button>
           </div>
 
+          <button type="button" onclick="switchVendorTab('pos')" class="vendor-header-sell-action" style="background: #2e7d32; color: #ffffff; border: 1.5px solid #1b5e20; border-radius: 12px; font-weight: 800; font-size: 0.85rem; padding: 7px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(46,125,50,0.25);">
+            <span>🏷️</span><span>Vender</span>
+          </button>
+
           <button class="b2b-cart-trigger" id="b2b-cart-trigger-btn">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="9" cy="21" r="1"></circle>
@@ -1257,8 +1284,12 @@
           <p>Todo lo importante del turno, en un solo lugar. Registrá, controlá y resolvé sin perder tiempo.</p>
         </div>
         <div class="vendor-home-hero-actions">
-          <button type="button" class="vendor-home-primary-action" onclick="switchVendorTab('cash')">Abrir Caja BÔ</button>
-          <button type="button" class="vendor-home-secondary-action" onclick="switchVendorTab('catalog')">Nueva venta</button>
+          <button type="button" class="vendor-home-primary-action" onclick="switchVendorTab('pos')" style="background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: #ffffff; border: none; font-weight: 800; box-shadow: 0 4px 14px rgba(46,125,50,0.3);">
+            🏷️🛒 Vender un producto
+          </button>
+          <button type="button" class="vendor-home-secondary-action" onclick="switchVendorTab('cash')">
+            💰 Abrir Caja BÔ
+          </button>
         </div>
       </header>
 
@@ -1279,12 +1310,12 @@
             <small>Calculado para el cierre</small>
           </div>
         </article>
-        <article class="vendor-home-kpi">
-          <span class="vendor-home-kpi-icon" aria-hidden="true">▤</span>
+        <article class="vendor-home-kpi" onclick="switchVendorTab('web-orders')" style="cursor: pointer;" title="Ver pedidos recibidos desde la tienda web">
+          <span class="vendor-home-kpi-icon" aria-hidden="true">📦</span>
           <div class="vendor-home-kpi-copy">
-            <span>Pedido actual</span>
-            <strong id="vendor-kpi-cart-count">0 artículos</strong>
-            <small id="vendor-kpi-cart-total">Listo para comenzar</small>
+            <span>Pedidos Web</span>
+            <strong id="vendor-kpi-web-orders-count">0 pendientes</strong>
+            <small id="vendor-kpi-web-orders-sub">Mediar y preparar</small>
           </div>
         </article>
         <article class="vendor-home-kpi">
@@ -1328,8 +1359,11 @@
             </div>
           </div>
           <div class="vendor-home-quick-actions">
+            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('pos')" style="border-left: 4px solid #2e7d32; background: rgba(46,125,50,0.06);">
+              <span aria-hidden="true">🏷️</span><span><strong>Vender producto (Mostrador)</strong><small>Escanear código, teclado o voz</small></span><span aria-hidden="true">›</span>
+            </button>
             <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('catalog')">
-              <span aria-hidden="true">▦</span><span><strong>Nueva venta</strong><small>Buscar y agregar productos</small></span><span aria-hidden="true">›</span>
+              <span aria-hidden="true">▦</span><span><strong>Catálogo B2B</strong><small>Buscar y agregar productos</small></span><span aria-hidden="true">›</span>
             </button>
             <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('portfolio')">
               <span aria-hidden="true">♙</span><span><strong>Consultar cliente</strong><small>Cartera y WhatsApp</small></span><span aria-hidden="true">›</span>
@@ -1339,6 +1373,9 @@
             </button>
             <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('fast-upload')">
               <span aria-hidden="true">＋</span><span><strong>Ingresar producto</strong><small>Foto, datos y stock guiados</small></span><span aria-hidden="true">›</span>
+            </button>
+            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('web-orders')">
+              <span aria-hidden="true">📦</span><span><strong>Pedidos Web</strong><small id="vendor-web-orders-quick-copy">Mediar y preparar compras online</small></span><span class="vendor-pending-web-orders-count" id="vendor-pending-web-orders-badge-action" hidden style="background: #e53935; color: white; border-radius: 10px; padding: 2px 6px; font-size: 0.7rem; font-weight: 800;">0</span><span aria-hidden="true">›</span>
             </button>
             <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('internal-catalog')">
               <span aria-hidden="true">▤</span><span><strong>Catálogo interno</strong><small>Editar productos propios</small></span><span aria-hidden="true">›</span>
@@ -1357,6 +1394,13 @@
 
       <div class="vendor-2col-grid">
         
+        <!-- Card 0: Vender un producto (Mostrador / POS Catálogo Interno) -->
+        <button type="button" class="vendor-launchpad-card vendor-launchpad-card-featured" id="vcard-pos" onclick="switchVendorTab('pos')" style="background: linear-gradient(135deg, #1f4a34 0%, #152d24 100%); border: 2.5px solid var(--color-accent-gold); border-radius: 18px; padding: 20px 16px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: 0 8px 20px rgba(21,45,36,0.18); grid-column: 1 / -1;">
+          <span style="font-size: 2.5rem; display: block; margin-bottom: 4px;">🏷️🛒</span>
+          <span style="font-size: 1.25rem; font-weight: 800; color: #ffffff; display: block; margin-bottom: 3px;">Vender un producto</span>
+          <span style="font-size: 0.78rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">MOSTRADOR POS · ESCÁNER DE BARRAS · TECLADO · VOZ</span>
+        </button>
+
         <!-- Card 1: Catálogo B2B -->
         <button type="button" class="vendor-launchpad-card" id="vcard-catalog" onclick="switchVendorTab('catalog')" style="background: var(--color-card-bg); border: 1.5px solid var(--color-accent-gold); border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
           <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📦</span>
@@ -1368,6 +1412,12 @@
           <span style="font-size: 2rem; display: block; margin-bottom: 6px;" aria-hidden="true">🏷️</span>
           <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Catálogo interno</span>
           <span style="font-size: 0.72rem; color: #2e7d32; font-weight: 800; text-transform: uppercase;">PRODUCTOS DE LA TIENDA</span>
+        </button>
+
+        <button type="button" class="vendor-launchpad-card" id="vcard-weborders" onclick="switchVendorTab('web-orders')" style="background: var(--color-card-bg); border: 1.5px solid #29b6f6; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
+          <span style="font-size: 2rem; display: block; margin-bottom: 6px;" aria-hidden="true">📦</span>
+          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Pedidos Web</span>
+          <span style="font-size: 0.72rem; color: #29b6f6; font-weight: 800; text-transform: uppercase;">MEDIACIÓN & PICKING</span>
         </button>
 
         <!-- Card 2: Mi Cartera de Clientes -->
@@ -1442,99 +1492,201 @@
           <span style="font-size: 0.72rem; color: #66bb6a; font-weight: 800; text-transform: uppercase;">APROBAR & PRECIOS</span>
         </button>
 
+        <!-- Card 12: Vencimientos -->
+        <button type="button" class="vendor-launchpad-card" id="vcard-expirations" onclick="switchVendorTab('expirations')" style="background: var(--color-card-bg); border: 2px solid #e65100; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm); position: relative;">
+          <span id="expirations-badge-kpi" style="position: absolute; top: -8px; right: -8px; background: #e65100; color: #fff; font-size: 0.75rem; font-weight: 800; padding: 3px 8px; border-radius: 12px; border: 1px solid #ffb74d; display: none;">0</span>
+          <span style="font-size: 2rem; display: block; margin-bottom: 4px;">⏳</span>
+          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Vencimientos</span>
+          <span style="font-size: 0.72rem; color: #e65100; font-weight: 800; text-transform: uppercase;">3 MESES A CRÍTICOS</span>
+        </button>
+
+        <!-- Card 13: Tiendas Cercanas -->
+        <button type="button" class="vendor-launchpad-card" id="vcard-nearbystores" onclick="switchVendorTab('nearby-stores')" style="background: var(--color-card-bg); border: 2px solid #1565c0; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
+          <span style="font-size: 2rem; display: block; margin-bottom: 4px;">🏪</span>
+          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Tiendas Cerca</span>
+          <span style="font-size: 0.72rem; color: #1565c0; font-weight: 800; text-transform: uppercase;">PROVEEDORES · 2 DÍAS</span>
+        </button>
+
       </div>
     </section>
 
-    <!-- SECTION: POS ITEMIZADO (NUEVA VENTA) -->
+    <!-- SECTION: VENDER UN PRODUCTO · MOSTRADOR POS ITEMIZADO (CATÁLOGO INTERNO) -->
     <section id="vendor-pos-section" class="vendor-workspace-section" style="display: none;" aria-labelledby="pos-workspace-title">
       <header class="stock-entry-hero" style="background: var(--color-card-bg); border-bottom: 2px solid var(--color-accent-gold); padding: 20px; border-radius: 16px; margin-bottom: 20px;">
         <div>
-          <span class="stock-entry-eyebrow" style="color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase;">Punto de Venta · POS Itemizado (Fase 11A)</span>
-          <h2 id="pos-workspace-title" style="margin: 4px 0 8px 0; font-family: 'Playfair Display', serif;">Nueva Venta de Mostrador</h2>
-          <p style="margin: 0; opacity: 0.85; font-size: 0.9rem;">Escanear o buscar productos, asignar vendedor que atendió y preparar el borrador de venta.</p>
+          <span class="stock-entry-eyebrow" style="color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase;">Venta de Mostrador · Catálogo Interno de la Tienda</span>
+          <h2 id="pos-workspace-title" style="margin: 4px 0 8px 0; font-family: 'Playfair Display', serif;">🏷️ Vender un producto</h2>
+          <p style="margin: 0; opacity: 0.85; font-size: 0.9rem;">Escanear con pistola lectora de código de barras, buscar con el teclado en tiempo real o usar dictado por voz para vender productos propios de la tienda.</p>
         </div>
         <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
       </header>
 
-      <div style="display: grid; grid-template-columns: 1fr 380px; gap: 20px;">
-        <!-- Columna Izquierda: Búsqueda, Dictado y Selección de Productos -->
+      <div style="display: grid; grid-template-columns: 1fr 390px; gap: 20px;">
+        <!-- Columna Izquierda: Búsqueda Unificada, Dictado y Selección de Productos -->
         <div>
-          <div style="background: var(--color-card-bg); padding: 20px; border-radius: 16px; border: 1px solid var(--color-border-accent); margin-bottom: 20px;">
-            <div style="display: flex; gap: 10px; margin-bottom: 12px;">
-              <input type="text" id="pos-barcode-input" class="b2b-form-input" placeholder="⚡ Escanear código de barras (Enter para agregar)..." autocomplete="off" style="font-size: 0.95rem; font-weight: 700;">
-              <button type="button" class="btn btn-secondary" onclick="focusPosBarcode()" style="white-space: nowrap;">⚡ Lector</button>
+          <!-- Barra de Búsqueda Unificada -->
+          <div class="pos-unified-search-box">
+            <div class="pos-search-input-wrapper">
+              <span class="pos-search-icon-left" aria-hidden="true">🔍</span>
+              <input type="text" id="pos-unified-search" class="pos-unified-input" placeholder="⚡ Escanear código de barras, escribir nombre o dictar por voz..." autocomplete="off" autofocus>
+              <button type="button" id="pos-search-clear-btn" class="pos-search-clear-btn" onclick="clearPosUnifiedSearch()" aria-label="Limpiar búsqueda">✕</button>
+              <button type="button" id="pos-voice-search-btn" class="pos-voice-btn" onclick="togglePosVoiceSearch()" aria-label="Activar dictado por voz">
+                <span style="font-size: 1.15rem;" aria-hidden="true">🎙️</span>
+                <span>Dictar</span>
+              </button>
             </div>
-            
-            <div style="display: flex; gap: 10px;">
-              <input type="search" id="pos-product-search" class="b2b-form-input" placeholder="🔍 Buscar por nombre, marca o SKU..." autocomplete="off">
-              <button type="button" id="pos-voice-search-btn" class="btn btn-secondary" onclick="togglePosVoiceSearch()" style="white-space: nowrap; background: rgba(194,162,70,0.15); border-color: var(--color-accent-gold);">🎙️ Dictar</button>
-            </div>
-            <small id="pos-voice-status" style="display: block; margin-top: 6px; color: var(--color-accent-gold); font-weight: 600;"></small>
 
-            <!-- Grid de Búsqueda Rápida POS -->
-            <div id="pos-search-results-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 15px; max-height: 280px; overflow-y: auto;">
-              <!-- Productos de búsqueda dinámica -->
+            <div class="pos-search-helpers-row">
+              <span id="pos-scanner-indicator" class="pos-scanner-badge">⚡ Lector láser listo</span>
+              <span id="pos-voice-status" class="pos-voice-status"></span>
+              <span id="pos-search-count-badge" style="color: var(--color-text-muted); font-weight: 700;">Catálogo interno</span>
+            </div>
+
+            <!-- Grilla de Coincidencias en Tiempo Real -->
+            <div id="pos-search-results-grid" class="pos-results-grid" style="margin-top: 15px;">
+              <!-- Productos del catálogo interno generados dinámicamente -->
             </div>
           </div>
         </div>
 
         <!-- Columna Derecha: Ítems del Carrito POS & Formulario de Cierre Draft -->
-        <div style="background: var(--color-card-bg); padding: 20px; border-radius: 16px; border: 1.5px solid var(--color-accent-gold);">
-          <h3 style="font-size: 1.1rem; margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 8px;">🛒 Carrito de Venta POS</h3>
+        <div style="background: var(--color-card-bg); padding: 20px; border-radius: 16px; border: 1.5px solid var(--color-accent-gold); display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <h3 style="font-size: 1.1rem; margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 8px; color: var(--color-text-main);">🛒 Ticket de Venta</h3>
 
-          <!-- Selección de Vendedor e Identidad -->
-          <div style="margin-bottom: 15px; background: rgba(21,45,36,0.04); padding: 12px; border-radius: 10px; border: 1px solid var(--color-border-subtle);">
-            <label for="pos-salesperson-select" style="font-size: 0.8rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 4px;">👤 Atendió el Cliente (Vendedor):</label>
-            <select id="pos-salesperson-select" class="b2b-form-input" style="font-size: 0.9rem; font-weight: 700; background: #fff; margin-bottom: 8px;">
-              <!-- Poblado dinámicamente con SaasAuth.getTenantUsers() -->
-            </select>
+            <!-- Selección de Vendedor e Identidad -->
+            <div style="margin-bottom: 15px; background: rgba(21,45,36,0.04); padding: 12px; border-radius: 10px; border: 1px solid var(--color-border-subtle);">
+              <label for="pos-salesperson-select" style="font-size: 0.8rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 4px;">👤 Atendió el Cliente (Vendedor):</label>
+              <select id="pos-salesperson-select" class="b2b-form-input" style="font-size: 0.9rem; font-weight: 700; background: #fff; margin-bottom: 8px;">
+                <!-- Poblado dinámicamente con SaasAuth.getTenantUsers() -->
+              </select>
 
-            <div style="font-size: 0.8rem; color: var(--color-text-muted);">
-              <span>🔑 Cobró / Cajero (Auth): </span>
-              <strong id="pos-cashier-display" style="color: var(--color-text-main);">Profesor Franco</strong>
+              <div style="font-size: 0.8rem; color: var(--color-text-muted);">
+                <span>🔑 Cobró / Cajero (Auth): </span>
+                <strong id="pos-cashier-display" style="color: var(--color-text-main);">Profesor Franco</strong>
+              </div>
+            </div>
+
+            <!-- Listado de Ítems POS -->
+            <div id="pos-cart-items-list" style="max-height: 250px; overflow-y: auto; margin-bottom: 15px;">
+              <div id="pos-cart-empty-state" style="text-align: center; padding: 20px; color: #888; font-size: 0.88rem;">
+                El carrito está vacío.<br>Escaneá o buscá un producto.
+              </div>
+              <ul id="pos-cart-items-body" style="list-style: none; padding: 0; margin: 0;">
+                <!-- Ítems agregados -->
+              </ul>
             </div>
           </div>
 
-          <!-- Listado de Ítems POS -->
-          <div id="pos-cart-items-list" style="max-height: 250px; overflow-y: auto; margin-bottom: 15px;">
-            <div id="pos-cart-empty-state" style="text-align: center; padding: 20px; color: #888; font-size: 0.88rem;">
-              El carrito está vacío.<br>Escaneá o buscá un producto.
+          <div>
+            <!-- Resumen de Importes -->
+            <div style="border-top: 2px solid var(--color-border-accent); padding-top: 12px; margin-bottom: 15px;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 6px;">
+                <span>Subtotal:</span>
+                <strong id="pos-summary-subtotal">$0,00</strong>
+              </div>
+              <div id="pos-summary-discount-row" style="display: none; justify-content: space-between; font-size: 0.9rem; margin-bottom: 6px; color: #2e7d32;">
+                <span id="pos-summary-discount-label">Descuento:</span>
+                <strong id="pos-summary-discount">-$0,00</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 1.25rem; font-weight: 900; color: var(--color-accent-gold);">
+                <span>TOTAL:</span>
+                <strong id="pos-summary-total">$0,00</strong>
+              </div>
             </div>
-            <ul id="pos-cart-items-body" style="list-style: none; padding: 0; margin: 0;">
-              <!-- Ítems agregados -->
-            </ul>
+
+            <!-- Método de Pago & Observación -->
+            <div style="margin-bottom: 15px;">
+              <label for="pos-payment-method-select" style="font-size: 0.8rem; font-weight: 800; text-transform: uppercase; display: block; margin-bottom: 4px;">Forma de Pago:</label>
+              <select id="pos-payment-method-select" class="b2b-form-input" style="font-size: 0.9rem; font-weight: 700; background: #fff; margin-bottom: 8px;" onchange="handlePosPaymentMethodChange()">
+                <option value="EFECTIVO">💵 Efectivo</option>
+                <option value="TRANSFERENCIA">🏦 Transferencia Bancaria</option>
+                <option value="DEBITO">💳 Tarjeta de Débito</option>
+                <option value="CREDITO">💳 Tarjeta de Crédito</option>
+                <option value="MERCADOPAGO">📱 MercadoPago QR</option>
+                <option value="CUENTA_CORRIENTE">📋 Cuenta Corriente (Fiado / Crédito)</option>
+              </select>
+
+              <!-- Selector de Cliente con Cuenta Corriente -->
+              <div id="pos-current-account-container" style="display: none; background: rgba(195,155,75,0.08); border: 1.5px solid var(--color-accent-gold); border-radius: 12px; padding: 12px; margin-bottom: 10px;">
+                <label for="pos-current-account-select" style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: var(--color-accent-gold); display: block; margin-bottom: 4px;">Seleccionar Cliente Cuenta Corriente:</label>
+                <select id="pos-current-account-select" class="b2b-form-input" style="font-size: 0.85rem; font-weight: 700; background: #fff; margin-bottom: 6px;" onchange="updatePosCurrentAccountInfo()">
+                  <option value="">-- Elegir cliente registrado --</option>
+                </select>
+                <div id="pos-current-account-info" style="font-size: 0.78rem; color: var(--color-text-muted); display: flex; flex-direction: column; gap: 2px;"></div>
+                <div style="margin-top: 6px;">
+                  <label for="pos-cc-due-date" style="font-size: 0.75rem; font-weight: 700; color: var(--color-text-main);">Vencimiento del 1.° pago:</label>
+                  <input type="date" id="pos-cc-due-date" class="b2b-form-input" style="padding: 6px 8px; font-size: 0.82rem; margin-top: 2px;">
+                </div>
+              </div>
+
+              <input type="text" id="pos-notes-input" class="b2b-form-input" placeholder="Observaciones de la venta (opcional)..." style="font-size: 0.85rem;">
+            </div>
+
+            <!-- Botón de Confirmación Borrador Draft -->
+            <button type="button" id="pos-create-draft-btn" class="b2b-checkout-btn" onclick="submitPosSaleDraft()" style="width: 100%; font-size: 1rem; font-weight: 800; padding: 14px;">
+              📄 Confirmar Venta / Generar Borrador
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL DE CONFIRMACIÓN PREVIA ANTES DE AGREGAR AL TICKET -->
+      <div id="pos-scan-confirm-modal" class="pos-confirm-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="pos-scan-confirm-name">
+        <div class="pos-confirm-modal-card">
+          <div class="pos-confirm-modal-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">🏷️</span>
+              <h3 style="margin: 0; font-size: 1.1rem; color: var(--color-text-main);">Confirmar Producto para Venta</h3>
+            </div>
+            <button type="button" class="pos-confirm-modal-close" onclick="closePosScanConfirmModal()" aria-label="Cerrar modal">✕</button>
           </div>
 
-          <!-- Resumen de Importes -->
-          <div style="border-top: 2px solid var(--color-border-accent); padding-top: 12px; margin-bottom: 15px;">
-            <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 6px;">
-              <span>Subtotal:</span>
-              <strong id="pos-summary-subtotal">$0,00</strong>
+          <div class="pos-confirm-modal-body">
+            <div style="display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px;">
+              <img id="pos-scan-confirm-img" src="assets/logo.jpg" alt="Producto" style="width: 84px; height: 84px; object-fit: cover; border-radius: 12px; border: 1.5px solid var(--color-border-accent); flex-shrink: 0; background: #f6f3e8;">
+              <div style="flex: 1; min-width: 0;">
+                <span id="pos-scan-confirm-category" style="display: inline-block; font-size: 0.72rem; font-weight: 800; color: var(--color-accent-gold); text-transform: uppercase; margin-bottom: 2px;">Categoría</span>
+                <h4 id="pos-scan-confirm-name" style="margin: 0 0 6px 0; font-size: 1.05rem; font-weight: 700; color: var(--color-text-main); line-height: 1.3;">Nombre del producto</h4>
+                <div style="font-size: 0.8rem; color: var(--color-text-muted); display: flex; flex-direction: column; gap: 2px;">
+                  <span>Código / Barcode: <strong id="pos-scan-confirm-code" style="color: var(--color-text-main);">-</strong></span>
+                  <span id="pos-scan-confirm-location" style="color: #2e7d32; font-weight: 600;">📍 Estante: -</span>
+                </div>
+              </div>
             </div>
-            <div style="display: flex; justify-content: space-between; font-size: 1.2rem; font-weight: 900; color: var(--color-accent-gold);">
-              <span>TOTAL:</span>
-              <strong id="pos-summary-total">$0,00</strong>
+
+            <div style="background: rgba(21, 45, 36, 0.04); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 14px; margin-bottom: 18px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-size: 0.85rem; font-weight: 700; color: var(--color-text-muted);">Precio Unitario:</span>
+                <strong id="pos-scan-confirm-price" style="font-size: 1.25rem; font-weight: 900; color: var(--color-accent-gold);">$0,00</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.85rem; font-weight: 700; color: var(--color-text-muted);">Stock Disponible:</span>
+                <span id="pos-scan-confirm-stock" class="pos-stock-badge pos-stock-badge-available">0 u.</span>
+              </div>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+              <label for="pos-scan-confirm-qty" style="display: block; font-size: 0.82rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-main); margin-bottom: 8px;">
+                Cantidad a Vender:
+              </label>
+              <div class="pos-qty-stepper">
+                <button type="button" class="pos-qty-btn" onclick="stepPosModalQty(-1)" aria-label="Restar una unidad">-</button>
+                <input type="number" id="pos-scan-confirm-qty" value="1" min="1" max="999" class="pos-qty-input" oninput="validatePosModalQty(this)">
+                <button type="button" class="pos-qty-btn" onclick="stepPosModalQty(1)" aria-label="Sumar una unidad">+</button>
+              </div>
+              <small id="pos-modal-qty-error" style="display: none; color: #c62828; font-weight: 700; margin-top: 6px;"></small>
             </div>
           </div>
 
-          <!-- Método de Pago & Observación -->
-          <div style="margin-bottom: 15px;">
-            <label for="pos-payment-method-select" style="font-size: 0.8rem; font-weight: 800; text-transform: uppercase; display: block; margin-bottom: 4px;">Forma de Pago:</label>
-            <select id="pos-payment-method-select" class="b2b-form-input" style="font-size: 0.9rem; font-weight: 700; background: #fff; margin-bottom: 8px;">
-              <option value="EFECTIVO">💵 Efectivo</option>
-              <option value="TRANSFERENCIA">🏦 Transferencia Bancaria</option>
-              <option value="DEBITO">💳 Tarjeta de Débito</option>
-              <option value="CREDITO">💳 Tarjeta de Crédito</option>
-              <option value="MERCADOPAGO">📱 MercadoPago QR</option>
-            </select>
-
-            <input type="text" id="pos-notes-input" class="b2b-form-input" placeholder="Observaciones (opcional)..." style="font-size: 0.85rem;">
+          <div class="pos-confirm-modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closePosScanConfirmModal()" style="flex: 1; min-height: 44px;">
+              Cancelar
+            </button>
+            <button type="button" id="pos-confirm-add-btn" class="b2b-checkout-btn" onclick="confirmAddPosProductToCart()" style="flex: 1.5; min-height: 44px; font-weight: 800;">
+              ✓ Agregar al ticket
+            </button>
           </div>
-
-          <!-- Botón de Confirmación Borrador Draft -->
-          <button type="button" id="pos-create-draft-btn" class="b2b-checkout-btn" onclick="submitPosSaleDraft()" style="width: 100%; font-size: 1rem; font-weight: 800; padding: 14px;">
-            📄 Generar Borrador de Venta
-          </button>
         </div>
       </div>
     </section>
@@ -1701,6 +1853,11 @@
                 <label for="fastupload-sale-price-input">Precio de venta *</label>
                 <input type="number" id="fastupload-sale-price-input" min="0.01" step="0.01" class="b2b-form-input" placeholder="Confirmar precio" inputmode="decimal" required>
               </div>
+              <div class="stock-field stock-seller-field">
+                <label for="fastupload-expiry-input">Fecha de vencimiento (Opcional)</label>
+                <input type="date" id="fastupload-expiry-input" class="b2b-form-input">
+                <small style="color: var(--vendor-muted); font-size: 0.75rem;">Para fertilizantes, sustratos, semillas o perecederos.</small>
+              </div>
               <div class="stock-field stock-field-wide stock-autofilled-field">
                 <label for="fastupload-description-input">Descripción</label>
                 <textarea id="fastupload-description-input" class="b2b-form-input" rows="3" placeholder="Descripción breve y verificable del producto"></textarea>
@@ -1817,19 +1974,19 @@
 
     <!-- SECTION: COLA DE BORRADORES Y APROBACIÓN (MARIANO / ADMIN) -->
     <div id="vendor-drafts-review-section" class="vendor-workspace-section" style="display: none; max-width: 1100px; margin: 30px auto; padding: 0 20px;">
-      <div style="background: var(--color-card-bg); border: 2px solid #2e7d32; border-radius: 20px; padding: 24px; box-shadow: var(--shadow-md); color: var(--color-text-main);">
+      <div style="background: #fffefb; border: 2px solid var(--vendor-gold); border-radius: 20px; padding: 24px; box-shadow: 0 8px 24px rgba(92,59,30,0.06); color: #5c3b1e;">
         
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
           <div>
-            <span style="background: rgba(46,125,50,0.2); border: 1px solid #2e7d32; color: #66bb6a; padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 700; text-transform: uppercase;">CONTROL CENTRALIZADO ADMINISTRACIÓN</span>
-            <h2 style="font-family: var(--font-display); color: #66bb6a; font-size: 1.6rem; margin: 6px 0 0 0;">👑 Cola de Borradores Pendientes</h2>
+            <span style="background: rgba(194,162,70,0.18); border: 1px solid var(--vendor-gold); color: #5c3b1e; padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 800; text-transform: uppercase;">CONTROL CENTRALIZADO ADMINISTRACIÓN</span>
+            <h2 style="font-family: var(--font-display); color: #5c3b1e; font-size: 1.6rem; margin: 6px 0 0 0;">👑 Cola de Borradores Pendientes</h2>
           </div>
 
           <div style="display: flex; gap: 10px; align-items: center;">
-            <button type="button" onclick="loadPendingProductDrafts()" style="background: rgba(46,125,50,0.15); border: 1.5px solid #2e7d32; color: #66bb6a; font-weight: 700; padding: 8px 16px; border-radius: 12px; cursor: pointer; font-size: 0.88rem;">
+            <button type="button" onclick="loadPendingProductDrafts()" style="background: #f7f4ea; border: 1.5px solid var(--vendor-gold); color: #5c3b1e; font-weight: 800; padding: 8px 16px; border-radius: 12px; cursor: pointer; font-size: 0.88rem;">
               🔄 Actualizar Cola
             </button>
-            <button type="button" onclick="switchVendorTab('catalog')" style="background: none; border: 1px solid var(--color-border-accent); color: var(--color-text-muted); padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: 0.85rem;">✕ Cerrar</button>
+            <button type="button" onclick="switchVendorTab('catalog')" style="background: none; border: 1px solid #d4c5a9; color: #5c3b1e; padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: 0.85rem;">✕ Cerrar</button>
           </div>
         </div>
 
@@ -1911,6 +2068,48 @@
             </div>
           </form>
         </aside>
+      </div>
+    </section>
+
+    <!-- SECTION: MEDIACIÓN DE PEDIDOS WEB (CLIENTE WEB + VENDEDOR TIENDA) -->
+    <section id="vendor-web-orders-section" class="vendor-workspace-section internal-catalog-workspace" style="display: none;" aria-labelledby="web-orders-title">
+      <header class="internal-catalog-hero" style="border-left: 4px solid #29b6f6;">
+        <div>
+          <span class="stock-entry-eyebrow" style="color: #29b6f6;">E-commerce & Tienda física · BÔ Grow Club</span>
+          <h2 id="web-orders-title">Pedidos Web & Mediación</h2>
+          <p>Pedidos generados por clientes desde la tienda online. Prepará el paquete con la ubicación WMS o pasalo a Caja POS para cobrar en el local.</p>
+        </div>
+        <div class="internal-catalog-hero-actions">
+          <button type="button" class="internal-catalog-add" style="background: #29b6f6; color: #0f172a; font-weight: 800;" onclick="loadWebOrders(true)">🔄 Actualizar pedidos</button>
+          <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
+        </div>
+      </header>
+
+      <div class="internal-catalog-toolbar" style="margin-top: 18px;" role="search">
+        <label style="flex: 2;">
+          <span>Buscar pedido</span>
+          <input type="search" id="web-orders-search" placeholder="ID de pedido (#BO-...), cliente o teléfono" autocomplete="off" oninput="filterWebOrders()">
+        </label>
+        <label style="flex: 1;">
+          <span>Estado</span>
+          <select id="web-orders-filter-status" onchange="filterWebOrders()">
+            <option value="all">Todos los estados</option>
+            <option value="PENDING">Pendientes de atención</option>
+            <option value="IN_PREPARATION">En preparación (Picking)</option>
+            <option value="READY">Listos para retiro / envío</option>
+            <option value="COMPLETED">Completados / Entregados</option>
+          </select>
+        </label>
+        <div class="internal-catalog-summary" aria-live="polite">
+          <strong id="web-orders-count">0</strong>
+          <span>pedidos registrados</span>
+        </div>
+      </div>
+
+      <div id="web-orders-status" class="stock-ai-status" role="status" aria-live="polite" hidden></div>
+
+      <div id="web-orders-list" class="web-orders-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 18px; margin-top: 18px;" aria-live="polite">
+        <!-- Generado dinámicamente -->
       </div>
     </section>
 
@@ -2562,58 +2761,191 @@
       </div>
     </div>
 
-    <!-- SECTION: CARTERA PERSONAL DEL VENDEDOR -->
+    <!-- SECTION: CLIENTES, CARTERA & CUENTAS CORRIENTES -->
     <section id="vendor-portfolio-section" class="vendor-workspace-section" style="display: none; max-width: 1400px; margin: 30px auto; padding: 0 20px;" aria-labelledby="vendor-portfolio-title">
       <div style="background: var(--color-card-bg); border: 1px solid var(--color-border-subtle); border-radius: 20px; padding: 24px; box-shadow: var(--shadow-md); color: var(--color-text-main);">
+        
+        <!-- Header & Nav Tabs -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
           <div>
-            <span style="background: rgba(171,71,188,0.15); border: 1px solid #ab47bc; color: #ab47bc; padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 700;">GESTIÓN DE CLIENTES RECOMENDADOS</span>
-            <h2 id="vendor-portfolio-title" style="font-family: var(--font-serif); color: var(--color-text-main); font-size: 1.6rem; margin: 6px 0 0 0;">👥 Mi Cartera Personal de Clientes</h2>
+            <span style="background: rgba(171,71,188,0.15); border: 1px solid #ab47bc; color: #ab47bc; padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 700;">GESTIÓN INTEGRAL DE CLIENTES & CRÉDITO</span>
+            <h2 id="vendor-portfolio-title" style="font-family: var(--font-serif); color: var(--color-text-main); font-size: 1.6rem; margin: 6px 0 0 0;">👥 Clientes & Cuentas Corrientes</h2>
           </div>
-          <button type="button" class="btn btn-secondary" onclick="copyVendorRefLink()" style="border-color: #ab47bc; color: #ab47bc; font-weight: 800; padding: 10px 18px; border-radius: 12px; font-size: 0.85rem;">
-            📋 Copiar Mi Link de Recomendación
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-secondary" onclick="openNewCurrentAccountModal()" style="border-color: var(--color-accent-gold); color: var(--color-accent-gold); font-weight: 800; padding: 10px 18px; border-radius: 12px; font-size: 0.85rem;">
+              ＋ Nueva Cuenta Corriente
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="copyVendorRefLink()" style="border-color: #ab47bc; color: #ab47bc; font-weight: 800; padding: 10px 18px; border-radius: 12px; font-size: 0.85rem;">
+              📋 Copiar Mi Link de Recomendación
+            </button>
+          </div>
+        </div>
+
+        <!-- Subtabs: Clientes vs Cuentas Corrientes -->
+        <div style="display: flex; gap: 12px; margin-bottom: 20px; border-bottom: 1.5px solid var(--color-border-subtle); padding-bottom: 12px;">
+          <button type="button" id="portfolio-subtab-btn-cc" class="b2b-tab-btn active" onclick="switchPortfolioSubtab('cc')" style="padding: 8px 18px; border-radius: 10px; font-weight: 800; font-size: 0.9rem; cursor: pointer;">
+            📋 Cuentas Corrientes & Deudas
+          </button>
+          <button type="button" id="portfolio-subtab-btn-general" class="b2b-tab-btn" onclick="switchPortfolioSubtab('general')" style="padding: 8px 18px; border-radius: 10px; font-weight: 700; font-size: 0.9rem; cursor: pointer;">
+            👥 Cartera de Recomendados
           </button>
         </div>
 
-        <!-- Metrics bar -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px;">
-          <div style="background: var(--color-card-bg-alt); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 14px; text-align: center;">
-            <span style="font-size: 0.75rem; color: var(--color-text-muted); display: block;">CLIENTES REGISTRADOS</span>
-            <strong id="portfolio-total-clients" style="font-size: 1.5rem; color: #ab47bc; font-family: var(--font-sans);">0</strong>
+        <!-- SUBTAB 1: CUENTAS CORRIENTES -->
+        <div id="portfolio-subtab-cc">
+          <!-- Metrics bar CC -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px;">
+            <div style="background: var(--color-card-bg-alt); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 14px; text-align: center;">
+              <span style="font-size: 0.75rem; color: var(--color-text-muted); display: block;">TOTAL DEUDA EN LA CALLE</span>
+              <strong id="cc-total-debt" style="font-size: 1.5rem; color: #ef5350; font-family: var(--font-sans);">$0</strong>
+            </div>
+            <div style="background: var(--color-card-bg-alt); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 14px; text-align: center;">
+              <span style="font-size: 0.75rem; color: var(--color-text-muted); display: block;">CUENTAS ACTIVAS</span>
+              <strong id="cc-active-count" style="font-size: 1.5rem; color: var(--color-accent-gold); font-family: var(--font-sans);">0</strong>
+            </div>
+            <div style="background: var(--color-card-bg-alt); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 14px; text-align: center;">
+              <span style="font-size: 0.75rem; color: var(--color-text-muted); display: block;">VENCIMIENTOS PRÓXIMOS</span>
+              <strong id="cc-due-alerts" style="font-size: 1.5rem; color: #ff9800; font-family: var(--font-sans);">0</strong>
+            </div>
           </div>
-          <div style="background: var(--color-card-bg-alt); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 14px; text-align: center;">
-            <span style="font-size: 0.75rem; color: var(--color-text-muted); display: block;">CLIENTES VIP ACTIVOS</span>
-            <strong id="portfolio-vip-clients" style="font-size: 1.5rem; color: var(--color-accent-gold); font-family: var(--font-sans);">0</strong>
+
+          <!-- Search & Filter CC -->
+          <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+            <input type="text" id="cc-search-input" onkeyup="renderCurrentAccountsUI()" placeholder="Buscar por cliente, DNI o teléfono..." style="flex: 1; padding: 10px 14px; border-radius: 10px; border: 1.5px solid var(--color-border-accent); background: var(--color-card-bg); color: var(--color-text-main); font-size: 0.9rem;">
           </div>
-          <div style="background: var(--color-card-bg-alt); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 14px; text-align: center;">
-            <span style="font-size: 0.75rem; color: var(--color-text-muted); display: block;">ALERTAS REABASTECIMIENTO</span>
-            <strong id="portfolio-soil-alerts" style="font-size: 1.5rem; color: #ef5350; font-family: var(--font-sans);">0</strong>
+
+          <!-- CC Table -->
+          <div style="overflow-x: auto; background: var(--color-card-bg-alt); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 12px;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+              <thead>
+                <tr style="border-bottom: 1.5px solid var(--color-border-accent); color: var(--color-text-muted);">
+                  <th style="padding: 10px;">Cliente / DNI</th>
+                  <th style="padding: 10px;">Contacto WhatsApp</th>
+                  <th style="padding: 10px;">Saldo Adeudado</th>
+                  <th style="padding: 10px;">Límite Crédito</th>
+                  <th style="padding: 10px;">Vencimiento 1.° Pago</th>
+                  <th style="padding: 10px; text-align: right;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="vendor-cc-table-body">
+                <!-- Rendered via JS -->
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <!-- Search & Filter -->
-        <div style="margin-bottom: 20px; display: flex; gap: 10px;">
-          <input type="text" id="portfolio-search-input" onkeyup="renderVendorPortfolioUI()" placeholder="Buscar cliente por nombre o teléfono..." style="flex: 1; padding: 10px 14px; border-radius: 10px; border: 1.5px solid var(--color-border-accent); background: var(--color-card-bg); color: var(--color-text-main); font-size: 0.9rem;">
+        <!-- SUBTAB 2: CARTERA GENERAL -->
+        <div id="portfolio-subtab-general" style="display: none;">
+          <!-- Metrics bar General -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px;">
+            <div style="background: var(--color-card-bg-alt); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 14px; text-align: center;">
+              <span style="font-size: 0.75rem; color: var(--color-text-muted); display: block;">CLIENTES REGISTRADOS</span>
+              <strong id="portfolio-total-clients" style="font-size: 1.5rem; color: #ab47bc; font-family: var(--font-sans);">0</strong>
+            </div>
+            <div style="background: var(--color-card-bg-alt); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 14px; text-align: center;">
+              <span style="font-size: 0.75rem; color: var(--color-text-muted); display: block;">CLIENTES VIP ACTIVOS</span>
+              <strong id="portfolio-vip-clients" style="font-size: 1.5rem; color: var(--color-accent-gold); font-family: var(--font-sans);">0</strong>
+            </div>
+            <div style="background: var(--color-card-bg-alt); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 14px; text-align: center;">
+              <span style="font-size: 0.75rem; color: var(--color-text-muted); display: block;">ALERTAS REABASTECIMIENTO</span>
+              <strong id="portfolio-soil-alerts" style="font-size: 1.5rem; color: #ef5350; font-family: var(--font-sans);">0</strong>
+            </div>
+          </div>
+
+          <!-- Search & Filter General -->
+          <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+            <input type="text" id="portfolio-search-input" onkeyup="renderVendorPortfolioUI()" placeholder="Buscar cliente por nombre o teléfono..." style="flex: 1; padding: 10px 14px; border-radius: 10px; border: 1.5px solid var(--color-border-accent); background: var(--color-card-bg); color: var(--color-text-main); font-size: 0.9rem;">
+          </div>
+
+          <!-- General Table -->
+          <div style="overflow-x: auto; background: var(--color-card-bg-alt); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 12px;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+              <thead>
+                <tr style="border-bottom: 1.5px solid var(--color-border-accent); color: var(--color-text-muted);">
+                  <th style="padding: 10px;">Cliente</th>
+                  <th style="padding: 10px;">Contacto / WhatsApp</th>
+                  <th style="padding: 10px;">Nivel VIP</th>
+                  <th style="padding: 10px;">Estado Sustrato</th>
+                  <th style="padding: 10px; text-align: right;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="vendor-portfolio-table-body">
+                <!-- Rendered via JS -->
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <!-- Table Container -->
+      </div>
+    </section>
+
+    <!-- SECTION: GESTIÓN DE VENCIMIENTOS (3 MESES A CRÍTICOS) -->
+    <section id="vendor-expirations-section" class="vendor-workspace-section" style="display: none; max-width: 1400px; margin: 30px auto; padding: 0 20px;" aria-labelledby="vendor-expirations-title">
+      <div style="background: var(--color-card-bg); border: 1.5px solid #e65100; border-radius: 20px; padding: 24px; box-shadow: var(--shadow-md); color: var(--color-text-main);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
+          <div>
+            <span style="background: rgba(230,81,0,0.15); border: 1px solid #e65100; color: #e65100; padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 800;">CONTROL DE CADUCIDAD & ROTACIÓN</span>
+            <h2 id="vendor-expirations-title" style="font-family: var(--font-serif); color: var(--color-text-main); font-size: 1.6rem; margin: 6px 0 0 0;">⏳ Alertas de Vencimiento de Productos</h2>
+          </div>
+          <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
+        </div>
+
+        <!-- Expirations Filters -->
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+          <button type="button" class="b2b-filter-chip active" id="exp-filter-all" onclick="filterExpirationsByTime('all')">Todos con Vencimiento</button>
+          <button type="button" class="b2b-filter-chip" id="exp-filter-critical" onclick="filterExpirationsByTime('critical')" style="border-color: #ef5350; color: #ef5350;">🔴 Críticos / Vencidos (≤ 3d)</button>
+          <button type="button" class="b2b-filter-chip" id="exp-filter-week" onclick="filterExpirationsByTime('week')" style="border-color: #ff9800; color: #ff9800;">🟠 1 Semana (≤ 7d)</button>
+          <button type="button" class="b2b-filter-chip" id="exp-filter-month" onclick="filterExpirationsByTime('month')" style="border-color: #fbc02d; color: #fbc02d;">🟡 1 Mes (≤ 30d)</button>
+          <button type="button" class="b2b-filter-chip" id="exp-filter-three-months" onclick="filterExpirationsByTime('three-months')" style="border-color: #4caf50; color: #4caf50;">🟢 3 Meses (≤ 90d)</button>
+        </div>
+
+        <!-- Expirations Table -->
         <div style="overflow-x: auto; background: var(--color-card-bg-alt); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 12px;">
           <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
             <thead>
               <tr style="border-bottom: 1.5px solid var(--color-border-accent); color: var(--color-text-muted);">
-                <th style="padding: 10px;">Cliente</th>
-                <th style="padding: 10px;">Contacto / WhatsApp</th>
-                <th style="padding: 10px;">Nivel VIP</th>
-                <th style="padding: 10px;">Estado Sustrato</th>
-                <th style="padding: 10px; text-align: right;">Acciones</th>
+                <th style="padding: 10px;">Producto / SKU</th>
+                <th style="padding: 10px;">Categoría</th>
+                <th style="padding: 10px;">Stock Actual</th>
+                <th style="padding: 10px;">Ubicación WMS</th>
+                <th style="padding: 10px;">Fecha Vencimiento</th>
+                <th style="padding: 10px;">Días Restantes</th>
+                <th style="padding: 10px; text-align: right;">Acción Comercial</th>
               </tr>
             </thead>
-            <tbody id="vendor-portfolio-table-body">
+            <tbody id="vendor-expirations-table-body">
               <!-- Rendered via JS -->
             </tbody>
           </table>
         </div>
+      </div>
+    </section>
 
+    <!-- SECTION: OTRAS TIENDAS CERCA (PROVEEDORES LOCALES · LLEGA EN 2 DÍAS) -->
+    <section id="vendor-nearby-stores-section" class="vendor-workspace-section" style="display: none; max-width: 1400px; margin: 30px auto; padding: 0 20px;" aria-labelledby="vendor-nearby-stores-title">
+      <div style="background: var(--color-card-bg); border: 1.5px solid #1565c0; border-radius: 20px; padding: 24px; box-shadow: var(--shadow-md); color: var(--color-text-main);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
+          <div>
+            <span style="background: rgba(21,101,192,0.15); border: 1px solid #1565c0; color: #1565c0; padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 800;">RED DE PROVEEDORES LOCALES & ALIANZAS</span>
+            <h2 id="vendor-nearby-stores-title" style="font-family: var(--font-serif); color: var(--color-text-main); font-size: 1.6rem; margin: 6px 0 0 0;">🏪 Otras Tiendas Cerca (Llega en 2 días)</h2>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button type="button" class="btn btn-secondary" onclick="openAddNearbyStoreModal()" style="border-color: #1565c0; color: #1565c0; font-weight: 800; padding: 10px 18px; border-radius: 12px; font-size: 0.85rem;">
+              ＋ Nueva Tienda / Ingesta IA
+            </button>
+            <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
+          </div>
+        </div>
+
+        <!-- Stores Tabs / Selector -->
+        <div id="nearby-stores-tabs-container" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+          <button type="button" class="b2b-filter-chip active" onclick="filterNearbyProductsByStore('all')">Todas las Tiendas</button>
+        </div>
+
+        <!-- Products from Nearby Stores -->
+        <div id="nearby-stores-products-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px;">
+          <!-- Populated dynamically -->
+        </div>
       </div>
     </section>
 
@@ -2979,7 +3311,176 @@
       </div>
     </div>
 
-    <!-- Filters Overlay for Mobile -->
+    <!-- MODAL: NUEVA CUENTA CORRIENTE -->
+    <div id="modal-new-current-account" class="location-assistant-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modal-cc-title">
+      <div class="location-assistant-shell" style="max-width: 520px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 id="modal-cc-title" style="margin: 0; color: var(--vendor-forest); font-family: var(--font-display);">📋 Alta de Cuenta Corriente</h3>
+          <button type="button" class="stock-entry-close" onclick="closeNewCurrentAccountModal()">×</button>
+        </div>
+        <form onsubmit="handleCreateCurrentAccount(event)">
+          <div style="margin-bottom: 12px;">
+            <label style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">Nombre y Apellido del Cliente *</label>
+            <input type="text" id="cc-new-name" class="b2b-form-input" placeholder="Ej: Juan Pérez" required>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+            <div>
+              <label style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">DNI / CUIT</label>
+              <input type="text" id="cc-new-dni" class="b2b-form-input" placeholder="Ej: 35123456">
+            </div>
+            <div>
+              <label style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">WhatsApp / Teléfono *</label>
+              <input type="tel" id="cc-new-phone" class="b2b-form-input" placeholder="Ej: 5493434123456" required>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+            <div>
+              <label style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">Límite de Crédito ($)</label>
+              <input type="number" id="cc-new-limit" class="b2b-form-input" value="300000" min="0" step="1000">
+            </div>
+            <div>
+              <label style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">Vencimiento 1.° Pago</label>
+              <input type="date" id="cc-new-due-date" class="b2b-form-input">
+            </div>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="btn btn-secondary" onclick="closeNewCurrentAccountModal()">Cancelar</button>
+            <button type="submit" class="wms-btn wms-btn-primary">Guardar Cuenta</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL: REGISTRAR COBRO / PAGO DE CUENTA CORRIENTE -->
+    <div id="modal-record-cc-payment" class="location-assistant-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modal-pay-cc-title">
+      <div class="location-assistant-shell" style="max-width: 480px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 id="modal-pay-cc-title" style="margin: 0; color: var(--vendor-forest); font-family: var(--font-display);">💵 Registrar Entrega / Cobro</h3>
+          <button type="button" class="stock-entry-close" onclick="closeRecordCcPaymentModal()">×</button>
+        </div>
+        <form onsubmit="handleRecordCcPaymentSubmit(event)">
+          <input type="hidden" id="cc-pay-account-id">
+          <div style="background: rgba(21, 45, 36, 0.04); border-radius: 12px; padding: 12px; margin-bottom: 14px;">
+            <span style="font-size: 0.8rem; color: var(--color-text-muted);">Cliente:</span>
+            <strong id="cc-pay-customer-name" style="display: block; font-size: 1.1rem; color: var(--color-text-main);">-</strong>
+            <span style="font-size: 0.8rem; color: var(--color-text-muted);">Deuda Actual: <strong id="cc-pay-current-debt" style="color: #ef5350;">$0</strong></span>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">Monto Abonado ($) *</label>
+            <input type="number" id="cc-pay-amount" class="b2b-form-input" min="1" step="0.01" required>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">Medio de Pago</label>
+            <select id="cc-pay-method" class="b2b-form-input">
+              <option value="EFECTIVO">💵 Efectivo (Suma a Caja)</option>
+              <option value="TRANSFERENCIA">🏦 Transferencia Bancaria</option>
+              <option value="MERCADOPAGO">📱 MercadoPago</option>
+            </select>
+          </div>
+          <div style="margin-bottom: 16px;">
+            <label style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">Concepto / Comprobante</label>
+            <input type="text" id="cc-pay-note" class="b2b-form-input" placeholder="Ej: Pago parcial cuota 1">
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="btn btn-secondary" onclick="closeRecordCcPaymentModal()">Cancelar</button>
+            <button type="submit" class="wms-btn wms-btn-primary">Registrar Pago</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL: ALTA DE TIENDA CERCANA & INGESTA IA -->
+    <div id="modal-add-nearby-store" class="location-assistant-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modal-nearby-title">
+      <div class="location-assistant-shell" style="max-width: 640px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 id="modal-nearby-title" style="margin: 0; color: var(--vendor-forest); font-family: var(--font-display);">🏪 Nueva Tienda Cercana & Ingesta IA</h3>
+          <button type="button" class="stock-entry-close" onclick="closeAddNearbyStoreModal()">×</button>
+        </div>
+        <form onsubmit="handleSaveNearbyStore(event)">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+            <div>
+              <label style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">Nombre de la Tienda *</label>
+              <input type="text" id="nearby-store-name" class="b2b-form-input" placeholder="Ej: Growshop Centro" required>
+            </div>
+            <div>
+              <label style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">WhatsApp Pedidos *</label>
+              <input type="tel" id="nearby-store-phone" class="b2b-form-input" placeholder="Ej: 5493434675428" required>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+            <div>
+              <label style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">Dirección / Localidad</label>
+              <input type="text" id="nearby-store-address" class="b2b-form-input" placeholder="Ej: Paraná, Centro">
+            </div>
+            <div>
+              <label style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">Margen de Ganancia (%) *</label>
+              <input type="number" id="nearby-store-markup" class="b2b-form-input" value="30" min="0" max="200" required>
+            </div>
+          </div>
+          
+          <div style="background: rgba(21, 101, 192, 0.05); border: 1px dashed #1565c0; border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+            <span style="font-size: 0.85rem; font-weight: 800; color: #1565c0; display: block; margin-bottom: 4px;">🤖 Ingesta IA de Catálogo / Lista de Precios</span>
+            <small style="color: var(--color-text-muted); display: block; margin-bottom: 8px;">Pegá aquí la lista de precios de la tienda (texto, WhatsApp o CSV) o escribí los productos. La IA estructurará precios y stock automáticamente.</small>
+            <textarea id="nearby-store-raw-catalog" class="b2b-form-input" rows="4" placeholder="Ejemplo:&#10;BioBizz Bio Bloom 500ml - $18.500 (Stock: 5)&#10;Sustrato Growers 50L - $12.000 (Stock: 10)&#10;Panel LED 150W Citizen - $140.000 (Stock: 2)"></textarea>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="btn btn-secondary" onclick="closeAddNearbyStoreModal()">Cancelar</button>
+            <button type="submit" class="wms-btn wms-btn-primary">Procesar & Guardar Tienda</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL: DETALLE DE CUENTA CORRIENTE, PRODUCTOS RETIRADOS Y EXPORTACIÓN PDF -->
+    <div id="modal-cc-details" class="location-assistant-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modal-cc-details-title">
+      <div class="location-assistant-shell" style="max-width: 820px; max-height: 90vh; display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 10px;">
+          <div>
+            <h3 id="modal-cc-details-title" style="margin: 0; color: var(--vendor-forest); font-family: var(--font-display); font-size: 1.25rem;">
+              📋 Detalle de Cuenta Corriente & Compras
+            </h3>
+            <span id="cc-details-customer-header" style="font-size: 0.85rem; color: var(--color-text-muted);">-</span>
+          </div>
+          <button type="button" class="stock-entry-close" onclick="closeCcDetailsModal()">×</button>
+        </div>
+
+        <!-- Summary KPIs & Actions Bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: rgba(21, 45, 36, 0.04); border-radius: 12px; padding: 12px; margin-bottom: 14px;">
+          <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+            <div>
+              <span style="font-size: 0.72rem; color: var(--color-text-muted); display: block;">Saldo Adeudado:</span>
+              <strong id="cc-details-debt-badge" style="font-size: 1.2rem; color: #ef5350;">$0</strong>
+            </div>
+            <div>
+              <span style="font-size: 0.72rem; color: var(--color-text-muted); display: block;">Límite de Crédito:</span>
+              <strong id="cc-details-limit-badge" style="font-size: 1rem; color: var(--color-text-main);">$0</strong>
+            </div>
+            <div>
+              <span style="font-size: 0.72rem; color: var(--color-text-muted); display: block;">Vencimiento 1.° Pago:</span>
+              <strong id="cc-details-due-badge" style="font-size: 0.95rem; color: #e65100;">-</strong>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-secondary" onclick="generateAndPrintCcPdf()" style="padding: 6px 12px; font-size: 0.82rem; border-color: var(--vendor-forest); color: var(--vendor-forest); font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
+              📄 Generar PDF con Fotos
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="sendCcDetailedWhatsAppFromModal()" style="padding: 6px 12px; font-size: 0.82rem; border-color: #25d366; color: #25d366; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
+              💬 Enviar por WhatsApp
+            </button>
+          </div>
+        </div>
+
+        <!-- Scrollable Products & Movement Ledger -->
+        <div id="cc-details-movements-container" style="flex: 1; overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 14px;">
+          <!-- Rendered dynamically -->
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-top: 14px; pt: 10px; border-top: 1px solid var(--color-border-subtle);">
+          <button type="button" class="btn btn-secondary" onclick="closeCcDetailsModal()">Cerrar</button>
+        </div>
+      </div>
+    </div>
     <div class="b2b-filters-overlay" id="b2b-filters-overlay"></div>
 
     <!-- Mobile Bottom Navigation -->
@@ -3017,7 +3518,7 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="mapa-local.js?v=stock_assistants_v1"></script>
+  <script src="mapa-local.js?v=gba_leafgreen_v1"></script>
   <script src="saas-auth.js?v=saas_v2"></script>
   <script src="business-verticals.js?v=verticals_v1"></script>
   <script src="tenant-theme.js?v=theme_v1"></script>
@@ -3029,6 +3530,6 @@
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=internal_catalog_v10"></script>
+  <script src="vendedor.js?v=vender_pos_v11"></script>
 </body>
 </html>

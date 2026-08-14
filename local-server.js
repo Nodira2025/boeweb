@@ -48,11 +48,26 @@ async function handleNetlifyFunction(request, response, modulePath, errorLabel) 
       body: ['GET', 'HEAD'].includes(request.method) ? undefined : body
     });
     const module = await import(modulePath);
-    const functionResponse = await module.default(webRequest, {
-      ip: request.socket.remoteAddress || 'local'
-    });
-    response.writeHead(functionResponse.status, Object.fromEntries(functionResponse.headers.entries()));
-    response.end(Buffer.from(await functionResponse.arrayBuffer()));
+    if (typeof module.default === 'function') {
+      const functionResponse = await module.default(webRequest, {
+        ip: request.socket.remoteAddress || 'local'
+      });
+      response.writeHead(functionResponse.status, Object.fromEntries(functionResponse.headers.entries()));
+      response.end(Buffer.from(await functionResponse.arrayBuffer()));
+    } else if (typeof module.handler === 'function') {
+      const urlObj = new URL(request.url, origin);
+      const event = {
+        httpMethod: request.method,
+        headers: request.headers,
+        body: body.length ? body.toString('utf8') : '',
+        queryStringParameters: Object.fromEntries(urlObj.searchParams.entries())
+      };
+      const result = await module.handler(event, { ip: request.socket.remoteAddress || 'local' });
+      response.writeHead(result.statusCode || 200, result.headers || { 'Content-Type': 'application/json' });
+      response.end(result.body || '');
+    } else {
+      throw new Error('Función Netlify sin export compatible (default o handler).');
+    }
   } catch (error) {
     console.error(`${errorLabel}:`, error.message);
     sendText(response, 500, 'Error del servidor local.');
@@ -89,16 +104,18 @@ function handleStaticFile(request, response) {
 }
 
 const server = http.createServer(async (request, response) => {
-  if (request.url?.startsWith('/.netlify/functions/analyze-product')) {
-    await handleNetlifyFunction(request, response, './netlify/functions/analyze-product.mjs', 'Error en análisis local');
-    return;
-  }
-  if (request.url?.startsWith('/.netlify/functions/lookup-product')) {
-    await handleNetlifyFunction(request, response, './netlify/functions/lookup-product.mjs', 'Error en búsqueda local');
-    return;
+  if (request.url?.startsWith('/.netlify/functions/')) {
+    const fnName = request.url.split('?')[0].replace('/.netlify/functions/', '').replace(/\/$/, '');
+    const fnPath = `./netlify/functions/${fnName}.mjs`;
+    const resolvedPath = path.resolve(root, fnPath);
+    if (fs.existsSync(resolvedPath)) {
+      await handleNetlifyFunction(request, response, fnPath, `Error en función ${fnName}`);
+      return;
+    }
   }
   handleStaticFile(request, response);
 });
+
 
 server.on('error', error => {
   console.error(`\nNo se pudo iniciar el servidor: ${error.message}`);

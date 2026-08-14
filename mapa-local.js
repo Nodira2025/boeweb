@@ -1,32 +1,90 @@
-// BÔ Grow Club — mapa físico conectado al inventario.
+// BÔ Grow Club — Mapa de Estanterías estilo GBA Pokémon Verde Hoja / FireRed (32-bit RPG)
+// Con la Computadora Central como punto de referencia cardinal (Brújula) para Tienda y Depósito.
 
 const DEFAULT_STORE_SHELVES = [
-  { id: 'shelf-A1', code: 'A-1', zone_code: 'A', name: 'Vitrina principal', floor_level: 1, x: 16, y: 12, width: 18, height: 14 },
-  { id: 'shelf-A2', code: 'A-2', zone_code: 'A', name: 'Vitrina secundaria', floor_level: 1, x: 16, y: 37, width: 18, height: 14 },
-  { id: 'shelf-B1', code: 'B-1', zone_code: 'B', name: 'Pasillo botánico norte', floor_level: 1, x: 43, y: 12, width: 18, height: 14 },
-  { id: 'shelf-B2', code: 'B-2', zone_code: 'B', name: 'Pasillo botánico sur', floor_level: 1, x: 65, y: 12, width: 18, height: 14 },
-  { id: 'shelf-C1', code: 'C-1', zone_code: 'C', name: 'Módulo indoor superior', floor_level: 1, x: 79, y: 32, width: 12, height: 16 },
-  { id: 'shelf-C2', code: 'C-2', zone_code: 'C', name: 'Módulo indoor inferior', floor_level: 1, x: 79, y: 53, width: 12, height: 16 },
-  { id: 'shelf-D1', code: 'D-1', zone_code: 'D', name: 'Semillas y productos reservados', floor_level: 1, x: 31, y: 76, width: 18, height: 14 },
-  { id: 'shelf-D2', code: 'D-2', zone_code: 'D', name: 'Depósito de insumos', floor_level: 1, x: 53, y: 76, width: 18, height: 14 },
-  { id: 'shelf-E1', code: 'E-1', zone_code: 'E', name: 'Coffee Lounge 1', floor_level: 1, x: 41, y: 36, width: 10, height: 26 },
-  { id: 'shelf-E2', code: 'E-2', zone_code: 'E', name: 'Coffee Lounge 2', floor_level: 1, x: 55, y: 36, width: 10, height: 26 }
+  // =========================================================================
+  // PLANTA 1: SALÓN TIENDA (PC EN EL CENTRO COMO BRÚJULA)
+  // =========================================================================
+  { id: 'tie-pc-center', code: 'PC-CENTRO', zone_code: 'PC', name: '💻 PC Central (Punto de Referencia / Brújula)', floor_level: 1, x: 42, y: 40, width: 16, height: 16, icon: '💻', is_anchor: true },
+
+  // PARED 1 (FRENTE / NORTE - ARRIBA)
+  { id: 'tie-P1-VIT1', code: 'P1-VIT1', zone_code: 'A', name: 'Pared 1 · Vitrina 1 (Semillas)', floor_level: 1, x: 4, y: 8, width: 14, height: 14, icon: '💎' },
+  { id: 'tie-P1-E1', code: 'P1-E1', zone_code: 'A', name: 'Pared 1 · Estante 1', floor_level: 1, x: 20, y: 8, width: 13, height: 14, icon: '🪵' },
+  { id: 'tie-P1-E2', code: 'P1-E2', zone_code: 'A', name: 'Pared 1 · Estante 2', floor_level: 1, x: 35, y: 8, width: 13, height: 14, icon: '🪵' },
+  { id: 'tie-P1-E3', code: 'P1-E3', zone_code: 'A', name: 'Pared 1 · Estante 3', floor_level: 1, x: 50, y: 8, width: 13, height: 14, icon: '🪵' },
+  { id: 'tie-P1-E4', code: 'P1-E4', zone_code: 'A', name: 'Pared 1 · Estante 4', floor_level: 1, x: 65, y: 8, width: 13, height: 14, icon: '🪵' },
+  { id: 'tie-P1-HEL1', code: 'P1-HEL1', zone_code: 'A', name: 'Pared 1 · Heladera 1 (Frío/Biotec)', floor_level: 1, x: 80, y: 8, width: 14, height: 14, icon: '❄️' },
+
+  // PARED 2 (FONDO / SUR - ABAJO)
+  { id: 'tie-P2-E1', code: 'P2-E1', zone_code: 'B', name: 'Pared 2 · Estante 1', floor_level: 1, x: 10, y: 78, width: 14, height: 14, icon: '🪵' },
+  { id: 'tie-P2-E2', code: 'P2-E2', zone_code: 'B', name: 'Pared 2 · Estante 2', floor_level: 1, x: 26, y: 78, width: 14, height: 14, icon: '🪵' },
+  { id: 'tie-P2-E3', code: 'P2-E3', zone_code: 'B', name: 'Pared 2 · Estante 3', floor_level: 1, x: 42, y: 78, width: 14, height: 14, icon: '🪵' },
+  { id: 'tie-P2-E4', code: 'P2-E4', zone_code: 'B', name: 'Pared 2 · Estante 4', floor_level: 1, x: 58, y: 78, width: 14, height: 14, icon: '🪵' },
+  { id: 'tie-P2-E5', code: 'P2-E5', zone_code: 'B', name: 'Pared 2 · Estante 5', floor_level: 1, x: 74, y: 78, width: 14, height: 14, icon: '🪵' },
+
+  // PARED 3 (DERECHA / ESTE - LATERAL DERECHO)
+  { id: 'tie-P3-E1', code: 'P3-E1', zone_code: 'C', name: 'Pared 3 (Derecha) · Estante 1', floor_level: 1, x: 86, y: 26, width: 11, height: 15, icon: '🪜' },
+  { id: 'tie-P3-E2', code: 'P3-E2', zone_code: 'C', name: 'Pared 3 (Derecha) · Estante 2', floor_level: 1, x: 86, y: 44, width: 11, height: 15, icon: '🪜' },
+  { id: 'tie-P3-E3', code: 'P3-E3', zone_code: 'C', name: 'Pared 3 (Derecha) · Estante 3', floor_level: 1, x: 86, y: 62, width: 11, height: 15, icon: '🪜' },
+
+  // PARED 4 (IZQUIERDA / OESTE - LATERAL IZQUIERDO)
+  { id: 'tie-P4-E1', code: 'P4-E1', zone_code: 'D', name: 'Pared 4 (Izquierda) · Estante 1', floor_level: 1, x: 3, y: 26, width: 11, height: 15, icon: '🪜' },
+  { id: 'tie-P4-E2', code: 'P4-E2', zone_code: 'D', name: 'Pared 4 (Izquierda) · Estante 2', floor_level: 1, x: 3, y: 44, width: 11, height: 15, icon: '🪜' },
+  { id: 'tie-P4-E3', code: 'P4-E3', zone_code: 'D', name: 'Pared 4 (Izquierda) · Estante 3', floor_level: 1, x: 3, y: 62, width: 11, height: 15, icon: '🪜' },
+
+  // =========================================================================
+  // PLANTA 2: DEPÓSITO GENERAL / ALMACÉN (PC EN EL CENTRO COMO BRÚJULA)
+  // =========================================================================
+  { id: 'dep-pc-center', code: 'PC-CENTRO', zone_code: 'PC', name: '💻 PC Central de Depósito (Brújula de Referencia)', floor_level: 2, x: 42, y: 40, width: 16, height: 16, icon: '💻', is_anchor: true },
+
+  // PARED 1 (FRENTE / NORTE - ARRIBA)
+  { id: 'dep-P1-E1', code: 'P1-E1', zone_code: 'A', name: 'Pared 1 (Frente) · Estante 1', floor_level: 2, x: 10, y: 8, width: 14, height: 14, icon: '📦' },
+  { id: 'dep-P1-E2', code: 'P1-E2', zone_code: 'A', name: 'Pared 1 (Frente) · Estante 2', floor_level: 2, x: 26, y: 8, width: 14, height: 14, icon: '📦' },
+  { id: 'dep-P1-E3', code: 'P1-E3', zone_code: 'A', name: 'Pared 1 (Frente) · Estante 3', floor_level: 2, x: 42, y: 8, width: 14, height: 14, icon: '📦' },
+  { id: 'dep-P1-E4', code: 'P1-E4', zone_code: 'A', name: 'Pared 1 (Frente) · Estante 4', floor_level: 2, x: 58, y: 8, width: 14, height: 14, icon: '📦' },
+  { id: 'dep-P1-E5', code: 'P1-E5', zone_code: 'A', name: 'Pared 1 (Frente) · Estante 5', floor_level: 2, x: 74, y: 8, width: 14, height: 14, icon: '📦' },
+
+  // PARED 2 (FONDO / SUR - ABAJO)
+  { id: 'dep-P2-E1', code: 'P2-E1', zone_code: 'B', name: 'Pared 2 (Fondo) · Estante 1', floor_level: 2, x: 8, y: 78, width: 13, height: 14, icon: '🧱' },
+  { id: 'dep-P2-E2', code: 'P2-E2', zone_code: 'B', name: 'Pared 2 (Fondo) · Estante 2', floor_level: 2, x: 23, y: 78, width: 13, height: 14, icon: '🧱' },
+  { id: 'dep-P2-E3', code: 'P2-E3', zone_code: 'B', name: 'Pared 2 (Fondo) · Estante 3', floor_level: 2, x: 38, y: 78, width: 13, height: 14, icon: '🧱' },
+  { id: 'dep-P2-E4', code: 'P2-E4', zone_code: 'B', name: 'Pared 2 (Fondo) · Estante 4', floor_level: 2, x: 53, y: 78, width: 13, height: 14, icon: '🧱' },
+  { id: 'dep-P2-E5', code: 'P2-E5', zone_code: 'B', name: 'Pared 2 (Fondo) · Estante 5', floor_level: 2, x: 68, y: 78, width: 13, height: 14, icon: '🧱' },
+  { id: 'dep-P2-PIS1', code: 'P2-PIS1', zone_code: 'B', name: 'Pared 2 · Pallet Sustratos (Piso)', floor_level: 2, x: 83, y: 78, width: 14, height: 14, icon: '📦' },
+
+  // PARED 3 (DERECHA / ESTE - LATERAL DERECHO)
+  { id: 'dep-P3-E1', code: 'P3-E1', zone_code: 'C', name: 'Pared 3 (Derecha) · Estante 1', floor_level: 2, x: 86, y: 26, width: 11, height: 15, icon: '🗄️' },
+  { id: 'dep-P3-E2', code: 'P3-E2', zone_code: 'C', name: 'Pared 3 (Derecha) · Estante 2', floor_level: 2, x: 86, y: 44, width: 11, height: 15, icon: '🗄️' },
+  { id: 'dep-P3-E3', code: 'P3-E3', zone_code: 'C', name: 'Pared 3 (Derecha) · Estante 3', floor_level: 2, x: 86, y: 62, width: 11, height: 15, icon: '🗄️' },
+
+  // PARED 4 (IZQUIERDA / OESTE - LATERAL IZQUIERDO)
+  { id: 'dep-P4-E1', code: 'P4-E1', zone_code: 'D', name: 'Pared 4 (Izquierda) · Estante 1', floor_level: 2, x: 3, y: 26, width: 11, height: 15, icon: '🗄️' },
+  { id: 'dep-P4-E2', code: 'P4-E2', zone_code: 'D', name: 'Pared 4 (Izquierda) · Estante 2', floor_level: 2, x: 3, y: 44, width: 11, height: 15, icon: '🗄️' },
+  { id: 'dep-P4-E3', code: 'P4-E3', zone_code: 'D', name: 'Pared 4 (Izquierda) · Estante 3', floor_level: 2, x: 3, y: 62, width: 11, height: 15, icon: '🗄️' }
 ];
 
-const FLOOR_NAMES = { 1: 'Planta baja', 2: 'Entrepiso', 3: 'Depósito alto' };
-const LEVEL_NAMES = { 1: 'Inferior', 2: 'Medio', 3: 'Superior' };
-const MAP_LAYOUT_KEY = 'boeweb_custom_store_layout_v4';
+const FLOOR_NAMES = { 1: '🏪 SALÓN TIENDA (PC AL CENTRO)', 2: '📦 DEPÓSITO GENERAL (PC AL CENTRO)' };
+const LEVEL_NAMES = {
+  1: 'Nv.1 Piso/Base (Abajo)',
+  2: 'Nv.2 Bajo',
+  3: 'Nv.3 Medio',
+  4: 'Nv.4 Medio-Alto',
+  5: 'Nv.5 Alto',
+  6: 'Nv.6 Tope (Arriba)'
+};
+const MAP_LAYOUT_KEY = 'boeweb_custom_store_layout_gba_v6';
 const MAP_PHOTOS_KEY = 'boeweb_store_shelf_photos_v1';
 
 let storeShelves = loadSavedStoreLayout();
 let storeLocationProducts = [];
 let selectedFloorLevel = 1;
-let selectedShelfCode = 'A-1';
-let selectedInternalLevel = 2;
+let selectedShelfCode = 'P1-E1';
+let selectedInternalLevel = 3;
 let currentViewMode = '2D';
+let activeMapTab = 'interactive'; // 'interactive' | 'illustration'
 let mapZoomLevel = 100;
 let isEditMode = false;
-let storeMapSyncLabel = 'Datos locales listos';
+let storeMapSyncLabel = 'BRÚJULA CENTRAL CONECTADA';
 
 function escapeMapHtml(value) {
   return String(value ?? '')
@@ -73,8 +131,10 @@ function normalizeShelf(shelf) {
     floor_level: Number(shelf.floor_level || shelf.floor || fallback.floor_level || 1),
     x: Number(shelf.x ?? fallback.x ?? 10),
     y: Number(shelf.y ?? fallback.y ?? 10),
-    width: Number(shelf.width ?? fallback.width ?? 16),
-    height: Number(shelf.height ?? fallback.height ?? 12)
+    width: Number(shelf.width ?? fallback.width ?? 14),
+    height: Number(shelf.height ?? fallback.height ?? 14),
+    icon: shelf.icon || fallback.icon || '📦',
+    is_anchor: shelf.is_anchor || fallback.is_anchor || false
   };
 }
 
@@ -100,13 +160,14 @@ function setStoreMapData(shelves = [], products = [], syncLabel = 'Inventario si
 
 function setFloorLevel(level) {
   selectedFloorLevel = Number(level) || 1;
-  const firstShelf = storeShelves.find(item => item.floor_level === selectedFloorLevel);
+  const firstShelf = storeShelves.find(item => item.floor_level === selectedFloorLevel && !item.is_anchor);
   if (firstShelf) selectedShelfCode = firstShelf.code;
   rerenderStoreMap();
 }
 
 function selectShelf(code, internalLevel = null) {
-  const shelf = storeShelves.find(item => item.code === code);
+  const shelf = storeShelves.find(item => item.code === code)
+    || storeShelves.find(item => String(item.code).toUpperCase() === String(code).toUpperCase());
   if (!shelf) return;
   selectedShelfCode = shelf.code;
   selectedFloorLevel = shelf.floor_level;
@@ -124,15 +185,20 @@ function setViewMode(mode) {
   rerenderStoreMap();
 }
 
+function setMapTab(tab) {
+  activeMapTab = tab;
+  rerenderStoreMap();
+}
+
 function adjustZoom(delta) {
-  mapZoomLevel = Math.max(70, Math.min(140, mapZoomLevel + Number(delta || 0)));
+  mapZoomLevel = Math.max(75, Math.min(140, mapZoomLevel + Number(delta || 0)));
   const canvas = document.getElementById('architectural-map-canvas');
   if (canvas) canvas.style.transform = getCanvasTransform();
 }
 
 function getCanvasTransform() {
   const scale = `scale(${mapZoomLevel / 100})`;
-  return currentViewMode === '3D' ? `perspective(900px) rotateX(11deg) ${scale}` : scale;
+  return currentViewMode === '3D' ? `perspective(1000px) rotateX(12deg) ${scale}` : scale;
 }
 
 function rerenderStoreMap() {
@@ -141,7 +207,9 @@ function rerenderStoreMap() {
 
 function getShelfProducts(code, internalLevel = null) {
   return storeLocationProducts.filter(product => {
-    const sameShelf = String(product.shelf_code || '').toUpperCase() === String(code || '').toUpperCase();
+    const rawShelf = String(product.shelf_code || '').toUpperCase();
+    const targetCode = String(code || '').toUpperCase();
+    const sameShelf = rawShelf === targetCode || rawShelf.includes(targetCode) || targetCode.includes(rawShelf);
     return sameShelf && (!internalLevel || Number(product.shelf_level) === Number(internalLevel));
   });
 }
@@ -153,7 +221,7 @@ function getShelfUnitCount(code) {
 function findStoreMapProduct(query) {
   const normalized = String(query || '').trim().toLocaleLowerCase('es-AR');
   if (!normalized) return null;
-  const product = storeLocationProducts.find(item => [item.name, item.product_code, item.barcode]
+  const product = storeLocationProducts.find(item => [item.name, item.product_code, item.barcode, item.shelf_code, item.location_label]
     .some(value => String(value || '').toLocaleLowerCase('es-AR').includes(normalized)));
   if (!product) return null;
   return {
@@ -186,7 +254,7 @@ function moveStoreItem(id, dx, dy) {
 function toggleStoreLayoutEditMode() {
   isEditMode = !isEditMode;
   saveStoreLayout();
-  if (!isEditMode && window.showToast) window.showToast('Plano guardado en este equipo.');
+  if (!isEditMode && window.showToast) window.showToast('🎮 Plano guardado en el Game Boy.');
   rerenderStoreMap();
 }
 
@@ -202,35 +270,105 @@ function showShelfDetailsModal(code) {
   const shelf = storeShelves.find(item => item.code === code);
   if (!shelf) return;
   const unitCount = getShelfUnitCount(code);
-  const message = `${FLOOR_NAMES[shelf.floor_level]} · Estante ${shelf.code} · ${LEVEL_NAMES[selectedInternalLevel]} · ${unitCount} unidades registradas`;
+  const message = `🌿 ${FLOOR_NAMES[shelf.floor_level]} · Estante ${shelf.code} · ${LEVEL_NAMES[selectedInternalLevel] || 'Nivel ' + selectedInternalLevel} · ${unitCount} u.`;
   if (window.showToast) window.showToast(message);
 }
 
-function renderFloorTabs() {
-  return Object.entries(FLOOR_NAMES).map(([level, label]) => `
-    <button type="button" class="store-map-floor-btn ${selectedFloorLevel === Number(level) ? 'active' : ''}"
-      onclick="setFloorLevel(${level})" aria-pressed="${selectedFloorLevel === Number(level)}">
-      ${escapeMapHtml(label)}
-    </button>`).join('');
+function parseLocationCode(code) {
+  const raw = String(code || '').trim().toUpperCase();
+  const parts = raw.split('-');
+  if (parts.length >= 6) {
+    const [zone, compass, wall, shelf, level, sector] = parts;
+    return {
+      zone: zone === 'TI' ? 'Tienda' : zone === 'DP' ? 'Depósito' : zone,
+      zoneCode: zone,
+      compass: compass === 'D' ? 'Derecha' : compass === 'I' ? 'Izquierda' : compass === 'F' ? 'Frente' : compass === 'A' ? 'Atrás' : compass,
+      compassCode: compass,
+      wall: wall.replace('P', 'Pared '),
+      wallCode: wall,
+      shelf: shelf.startsWith('E') ? shelf.replace('E', 'Estante ') : shelf,
+      shelfCode: shelf,
+      level: level.replace('N', 'Nivel '),
+      levelNum: Number(level.replace(/\D/g, '')) || 1,
+      sector: sector === 'I' ? 'Izquierda' : sector === 'C' ? 'Centro' : sector === 'D' ? 'Derecha' : sector,
+      sectorCode: sector
+    };
+  }
+  return null;
+}
+
+function formatLocationVoiceText(loc) {
+  if (typeof loc === 'string') {
+    const parsed = parseLocationCode(loc);
+    if (parsed) loc = parsed;
+    else return loc;
+  }
+  const zone = loc.zone || (loc.zoneCode === 'DP' ? 'el depósito' : 'la tienda');
+  const compass = loc.compass || 'frente';
+  const wall = loc.wall || 'Pared 1';
+  const shelf = loc.shelf || 'Estante 1';
+  const level = loc.level || `nivel ${loc.levelNum || 1}`;
+  const sector = loc.sector || 'centro';
+  return `Está en ${zone.toLowerCase()}, a la ${compass.toLowerCase()} de la PC, ${wall.toLowerCase()}, ${shelf.toLowerCase()}, ${level.toLowerCase()}, sector ${sector.toLowerCase()}.`;
 }
 
 function renderShelfBlocks() {
   const floorShelves = storeShelves.filter(item => item.floor_level === selectedFloorLevel);
   if (!floorShelves.length) {
-    return `<div class="map-empty-floor"><div><strong>Este nivel todavía no tiene estantes.</strong><br>Podés asignarlos cuando definas el plano físico.</div></div>`;
+    return `<div class="gba-empty-room"><div><span style="font-size:2.5rem;">🌿</span><br><strong>SALA SIN ESTANTES</strong><br><small>Ajustá el plano para colocar módulos.</small></div></div>`;
   }
   return floorShelves.map(shelf => {
+    // Si es la Computadora Central (Brújula)
+    if (shelf.is_anchor) {
+      return `
+        <div class="gba-shelf-wrapper gba-anchor-pc-wrapper" style="left:${shelf.x}%;top:${shelf.y}%;width:${shelf.width}%;height:${shelf.height}%;">
+          <div class="gba-anchor-pc" title="Computadora Central: Punto de Referencia Cardinal">
+            <div class="gba-pc-screen">💻</div>
+            <strong class="gba-pc-title">PC CENTRAL</strong>
+            <small class="gba-pc-sub">(BRÚJULA)</small>
+            
+            <!-- Flechas Cardinales de Brújula -->
+            <span class="gba-compass-arrow gba-compass-north" title="Frente / Norte (Pared 1)">⬆️ Frente</span>
+            <span class="gba-compass-arrow gba-compass-south" title="Atrás / Sur (Pared 2)">⬇️ Atrás</span>
+            <span class="gba-compass-arrow gba-compass-east" title="Derecha / Este (Pared 3)">➡️ Derecha</span>
+            <span class="gba-compass-arrow gba-compass-west" title="Izquierda / Oeste (Pared 4)">⬅️ Izquierda</span>
+          </div>
+        </div>`;
+    }
+
     const count = getShelfUnitCount(shelf.code);
     const selected = shelf.code === selectedShelfCode;
+    
+    // HP Bar calculation
+    let hpColor = '#4caf50'; // Green (>10)
+    let hpPercent = Math.min(100, Math.max(8, (count / 25) * 100));
+    if (count === 0) {
+      hpColor = '#e53935';
+      hpPercent = 0;
+    } else if (count < 10) {
+      hpColor = '#fbc02d';
+    }
+
     return `
-      <div class="map-shelf-position" style="left:${shelf.x}%;top:${shelf.y}%;width:${shelf.width}%;height:${shelf.height}%;">
-        <button type="button" class="map-shelf-block ${selected ? 'selected' : ''}" data-zone="${escapeMapHtml(shelf.zone_code)}"
+      <div class="gba-shelf-wrapper" style="left:${shelf.x}%;top:${shelf.y}%;width:${shelf.width}%;height:${shelf.height}%;">
+        <button type="button" class="gba-shelf-block ${selected ? 'selected' : ''}" data-zone="${escapeMapHtml(shelf.zone_code)}"
           onclick="selectShelf('${escapeMapHtml(shelf.code)}')" aria-label="Estante ${escapeMapHtml(shelf.code)}, ${count} unidades">
-          <span>${escapeMapHtml(shelf.code)}</span><small>${count} u.</small>
+          
+          <div class="gba-shelf-header">
+            <span class="gba-shelf-icon">${shelf.icon || '📦'}</span>
+            <strong class="gba-shelf-code">${escapeMapHtml(shelf.code)}</strong>
+          </div>
+          
+          <div class="gba-hp-track" title="${count} unidades">
+            <div class="gba-hp-fill" style="width: ${hpPercent}%; background: ${hpColor};"></div>
+          </div>
+          
+          <span class="gba-shelf-count">${count} u.</span>
+          ${selected ? '<span class="gba-cursor-tag">🎯</span>' : ''}
         </button>
-        ${isEditMode ? `<div class="map-editor-controls" aria-label="Mover estante ${escapeMapHtml(shelf.code)}">
-          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',-3,0)" aria-label="Mover a la izquierda">←</button>
-          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',3,0)" aria-label="Mover a la derecha">→</button>
+        ${isEditMode ? `<div class="gba-editor-arrows">
+          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',-3,0)">◀</button>
+          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',3,0)">▶</button>
         </div>` : ''}
       </div>`;
   }).join('');
@@ -238,102 +376,201 @@ function renderShelfBlocks() {
 
 function renderProductRows(products) {
   if (!products.length) {
-    return `<div class="map-products-empty">No hay productos asignados a este nivel del estante.</div>`;
+    return `<div class="gba-bag-empty"><span style="font-size: 1.5rem; display: block; margin-bottom: 6px;">🎒</span>No hay objetos en este nivel del estante.</div>`;
   }
   return products.map(product => {
     const exactPosition = product.shelf_position ? ` · ${escapeMapHtml(product.shelf_position)}` : '';
+    const stockNum = Number(product.stock) || 0;
+    const stockBadgeClass = stockNum > 5 ? 'gba-badge-ok' : stockNum > 0 ? 'gba-badge-low' : 'gba-badge-zero';
     return `
-      <article class="map-product-row" data-product-code="${escapeMapHtml(product.product_code)}">
-        ${product.image_url ? `<img src="${escapeMapHtml(product.image_url)}" alt="${escapeMapHtml(product.name || 'Producto')}">` : '<span class="map-product-placeholder" aria-hidden="true">□</span>'}
-        <div>
-          <strong>${escapeMapHtml(product.name || 'Producto sin nombre')}</strong>
-          <small>${escapeMapHtml(product.product_code || 'Sin código')} · ${Number(product.stock) || 0} unidades${exactPosition}${product.barcode ? ` · Barra ${escapeMapHtml(product.barcode)}` : ''}</small>
+      <article class="gba-item-row" data-product-code="${escapeMapHtml(product.product_code)}">
+        <div class="gba-item-thumb">
+          ${product.image_url ? `<img src="${escapeMapHtml(product.image_url)}" alt="${escapeMapHtml(product.name || 'Producto')}">` : '<span class="gba-item-icon-ph">🌿</span>'}
         </div>
-        <button type="button" class="map-product-action" onclick="printProductQrByCode('${escapeMapHtml(product.product_code)}')" aria-label="Imprimir QR de ${escapeMapHtml(product.name)}">QR</button>
+        <div class="gba-item-info">
+          <strong>${escapeMapHtml(product.name || 'Producto sin nombre')}</strong>
+          <small>${escapeMapHtml(product.product_code || 'SIN CÓD')} · <span class="gba-stock-pill ${stockBadgeClass}">x${stockNum}</span>${exactPosition}</small>
+        </div>
+        <button type="button" class="gba-qr-btn" onclick="printProductQrByCode('${escapeMapHtml(product.product_code)}')" aria-label="Imprimir QR">QR</button>
       </article>`;
   }).join('');
 }
 
 function renderSelectedShelfPanel() {
   const shelf = storeShelves.find(item => item.code === selectedShelfCode)
-    || storeShelves.find(item => item.floor_level === selectedFloorLevel)
+    || storeShelves.find(item => item.floor_level === selectedFloorLevel && !item.is_anchor)
     || storeShelves[0];
   if (!shelf) return '';
   selectedShelfCode = shelf.code;
   const allProducts = getShelfProducts(shelf.code);
   const visibleProducts = getShelfProducts(shelf.code, selectedInternalLevel);
   const unitCount = allProducts.reduce((sum, product) => sum + (Number(product.stock) || 0), 0);
-  const levels = [1, 2, 3].map(level => `
-    <button type="button" class="map-shelf-level ${selectedInternalLevel === level ? 'active' : ''}" onclick="setInternalLevel(${level})">
-      ${LEVEL_NAMES[level]} · ${getShelfProducts(shelf.code, level).reduce((sum, item) => sum + (Number(item.stock) || 0), 0)} u.
-    </button>`).join('');
+  
+  // 6 Niveles según el diagrama oficial (N1 abajo .. N6 arriba)
+  const levels = [1, 2, 3, 4, 5, 6].map(level => {
+    const lvlUnits = getShelfProducts(shelf.code, level).reduce((sum, item) => sum + (Number(item.stock) || 0), 0);
+    return `
+      <button type="button" class="gba-level-btn ${selectedInternalLevel === level ? 'active' : ''}" onclick="setInternalLevel(${level})">
+        <span class="gba-lvl-num">N${level}</span>
+        <small class="gba-lvl-qty">${lvlUnits}u</small>
+      </button>`;
+  }).join('');
+
   return `
-    <aside class="store-map-side">
-      <section class="map-detail-card" aria-labelledby="map-selected-shelf-title">
-        <span class="stock-entry-step">Estante seleccionado</span>
-        <h3 id="map-selected-shelf-title">${escapeMapHtml(shelf.code)} · ${escapeMapHtml(shelf.name)}</h3>
-        <div class="map-detail-meta">${escapeMapHtml(FLOOR_NAMES[shelf.floor_level])} · Zona ${escapeMapHtml(shelf.zone_code)} · ${unitCount} unidades</div>
-        <div class="map-shelf-photo">
-          ${shelf.photo_url ? `<img src="${escapeMapHtml(shelf.photo_url)}" alt="Foto del estante ${escapeMapHtml(shelf.code)}">` : '<span>Agregá una foto real para reconocer el estante más rápido.</span>'}
+    <aside class="gba-inspector-side">
+      <!-- Retro GBA Dialog Window Box -->
+      <section class="gba-dialog-box" aria-labelledby="map-selected-shelf-title">
+        <div class="gba-dialog-banner">
+          <span class="gba-poke-ball">🔴</span>
+          <span class="gba-dialog-kicker">INFORMACIÓN DEL ESTANTE</span>
+          <span class="gba-poke-leaf">🌿</span>
         </div>
-        <div class="map-photo-actions">
-          <label class="map-photo-button">${shelf.photo_url ? 'Cambiar foto' : 'Cargar foto'}
+        <h3 id="map-selected-shelf-title" class="gba-shelf-title">${escapeMapHtml(shelf.code)} · ${escapeMapHtml(shelf.name)}</h3>
+        <div class="gba-dialog-meta">
+          <span>${escapeMapHtml(FLOOR_NAMES[shelf.floor_level])}</span> · 
+          <strong>${unitCount} UNIDADES EN TOTAL</strong>
+        </div>
+
+        <div class="gba-photo-frame">
+          ${shelf.photo_url ? `<img src="${escapeMapHtml(shelf.photo_url)}" alt="Foto del estante ${escapeMapHtml(shelf.code)}">` : '<div class="gba-photo-empty"><span>📷 SIN FOTO DEL MUEBLE</span><small>Agregá una imagen de referencia.</small></div>'}
+        </div>
+
+        <div class="gba-photo-buttons">
+          <label class="gba-action-btn-green">
+            ${shelf.photo_url ? '🔄 CAMBIAR FOTO' : '📸 CARGAR FOTO'}
             <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden onchange="handleShelfPhotoChange(event,'${escapeMapHtml(shelf.code)}')">
           </label>
-          <button type="button" class="map-editor-button" onclick="showShelfDetailsModal('${escapeMapHtml(shelf.code)}')">Ver resumen</button>
+          <button type="button" class="gba-action-btn-gold" onclick="showShelfDetailsModal('${escapeMapHtml(shelf.code)}')">📋 RESUMEN</button>
         </div>
-        <div class="map-level-actions">${levels}</div>
+
+        <div class="gba-levels-row">
+          <div class="gba-levels-label">ALTURA / BALDA (N1 = Abajo, N6 = Arriba):</div>
+          <div class="gba-levels-grid" style="grid-template-columns: repeat(6, 1fr);">${levels}</div>
+        </div>
       </section>
-      <section class="map-products-card" aria-labelledby="map-products-title">
-        <span class="stock-entry-step">${escapeMapHtml(LEVEL_NAMES[selectedInternalLevel])}</span>
-        <h3 id="map-products-title">Productos ubicados</h3>
-        <div class="map-products-list">${renderProductRows(visibleProducts)}</div>
+
+      <!-- Retro GBA Item Bag / Products Box -->
+      <section class="gba-bag-box" aria-labelledby="map-products-title">
+        <div class="gba-bag-header">
+          <span class="gba-bag-icon">🎒</span>
+          <h3 id="map-products-title" class="gba-bag-title">OBJETOS EN NIVEL ${selectedInternalLevel} (${LEVEL_NAMES[selectedInternalLevel] || ''})</h3>
+        </div>
+        <div class="gba-bag-list">${renderProductRows(visibleProducts)}</div>
       </section>
     </aside>`;
 }
 
 function renderStoreMapHTML(activeZone = null, activeShelf = null, targetLevel = null) {
   if (activeShelf) {
-    const shelf = storeShelves.find(item => item.code === activeShelf);
+    const shelf = storeShelves.find(item => item.code === activeShelf)
+      || storeShelves.find(item => String(item.code).toUpperCase() === String(activeShelf).toUpperCase());
     if (shelf) {
       selectedShelfCode = shelf.code;
       selectedFloorLevel = shelf.floor_level;
     }
   }
   if (targetLevel) selectedInternalLevel = Number(targetLevel);
-  const floorShelfCount = storeShelves.filter(item => item.floor_level === selectedFloorLevel).length;
+  const floorShelfCount = storeShelves.filter(item => item.floor_level === selectedFloorLevel && !item.is_anchor).length;
   const totalUnits = storeLocationProducts.reduce((sum, item) => sum + Math.max(0, Number(item.stock) || 0), 0);
-  const updatedAt = new Intl.DateTimeFormat('es-AR', { hour: '2-digit', minute: '2-digit' }).format(new Date());
+  const currentRoomName = FLOOR_NAMES[selectedFloorLevel] || 'SALÓN';
 
   return `
-    <div class="store-map-dashboard">
-      <div class="store-map-toolbar">
-        <div class="store-map-floor-tabs" aria-label="Pisos del local">${renderFloorTabs()}</div>
-        <div class="store-map-map-actions">
-          <button type="button" class="store-map-action-btn" onclick="toggleStoreLayoutEditMode()">${isEditMode ? 'Guardar plano' : 'Ajustar plano'}</button>
-          ${isEditMode ? '<button type="button" class="store-map-action-btn" onclick="resetStoreLayoutToDefault()">Restablecer</button>' : ''}
-          <button type="button" class="store-map-action-btn" onclick="setViewMode('2D')">2D</button>
-          <button type="button" class="store-map-action-btn" onclick="setViewMode('3D')">3D</button>
-          <button type="button" class="store-map-action-btn" onclick="adjustZoom(-10)" aria-label="Alejar">−</button>
-          <button type="button" class="store-map-action-btn" onclick="adjustZoom(10)" aria-label="Acercar">+</button>
+    <div class="gba-map-shell">
+      
+      <!-- Top GBA Status Bar -->
+      <div class="gba-screen-topbar">
+        <div class="gba-topbar-left">
+          <span class="gba-led-light"></span>
+          <span class="gba-title-logo">🌿 BÔ GROW CLUB</span>
+          <span class="gba-version-tag">BRÚJULA CENTRAL</span>
         </div>
-        <span class="store-map-sync">${escapeMapHtml(storeMapSyncLabel)} · ${updatedAt}</span>
+        <div class="gba-topbar-right">
+          <span class="gba-battery-tag">🧭 PC = CENTRO</span>
+          <span class="gba-sync-tag">${escapeMapHtml(storeMapSyncLabel)}</span>
+        </div>
       </div>
-      <div class="store-map-main-grid">
-        <div class="store-map-canvas-wrap">
-          <div id="architectural-map-canvas" class="architectural-map-canvas" style="transform:${getCanvasTransform()}">
-            <span class="map-entrance">Entrada →</span>
-            <span class="map-depot-label">Depósito</span>
-            ${renderShelfBlocks()}
+
+      <!-- Navigation & Controls Header -->
+      <div class="gba-map-toolbar">
+        <div class="gba-room-tabs">
+          ${renderFloorTabs()}
+          <button type="button" class="gba-room-btn ${activeMapTab === 'illustration' ? 'active' : ''}" onclick="setMapTab('illustration')">
+            🖼️ PLANO ILUSTRADO
+          </button>
+          <button type="button" class="gba-room-btn ${activeMapTab === 'interactive' ? 'active' : ''}" onclick="setMapTab('interactive')">
+            🎮 MAPA INTERACTIVO
+          </button>
+        </div>
+        <div class="gba-hardware-buttons">
+          <button type="button" class="gba-pad-btn ${isEditMode ? 'active' : ''}" onclick="toggleStoreLayoutEditMode()">${isEditMode ? '💾 GUARDAR' : '🛠️ EDITAR'}</button>
+          ${isEditMode ? '<button type="button" class="gba-pad-btn" onclick="resetStoreLayoutToDefault()">↺ RESET</button>' : ''}
+          <button type="button" class="gba-pad-btn ${currentViewMode === '2D' ? 'active' : ''}" onclick="setViewMode('2D')">2D</button>
+          <button type="button" class="gba-pad-btn ${currentViewMode === '3D' ? 'active' : ''}" onclick="setViewMode('3D')">3D</button>
+          <button type="button" class="gba-pad-btn" onclick="adjustZoom(-10)" aria-label="Alejar">🔍−</button>
+          <button type="button" class="gba-pad-btn" onclick="adjustZoom(10)" aria-label="Acercar">🔍+</button>
+        </div>
+      </div>
+
+      ${activeMapTab === 'illustration' ? `
+        <!-- Vista Ilustrada / Infografía Oficial del Local -->
+        <div style="background: #0f2318; border: 2px solid #2e6b4d; border-radius: 16px; padding: 18px; margin: 12px 0; text-align: center;">
+          <h3 style="color: #a5d6a7; font-family: 'Press Start 2P', monospace; font-size: 0.8rem; margin: 0 0 12px 0;">
+            🧭 SISTEMA DE UBICACIÓN — PC AL CENTRO COMO BRÚJULA
+          </h3>
+          <div style="max-width: 820px; margin: 0 auto; border: 3px solid #c2a246; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.5);">
+            <img src="assets/store-shelf-map-gba.jpg" alt="Mapa Isométrico con PC Central y Estanterías Pared 1 a 4" style="width: 100%; height: auto; display: block;">
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 14px; text-align: left; font-size: 0.8rem; color: #e8f5e9;">
+            <div style="background: rgba(255,255,255,0.06); padding: 10px; border-radius: 10px; border-left: 3px solid #4caf50;">
+              <strong>⬆️ Frente (Norte):</strong> Pared 1 con vitrinas y estantes.
+            </div>
+            <div style="background: rgba(255,255,255,0.06); padding: 10px; border-radius: 10px; border-left: 3px solid #fbc02d;">
+              <strong>➡️ Derecha (Este):</strong> Pared 3 con estantes laterales.
+            </div>
+            <div style="background: rgba(255,255,255,0.06); padding: 10px; border-radius: 10px; border-left: 3px solid #29b6f6;">
+              <strong>⬇️ Atrás (Sur):</strong> Pared 2 / Ingreso / Pallets.
+            </div>
+            <div style="background: rgba(255,255,255,0.06); padding: 10px; border-radius: 10px; border-left: 3px solid #ab47bc;">
+              <strong>⬅️ Izquierda (Oeste):</strong> Pared 4 con estantes laterales.
+            </div>
           </div>
         </div>
-        ${renderSelectedShelfPanel()}
+      ` : `
+        <!-- Main Layout: Retro Canvas + Inspector -->
+        <div class="gba-main-grid">
+          <div class="gba-screen-viewport">
+            
+            <div id="architectural-map-canvas" class="gba-pokemart-canvas" style="transform:${getCanvasTransform()}">
+              
+              <!-- Room Background Floor Grid -->
+              <div class="gba-floor-grid ${selectedFloorLevel === 2 ? 'gba-floor-warehouse' : 'gba-floor-wood'}"></div>
+
+              <!-- Shelf & Compass Anchor Blocks -->
+              ${renderShelfBlocks()}
+            </div>
+          </div>
+
+          <!-- Right Side: Retro Inspector & Bag -->
+          ${renderSelectedShelfPanel()}
+        </div>
+      `}
+
+      <!-- Retro Bottom HUD -->
+      <div class="gba-bottom-hud">
+        <div class="gba-hud-stat">
+          <span>SALA ACTUAL:</span>
+          <strong>${escapeMapHtml(currentRoomName)}</strong>
+        </div>
+        <div class="gba-hud-stat">
+          <span>ESTANTES ACTIVOS:</span>
+          <strong>${floorShelfCount} MÓDULOS</strong>
+        </div>
+        <div class="gba-hud-stat">
+          <span>TOTAL EN INVENTARIO:</span>
+          <strong>${totalUnits} UNIDADES</strong>
+        </div>
       </div>
-      <div class="store-map-kpis">
-        <div class="map-kpi"><span>Estantes en este piso</span><strong>${floorShelfCount}</strong></div>
-        <div class="map-kpi"><span>Productos ubicados</span><strong>${storeLocationProducts.length}</strong></div>
-        <div class="map-kpi"><span>Unidades registradas</span><strong>${totalUnits}</strong></div>
-      </div>
+
     </div>`;
 }
 
@@ -350,3 +587,6 @@ window.setInternalLevel = setInternalLevel;
 window.setViewMode = setViewMode;
 window.adjustZoom = adjustZoom;
 window.showShelfDetailsModal = showShelfDetailsModal;
+window.setMapTab = setMapTab;
+window.parseLocationCode = parseLocationCode;
+window.formatLocationVoiceText = formatLocationVoiceText;
