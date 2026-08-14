@@ -910,6 +910,46 @@
   transform: translateY(-1px);
 }
 
+.pos-camera-btn,
+.stock-camera-scan-btn,
+.wms-camera-btn {
+  min-height: 50px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: 'Outfit', 'Montserrat', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #ffffff;
+  background: linear-gradient(180deg, #27593f 0%, #152d24 100%);
+  border: 1.5px solid var(--color-accent-gold, #c2a246);
+  border-radius: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(21, 45, 36, 0.2);
+  transition: all 0.2s ease;
+}
+
+.pos-camera-btn:hover,
+.stock-camera-scan-btn:hover,
+.wms-camera-btn:hover {
+  background: linear-gradient(180deg, #326e4e 0%, #1e4634 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(194, 162, 70, 0.3);
+}
+
+.pos-camera-btn:active,
+.stock-camera-scan-btn:active {
+  transform: translateY(1px);
+}
+
+@keyframes camera-laser-scan {
+  0%, 100% { top: 15%; opacity: 0.85; }
+  50% { top: 85%; opacity: 1; }
+}
+
 .pos-voice-btn.recording {
   background: #c62828 !important;
   color: #ffffff !important;

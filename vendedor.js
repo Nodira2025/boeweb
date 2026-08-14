@@ -8965,6 +8965,282 @@ function updatePosCurrentAccountInfo() {
   }
 }
 
+// ==========================================
+// 📷 ESCÁNER UNIVERSAL POR CÁMARA (CELULARES Y PC)
+// ==========================================
+
+let universalCameraScannerInstance = null;
+let universalCameraFacingMode = 'environment';
+let universalCameraActiveMode = 'pos';
+let universalCameraTorchOn = false;
+let universalCameraStream = null;
+
+function playScannerBeep() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1800, ctx.currentTime);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.12);
+  } catch (err) {
+    console.warn('Audio feedback not available:', err);
+  }
+}
+
+async function openUniversalCameraScanner(mode = 'pos') {
+  universalCameraActiveMode = mode;
+  const modal = document.getElementById('modal-universal-camera-scanner');
+  const titleEl = document.getElementById('camera-scanner-modal-title');
+  const hintEl = document.getElementById('camera-scanner-modal-hint');
+  const feedbackEl = document.getElementById('camera-scanner-feedback');
+
+  if (titleEl) {
+    if (mode === 'pos') titleEl.textContent = '📷 Escanear Producto para Venta';
+    else if (mode === 'stock') titleEl.textContent = '📷 Escanear Código para Ingreso de Stock';
+    else if (mode === 'wms') titleEl.textContent = '📷 Escanear Ubicación / Producto WMS';
+  }
+
+  if (hintEl) {
+    hintEl.textContent = 'Apuntá la cámara al código de barras o QR. Se detectará automáticamente.';
+  }
+
+  if (feedbackEl) {
+    feedbackEl.innerHTML = '<span style="color: #81c784;">⚡ Iniciando cámara en vivo…</span>';
+  }
+
+  if (modal) modal.style.display = 'flex';
+
+  await startUniversalCameraReader();
+}
+
+async function startUniversalCameraReader() {
+  const viewportId = 'universal-camera-reader-viewport';
+  const feedbackEl = document.getElementById('camera-scanner-feedback');
+
+  if (universalCameraScannerInstance) {
+    try {
+      await universalCameraScannerInstance.stop();
+      universalCameraScannerInstance.clear();
+    } catch {
+      // Ignorar errores al detener
+    }
+    universalCameraScannerInstance = null;
+  }
+
+  // 1. Si Html5Qrcode está disponible (CDN)
+  if (window.Html5Qrcode) {
+    try {
+      universalCameraScannerInstance = new window.Html5Qrcode(viewportId, {
+        formatsToSupport: [
+          window.Html5QrcodeSupportedFormats.EAN_13,
+          window.Html5QrcodeSupportedFormats.EAN_8,
+          window.Html5QrcodeSupportedFormats.CODE_128,
+          window.Html5QrcodeSupportedFormats.CODE_39,
+          window.Html5QrcodeSupportedFormats.UPC_A,
+          window.Html5QrcodeSupportedFormats.UPC_E,
+          window.Html5QrcodeSupportedFormats.QR_CODE,
+          window.Html5QrcodeSupportedFormats.DATA_MATRIX
+        ],
+        verbose: false
+      });
+
+      const config = {
+        fps: 15,
+        qrbox: { width: 260, height: 180 },
+        aspectRatio: 1.333333
+      };
+
+      await universalCameraScannerInstance.start(
+        { facingMode: universalCameraFacingMode },
+        config,
+        (decodedText, decodedResult) => {
+          handleUniversalCameraScanSuccess(decodedText, decodedResult);
+        },
+        () => {
+          // Escaneo continuo sin código detectado
+        }
+      );
+
+      if (feedbackEl) {
+        feedbackEl.innerHTML = '<span style="color: #a5d6a7;">🟢 Cámara activa · Apuntá al código de barras o QR</span>';
+      }
+      return;
+    } catch (err) {
+      console.warn('Html5Qrcode camera start failed, fallback to native video:', err);
+    }
+  }
+
+  // 2. Fallback nativo con getUserMedia y BarcodeDetector
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: universalCameraFacingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    universalCameraStream = stream;
+    const viewport = document.getElementById(viewportId);
+    if (viewport) {
+      viewport.innerHTML = '';
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.setAttribute('playsinline', 'true');
+      video.autoplay = true;
+      video.muted = true;
+      video.style.width = '100%';
+      video.style.height = '100%';
+      video.style.objectFit = 'cover';
+      viewport.appendChild(video);
+      await video.play();
+
+      if ('BarcodeDetector' in window) {
+        const barcodeDetector = new window.BarcodeDetector({
+          formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'qr_code', 'upc_a', 'upc_e']
+        });
+        const scanInterval = setInterval(async () => {
+          const modal = document.getElementById('modal-universal-camera-scanner');
+          if (!modal || modal.style.display === 'none') {
+            clearInterval(scanInterval);
+            return;
+          }
+          try {
+            const barcodes = await barcodeDetector.detect(video);
+            if (barcodes.length > 0) {
+              clearInterval(scanInterval);
+              handleUniversalCameraScanSuccess(barcodes[0].rawValue);
+            }
+          } catch {
+            // Frame skip
+          }
+        }, 150);
+      }
+
+      if (feedbackEl) {
+        feedbackEl.innerHTML = '<span style="color: #a5d6a7;">🟢 Cámara activa</span>';
+      }
+    }
+  } catch (nativeErr) {
+    console.error('No se pudo acceder a la cámara:', nativeErr);
+    if (feedbackEl) {
+      feedbackEl.innerHTML = '<span style="color: #ff8a80;">⚠️ No se pudo acceder a la cámara. Verificá los permisos del navegador o usá el botón "Subir foto".</span>';
+    }
+  }
+}
+
+function handleUniversalCameraScanSuccess(decodedText) {
+  if (!decodedText) return;
+  const cleanCode = String(decodedText).trim();
+
+  playScannerBeep();
+  if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+    navigator.vibrate(80);
+  }
+
+  const feedbackEl = document.getElementById('camera-scanner-feedback');
+  if (feedbackEl) {
+    feedbackEl.innerHTML = `<span style="color: #ffd54f;">✅ ¡Código detectado: <strong>${cleanCode}</strong>!</span>`;
+  }
+
+  setTimeout(() => {
+    closeUniversalCameraScanner();
+
+    if (universalCameraActiveMode === 'pos') {
+      const unifiedInput = document.getElementById('pos-unified-search');
+      if (unifiedInput) {
+        unifiedInput.value = cleanCode;
+        const clearBtn = document.getElementById('pos-search-clear-btn');
+        if (clearBtn) clearBtn.style.display = 'block';
+      }
+      handlePosBarcodeOrDirectSearch(cleanCode);
+    } else if (universalCameraActiveMode === 'stock') {
+      const stockBarcodeInput = document.getElementById('fastupload-barcode-input');
+      if (stockBarcodeInput) {
+        stockBarcodeInput.value = cleanCode;
+      }
+      lookupFastUploadProductWithoutAi('barcode');
+    } else if (universalCameraActiveMode === 'wms') {
+      const mapSearchInput = document.getElementById('map-search-input');
+      if (mapSearchInput) {
+        mapSearchInput.value = cleanCode;
+      }
+      if (typeof searchShelfOnMap === 'function') {
+        searchShelfOnMap();
+      }
+    }
+  }, 400);
+}
+
+async function closeUniversalCameraScanner() {
+  const modal = document.getElementById('modal-universal-camera-scanner');
+  if (modal) modal.style.display = 'none';
+
+  if (universalCameraScannerInstance) {
+    try {
+      await universalCameraScannerInstance.stop();
+      universalCameraScannerInstance.clear();
+    } catch {
+      // Ignorar errores al detener
+    }
+    universalCameraScannerInstance = null;
+  }
+
+  if (universalCameraStream) {
+    universalCameraStream.getTracks().forEach(track => track.stop());
+    universalCameraStream = null;
+  }
+
+  const viewport = document.getElementById('universal-camera-reader-viewport');
+  if (viewport) viewport.innerHTML = '';
+}
+
+async function switchUniversalCamera() {
+  universalCameraFacingMode = (universalCameraFacingMode === 'environment') ? 'user' : 'environment';
+  await startUniversalCameraReader();
+}
+
+async function toggleUniversalCameraTorch() {
+  if (!universalCameraScannerInstance) return;
+  universalCameraTorchOn = !universalCameraTorchOn;
+  try {
+    await universalCameraScannerInstance.applyVideoConstraints({
+      advanced: [{ torch: universalCameraTorchOn }]
+    });
+  } catch (err) {
+    console.warn('Flashlight not supported on this device/camera:', err);
+  }
+}
+
+async function handleCameraScannerFile(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const feedbackEl = document.getElementById('camera-scanner-feedback');
+  if (feedbackEl) {
+    feedbackEl.innerHTML = '<span style="color: #ffd54f;">⌛ Analizando imagen…</span>';
+  }
+
+  if (window.Html5Qrcode) {
+    try {
+      const html5QrCode = new window.Html5Qrcode('universal-camera-reader-viewport');
+      const result = await html5QrCode.scanFile(file, true);
+      html5QrCode.clear();
+      handleUniversalCameraScanSuccess(result);
+      return;
+    } catch (err) {
+      console.warn('Html5Qrcode scanFile failed:', err);
+    }
+  }
+
+  if (feedbackEl) {
+    feedbackEl.innerHTML = '<span style="color: #ff8a80;">⚠️ No se encontró ningún código legible en la imagen. Probá con otra foto o usá la cámara en vivo.</span>';
+  }
+}
+
 // Exports
 window.calculateExpirationStatus = calculateExpirationStatus;
 window.getAllProductsWithExpirations = getAllProductsWithExpirations;
@@ -8972,6 +9248,46 @@ window.renderExpirationsSection = renderExpirationsSection;
 window.filterExpirationsByTime = filterExpirationsByTime;
 window.applyPromoForExpiringProduct = applyPromoForExpiringProduct;
 
+window.getNearbyStores = getNearbyStores;
+window.saveNearbyStore = saveNearbyStore;
+window.renderNearbyStoresSection = renderNearbyStoresSection;
+window.filterNearbyProductsByStore = filterNearbyProductsByStore;
+window.openAddNearbyStoreModal = openAddNearbyStoreModal;
+window.closeAddNearbyStoreModal = closeAddNearbyStoreModal;
+window.handleSaveNearbyStore = handleSaveNearbyStore;
+window.orderNearbyProductViaWa = orderNearbyProductViaWa;
+
+window.getVendorPriceAdjustmentCount = getVendorPriceAdjustmentCount;
+window.canVendorAdjustPrice = canVendorAdjustPrice;
+window.recordVendorPriceAdjustment = recordVendorPriceAdjustment;
+
+window.getCurrentAccounts = getCurrentAccounts;
+window.saveCurrentAccount = saveCurrentAccount;
+window.switchPortfolioSubtab = switchPortfolioSubtab;
+window.renderCurrentAccountsUI = renderCurrentAccountsUI;
+window.openNewCurrentAccountModal = openNewCurrentAccountModal;
+window.closeNewCurrentAccountModal = closeNewCurrentAccountModal;
+window.handleCreateCurrentAccount = handleCreateCurrentAccount;
+window.openRecordCcPaymentModal = openRecordCcPaymentModal;
+window.closeRecordCcPaymentModal = closeRecordCcPaymentModal;
+window.handleRecordCcPaymentSubmit = handleRecordCcPaymentSubmit;
+window.sendCcWhatsAppReminder = sendCcWhatsAppReminder;
+window.sendCcDetailedWhatsApp = sendCcDetailedWhatsApp;
+window.sendCcDetailedWhatsAppFromModal = sendCcDetailedWhatsAppFromModal;
+window.openCcDetailsModal = openCcDetailsModal;
+window.closeCcDetailsModal = closeCcDetailsModal;
+window.generateAndPrintCcPdf = generateAndPrintCcPdf;
+window.handlePosPaymentMethodChange = handlePosPaymentMethodChange;
+window.updatePosCurrentAccountInfo = updatePosCurrentAccountInfo;
+
+window.openUniversalCameraScanner = openUniversalCameraScanner;
+window.startUniversalCameraReader = startUniversalCameraReader;
+window.handleUniversalCameraScanSuccess = handleUniversalCameraScanSuccess;
+window.closeUniversalCameraScanner = closeUniversalCameraScanner;
+window.switchUniversalCamera = switchUniversalCamera;
+window.toggleUniversalCameraTorch = toggleUniversalCameraTorch;
+window.handleCameraScannerFile = handleCameraScannerFile;
+window.playScannerBeep = playScannerBeep;
 window.getNearbyStores = getNearbyStores;
 window.saveNearbyStore = saveNearbyStore;
 window.renderNearbyStoresSection = renderNearbyStoresSection;

@@ -1529,6 +1529,10 @@
             <div class="pos-search-input-wrapper">
               <span class="pos-search-icon-left" aria-hidden="true">🔍</span>
               <input type="text" id="pos-unified-search" class="pos-unified-input" placeholder="⚡ Escanear código de barras, escribir nombre o dictar por voz..." autocomplete="off" autofocus>
+              <button type="button" id="pos-camera-scanner-btn" class="pos-camera-btn" onclick="openUniversalCameraScanner('pos')" aria-label="Usar cámara para escanear código de barras">
+                <span style="font-size: 1.15rem;" aria-hidden="true">📷</span>
+                <span>Usar cámara</span>
+              </button>
               <button type="button" id="pos-search-clear-btn" class="pos-search-clear-btn" onclick="clearPosUnifiedSearch()" aria-label="Limpiar búsqueda">✕</button>
               <button type="button" id="pos-voice-search-btn" class="pos-voice-btn" onclick="togglePosVoiceSearch()" aria-label="Activar dictado por voz">
                 <span style="font-size: 1.15rem;" aria-hidden="true">🎙️</span>
@@ -1746,6 +1750,7 @@
               <label for="fastupload-barcode-input">Código de barras</label>
               <div class="stock-noai-action-row">
                 <input type="text" id="fastupload-barcode-input" class="b2b-form-input" placeholder="Escanear o escribir" inputmode="numeric" enterkeyhint="search" autocomplete="off" aria-describedby="fastupload-scanner-help fastupload-scanner-state">
+                <button type="button" class="stock-camera-scan-btn" onclick="openUniversalCameraScanner('stock')" aria-label="Usar cámara para escanear código">📷 Usar cámara</button>
                 <button type="button" class="stock-entry-secondary-btn" onclick="focusFastUploadBarcode()">Usar lector</button>
                 <button type="button" class="stock-lookup-btn" data-stock-lookup-button onclick="lookupFastUploadProductWithoutAi('barcode')">Buscar datos</button>
               </div>
@@ -3517,6 +3522,52 @@
     </div>
   </div>
 
+  <!-- Modal Escáner Universal por Cámara (Celulares y PC) -->
+  <div id="modal-universal-camera-scanner" class="b2b-modal" style="display: none; z-index: 999999; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);">
+    <div class="b2b-modal-content" style="max-width: 480px; width: 92%; border-radius: 24px; border: 2px solid var(--color-accent-gold, #c2a246); background: #152d24; color: #ffffff; padding: 22px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.7); margin: 30px auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.5rem;" aria-hidden="true">📷</span>
+          <h3 id="camera-scanner-modal-title" style="margin: 0; font-size: 1.15rem; color: #c2a246; font-weight: 800;">Escanear Código con Cámara</h3>
+        </div>
+        <button type="button" onclick="closeUniversalCameraScanner()" style="background: rgba(255,255,255,0.15); border: none; color: #fff; font-size: 1.3rem; border-radius: 50%; width: 34px; height: 34px; cursor: pointer; display: flex; align-items: center; justify-content: center;" aria-label="Cerrar cámara">✕</button>
+      </div>
+
+      <p id="camera-scanner-modal-hint" style="font-size: 0.85rem; color: rgba(247,246,242,0.85); margin: 0 0 14px 0;">
+        Apuntá la cámara al código de barras o QR. Se detectará automáticamente.
+      </p>
+
+      <!-- Viewport de Video / Escáner -->
+      <div style="position: relative; width: 100%; aspect-ratio: 4/3; max-height: 290px; background: #000; border-radius: 16px; overflow: hidden; border: 2px solid #7ea642; margin-bottom: 12px;">
+        <div id="universal-camera-reader-viewport" style="width: 100%; height: 100%;"></div>
+        
+        <!-- Láser y marco visor -->
+        <div class="camera-scanner-laser" style="position: absolute; left: 10%; right: 10%; top: 50%; height: 2px; background: #ff3b30; box-shadow: 0 0 10px #ff3b30; animation: camera-laser-scan 2s infinite ease-in-out; pointer-events: none;"></div>
+        <div style="position: absolute; inset: 12%; border: 2px dashed rgba(255,255,255,0.5); border-radius: 12px; pointer-events: none;"></div>
+      </div>
+
+      <!-- Estado / Feedback -->
+      <div id="camera-scanner-feedback" style="padding: 10px 14px; border-radius: 12px; background: rgba(0,0,0,0.35); font-size: 0.85rem; font-weight: 700; color: #81c784; margin-bottom: 14px; border: 1px solid rgba(126,166,66,0.3);">
+        <span>⚡ Buscando código de barras o QR…</span>
+      </div>
+
+      <!-- Controles de Cámara -->
+      <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+        <button type="button" id="camera-switch-btn" onclick="switchUniversalCamera()" style="background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.25); padding: 8px 14px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; cursor: pointer;">
+          🔄 Cambiar cámara
+        </button>
+        <button type="button" id="camera-torch-btn" onclick="toggleUniversalCameraTorch()" style="background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.25); padding: 8px 14px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; cursor: pointer;">
+          💡 Linterna
+        </button>
+        <label style="background: #7ea642; color: #152d24; border: none; padding: 8px 14px; border-radius: 10px; font-size: 0.82rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+          📁 Subir foto
+          <input type="file" accept="image/*" capture="environment" onchange="handleCameraScannerFile(event)" hidden>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="mapa-local.js?v=gba_leafgreen_v1"></script>
   <script src="saas-auth.js?v=saas_v2"></script>
