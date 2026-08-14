@@ -1030,7 +1030,7 @@
     }
   </style>
   <link rel="stylesheet" href="vendedor-caja.css?v=camera_pos_v21">
-  <link rel="stylesheet" href="vendedor-portal.css?v=desktop_v4_6cols">
+  <link rel="stylesheet" href="vendedor-portal.css?v=flow_order_v25">
   <link rel="stylesheet" href="vendedor-stock.css?v=camera_pos_v21">
   <style id="vendor-rescue-critical-styles">
     .saas-prototype-only,
@@ -1277,23 +1277,26 @@
 
     <!-- VENDOR HOME / CENTRO OPERATIVO -->
     <section id="vendor-dashboard-home" class="vendor-dashboard-home" aria-labelledby="vendor-welcome-title">
+      
+      <!-- ================= NOTIFICACIONES & RESUMEN DEL TURNO ================= -->
       <header class="vendor-home-hero">
         <div class="vendor-home-copy">
           <span class="vendor-home-eyebrow">Centro operativo · BÔ Grow Club</span>
           <h2 id="vendor-welcome-title">Buenas tardes, vendedor</h2>
-          <p>Todo lo importante del turno, en un solo lugar. Registrá, controlá y resolvé sin perder tiempo.</p>
+          <p>Notificaciones y alertas activas del turno. Registrá, controlá y resolvé en el orden operativo del local.</p>
         </div>
         <div class="vendor-home-hero-actions">
           <button type="button" class="vendor-home-primary-action" onclick="switchVendorTab('pos')" style="background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: #ffffff; border: none; font-weight: 800; box-shadow: 0 4px 14px rgba(46,125,50,0.3);">
-            🏷️🛒 Vender un producto
+            🏷️🛒 2. Vender producto
           </button>
-          <button type="button" class="vendor-home-secondary-action" onclick="switchVendorTab('cash')">
-            💰 Abrir Caja BÔ
+          <button type="button" class="vendor-home-secondary-action" onclick="switchVendorTab('fast-upload')">
+            📥 1. Ingresar producto
           </button>
         </div>
       </header>
 
-      <section class="vendor-home-kpis" aria-label="Resumen operativo del turno">
+      <!-- Notificaciones / KPIs del Turno -->
+      <section class="vendor-home-kpis" aria-label="Notificaciones y resumen operativo del turno">
         <article class="vendor-home-kpi">
           <span class="vendor-home-kpi-icon" aria-hidden="true">↗</span>
           <div class="vendor-home-kpi-copy">
@@ -1302,10 +1305,10 @@
             <small id="vendor-kpi-movement-count">Sin movimientos todavía</small>
           </div>
         </article>
-        <article class="vendor-home-kpi">
+        <article class="vendor-home-kpi" onclick="switchVendorTab('cash')" style="cursor: pointer;" title="Ver estado de caja y arqueo">
           <span class="vendor-home-kpi-icon" aria-hidden="true">$</span>
           <div class="vendor-home-kpi-copy">
-            <span>Efectivo esperado</span>
+            <span>Efectivo en caja</span>
             <strong id="vendor-kpi-expected-cash">$0,00</strong>
             <small>Calculado para el cierre</small>
           </div>
@@ -1318,15 +1321,196 @@
             <small id="vendor-kpi-web-orders-sub">Mediar y preparar</small>
           </div>
         </article>
-        <article class="vendor-home-kpi">
-          <span class="vendor-home-kpi-icon" aria-hidden="true">!</span>
+        <article class="vendor-home-kpi" onclick="switchVendorTab('location-assistant')" style="cursor: pointer;" title="Ver productos pendientes de asignar ubicación WMS">
+          <span class="vendor-home-kpi-icon" aria-hidden="true">⌖</span>
           <div class="vendor-home-kpi-copy">
-            <span>Stock a revisar</span>
-            <strong id="vendor-kpi-stock-alerts">0 alertas</strong>
-            <small>Dentro del catálogo cargado</small>
+            <span>Pendientes WMS</span>
+            <strong id="vendor-kpi-location-count" data-pending-location-count>0 por ubicar</strong>
+            <small>Asignar estante</small>
           </div>
         </article>
       </section>
+
+      <!-- ================= FLUJO OPERATIVO DEL VENDEDOR (1 al 13) ================= -->
+      <div class="vendor-section-heading" id="vendor-flow-title" style="margin-top: 24px;">
+        <div>
+          <span class="vendor-section-eyebrow">Flujo de trabajo</span>
+          <h3>Operaciones del vendedor</h3>
+        </div>
+        <p>Herramientas ordenadas según el proceso diario de la tienda.</p>
+      </div>
+
+      <div class="vendor-2col-grid">
+        
+        <!-- 1. Ingresar producto -->
+        <button type="button" class="vendor-flow-card" id="vcard-fastupload" onclick="switchVendorTab('fast-upload')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-num">1</span>
+            <span class="vendor-flow-icon">📥</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Ingresar producto</strong>
+            <span class="vendor-flow-desc">Foto IA · Código de barra · Datos y stock guiados</span>
+          </div>
+        </button>
+
+        <!-- 2. Vender producto -->
+        <button type="button" class="vendor-flow-card vendor-flow-card-featured" id="vcard-pos" onclick="switchVendorTab('pos')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-num">2</span>
+            <span class="vendor-flow-icon">🏷️🛒</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Vender producto</strong>
+            <span class="vendor-flow-desc">Mostrador POS · Escáner de barra · Teclado · Voz</span>
+          </div>
+        </button>
+
+        <!-- 3. Ubicar producto -->
+        <button type="button" class="vendor-flow-card" id="vcard-locationassistant" onclick="switchVendorTab('location-assistant')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-num">3</span>
+            <span class="vendor-flow-icon">⌖</span>
+            <span class="vendor-flow-badge" data-pending-location-count hidden>0</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Ubicar producto</strong>
+            <span class="vendor-flow-desc">Asistente WMS paso a paso · Asignar estantes</span>
+          </div>
+        </button>
+
+        <!-- 4. Buscar producto en local -->
+        <button type="button" class="vendor-flow-card" id="vcard-map" onclick="switchVendorTab('map')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-num">4</span>
+            <span class="vendor-flow-icon">📍</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Buscar Producto en local</strong>
+            <span class="vendor-flow-desc">Mapa WMS · Tienda y Depósito (PC central)</span>
+          </div>
+        </button>
+
+        <!-- 5. Comprar productos (catálogo B2B) -->
+        <button type="button" class="vendor-flow-card" id="vcard-catalog" onclick="switchVendorTab('catalog')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-num">5</span>
+            <span class="vendor-flow-icon">📦</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Comprar productos</strong>
+            <span class="vendor-flow-desc">Catálogo B2B · Mayoristas y distribuidores</span>
+          </div>
+        </button>
+
+        <!-- 6. Buscar en catálogo tienda física -->
+        <button type="button" class="vendor-flow-card" id="vcard-internalcatalog" onclick="switchVendorTab('internal-catalog')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-num">6</span>
+            <span class="vendor-flow-icon">🏷️</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Buscar en catálogo tienda física</strong>
+            <span class="vendor-flow-desc">Catálogo interno · Stock comercial del local</span>
+          </div>
+        </button>
+
+        <!-- 7. Ver pedidos web -->
+        <button type="button" class="vendor-flow-card" id="vcard-weborders" onclick="switchVendorTab('web-orders')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-num">7</span>
+            <span class="vendor-flow-icon">🛍️</span>
+            <span class="vendor-flow-badge" id="vendor-pending-web-orders-badge-action" hidden>0</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Ver pedidos web</strong>
+            <span class="vendor-flow-desc">Compras online · Mediación, picking y cobro</span>
+          </div>
+        </button>
+
+        <!-- 8. Gestionar Clientes (propios y cuenta corriente) -->
+        <button type="button" class="vendor-flow-card" id="vcard-portfolio" onclick="switchVendorTab('portfolio')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-num">8</span>
+            <span class="vendor-flow-icon">👥</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Gestionar Clientes</strong>
+            <span class="vendor-flow-desc">Clientes propios · Cuentas Corrientes · WhatsApp</span>
+          </div>
+        </button>
+
+        <!-- 9. Productos a Vencer -->
+        <button type="button" class="vendor-flow-card" id="vcard-expirations" onclick="switchVendorTab('expirations')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-num">9</span>
+            <span class="vendor-flow-icon">⏳</span>
+            <span class="vendor-flow-badge" id="expirations-badge-kpi" style="display: none;">0</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Productos a Vencer</strong>
+            <span class="vendor-flow-desc">Control de lotes · 3 meses a críticos · Promos</span>
+          </div>
+        </button>
+
+        <!-- 10. Tiendas Cerca -->
+        <button type="button" class="vendor-flow-card" id="vcard-nearbystores" onclick="switchVendorTab('nearby-stores')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-num">10</span>
+            <span class="vendor-flow-icon">🏪</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Tiendas Cerca</strong>
+            <span class="vendor-flow-desc">Red de locales asociados · Stock en 48 hs</span>
+          </div>
+        </button>
+
+        <!-- 11. Promos TV -->
+        <a href="tv.html" target="_blank" rel="noopener" class="vendor-flow-card">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-num">11</span>
+            <span class="vendor-flow-icon">📺</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Promos TV</strong>
+            <span class="vendor-flow-desc">Pantalla interactiva · Cartelera del local</span>
+          </div>
+        </a>
+
+        <!-- 12. Tablet promos -->
+        <a href="tablet.html" target="_blank" rel="noopener" class="vendor-flow-card">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-num">12</span>
+            <span class="vendor-flow-icon">📱</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Tablet promos</strong>
+            <span class="vendor-flow-desc">Modo Kiosco · Catálogo interactivo en local</span>
+          </div>
+        </a>
+
+        <!-- 13. BÔ Caffè Club -->
+        <a href="coffee.html" target="_blank" rel="noopener" class="vendor-flow-card">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-num">13</span>
+            <span class="vendor-flow-icon">☕</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">BÔ Caffè Club</strong>
+            <span class="vendor-flow-desc">Cafetería de especialidad · Bar y menú</span>
+          </div>
+        </a>
+
+      </div>
+
+      <!-- ================= REPORTES & CAJA DEL TURNO ================= -->
+      <div class="vendor-section-heading" id="vendor-reports-title" style="margin-top: 32px;">
+        <div>
+          <span class="vendor-section-eyebrow">Cierre & Control</span>
+          <h3>Reportes y Caja</h3>
+        </div>
+        <p>Arqueo de turno, movimientos de dinero y reportes de gestión.</p>
+      </div>
 
       <div class="vendor-home-operational-grid">
         <section class="vendor-home-panel vendor-home-cash-card" aria-labelledby="vendor-home-cash-title">
@@ -1344,170 +1528,37 @@
           <div class="vendor-home-cash-actions">
             <button type="button" onclick="openCashWithType('venta_efectivo')">+ Ingreso efectivo</button>
             <button type="button" onclick="openCashWithType('gasto')">− Registrar gasto</button>
-            <button type="button" onclick="switchVendorTab('cash')">Ver arqueo completo</button>
+            <button type="button" onclick="switchVendorTab('cash')">📊 Ver arqueo y reportes completos</button>
           </div>
           <div class="vendor-home-movement-list" id="vendor-home-movement-list" aria-live="polite">
             <div class="vendor-home-empty-movements">La caja está lista para comenzar.</div>
           </div>
         </section>
 
-        <aside class="vendor-home-panel" aria-labelledby="vendor-quick-actions-title">
+        <aside class="vendor-home-panel" aria-labelledby="vendor-quick-reports-title">
           <div class="vendor-home-panel-heading">
             <div>
-              <span class="vendor-section-eyebrow">Atajos útiles</span>
-              <h3 id="vendor-quick-actions-title">Acciones rápidas</h3>
+              <span class="vendor-section-eyebrow">Acceso rápido</span>
+              <h3 id="vendor-quick-reports-title">Reportes Rápidos</h3>
             </div>
           </div>
           <div class="vendor-home-quick-actions">
-            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('pos')" style="border-left: 4px solid #2e7d32; background: rgba(46,125,50,0.06);">
-              <span aria-hidden="true">🏷️</span><span><strong>Vender producto (Mostrador)</strong><small>Escanear código, teclado o voz</small></span><span aria-hidden="true">›</span>
-            </button>
-            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('catalog')">
-              <span aria-hidden="true">▦</span><span><strong>Catálogo B2B</strong><small>Buscar y agregar productos</small></span><span aria-hidden="true">›</span>
+            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('cash')">
+              <span aria-hidden="true">💰</span><span><strong>Arqueo y Cierre de Caja</strong><small>Control de efectivo, tarjetas y QR</small></span><span aria-hidden="true">›</span>
             </button>
             <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('portfolio')">
-              <span aria-hidden="true">♙</span><span><strong>Consultar cliente</strong><small>Cartera y WhatsApp</small></span><span aria-hidden="true">›</span>
+              <span aria-hidden="true">💳</span><span><strong>Reporte de Cuentas Corrientes</strong><small>Saldos deudores y recibos de pago</small></span><span aria-hidden="true">›</span>
+            </button>
+            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('expirations')">
+              <span aria-hidden="true">⏳</span><span><strong>Reporte de Vencimientos</strong><small>Productos críticos y liquidaciones</small></span><span aria-hidden="true">›</span>
             </button>
             <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('location-assistant')">
-              <span aria-hidden="true">⌖</span><span><strong>Ubicar pendientes</strong><small id="vendor-location-quick-copy">Asistente de ubicación</small></span><span class="vendor-pending-location-count" data-pending-location-count hidden>0</span><span aria-hidden="true">›</span>
-            </button>
-            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('fast-upload')">
-              <span aria-hidden="true">＋</span><span><strong>Ingresar producto</strong><small>Foto, datos y stock guiados</small></span><span aria-hidden="true">›</span>
-            </button>
-            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('web-orders')">
-              <span aria-hidden="true">📦</span><span><strong>Pedidos Web</strong><small id="vendor-web-orders-quick-copy">Mediar y preparar compras online</small></span><span class="vendor-pending-web-orders-count" id="vendor-pending-web-orders-badge-action" hidden style="background: #e53935; color: white; border-radius: 10px; padding: 2px 6px; font-size: 0.7rem; font-weight: 800;">0</span><span aria-hidden="true">›</span>
-            </button>
-            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('internal-catalog')">
-              <span aria-hidden="true">▤</span><span><strong>Catálogo interno</strong><small>Editar productos propios</small></span><span aria-hidden="true">›</span>
+              <span aria-hidden="true">⌖</span><span><strong>Auditoría de Ubicación WMS</strong><small>Control de estanterías y posiciones</small></span><span aria-hidden="true">›</span>
             </button>
           </div>
         </aside>
       </div>
 
-      <div class="vendor-section-heading" id="vendor-tools-title">
-        <div>
-          <span class="vendor-section-eyebrow">Ecosistema BÔ</span>
-          <h3>Herramientas del vendedor</h3>
-        </div>
-        <p>Accesos complementarios para el trabajo diario.</p>
-      </div>
-
-      <div class="vendor-2col-grid">
-        
-        <!-- Card 0: Vender un producto (Mostrador / POS Catálogo Interno) -->
-        <button type="button" class="vendor-launchpad-card vendor-launchpad-card-featured" id="vcard-pos" onclick="switchVendorTab('pos')" style="background: linear-gradient(135deg, #1f4a34 0%, #152d24 100%); border: 2.5px solid var(--color-accent-gold); border-radius: 18px; padding: 20px 16px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: 0 8px 20px rgba(21,45,36,0.18); grid-column: 1 / -1;">
-          <span style="font-size: 2.5rem; display: block; margin-bottom: 4px;">🏷️🛒</span>
-          <span style="font-size: 1.25rem; font-weight: 800; color: #ffffff; display: block; margin-bottom: 3px;">Vender un producto</span>
-          <span style="font-size: 0.78rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">MOSTRADOR POS · ESCÁNER DE BARRAS · TECLADO · VOZ</span>
-        </button>
-
-        <!-- Card 1: Catálogo B2B -->
-        <button type="button" class="vendor-launchpad-card" id="vcard-catalog" onclick="switchVendorTab('catalog')" style="background: var(--color-card-bg); border: 1.5px solid var(--color-accent-gold); border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📦</span>
-          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Catálogo B2B</span>
-          <span style="font-size: 0.72rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase;">PROCESAR VENTA</span>
-        </button>
-
-        <button type="button" class="vendor-launchpad-card" id="vcard-internalcatalog" onclick="switchVendorTab('internal-catalog')" style="background: var(--color-card-bg); border: 1.5px solid #7ea642; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 2rem; display: block; margin-bottom: 6px;" aria-hidden="true">🏷️</span>
-          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Catálogo interno</span>
-          <span style="font-size: 0.72rem; color: #2e7d32; font-weight: 800; text-transform: uppercase;">PRODUCTOS DE LA TIENDA</span>
-        </button>
-
-        <button type="button" class="vendor-launchpad-card" id="vcard-weborders" onclick="switchVendorTab('web-orders')" style="background: var(--color-card-bg); border: 1.5px solid #29b6f6; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 2rem; display: block; margin-bottom: 6px;" aria-hidden="true">📦</span>
-          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Pedidos Web</span>
-          <span style="font-size: 0.72rem; color: #29b6f6; font-weight: 800; text-transform: uppercase;">MEDIACIÓN & PICKING</span>
-        </button>
-
-        <!-- Card 2: Mi Cartera de Clientes -->
-        <button type="button" class="vendor-launchpad-card" id="vcard-portfolio" onclick="switchVendorTab('portfolio')" style="background: var(--color-card-bg); border: 1.5px solid #ab47bc; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 2rem; display: block; margin-bottom: 6px;">👥</span>
-          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Mi Cartera</span>
-          <span style="font-size: 0.72rem; color: #ab47bc; font-weight: 800; text-transform: uppercase;">FIDELIZACIÓN & WHATSAPP</span>
-        </button>
-
-        <!-- Card 3: Caja y Arqueo Diario -->
-        <button type="button" class="vendor-launchpad-card" id="vcard-cash" onclick="switchVendorTab('cash')" style="width: 100%; font: inherit; background: var(--color-card-bg); border: 1.5px solid #ffb74d; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 2rem; display: block; margin-bottom: 6px;">💰</span>
-          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Caja & Arqueo</span>
-          <span style="font-size: 0.72rem; color: #ffb74d; font-weight: 800; text-transform: uppercase;">REGISTRO & CIERRE</span>
-        </button>
-
-        <!-- Card 4: Mapa de Estantes -->
-        <button type="button" class="vendor-launchpad-card" id="vcard-map" onclick="switchVendorTab('map')" style="background: var(--color-card-bg); border: 1.5px solid #42a5f5; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📍</span>
-          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Mapa Estantes</span>
-          <span style="font-size: 0.72rem; color: #42a5f5; font-weight: 800; text-transform: uppercase;">UBICACIÓN LOCAL</span>
-        </button>
-
-        <!-- Card 5: Escanear QR Cliente -->
-        <button type="button" class="vendor-launchpad-card" id="vcard-scan" onclick="switchVendorTab('scan')" style="background: var(--color-card-bg); border: 1.5px solid #66bb6a; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📷</span>
-          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">QR Cliente VIP</span>
-          <span style="font-size: 0.72rem; color: #66bb6a; font-weight: 800; text-transform: uppercase;">VALIDAR CLIENTE</span>
-        </button>
-
-        <!-- Card 6: Modo Tablet Local -->
-        <a href="tablet.html" target="_blank" rel="noopener" class="vendor-launchpad-card" style="background: var(--color-card-bg); border: 1.5px solid #ba68c8; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📱</span>
-          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Tablet Kiosco</span>
-          <span style="font-size: 0.72rem; color: #ba68c8; font-weight: 800; text-transform: uppercase;">MODO INTERACTIVO</span>
-        </a>
-
-        <!-- Card 7: Pantalla TV Promos -->
-        <a href="tv.html" target="_blank" rel="noopener" class="vendor-launchpad-card" style="background: var(--color-card-bg); border: 1.5px solid #ff7043; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 2rem; display: block; margin-bottom: 6px;">📺</span>
-          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">TV Promos</span>
-          <span style="font-size: 0.72rem; color: #ff7043; font-weight: 800; text-transform: uppercase;">PANTALLA LOCAL</span>
-        </a>
-
-        <!-- Card 8: Coffee Club -->
-        <a href="coffee.html" target="_blank" rel="noopener" class="vendor-launchpad-card" style="background: var(--color-card-bg); border: 1.5px solid #d4a373; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 2rem; display: block; margin-bottom: 4px;">☕</span>
-          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">BO Coffee Club</span>
-          <span style="font-size: 0.72rem; color: #d4a373; font-weight: 800; text-transform: uppercase;">CAFETERÍA & BAR</span>
-        </a>
-
-        <!-- Card 9: Ingreso de producto al stock -->
-        <button type="button" class="vendor-launchpad-card" id="vcard-fastupload" onclick="switchVendorTab('fast-upload')" style="background: var(--color-card-bg); border: 2px solid var(--color-accent-gold); border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 2rem; display: block; margin-bottom: 4px;">📸</span>
-          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Ingresar producto</span>
-          <span style="font-size: 0.72rem; color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase;">IA · STOCK · UBICACIÓN</span>
-        </button>
-
-        <!-- Card 10: Asistente para productos pendientes de ubicación -->
-        <button type="button" class="vendor-launchpad-card vendor-location-launcher" id="vcard-locationassistant" onclick="switchVendorTab('location-assistant')">
-          <span class="vendor-location-launcher-badge" data-pending-location-count hidden>0</span>
-          <span class="vendor-location-launcher-icon" aria-hidden="true">⌖</span>
-          <span class="vendor-location-launcher-title">Ubicar pendientes</span>
-          <span class="vendor-location-launcher-copy">ASISTENTE PASO A PASO</span>
-        </button>
-
-        <!-- Card 11: Cola de Borradores (Mariano / Admin) -->
-        <button type="button" class="vendor-launchpad-card" id="vcard-draftsreview" onclick="switchVendorTab('drafts-review')" style="background: var(--color-card-bg); border: 2px solid #2e7d32; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm); position: relative;">
-          <span id="drafts-pending-count-badge" style="position: absolute; top: -8px; right: -8px; background: #2e7d32; color: #fff; font-size: 0.75rem; font-weight: 800; padding: 3px 8px; border-radius: 12px; border: 1px solid var(--color-accent-gold); display: none;">0</span>
-          <span style="font-size: 2rem; display: block; margin-bottom: 4px;">👑</span>
-          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Cola Mariano</span>
-          <span style="font-size: 0.72rem; color: #66bb6a; font-weight: 800; text-transform: uppercase;">APROBAR & PRECIOS</span>
-        </button>
-
-        <!-- Card 12: Vencimientos -->
-        <button type="button" class="vendor-launchpad-card" id="vcard-expirations" onclick="switchVendorTab('expirations')" style="background: var(--color-card-bg); border: 2px solid #e65100; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm); position: relative;">
-          <span id="expirations-badge-kpi" style="position: absolute; top: -8px; right: -8px; background: #e65100; color: #fff; font-size: 0.75rem; font-weight: 800; padding: 3px 8px; border-radius: 12px; border: 1px solid #ffb74d; display: none;">0</span>
-          <span style="font-size: 2rem; display: block; margin-bottom: 4px;">⏳</span>
-          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Vencimientos</span>
-          <span style="font-size: 0.72rem; color: #e65100; font-weight: 800; text-transform: uppercase;">3 MESES A CRÍTICOS</span>
-        </button>
-
-        <!-- Card 13: Tiendas Cercanas -->
-        <button type="button" class="vendor-launchpad-card" id="vcard-nearbystores" onclick="switchVendorTab('nearby-stores')" style="background: var(--color-card-bg); border: 2px solid #1565c0; border-radius: 16px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.25s ease; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 2rem; display: block; margin-bottom: 4px;">🏪</span>
-          <span style="font-size: 0.95rem; font-weight: 800; color: var(--color-text-main); display: block; margin-bottom: 2px;">Tiendas Cerca</span>
-          <span style="font-size: 0.72rem; color: #1565c0; font-weight: 800; text-transform: uppercase;">PROVEEDORES · 2 DÍAS</span>
-        </button>
-
-      </div>
     </section>
 
     <!-- SECTION: VENDER UN PRODUCTO · MOSTRADOR POS ITEMIZADO (CATÁLOGO INTERNO) -->
@@ -3586,6 +3637,6 @@
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=resize_v24"></script>
+  <script src="vendedor.js?v=flow_order_v25"></script>
 </body>
 </html>
