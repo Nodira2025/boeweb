@@ -1029,9 +1029,9 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="vendedor-caja.css?v=legado_v2">
+  <link rel="stylesheet" href="vendedor-caja.css?v=camera_pos_v21">
   <link rel="stylesheet" href="vendedor-portal.css?v=desktop_v4_6cols">
-  <link rel="stylesheet" href="vendedor-stock.css?v=gba_leafgreen_v1">
+  <link rel="stylesheet" href="vendedor-stock.css?v=camera_pos_v21">
   <style id="vendor-rescue-critical-styles">
     .saas-prototype-only,
     #saas-login-modal {
@@ -2591,8 +2591,11 @@
         <p style="font-size: 0.88rem; color: var(--vendor-muted); margin-bottom: 16px;">Apuntá la cámara a la etiqueta QR del módulo (ej: <strong>PI-M04</strong>) o seleccioná un módulo demo:</p>
         <div style="background: rgba(0,0,0,0.04); border: 2px dashed var(--vendor-gold); border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 16px;">
           <div style="font-size: 3rem; margin-bottom: 8px;">📷</div>
-          <p style="font-size: 0.85rem; margin-bottom: 14px;">Escanear código de barras o QR de módulo</p>
-          <label style="display: block; margin-bottom: 8px; font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest);">Seleccionar Módulo Demo:</label>
+          <p style="font-size: 0.85rem; margin-bottom: 14px;">Escanear código de barras o QR de módulo con la cámara</p>
+          <button type="button" class="wms-btn wms-btn-primary" style="width: 100%; margin-bottom: 14px; background: #2e7d32; font-weight: 800;" onclick="closeWmsModal('wms-qr-modal'); openUniversalCameraScanner('wms');">
+            ⚡ ACTIVAR CÁMARA EN VIVO
+          </button>
+          <label style="display: block; margin-bottom: 8px; font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest);">O seleccionar módulo demo:</label>
           <select id="wms-demo-module-select" class="wms-btn" style="width: 100%; margin-bottom: 14px;">
             <option value="PI-M04">PI-M04 (Pared Izquierda - Control de plagas)</option>
             <option value="PD-M02">PD-M02 (Pared Derecha - Accesorios)</option>
@@ -2600,8 +2603,8 @@
             <option value="PI-M01">PI-M01 (Pared Izquierda - Nutrición)</option>
             <option value="PT-M01">PT-M01 (Pared Trasera - Iluminación)</option>
           </select>
-          <button type="button" class="wms-btn wms-btn-primary" style="width: 100%;" onclick="confirmWmsQrScanFromSelect()">
-            ⚡ ABRIR MÓDULO SELECCIONADO
+          <button type="button" class="wms-btn" style="width: 100%;" onclick="confirmWmsQrScanFromSelect()">
+            Abrir módulo demo seleccionado
           </button>
         </div>
       </div>
@@ -3581,6 +3584,6 @@
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=vender_pos_v11"></script>
+  <script src="vendedor.js?v=camera_pos_v21"></script>
 </body>
 </html>

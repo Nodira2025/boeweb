@@ -9005,7 +9005,8 @@ async function openUniversalCameraScanner(mode = 'pos') {
   if (titleEl) {
     if (mode === 'pos') titleEl.textContent = '📷 Escanear Producto para Venta';
     else if (mode === 'stock') titleEl.textContent = '📷 Escanear Código para Ingreso de Stock';
-    else if (mode === 'wms') titleEl.textContent = '📷 Escanear Ubicación / Producto WMS';
+    else if (mode === 'wms') titleEl.textContent = '📷 Escanear Ubicación / Módulo WMS';
+    else if (mode === 'customer') titleEl.textContent = '📷 Escanear Pase Digital VIP del Cliente';
   }
 
   if (hintEl) {
@@ -9016,9 +9017,18 @@ async function openUniversalCameraScanner(mode = 'pos') {
     feedbackEl.innerHTML = '<span style="color: #81c784;">⚡ Iniciando cámara en vivo…</span>';
   }
 
-  if (modal) modal.style.display = 'flex';
+  if (modal) {
+    modal.style.display = 'flex';
+  }
 
-  await startUniversalCameraReader();
+  try {
+    await startUniversalCameraReader();
+  } catch (err) {
+    console.error('Error starting camera reader:', err);
+    if (feedbackEl) {
+      feedbackEl.innerHTML = '<span style="color: #ff8a80;">⚠️ No se pudo iniciar la cámara en vivo. Podés usar el botón "📁 Subir foto" para tomar una foto del código.</span>';
+    }
+  }
 }
 
 async function startUniversalCameraReader() {
@@ -9033,6 +9043,11 @@ async function startUniversalCameraReader() {
       // Ignorar errores al detener
     }
     universalCameraScannerInstance = null;
+  }
+
+  if (universalCameraStream) {
+    universalCameraStream.getTracks().forEach(track => track.stop());
+    universalCameraStream = null;
   }
 
   // 1. Si Html5Qrcode está disponible (CDN)
@@ -9054,7 +9069,11 @@ async function startUniversalCameraReader() {
 
       const config = {
         fps: 15,
-        qrbox: { width: 260, height: 180 },
+        qrbox: (viewfinderWidth, viewfinderHeight) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const qrboxSize = Math.floor(minEdge * 0.8);
+          return { width: qrboxSize, height: qrboxSize };
+        },
         aspectRatio: 1.333333
       };
 
@@ -9127,7 +9146,7 @@ async function startUniversalCameraReader() {
   } catch (nativeErr) {
     console.error('No se pudo acceder a la cámara:', nativeErr);
     if (feedbackEl) {
-      feedbackEl.innerHTML = '<span style="color: #ff8a80;">⚠️ No se pudo acceder a la cámara. Verificá los permisos del navegador o usá el botón "Subir foto".</span>';
+      feedbackEl.innerHTML = '<span style="color: #ff8a80;">⚠️ Cámara bloqueada o sin permisos. Podés presionar "📁 Subir foto" para capturar el código.</span>';
     }
   }
 }
@@ -9170,6 +9189,12 @@ function handleUniversalCameraScanSuccess(decodedText) {
       }
       if (typeof searchShelfOnMap === 'function') {
         searchShelfOnMap();
+      }
+    } else if (universalCameraActiveMode === 'customer') {
+      if (typeof handleScannedCustomerData === 'function') {
+        handleScannedCustomerData(cleanCode);
+      } else if (typeof simulateCustomerQRScan === 'function') {
+        simulateCustomerQRScan();
       }
     }
   }, 400);
