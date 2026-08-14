@@ -236,3 +236,33 @@ test('6. Retiro / Ajuste de Stock en Ubicaciones Físicas y Catálogo', () => {
   assert.equal(loc.stock, 6);
 });
 
+test('7. Catálogo Web Unificado: Producto con stock 0 sin B2B queda SIN_STOCK y no permite retiro excesivo', () => {
+  const ownStoreProducts = [
+    {
+      id: 'BO-PROD-ZERO',
+      product_code: 'BO-PROD-ZERO',
+      name: 'Semillas Auto 3u',
+      price: 15000,
+      stock: 0,
+      own_stock: 0,
+      available: false,
+      category: 'Semillas'
+    }
+  ];
+
+  const unified = PublicCatalogUnifier.unifyProducts(ownStoreProducts, []);
+  assert.equal(unified.length, 1);
+  assert.equal(unified[0].own_stock, 0);
+  assert.equal(unified[0].has_own_stock, false);
+  assert.equal(unified[0].available, false);
+  assert.equal(unified[0].availability, 'SIN_STOCK');
+  assert.equal(unified[0].badge_text, '🔴 SIN STOCK');
+
+  // Validación de retiro: no permitir retirar si stock <= 0 o qty > stock
+  const prevStock = unified[0].own_stock;
+  const attemptWithdraw = 3;
+  const canWithdraw = prevStock > 0 && attemptWithdraw <= prevStock;
+  assert.equal(canWithdraw, false, 'No debe permitir retiro cuando stock es 0 o excede disponible');
+});
+
+

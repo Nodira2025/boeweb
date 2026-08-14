@@ -222,14 +222,26 @@ document.addEventListener('DOMContentLoaded', () => {
               }
             }
 
-            const ownRows = allSupplierRows.filter(r => r.supplier_id === 'local_store');
-            const b2bRows = allSupplierRows.filter(r => r.supplier_id !== 'local_store');
+            // Local Stock Overrides (para reflejar bajas y retiros inmediatamente)
+            let localCatalogMap = new Map();
+            try {
+              const cachedCat = JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
+              if (Array.isArray(cachedCat)) {
+                cachedCat.forEach(item => {
+                  const code = String(item.product_code || item.id || '').toUpperCase();
+                  if (code) localCatalogMap.set(code, item);
+                });
+              }
+            } catch (_) {}
 
             const ownParsed = ownRows.map(r => {
               const pid = String(r.mapped_product_id || r.supplier_product_id || r.id);
               const meta = metadataMap.get(pid) || {};
-              const qty = Math.max(0, Number(r.stock) || 0);
-              const isAvail = r.available !== false && (qty > 0 || r.stock === null);
+              const localOverride = localCatalogMap.get(pid.toUpperCase());
+              const finalStock = localOverride !== undefined && localOverride.stock !== undefined
+                ? Math.max(0, Number(localOverride.stock) || 0)
+                : Math.max(0, Number(r.stock) || 0);
+              const isAvail = r.available !== false && finalStock > 0;
               return {
                 id: pid,
                 product_code: pid,
@@ -238,8 +250,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 image: meta.image || r.image || 'assets/logo.jpg',
                 link: r.link || '',
                 slug: (meta.name || r.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-                stock: qty,
-                own_stock: qty,
+                stock: finalStock,
+                own_stock: finalStock,
                 available: isAvail,
                 category: meta.category || 'Otros',
                 description: meta.description || r.description || ''
@@ -784,22 +796,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Render cards
     itemsToRender.forEach(product => {
+      const stockNum = Number(product.stock !== undefined ? product.stock : (product.own_stock !== undefined ? product.own_stock : 0)) || 0;
+      const hasPhysicalStock = stockNum > 0;
+      const isLocalOrB2b = product.availability === 'LOCAL_2_DAYS' || product.availability === 'A_PEDIDO';
+      const isAvailableToBuy = hasPhysicalStock || isLocalOrB2b;
+
       const card = document.createElement('article');
-      card.className = `product-card ${!product.available ? 'out-of-stock' : ''}`;
+      card.className = `product-card ${!isAvailableToBuy ? 'out-of-stock' : ''}`;
       card.setAttribute('data-id', product.id);
       
       // Stock warning tags
       let stockTag = '';
-      if (product.availability === 'LOCAL_2_DAYS' || product.badge_text?.includes('2 DÍAS')) {
+      if (hasPhysicalStock) {
+        if (stockNum <= 5) {
+          stockTag = `<span class="stock-tag">Últimos ${stockNum}</span>`;
+        } else {
+          stockTag = '<span class="stock-tag tag-in-stock">🟢 En Stock</span>';
+        }
+      } else if (product.availability === 'LOCAL_2_DAYS' || product.badge_text?.includes('2 DÍAS')) {
         stockTag = '<span class="stock-tag tag-local-store">📦 Llega en 2 días</span>';
       } else if (product.availability === 'A_PEDIDO' || product.badge_text?.includes('5 días') || product.badge_text?.includes('PEDIDO')) {
         stockTag = '<span class="stock-tag tag-on-demand">📦 Solo por pedido · 5 días</span>';
-      } else if (!product.available) {
-        stockTag = '<span class="stock-tag tag-out">Sin Stock</span>';
-      } else if (product.stock && product.stock <= 5) {
-        stockTag = `<span class="stock-tag">Últimos ${product.stock}</span>`;
       } else {
-        stockTag = '<span class="stock-tag tag-in-stock">🟢 En Stock</span>';
+        stockTag = '<span class="stock-tag tag-out">Sin Stock</span>';
       }
 
       // Fallback image if empty
@@ -829,10 +848,10 @@ document.addEventListener('DOMContentLoaded', () => {
           <button type="button" class="product-card-detail-link" data-id="${product.id}" aria-label="Ver detalles de ${safeName}">Ver detalles</button>
           <div class="product-card-footer">
             <div class="product-card-price">$${formatPrice(product.price)}</div>
-            <button class="add-to-cart-btn ${!product.available ? 'disabled' : ''}" 
+            <button class="add-to-cart-btn ${!isAvailableToBuy ? 'disabled' : ''}" 
                     data-id="${product.id}" 
                     aria-label="Agregar ${safeName} al carrito"
-                    ${!product.available ? 'disabled' : ''}>
+                    ${!isAvailableToBuy ? 'disabled' : ''}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>

@@ -41,19 +41,31 @@ class PublicCatalogUnifier {
       const sku = (prod.product_code || prod.id || '').trim().toUpperCase();
       const name = prod.name || 'Producto Sin Nombre';
       const ownQty = Number(prod.own_stock !== undefined ? prod.own_stock : (prod.stock || 0));
-      const isAvailable = prod.available !== false && ownQty > 0;
+      const hasPhysicalStock = ownQty > 0;
+      const isExplicitlyUnavailable = prod.available === false || prod.is_available === false;
+      const availabilityStatus = isExplicitlyUnavailable
+        ? 'SIN_STOCK'
+        : hasPhysicalStock
+        ? 'EN_STOCK'
+        : 'A_PEDIDO';
+      const isAvailable = !isExplicitlyUnavailable;
 
       unifiedMap.set(sku || name.toLowerCase(), {
         id: prod.id || sku,
         product_code: sku,
         name: prod.name,
         price: Number(prod.price) || 0,
+        stock: ownQty,
         own_stock: ownQty,
-        has_own_stock: ownQty > 0,
+        has_own_stock: hasPhysicalStock,
         available: isAvailable,
-        availability: isAvailable ? 'EN_STOCK' : 'A_PEDIDO',
-        badge_text: isAvailable ? '🟢 EN STOCK' : '📦 SOLO POR PEDIDO · Llega en 5 días',
-        delivery_estimate: isAvailable ? 'Inmediata en local' : '5 días hábiles',
+        availability: availabilityStatus,
+        badge_text: availabilityStatus === 'EN_STOCK'
+          ? '🟢 EN STOCK'
+          : availabilityStatus === 'A_PEDIDO'
+          ? '📦 SOLO POR PEDIDO · Llega en 5 días'
+          : '🔴 SIN STOCK',
+        delivery_estimate: availabilityStatus === 'EN_STOCK' ? 'Inmediata en local' : '5 días hábiles',
         category: prod.category || 'Otros',
         image: prod.image || prod.image_url || 'assets/logo.jpg',
         description: prod.description || '',
@@ -125,6 +137,12 @@ class PublicCatalogUnifier {
 
       if (existing) {
         existing.suppliers.push(supplierOffer);
+        if (!existing.has_own_stock) {
+          existing.available = true;
+          existing.availability = 'A_PEDIDO';
+          existing.badge_text = b2b.badge_text || '📦 SOLO POR PEDIDO · Llega en 5 días';
+          existing.delivery_estimate = '5 días hábiles';
+        }
       } else {
         const publicPrice = Number(b2b.public_price) || (applyMarkup ? PublicCatalogUnifier.calculatePublicPrice(b2b.price, markupPercent) : Number(b2b.price) || 0);
         unifiedMap.set(key, {

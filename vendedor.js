@@ -10177,6 +10177,17 @@ function openStockAdjustmentModal(productIdentifier = null, actionType = 'remove
     if (idInput) idInput.value = found.id || '';
     if (codeInput) codeInput.value = found.product_code || found.barcode || '';
     if (dropdownContainer) dropdownContainer.style.display = 'none';
+
+    const qtyInput = document.getElementById('adjustment-quantity');
+    if (qtyInput) {
+      if (currentStockAdjustmentAction === 'remove') {
+        qtyInput.max = currentStock || 1;
+        qtyInput.value = currentStock > 0 ? 1 : 0;
+      } else {
+        qtyInput.removeAttribute('max');
+        qtyInput.value = 1;
+      }
+    }
   } else {
     currentStockAdjustmentProduct = null;
     if (imgEl) imgEl.style.display = 'none';
@@ -10254,6 +10265,17 @@ function handleAdjustmentProductDropdownChange(val) {
     if (stockEl) stockEl.textContent = `${currentStock} u.`;
     if (idInput) idInput.value = found.id || '';
     if (codeInput) codeInput.value = found.product_code || found.barcode || '';
+
+    const qtyInput = document.getElementById('adjustment-quantity');
+    if (qtyInput) {
+      if (currentStockAdjustmentAction === 'remove') {
+        qtyInput.max = currentStock || 1;
+        qtyInput.value = currentStock > 0 ? 1 : 0;
+      } else {
+        qtyInput.removeAttribute('max');
+        qtyInput.value = 1;
+      }
+    }
   }
 }
 
@@ -10274,6 +10296,7 @@ function setAdjustmentAction(action) {
   const subtitle = document.getElementById('adjustment-modal-subtitle');
   const icon = document.getElementById('adjustment-modal-icon');
   const submitBtn = document.getElementById('adjustment-submit-btn');
+  const qtyInput = document.getElementById('adjustment-quantity');
 
   if (currentStockAdjustmentAction === 'remove') {
     if (btnRemove) {
@@ -10295,6 +10318,11 @@ function setAdjustmentAction(action) {
       submitBtn.style.borderColor = '#ef5350';
       submitBtn.style.color = '#ffffff';
     }
+    if (qtyInput && currentStockAdjustmentProduct) {
+      const currStock = Math.max(0, Number(currentStockAdjustmentProduct.stock ?? currentStockAdjustmentProduct.on_hand) || 0);
+      qtyInput.max = currStock || 1;
+      qtyInput.value = currStock > 0 ? 1 : 0;
+    }
   } else {
     if (btnAdd) {
       btnAdd.style.border = '2px solid #81c784';
@@ -10315,6 +10343,10 @@ function setAdjustmentAction(action) {
       submitBtn.style.borderColor = '#81c784';
       submitBtn.style.color = '#ffffff';
     }
+    if (qtyInput) {
+      qtyInput.removeAttribute('max');
+      qtyInput.value = 1;
+    }
   }
 }
 
@@ -10322,7 +10354,19 @@ function adjustAdjustmentQty(delta) {
   const input = document.getElementById('adjustment-quantity');
   if (!input) return;
   const current = Math.max(1, parseInt(input.value, 10) || 1);
-  const next = Math.max(1, current + delta);
+  const actionType = document.getElementById('adjustment-action-type')?.value || currentStockAdjustmentAction;
+
+  let next = current + delta;
+  if (actionType === 'remove' && currentStockAdjustmentProduct) {
+    const maxStock = Math.max(0, Number(currentStockAdjustmentProduct.stock ?? currentStockAdjustmentProduct.on_hand) || 0);
+    if (maxStock > 0) {
+      next = Math.min(maxStock, Math.max(1, next));
+    } else {
+      next = 0;
+    }
+  } else {
+    next = Math.max(1, next);
+  }
   input.value = next;
 }
 
@@ -10408,6 +10452,19 @@ async function handleStockAdjustmentSubmit(event) {
   }
 
   const prevStock = Math.max(0, Number(product.stock ?? product.on_hand) || 0);
+
+  // Validación estricta: No permitir retirar más unidades que las disponibles ni cuando el stock es 0
+  if (actionType === 'remove') {
+    if (prevStock <= 0) {
+      showToast(`⚠️ "${product.name}" no tiene unidades en stock para retirar.`);
+      return;
+    }
+    if (qty > prevStock) {
+      showToast(`⚠️ No podés retirar ${qty} u. porque solo hay ${prevStock} u. disponibles.`);
+      return;
+    }
+  }
+
   let newStock = prevStock;
   if (actionType === 'remove') {
     newStock = Math.max(0, prevStock - qty);
@@ -10416,11 +10473,15 @@ async function handleStockAdjustmentSubmit(event) {
   }
 
   product.stock = newStock;
+  product.own_stock = newStock;
   
   // 1. Actualizar catálogo interno
   if (Array.isArray(internalCatalogProducts)) {
     const intItem = internalCatalogProducts.find(p => String(p.id) === String(product.id) || p.product_code === product.product_code || (product.barcode && p.barcode === product.barcode));
-    if (intItem) intItem.stock = newStock;
+    if (intItem) {
+      intItem.stock = newStock;
+      intItem.own_stock = newStock;
+    }
     try {
       localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
     } catch (_) {}
@@ -10444,10 +10505,20 @@ async function handleStockAdjustmentSubmit(event) {
     }
   }
 
-  // 4. Actualizar Supabase si está disponible
-  if (supabaseClient && product.id) {
+  // 4. Actualizar Supabase (product_drafts y supplier_products para sincronizar con la tienda web)
+  if (supabaseClient) {
     try {
-      supabaseClient.from('product_drafts').update({ stock: newStock, updated_at: new Date().toISOString() }).eq('id', product.id).then();
+      if (product.id) {
+        supabaseClient.from('product_drafts').update({ stock: newStock, updated_at: new Date().toISOString() }).eq('id', product.id).then();
+      }
+      const targetSku = product.product_code || product.id;
+      if (targetSku) {
+        supabaseClient.from('supplier_products')
+          .update({ stock: newStock, available: newStock > 0, updated_at: new Date().toISOString() })
+          .eq('supplier_id', 'local_store')
+          .or(`mapped_product_id.eq.${targetSku},supplier_product_id.eq.${targetSku}`)
+          .then();
+      }
     } catch (_) {}
   }
 
