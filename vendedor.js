@@ -32,8 +32,7 @@ let universalCameraActiveMode = 'pos';
 let universalCameraTorchOn = false;
 let universalCameraStream = null;
 
-// Store location & internal catalog state (hoisted to avoid TDZ when accessed across modules)
-let storeLocationProducts = window.storeLocationProducts || [];
+// Internal catalog state (hoisted to avoid TDZ when accessed across modules)
 let internalCatalogProducts = [];
 let internalCatalogFilterQuery = '';
 let internalCatalogFilterCategory = 'all';
@@ -1811,7 +1810,8 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
 
   // Match product from internal catalog or locations
   let matched = matchedProduct;
-  const allProducts = [...(internalCatalogProducts || []), ...(storeLocationProducts || []), ...(baseProducts || [])];
+  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
+  const allProducts = [...(internalCatalogProducts || []), ...storeLocs, ...(baseProducts || [])];
   if (!matched) {
     matched = allProducts.find(p => 
       p.wms_code === raw || 
@@ -9951,7 +9951,8 @@ function openStockAdjustmentModal(productIdentifier = null, actionType = 'remove
   const voiceStatus = document.getElementById('adjustment-voice-status');
   if (voiceStatus) voiceStatus.textContent = '';
 
-  const allProducts = [...(internalCatalogProducts || []), ...(storeLocationProducts || []), ...(baseProducts || [])];
+  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
+  const allProducts = [...(internalCatalogProducts || []), ...storeLocs, ...(baseProducts || [])];
   let found = null;
   if (productIdentifier) {
     const raw = String(productIdentifier).trim().toLowerCase();
@@ -10017,7 +10018,8 @@ function openStockAdjustmentModal(productIdentifier = null, actionType = 'remove
 
 function handleAdjustmentProductDropdownChange(val) {
   if (!val) return;
-  const allProducts = [...(internalCatalogProducts || []), ...(storeLocationProducts || []), ...(baseProducts || [])];
+  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
+  const allProducts = [...(internalCatalogProducts || []), ...storeLocs, ...(baseProducts || [])];
   const found = allProducts.find(p => String(p.id) === String(val) || p.product_code === val);
   if (found) {
     currentStockAdjustmentProduct = found;
@@ -10187,7 +10189,8 @@ function handleStockAdjustmentSubmit(event) {
   const prodId = document.getElementById('adjustment-product-id')?.value;
   const prodCode = document.getElementById('adjustment-product-code')?.value;
 
-  const allProducts = [...(internalCatalogProducts || []), ...(storeLocationProducts || []), ...(baseProducts || [])];
+  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
+  const allProducts = [...(internalCatalogProducts || []), ...storeLocs, ...(baseProducts || [])];
   const product = currentStockAdjustmentProduct || allProducts.find(p => String(p.id) === String(prodId) || p.product_code === prodCode);
 
   if (!product) {
@@ -10441,7 +10444,8 @@ function openProductFullInfoModal(productIdentifier) {
   const footer = document.getElementById('pinfo-modal-footer');
   if (!modal || !body || !footer) return;
 
-  const allProducts = [...(internalCatalogProducts || []), ...(storeLocationProducts || []), ...(baseProducts || [])];
+  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
+  const allProducts = [...(internalCatalogProducts || []), ...storeLocs, ...(baseProducts || [])];
   const raw = String(productIdentifier || '').trim().toLowerCase();
   const found = allProducts.find(p => 
     (p.id && String(p.id).toLowerCase() === raw) ||
