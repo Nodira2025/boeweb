@@ -458,6 +458,8 @@ function renderSelectedShelfPanel() {
         <div class="gba-bag-list">${renderProductRows(visibleProducts)}</div>
       </section>
     </aside>`;
+}
+
 function renderFloorTabs() {
   return Object.entries(FLOOR_NAMES).map(([floor, name]) => {
     const floorNum = Number(floor);
@@ -597,3 +599,5 @@ window.showShelfDetailsModal = showShelfDetailsModal;
 window.setMapTab = setMapTab;
 window.parseLocationCode = parseLocationCode;
 window.formatLocationVoiceText = formatLocationVoiceText;
+window.storeLocationProducts = storeLocationProducts;
+window.storeShelves = storeShelves;

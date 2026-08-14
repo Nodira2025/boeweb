@@ -32,7 +32,8 @@ let universalCameraActiveMode = 'pos';
 let universalCameraTorchOn = false;
 let universalCameraStream = null;
 
-// Internal catalog state (hoisted to avoid TDZ when accessed by drafts and locations)
+// Store location & internal catalog state (hoisted to avoid TDZ when accessed across modules)
+let storeLocationProducts = window.storeLocationProducts || [];
 let internalCatalogProducts = [];
 let internalCatalogFilterQuery = '';
 let internalCatalogFilterCategory = 'all';
