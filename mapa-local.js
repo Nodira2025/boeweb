@@ -458,6 +458,13 @@ function renderSelectedShelfPanel() {
         <div class="gba-bag-list">${renderProductRows(visibleProducts)}</div>
       </section>
     </aside>`;
+function renderFloorTabs() {
+  return Object.entries(FLOOR_NAMES).map(([floor, name]) => {
+    const floorNum = Number(floor);
+    const active = floorNum === selectedFloorLevel;
+    const label = floorNum === 1 ? '🏪 SALÓN TIENDA (PC AL CENTRO)' : '📦 DEPÓSITO GENERAL (PC AL CENTRO)';
+    return `<button type="button" class="gba-room-btn ${active ? 'active' : ''}" onclick="setFloorLevel(${floorNum})">${label}</button>`;
+  }).join('');
 }
 
 function renderStoreMapHTML(activeZone = null, activeShelf = null, targetLevel = null) {

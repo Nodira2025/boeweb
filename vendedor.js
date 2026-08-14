@@ -1808,32 +1808,37 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
   // Physical shelf code on the floor layout (e.g. P3-E3 or E3)
   const layoutShelfCode = `${wallCode}-${shelfCode}`.replace(/P\d-P/, 'P');
 
-  // Stock count & product name
-  let stockCount = matchedProduct?.stock ?? matchedProduct?.on_hand ?? null;
-  let productName = matchedProduct?.name || null;
-  let productBarcode = matchedProduct?.barcode || matchedProduct?.product_code || null;
-
-  if (stockCount === null) {
-    const allProducts = [...(internalCatalogProducts || []), ...(storeLocationProducts || [])];
-    const match = allProducts.find(p => 
+  // Match product from internal catalog or locations
+  let matched = matchedProduct;
+  const allProducts = [...(internalCatalogProducts || []), ...(storeLocationProducts || []), ...(baseProducts || [])];
+  if (!matched) {
+    matched = allProducts.find(p => 
       p.wms_code === raw || 
       p.shelf_code === layoutShelfCode || 
       p.shelf_code === shelfCode ||
       (p.barcode && p.barcode === raw) ||
-      (p.product_code && p.product_code === raw)
+      (p.product_code && p.product_code === raw) ||
+      (p.name && p.name.toLowerCase().includes(raw.toLowerCase())) ||
+      (p.id && String(p.id).toLowerCase() === raw.toLowerCase())
     );
-    if (match) {
-      stockCount = Math.max(0, Number(match.stock) || 0);
-      productName = productName || match.name;
-      productBarcode = productBarcode || match.barcode || match.product_code;
-    }
   }
+
+  // Stock count & product properties
+  let stockCount = matched?.stock ?? matched?.on_hand ?? null;
+  let productName = matched?.name || null;
+  let productBarcode = matched?.barcode || matched?.product_code || null;
+  let productImage = matched?.image || matched?.image_url || null;
+  let productCategory = matched?.category || '';
+  let productPrice = matched?.price || matched?.sale_price || 0;
+  let productDesc = matched?.description || '';
+  let productBrand = matched?.brand || '';
+  let productId = matched?.id || matched?.product_code || '';
 
   // Photo
   let shelfPhoto = null;
   try {
     const photos = JSON.parse(localStorage.getItem('boeweb_store_shelf_photos_v1') || '{}');
-    shelfPhoto = photos[layoutShelfCode] || photos[shelfCode] || matchedProduct?.placement_photo_url || null;
+    shelfPhoto = photos[layoutShelfCode] || photos[shelfCode] || matched?.placement_photo_url || null;
   } catch (err) {}
 
   return {
@@ -1856,6 +1861,12 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
     stockCount: stockCount !== null ? stockCount : 'Disponible',
     productName,
     productBarcode,
+    productImage,
+    productCategory,
+    productPrice,
+    productDesc,
+    productBrand,
+    productId,
     shelfPhoto
   };
 }
@@ -1877,16 +1888,27 @@ function renderStoreMapLocationCard(info) {
     <div class="location-found-card" style="background: linear-gradient(135deg, #152d24 0%, #1c3c30 100%); border: 2px solid #c2a246; border-radius: 20px; padding: 22px; color: #ffffff; box-shadow: 0 14px 40px rgba(0,0,0,0.4);">
       
       <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; border-bottom: 1px solid rgba(194,162,70,0.3); padding-bottom: 12px;">
-        <div>
-          <span style="background: rgba(194,162,70,0.25); color: #c2a246; border: 1px solid #c2a246; padding: 3px 10px; border-radius: 8px; font-size: 0.76rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
-            📍 Guía de Ubicación Física
-          </span>
-          <h3 style="margin: 8px 0 0 0; font-size: 1.22rem; color: #ffffff; font-weight: 800; line-height: 1.3;">
-            ${title}
-          </h3>
-          ${info.productBarcode ? `<small style="color: rgba(247,246,242,0.7); font-size: 0.8rem; font-family: monospace;">SKU / Código: ${escapeFn(info.productBarcode)}</small>` : ''}
+        <div style="display: flex; gap: 12px; align-items: center; min-width: 0;">
+          ${info.productImage ? `
+            <img src="${escapeFn(info.productImage)}" alt="${title}" style="width: 58px; height: 58px; border-radius: 12px; border: 1.5px solid #c2a246; object-fit: cover; background: #fff; flex-shrink: 0;">
+          ` : `
+            <div style="width: 58px; height: 58px; border-radius: 12px; border: 1.5px solid #c2a246; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; flex-shrink: 0;">📦</div>
+          `}
+          <div style="min-width: 0;">
+            <span style="background: rgba(194,162,70,0.25); color: #c2a246; border: 1px solid #c2a246; padding: 2px 8px; border-radius: 8px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase;">
+              📍 Guía de Ubicación Física
+            </span>
+            <h3 style="margin: 4px 0 0 0; font-size: 1.15rem; color: #ffffff; font-weight: 800; line-height: 1.3; word-break: break-word;">
+              ${title}
+            </h3>
+            ${info.productBarcode ? `<small style="color: rgba(247,246,242,0.7); font-size: 0.78rem; font-family: monospace;">SKU / Código: ${escapeFn(info.productBarcode)}</small>` : ''}
+          </div>
         </div>
-        <span style="font-size: 2.2rem; line-height: 1;">🗺️</span>
+        ${info.productId || info.productBarcode || info.productName ? `
+          <button type="button" onclick="openProductFullInfoModal('${escapeFn(info.productId || info.productBarcode || info.productName)}')" style="padding: 7px 12px; border-radius: 10px; background: rgba(194,162,70,0.25); border: 1.5px solid #c2a246; color: #ffd54f; font-size: 0.78rem; font-weight: 800; cursor: pointer; white-space: nowrap; flex-shrink: 0; display: flex; align-items: center; gap: 4px;">
+            ℹ️ Ver más info
+          </button>
+        ` : ''}
       </div>
 
       <div style="background: rgba(0,0,0,0.3); border-radius: 14px; padding: 16px; border: 1px solid rgba(255,255,255,0.12); margin-bottom: 18px; font-size: 0.95rem; line-height: 1.7;">
@@ -5086,11 +5108,14 @@ window.printProductQrByCode = printProductQrByCode;
 window.handleShelfPhotoChange = handleShelfPhotoChange;
 window.loadPendingLocationProducts = loadPendingLocationProducts;
 window.selectPendingLocationProduct = selectPendingLocationProduct;
-// window.chooseLocationAssistantArea — function not yet implemented
+window.chooseLocationAssistantZone = chooseLocationAssistantZone;
+window.chooseLocationAssistantType = chooseLocationAssistantType;
+window.chooseLocationAssistantCompass = chooseLocationAssistantCompass;
 window.chooseLocationAssistantWall = chooseLocationAssistantWall;
 window.chooseLocationAssistantShelf = chooseLocationAssistantShelf;
 window.chooseLocationAssistantLevel = chooseLocationAssistantLevel;
-window.chooseLocationAssistantPosition = chooseLocationAssistantPosition;
+window.chooseLocationAssistantSector = chooseLocationAssistantSector;
+window.chooseLocationAssistantPosition = chooseLocationAssistantSector;
 window.openLocationAssistantPhotoPicker = openLocationAssistantPhotoPicker;
 window.handleLocationAssistantPhotoChange = handleLocationAssistantPhotoChange;
 window.useExistingProductPhotoForLocation = useExistingProductPhotoForLocation;
@@ -9942,6 +9967,8 @@ function openStockAdjustmentModal(productIdentifier = null, actionType = 'remove
   const nameEl = document.getElementById('adjustment-product-name');
   const metaEl = document.getElementById('adjustment-product-meta');
   const stockEl = document.getElementById('adjustment-product-current-stock');
+  const imgEl = document.getElementById('adjustment-product-img');
+  const moreInfoBtn = document.getElementById('adjustment-product-moreinfo-btn');
   const idInput = document.getElementById('adjustment-product-id');
   const codeInput = document.getElementById('adjustment-product-code');
   const dropdownContainer = document.getElementById('adjustment-product-selector-container');
@@ -9949,6 +9976,16 @@ function openStockAdjustmentModal(productIdentifier = null, actionType = 'remove
 
   if (found) {
     currentStockAdjustmentProduct = found;
+    if (imgEl) {
+      const imgSrc = found.image || found.image_url || found.placement_photo_url;
+      if (imgSrc) {
+        imgEl.src = imgSrc;
+        imgEl.style.display = 'block';
+      } else {
+        imgEl.style.display = 'none';
+      }
+    }
+    if (moreInfoBtn) moreInfoBtn.style.display = 'inline-block';
     if (nameEl) nameEl.textContent = found.name;
     if (metaEl) metaEl.textContent = `SKU: ${found.product_code || found.id} · Ubicación: ${found.location_label || found.location || found.shelf_code || 'Sin asignar'}`;
     const currentStock = Math.max(0, Number(found.stock ?? found.on_hand) || 0);
@@ -9958,6 +9995,8 @@ function openStockAdjustmentModal(productIdentifier = null, actionType = 'remove
     if (dropdownContainer) dropdownContainer.style.display = 'none';
   } else {
     currentStockAdjustmentProduct = null;
+    if (imgEl) imgEl.style.display = 'none';
+    if (moreInfoBtn) moreInfoBtn.style.display = 'none';
     if (dropdownContainer) {
       dropdownContainer.style.display = 'block';
       if (dropdown) {
@@ -9984,8 +10023,20 @@ function handleAdjustmentProductDropdownChange(val) {
     const nameEl = document.getElementById('adjustment-product-name');
     const metaEl = document.getElementById('adjustment-product-meta');
     const stockEl = document.getElementById('adjustment-product-current-stock');
+    const imgEl = document.getElementById('adjustment-product-img');
+    const moreInfoBtn = document.getElementById('adjustment-product-moreinfo-btn');
     const idInput = document.getElementById('adjustment-product-id');
     const codeInput = document.getElementById('adjustment-product-code');
+    if (imgEl) {
+      const imgSrc = found.image || found.image_url || found.placement_photo_url;
+      if (imgSrc) {
+        imgEl.src = imgSrc;
+        imgEl.style.display = 'block';
+      } else {
+        imgEl.style.display = 'none';
+      }
+    }
+    if (moreInfoBtn) moreInfoBtn.style.display = 'inline-block';
     if (nameEl) nameEl.textContent = found.name;
     if (metaEl) metaEl.textContent = `SKU: ${found.product_code || found.id} · Ubicación: ${found.location_label || found.location || found.shelf_code || 'Sin asignar'}`;
     const currentStock = Math.max(0, Number(found.stock ?? found.on_hand) || 0);
@@ -10382,6 +10433,110 @@ function exportRetiredProductsCsv() {
   URL.revokeObjectURL(url);
   showToast('📥 Reporte CSV descargado con éxito.');
 }
+
+function openProductFullInfoModal(productIdentifier) {
+  const modal = document.getElementById('modal-product-full-info');
+  const body = document.getElementById('pinfo-modal-body');
+  const footer = document.getElementById('pinfo-modal-footer');
+  if (!modal || !body || !footer) return;
+
+  const allProducts = [...(internalCatalogProducts || []), ...(storeLocationProducts || []), ...(baseProducts || [])];
+  const raw = String(productIdentifier || '').trim().toLowerCase();
+  const found = allProducts.find(p => 
+    (p.id && String(p.id).toLowerCase() === raw) ||
+    (p.product_code && p.product_code.toLowerCase() === raw) ||
+    (p.barcode && p.barcode.toLowerCase() === raw) ||
+    (p.name && p.name.toLowerCase().includes(raw)) ||
+    (p.wms_code && p.wms_code.toLowerCase() === raw)
+  );
+
+  if (!found) {
+    showToast('No se encontraron detalles completos para este producto.');
+    return;
+  }
+
+  const escapeFn = typeof escapeMapHtml === 'function' ? escapeMapHtml : (v => String(v || ''));
+  const currentStock = Math.max(0, Number(found.stock ?? found.on_hand) || 0);
+  const priceFormatted = typeof formatCurrency === 'function' 
+    ? formatCurrency(Number(found.price || found.sale_price) || 0) 
+    : `$${Number(found.price || found.sale_price || 0).toLocaleString('es-AR')}`;
+
+  const imageSrc = found.image || found.image_url || found.placement_photo_url || '';
+
+  body.innerHTML = `
+    <div style="display: flex; gap: 16px; align-items: center; background: rgba(0,0,0,0.3); padding: 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12);">
+      ${imageSrc ? `
+        <img src="${escapeFn(imageSrc)}" alt="${escapeFn(found.name)}" style="width: 90px; height: 90px; border-radius: 12px; border: 2px solid #c2a246; object-fit: cover; background: #fff; flex-shrink: 0;">
+      ` : `
+        <div style="width: 90px; height: 90px; border-radius: 12px; border: 2px solid #c2a246; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; flex-shrink: 0;">📦</div>
+      `}
+      <div style="min-width: 0; flex: 1;">
+        <span style="background: rgba(194,162,70,0.25); color: #c2a246; border: 1px solid #c2a246; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase;">
+          ${escapeFn(found.category || 'Catálogo Interno')}
+        </span>
+        <h3 style="margin: 6px 0 2px 0; font-size: 1.15rem; color: #ffffff; font-weight: 800; line-height: 1.3;">
+          ${escapeFn(found.name)}
+        </h3>
+        ${found.brand ? `<small style="color: #ffd54f; display: block; font-weight: 700; font-size: 0.8rem;">Marca: ${escapeFn(found.brand)}</small>` : ''}
+        ${found.presentation ? `<small style="color: rgba(255,255,255,0.7); display: block; font-size: 0.78rem;">Presentación: ${escapeFn(found.presentation)}</small>` : ''}
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+      <div style="background: rgba(0,0,0,0.25); padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
+        <small style="color: rgba(255,255,255,0.6); display: block; font-size: 0.72rem; text-transform: uppercase;">Precio de Venta</small>
+        <strong style="color: #81c784; font-size: 1.25rem; font-weight: 900;">${priceFormatted}</strong>
+      </div>
+      <div style="background: rgba(0,0,0,0.25); padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
+        <small style="color: rgba(255,255,255,0.6); display: block; font-size: 0.72rem; text-transform: uppercase;">Stock en Tienda</small>
+        <strong style="color: #ffd54f; font-size: 1.25rem; font-weight: 900;">${currentStock} u.</strong>
+      </div>
+    </div>
+
+    <div style="background: rgba(0,0,0,0.25); padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); font-size: 0.86rem; line-height: 1.6;">
+      <div style="margin-bottom: 6px;">
+        🏷️ <strong>Código / SKU:</strong> <span style="font-family: monospace; color: #c2a246;">${escapeFn(found.product_code || found.id || '-')}</span>
+      </div>
+      ${found.barcode ? `
+        <div style="margin-bottom: 6px;">
+          📊 <strong>Código de Barras:</strong> <span style="font-family: monospace; color: #a5d6a7;">${escapeFn(found.barcode)}</span>
+        </div>
+      ` : ''}
+      <div style="margin-bottom: 6px;">
+        📍 <strong>Ubicación WMS:</strong> <span style="color: #ffffff; font-weight: 700;">${escapeFn(found.location_label || found.location || found.shelf_code || found.wms_code || 'Sin asignar')}</span>
+      </div>
+    </div>
+
+    ${found.description ? `
+      <div style="background: rgba(0,0,0,0.25); padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
+        <strong style="color: #c2a246; font-size: 0.82rem; text-transform: uppercase; display: block; margin-bottom: 4px;">📝 Descripción / Especificaciones</strong>
+        <p style="margin: 0; font-size: 0.86rem; color: rgba(255,255,255,0.85); line-height: 1.5; white-space: pre-line;">${escapeFn(found.description)}</p>
+      </div>
+    ` : ''}
+  `;
+
+  footer.innerHTML = `
+    <button type="button" onclick="closeProductFullInfoModal(); openStockAdjustmentModal('${escapeFn(found.product_code || found.id)}', 'add')" style="flex: 1; min-height: 42px; padding: 8px 10px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; background: rgba(76,175,80,0.25); border: 1.5px solid #81c784; color: #a5d6a7; cursor: pointer;">
+      ➕ Agregar Stock
+    </button>
+    <button type="button" onclick="closeProductFullInfoModal(); openStockAdjustmentModal('${escapeFn(found.product_code || found.id)}', 'remove')" style="flex: 1; min-height: 42px; padding: 8px 10px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; background: rgba(239,83,80,0.25); border: 1.5px solid #ef5350; color: #ef9a9a; cursor: pointer;">
+      ➖ Retirar / Quitar
+    </button>
+    <button type="button" onclick="closeProductFullInfoModal()" style="min-height: 42px; padding: 8px 16px; border-radius: 10px; font-size: 0.85rem; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; cursor: pointer;">
+      Cerrar
+    </button>
+  `;
+
+  modal.style.display = 'flex';
+}
+
+function closeProductFullInfoModal() {
+  const modal = document.getElementById('modal-product-full-info');
+  if (modal) modal.style.display = 'none';
+}
+
+window.openProductFullInfoModal = openProductFullInfoModal;
+window.closeProductFullInfoModal = closeProductFullInfoModal;
 
 window.openVendorPasswordModal = openVendorPasswordModal;
 window.closeVendorPasswordModal = closeVendorPasswordModal;

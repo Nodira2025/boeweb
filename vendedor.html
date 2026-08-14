@@ -3802,13 +3802,15 @@
       <!-- Modal Body -->
       <form id="stock-adjustment-form" onsubmit="handleStockAdjustmentSubmit(event)" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px; padding-right: 4px;">
         
-        <!-- Product Quick Details -->
-        <div id="adjustment-product-info-box" style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.18); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+        <!-- Product Quick Details with Photo -->
+        <div id="adjustment-product-info-box" style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.18); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 12px;">
+          <img id="adjustment-product-img" src="" alt="Foto del producto" style="width: 54px; height: 54px; border-radius: 10px; border: 1px solid #c2a246; object-fit: cover; background: #fff; display: none; flex-shrink: 0;">
           <div style="flex: 1; min-width: 0;">
             <strong id="adjustment-product-name" style="display: block; font-size: 0.95rem; color: #ffffff; word-break: break-word;">Seleccionar producto...</strong>
-            <small id="adjustment-product-meta" style="color: rgba(255,255,255,0.7); font-size: 0.78rem;">SKU: - · Ubicación: -</small>
+            <small id="adjustment-product-meta" style="color: rgba(255,255,255,0.7); font-size: 0.78rem; display: block; margin-top: 2px;">SKU: - · Ubicación: -</small>
+            <button type="button" id="adjustment-product-moreinfo-btn" onclick="openProductFullInfoModal(currentStockAdjustmentProduct?.id || currentStockAdjustmentProduct?.product_code)" style="display: none; background: none; border: none; padding: 0; color: #ffd54f; font-size: 0.76rem; font-weight: 700; text-decoration: underline; cursor: pointer; margin-top: 4px;">ℹ️ Ver más info del producto</button>
           </div>
-          <div style="text-align: right; white-space: nowrap;">
+          <div style="text-align: right; white-space: nowrap; flex-shrink: 0;">
             <span style="display: block; font-size: 0.7rem; color: rgba(255,255,255,0.6); text-transform: uppercase;">Stock actual</span>
             <strong id="adjustment-product-current-stock" style="font-size: 1.15rem; color: #81c784;">0 u.</strong>
           </div>
@@ -3886,11 +3888,37 @@
 
       </form>
     </div>
+  <!-- Modal Ficha Completa del Producto (Ver más info) -->
+  <div id="modal-product-full-info" style="display: none; position: fixed !important; inset: 0 !important; z-index: 999999999 !important; background: rgba(0,0,0,0.85) !important; backdrop-filter: blur(6px) !important; -webkit-backdrop-filter: blur(6px) !important; align-items: center !important; justify-content: center !important; padding: 16px !important; box-sizing: border-box !important;">
+    <div style="max-width: 540px; width: 100%; border-radius: 22px; border: 2px solid var(--color-accent-gold, #c2a246); background: #152d24; color: #ffffff; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,0.8); margin: auto; position: relative; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box;">
+      
+      <!-- Modal Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid rgba(194,162,70,0.3); padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.4rem;">🏷️</span>
+          <div>
+            <h3 id="pinfo-modal-title" style="margin: 0; font-size: 1.15rem; color: #c2a246; font-weight: 800;">Ficha del Producto</h3>
+            <small style="color: rgba(247,246,242,0.8); font-size: 0.78rem;">Catálogo interno y especificaciones</small>
+          </div>
+        </div>
+        <button type="button" onclick="closeProductFullInfoModal()" style="background: rgba(255,255,255,0.15); border: none; color: #fff; font-size: 1.2rem; border-radius: 50%; width: 34px; height: 34px; cursor: pointer; display: flex; align-items: center; justify-content: center;" aria-label="Cerrar">✕</button>
+      </div>
+
+      <!-- Modal Body -->
+      <div id="pinfo-modal-body" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px; padding-right: 4px;">
+        <!-- Populated dynamically -->
+      </div>
+
+      <!-- Modal Footer Actions -->
+      <div id="pinfo-modal-footer" style="display: flex; gap: 10px; margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
   </div>
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="mapa-local.js?v=gba_leafgreen_v1"></script>
+  <script src="mapa-local.js?v=gba_leafgreen_v2"></script>
   <script src="saas-auth.js?v=saas_v2"></script>
   <script src="business-verticals.js?v=verticals_v1"></script>
   <script src="tenant-theme.js?v=theme_v1"></script>
@@ -3902,6 +3930,6 @@
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=retired_products_v30"></script>
+  <script src="vendedor.js?v=retired_products_v31"></script>
 </body>
 </html>
