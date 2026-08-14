@@ -7,6 +7,51 @@ let supabaseClient;
 // --- STATE MANAGEMENT ---
 let baseProducts = []; // Stores products rendered in the grid
 let cart = JSON.parse(localStorage.getItem('boeweb_b2b_cart')) || [];
+// --- PRODUCTION RESET / CLEANUP UTILITY ---
+function purgeProductionTestData(silent = true) {
+  try {
+    // 1. Limpiar ventas POS de prueba, recibos y carritos
+    localStorage.removeItem('boeweb_pos_sale_drafts');
+    localStorage.removeItem('boeweb_last_pos_sale_receipt');
+    localStorage.removeItem('boeweb_sales_history');
+    localStorage.removeItem('boeweb_pos_cart');
+
+    // 2. Limpiar pedidos web y mediaciones
+    localStorage.removeItem('boeweb_web_orders');
+    localStorage.removeItem('boeweb_order_history');
+    localStorage.removeItem('boeweb_last_mp_order');
+
+    // 3. Limpiar borradores de ingresos de productos
+    localStorage.removeItem('boeweb_local_product_drafts');
+    localStorage.removeItem('boeweb_pending_product_drafts');
+    localStorage.removeItem('boeweb_product_drafts');
+
+    // 4. Limpiar asignaciones temporales de ubicaciones y mermas
+    localStorage.removeItem('boeweb_wms_product_locations');
+    localStorage.removeItem('boeweb_retired_products');
+    localStorage.removeItem('boeweb_inventory_audits');
+
+    // 5. Reiniciar caja a estado 0 inicial (sin movimientos)
+    const todayKey = (new Date()).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }).split('/').reverse().join('-');
+    localStorage.removeItem(`boeweb_cash_${todayKey}`);
+    localStorage.removeItem('boeweb_cash_legacy');
+
+    // Marcar como limpio para producción
+    localStorage.setItem('boeweb_production_clean_v1', 'true');
+
+    if (!silent && window.showToast) {
+      window.showToast('✨ Datos de prueba eliminados. ¡Local listo para operar en producción!');
+    }
+  } catch (err) {
+    console.warn('Error purging test data:', err);
+  }
+}
+window.purgeProductionTestData = purgeProductionTestData;
+
+if (localStorage.getItem('boeweb_production_clean_v1') !== 'true') {
+  purgeProductionTestData(true);
+}
+
 // Clear legacy carts once to prevent price mismatch with the new 30% discount system
 if (localStorage.getItem('boeweb_b2b_cart_version') !== '1.1') {
   cart = [];

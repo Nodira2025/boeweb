@@ -25,6 +25,16 @@ window.closeNavMoreMenu = function() {
   if (dropdown) dropdown.classList.remove('active');
 };
 
+if (localStorage.getItem('boeweb_production_clean_v1') !== 'true') {
+  try {
+    localStorage.removeItem('boeweb_cart');
+    localStorage.removeItem('boeweb_order_history');
+    localStorage.removeItem('boeweb_web_orders');
+    localStorage.removeItem('boeweb_last_mp_order');
+    localStorage.setItem('boeweb_production_clean_v1', 'true');
+  } catch (_) {}
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // --- STATE MANAGEMENT ---
   let products = [];

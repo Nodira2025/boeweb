@@ -4241,6 +4241,14 @@
               <small>Red asociada 48h</small>
             </div>
           </button>
+
+          <button type="button" class="vendor-sheet-op-btn" onclick="if(confirm('¿Querés limpiar todos los datos y ventas de prueba para dejar el local listo para producción?')) { purgeProductionTestData(false); location.reload(); }" style="background: rgba(239,83,80,0.12); border-color: #ef5350;">
+            <span class="vendor-sheet-icon">🧹</span>
+            <div>
+              <strong style="color: #ef5350;">Resetear Pruebas</strong>
+              <small>Dejar listo para el local</small>
+            </div>
+          </button>
         </div>
       </div>
     </div>
