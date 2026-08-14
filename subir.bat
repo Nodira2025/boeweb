@@ -1,60 +1,61 @@
 @echo off
-setlocal enabledelayedexpansion
-chcp 65001 >nul
+setlocal EnableDelayedExpansion
 
 echo ===================================================
-echo   🌿 BÔ GROW CLUB — SUBIR CAMBIOS AL REPOSITORIO
+echo   BO GROW CLUB - SUBIR CAMBIOS AL REPOSITORIO
 echo ===================================================
 echo.
 
-:: 1. Validar sintaxis de Javascript
-echo [1/4] Verificando sintaxis del proyecto...
+:: 1. Validar sintaxis
+echo [1/4] Verificando sintaxis del proyecto (npm run check)...
 call npm run check
-if %errorlevel% neq 0 (
+if errorlevel 1 (
     echo.
-    echo ❌ ERROR: Se detectaron errores de sintaxis. Revisa el codigo antes de subir.
+    echo [ERROR] Se detectaron errores de sintaxis en el codigo.
+    echo Revisa los archivos antes de subir.
     echo.
     pause
-    exit /b %errorlevel%
+    exit /b 1
 )
-echo ✅ Sintaxis correcta.
+echo [OK] Sintaxis correcta.
 echo.
 
-:: 2. Preguntar mensaje de commit
-set /p "COMMIT_MSG=Ingresa el mensaje para el commit (Enter para mensaje automatico): "
+:: 2. Mensaje de commit
+set "COMMIT_MSG="
+set /p "COMMIT_MSG=Ingresa el mensaje del commit (Presiona ENTER para mensaje automatico): "
 if "!COMMIT_MSG!"=="" (
-    for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set "LDT=%%I"
-    set "FECHA=!LDT:~0,4!-!LDT:~4,2!-!LDT:~6,2! !LDT:~8,2!:!LDT:~10,2!"
-    set "COMMIT_MSG=chore: Actualizacion automatica - !FECHA!"
+    for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value 2^>nul') do set "LDT=%%I"
+    if defined LDT (
+        set "FECHA=!LDT:~0,4!-!LDT:~4,2!-!LDT:~6,2! !LDT:~8,2!:!LDT:~10,2!"
+        set "COMMIT_MSG=chore: Actualizacion automatica - !FECHA!"
+    ) else (
+        set "COMMIT_MSG=chore: Actualizacion de archivos"
+    )
 )
 
-:: 3. Agregar archivos al stage y commitear
+:: 3. Preparar commit
 echo.
-echo [2/4] Preparando archivos para commit...
+echo [2/4] Preparando archivos para commit (git add .)...
 git add .
 
 echo [3/4] Creando commit: "!COMMIT_MSG!"
 git commit --no-verify -m "!COMMIT_MSG!"
-if %errorlevel% neq 0 (
-    echo.
-    echo ⚠️ No habia cambios nuevos para commitear o el commit fallo.
-)
-
-:: 4. Subir al repositorio remoto
 echo.
-echo [4/4] Subiendo a GitHub (git push)...
+
+:: 4. Subir a GitHub
+echo [4/4] Subiendo a GitHub (git push origin HEAD)...
 git push origin HEAD
-if %errorlevel% neq 0 (
+if errorlevel 1 (
     echo.
-    echo ❌ ERROR al hacer push. Verifica tu conexion o permisos.
+    echo [ERROR] No se pudo hacer push. Revisa tu conexion a Internet o permisos de Git.
     echo.
     pause
-    exit /b %errorlevel%
+    exit /b 1
 )
 
 echo.
 echo ===================================================
-echo   🚀 ¡CAMBIOS SUBIDOS CON EXITO A GITHUB!
+echo   CAMBIOS SUBIDOS CON EXITO A GITHUB
 echo ===================================================
 echo.
 pause
