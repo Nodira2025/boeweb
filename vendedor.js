@@ -32,6 +32,26 @@ let universalCameraActiveMode = 'pos';
 let universalCameraTorchOn = false;
 let universalCameraStream = null;
 
+// Internal catalog state (hoisted to avoid TDZ when accessed by drafts and locations)
+let internalCatalogProducts = [];
+let internalCatalogFilterQuery = '';
+let internalCatalogFilterCategory = 'all';
+let internalCatalogEditingId = null;
+let internalCatalogImageFile = null;
+let internalCatalogImagePreviewUrl = null;
+
+// WMS state (hoisted to avoid TDZ)
+let currentWmsModuleCode = 'PI-M04';
+
+// POS state (hoisted to avoid TDZ)
+let globalPosCart = null;
+let posScanPendingProduct = null;
+
+// Expirations, Nearby Stores & CC state (hoisted to avoid TDZ)
+let currentExpirationsFilter = 'all';
+let activeNearbyStoreFilter = 'all';
+let currentSelectedCcId = null;
+
 // Supplier display names mapping
 const supplierNames = {
   'astrogrow': 'AstroGrow',
@@ -4796,12 +4816,7 @@ window.submitProductDraft = submitProductDraft;
 window.loadPendingProductDrafts = loadPendingProductDrafts;
 window.approveProductDraft = approveProductDraft;
 window.rejectProductDraft = rejectProductDraft;
-let internalCatalogProducts = [];
-let internalCatalogFilterQuery = '';
-let internalCatalogFilterCategory = 'all';
-let internalCatalogEditingId = null;
-let internalCatalogImageFile = null;
-let internalCatalogImagePreviewUrl = null;
+// internalCatalog state vars — declared at top of file
 
 function revokeInternalCatalogImagePreview() {
   if (internalCatalogImagePreviewUrl && internalCatalogImagePreviewUrl.startsWith('blob:')) {
@@ -5176,7 +5191,7 @@ const WMS_LOCATIONS_KEY = 'boeweb_wms_inventory_locations_v1';
 const WMS_MOVEMENTS_KEY = 'boeweb_wms_inventory_movements_v1';
 const WMS_AUDITS_KEY = 'boeweb_wms_inventory_audits_v1';
 
-let currentWmsModuleCode = 'PI-M04';
+// currentWmsModuleCode — declared at top of file
 
 function getHumanLevelLabel(level) {
   const num = Number(level) || 3;
@@ -6743,8 +6758,7 @@ window.executeTenantActivationApproved = executeTenantActivationApproved;
 window.impersonateTenantSuperadmin = impersonateTenantSuperadmin;
 
 // --- POS ITEMIZADO (VENDER UN PRODUCTO · CATÁLOGO INTERNO) ---
-let globalPosCart = null;
-let posScanPendingProduct = null;
+// POS state vars — declared at top of file
 
 function getPosCartEngine() {
   if (!globalPosCart) {
@@ -7839,7 +7853,7 @@ window.refreshWebOrdersBadges = refreshWebOrdersBadges;
    y días críticos (<= 3 días o vencidos).
    ========================================================================== */
 
-let currentExpirationsFilter = 'all';
+// currentExpirationsFilter — declared at top of file
 
 function calculateExpirationStatus(expirationDateStr) {
   if (!expirationDateStr) {
@@ -8066,7 +8080,7 @@ function saveNearbyStore(store) {
   localStorage.setItem('boeweb_nearby_stores_catalog', JSON.stringify(flatCatalog));
 }
 
-let activeNearbyStoreFilter = 'all';
+// activeNearbyStoreFilter — declared at top of file
 
 function renderNearbyStoresSection() {
   const tabsContainer = document.getElementById('nearby-stores-tabs-container');
@@ -8478,7 +8492,7 @@ function renderCurrentAccountsUI() {
   }).join('');
 }
 
-let currentSelectedCcId = null;
+// currentSelectedCcId — declared at top of file
 
 function openCcDetailsModal(ccId) {
   currentSelectedCcId = ccId;
