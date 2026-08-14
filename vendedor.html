@@ -1030,7 +1030,7 @@
     }
   </style>
   <link rel="stylesheet" href="vendedor-caja.css?v=camera_pos_v23">
-  <link rel="stylesheet" href="vendedor-portal.css?v=flow_order_v29">
+  <link rel="stylesheet" href="vendedor-portal.css?v=desktop_auth_v30">
   <link rel="stylesheet" href="vendedor-stock.css?v=mobile_gba_v1">
   <style id="vendor-rescue-critical-styles">
     .saas-prototype-only,
@@ -1216,10 +1216,20 @@
 
       <div class="vendor-sidebar-profile">
         <span class="vendor-sidebar-avatar" id="vendor-sidebar-avatar" aria-hidden="true">V</span>
-        <span>
+        <div style="min-width: 0; flex: 1;">
           <strong id="vendor-sidebar-name">Vendedor</strong>
           <small id="vendor-sidebar-shift-copy">Turno activo</small>
-        </span>
+        </div>
+      </div>
+
+      <!-- Quick Session & Password Actions in Sidebar -->
+      <div class="vendor-sidebar-user-actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: -16px 0 18px;">
+        <button type="button" onclick="openVendorPasswordModal()" class="vendor-sidebar-action-btn" title="Cambiar mi contraseña">
+          <span>🔑</span><span>Clave</span>
+        </button>
+        <button type="button" onclick="vendorLogout()" class="vendor-sidebar-action-btn vendor-sidebar-logout-btn" title="Cerrar sesión">
+          <span>🔒</span><span>Salir</span>
+        </button>
       </div>
 
       <nav class="vendor-side-nav" aria-label="Secciones de trabajo">
@@ -1333,12 +1343,15 @@
             🌙 Modo Oscuro
           </button>
 
-          <div id="vendor-user-status" style="display: flex; align-items: center; gap: 6px;">
-            <span id="active-vendor-display-name" style="background: rgba(195,155,75,0.15); border: 1px solid var(--color-accent-gold); color: var(--color-text-main); padding: 5px 10px; border-radius: 9px; font-weight: 800; font-size: 0.78rem;">
-              🧑‍💼 Vendedor
+          <div id="vendor-user-status" style="display: flex; align-items: center; gap: 8px;">
+            <span id="active-vendor-display-name" style="background: rgba(195,155,75,0.15); border: 1.5px solid var(--color-accent-gold, #c2a246); color: var(--color-text-main, #152d24); padding: 6px 12px; border-radius: 10px; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px;">
+              🧑‍💼 <span id="active-vendor-name-text">Vendedor</span>
             </span>
-            <button type="button" onclick="vendorLogout()" class="btn btn-secondary" style="font-size: 0.74rem; border-color: #ef5350; color: #ef5350; padding: 5px 8px; border-radius: 9px; cursor: pointer;" title="Cerrar sesión">
-              🔒 <span class="no-mobile">Salir</span>
+            <button type="button" onclick="openVendorPasswordModal()" class="vendor-nav-action-btn" title="Cambiar contraseña de acceso">
+              <span>🔑</span><span class="no-mobile">Cambiar Contraseña</span>
+            </button>
+            <button type="button" onclick="vendorLogout()" class="vendor-nav-action-btn vendor-nav-logout-btn" title="Cerrar sesión del vendedor">
+              <span>🔒</span><span>Cerrar Sesión</span>
             </button>
           </div>
 
@@ -4242,6 +4255,22 @@
             </div>
           </button>
 
+          <button type="button" class="vendor-sheet-op-btn" onclick="openVendorPasswordModal(); closeVendorMobileOperationsMenu();">
+            <span class="vendor-sheet-icon">🔑</span>
+            <div>
+              <strong>Cambiar Contraseña</strong>
+              <small>Modificar clave de acceso</small>
+            </div>
+          </button>
+
+          <button type="button" class="vendor-sheet-op-btn" onclick="vendorLogout(); closeVendorMobileOperationsMenu();" style="background: rgba(239,83,80,0.1); border-color: rgba(239,83,80,0.4);">
+            <span class="vendor-sheet-icon">🔒</span>
+            <div>
+              <strong style="color: #ef5350;">Cerrar Sesión</strong>
+              <small>Finalizar turno actual</small>
+            </div>
+          </button>
+
           <button type="button" class="vendor-sheet-op-btn" onclick="if(confirm('¿Querés limpiar todos los datos y ventas de prueba para dejar el local listo para producción?')) { purgeProductionTestData(false); location.reload(); }" style="background: rgba(239,83,80,0.12); border-color: #ef5350;">
             <span class="vendor-sheet-icon">🧹</span>
             <div>
@@ -4268,6 +4297,6 @@
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=pos_mobile_v46"></script>
+  <script src="vendedor.js?v=pos_mobile_v47"></script>
 </body>
 </html>

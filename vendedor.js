@@ -1148,7 +1148,12 @@ function checkVendorAuth() {
   if (activeVendor) {
     if (loginScreen) loginScreen.style.display = 'none';
     if (portalApp) portalApp.style.display = 'block';
-    if (vendorNameHeader) vendorNameHeader.innerHTML = `🧑‍💼 <span style="font-weight: 800; color: #fff;">${activeVendor}</span>`;
+    const activeVendorNameText = document.getElementById('active-vendor-name-text');
+    if (activeVendorNameText) {
+      activeVendorNameText.textContent = activeVendor;
+    } else if (vendorNameHeader) {
+      vendorNameHeader.innerHTML = `🧑‍💼 <span style="font-weight: 800; color: var(--color-text-main, #152d24);">${activeVendor}</span>`;
+    }
     if (vendorCheckoutInput) vendorCheckoutInput.value = activeVendor;
     if (sidebarName) sidebarName.textContent = activeVendor;
     if (sidebarAvatar) sidebarAvatar.textContent = activeVendor.charAt(0).toUpperCase();
