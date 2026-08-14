@@ -3946,6 +3946,85 @@
       <div id="pinfo-modal-footer" style="display: flex; gap: 10px; margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">
         <!-- Populated dynamically -->
       </div>
+  <!-- Modal Cancelar Pedido Web y Restituir Stock -->
+  <div id="modal-cancel-web-order" style="display: none; position: fixed !important; inset: 0 !important; z-index: 999999999 !important; background: rgba(0,0,0,0.85) !important; backdrop-filter: blur(6px) !important; -webkit-backdrop-filter: blur(6px) !important; align-items: center !important; justify-content: center !important; padding: 16px !important; box-sizing: border-box !important;">
+    <div style="max-width: 520px; width: 100%; border-radius: 22px; border: 2px solid #ef5350; background: #1a1e1b; color: #ffffff; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,0.85); margin: auto; position: relative; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box;">
+      
+      <!-- Modal Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid rgba(239,83,80,0.3); padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.4rem;">🚫</span>
+          <div>
+            <h3 style="margin: 0; font-size: 1.15rem; color: #ef5350; font-weight: 800;">Cancelar Pedido Web</h3>
+            <small style="color: rgba(247,246,242,0.8); font-size: 0.78rem;">Restitución automática de stock al catálogo físico y WMS</small>
+          </div>
+        </div>
+        <button type="button" onclick="closeCancelWebOrderModal()" style="background: rgba(255,255,255,0.15); border: none; color: #fff; font-size: 1.2rem; border-radius: 50%; width: 34px; height: 34px; cursor: pointer; display: flex; align-items: center; justify-content: center;" aria-label="Cerrar">✕</button>
+      </div>
+
+      <!-- Modal Body -->
+      <div style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px; padding-right: 4px;">
+        
+        <!-- Order Overview Banner -->
+        <div style="background: rgba(239,83,80,0.12); border: 1px solid rgba(239,83,80,0.3); border-radius: 12px; padding: 12px 14px; font-size: 0.85rem; line-height: 1.4;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span>Pedido: <strong id="cancel-order-id-display" style="color: #ffd54f;">#ORD-...</strong></span>
+            <span id="cancel-order-total-display" style="font-weight: 800; color: #81c784;">$0</span>
+          </div>
+          <div>Cliente: <strong id="cancel-order-client-display">Cliente</strong></div>
+        </div>
+
+        <!-- Restocked Items List -->
+        <div>
+          <label style="display: block; font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: #81c784; margin-bottom: 6px;">
+            🔄 Artículos a Restituir al Stock:
+          </label>
+          <ul id="cancel-order-items-list" style="list-style: none; padding: 0; margin: 0; background: rgba(0,0,0,0.25); border-radius: 10px; padding: 8px 12px; max-height: 120px; overflow-y: auto;">
+            <!-- Rendered dynamically -->
+          </ul>
+        </div>
+
+        <!-- Motivo de cancelación -->
+        <div>
+          <label for="cancel-order-reason-select" style="display: block; font-size: 0.8rem; font-weight: 700; color: #f7f4ea; margin-bottom: 4px;">
+            Motivo de Cancelación *
+          </label>
+          <select id="cancel-order-reason-select" style="width: 100%; padding: 10px; border-radius: 10px; background: #0c1813; border: 1.5px solid rgba(255,255,255,0.25); color: #ffffff; font-size: 0.88rem;">
+            <option value="Cliente no respondió / no envió comprobante">Cliente no respondió / no envió comprobante de pago</option>
+            <option value="Cliente canceló la compra / se arrepintió">Cliente canceló la compra / se arrepintió</option>
+            <option value="Pago rechazado / comprobante falso o inválido">Pago rechazado / comprobante falso o inválido</option>
+            <option value="Sin disponibilidad de entrega en su zona">Sin disponibilidad de entrega a domicilio en su zona</option>
+            <option value="Error en el pedido / pedido duplicado">Error en el pedido / pedido duplicado</option>
+            <option value="Falta de stock o producto dañado">Falta de stock o producto dañado</option>
+            <option value="Otro motivo (especificar obligado)">Otro motivo (especificar obligado)</option>
+          </select>
+        </div>
+
+        <!-- Aclaración y Dictado por voz -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label for="cancel-order-notes-input" style="font-size: 0.8rem; font-weight: 700; color: #f7f4ea;">
+              Aclaración / Detalle (Obligatorio si es 'Otro motivo')
+            </label>
+            <button type="button" id="btn-cancel-voice" onclick="startCancelVoiceDictation()" style="background: rgba(194,162,70,0.25); border: 1px solid #c2a246; color: #ffd54f; padding: 3px 8px; border-radius: 8px; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              🎙️ Dictar por voz
+            </button>
+          </div>
+          <textarea id="cancel-order-notes-input" rows="2" placeholder="Escribí o dictá el motivo de la cancelación..." style="width: 100%; padding: 10px; border-radius: 10px; background: #0c1813; border: 1.5px solid rgba(255,255,255,0.25); color: #ffffff; font-size: 0.85rem; resize: vertical; box-sizing: border-box;"></textarea>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div style="display: flex; gap: 10px; margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">
+        <button type="button" onclick="closeCancelWebOrderModal()" class="btn btn-secondary" style="flex: 1; padding: 10px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: #fff; border-radius: 10px; cursor: pointer; font-size: 0.88rem;">
+          ✕ No cancelar
+        </button>
+        <button type="button" onclick="confirmCancelWebOrder()" style="flex: 1.5; padding: 10px; background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%); border: 1.5px solid #ef5350; color: #fff; font-weight: 800; border-radius: 10px; cursor: pointer; font-size: 0.88rem; box-shadow: 0 4px 12px rgba(211,47,47,0.4);">
+          🔄 Confirmar y Restituir Stock
+        </button>
+      </div>
+
     </div>
   </div>
 
@@ -3963,6 +4042,6 @@
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=retired_products_v39"></script>
+  <script src="vendedor.js?v=retired_products_v40"></script>
 </body>
 </html>

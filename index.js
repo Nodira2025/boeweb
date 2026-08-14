@@ -1441,18 +1441,23 @@ document.addEventListener('DOMContentLoaded', () => {
       bankMsg += `🏷️ *Alias:* ${bankAlias}\n\n`;
       bankMsg += `Al realizar la transferencia, envianos el comprobante por WhatsApp.`;
 
-      alert(`🏦 DATOS PARA TRANSFERENCIA BANCARIA\n\nPedido N°: ${orderId}\nTotal a transferir: $${formatPrice(total)}\n\nBanco: ${bankName}\nTitular: ${bankHolder}\nCBU/CVU: ${bankCbu}\nAlias: ${bankAlias}\n\n¡Al presionar Aceptar se abrirá WhatsApp para enviar tu comprobante!`);
-
       const waPhone = "5493813023185";
       const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(bankMsg)}`;
       
+      // Descontar stock inmediatamente para reserva
+      deductWebOrderStock(newOrder.items, orderId);
+      newOrder.stock_deducted = true;
+
       cart = [];
       localStorage.removeItem('boeweb_cart');
       updateCartBadge();
       appliedCoupon = null;
       localStorage.removeItem('boeweb_applied_coupon');
       closeCheckout();
+      
+      // Abrir WhatsApp en ventana aparte y mostrar comprobante en la web
       window.open(waUrl, '_blank');
+      showWebOrderReceipt(newOrder, waUrl);
       return;
     }
 
@@ -1480,13 +1485,210 @@ document.addEventListener('DOMContentLoaded', () => {
     const waPhone = "5493813023185";
     const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
 
+    // Descontar stock inmediatamente para reserva
+    deductWebOrderStock(newOrder.items, orderId);
+    newOrder.stock_deducted = true;
+
     cart = [];
     localStorage.removeItem('boeweb_cart');
     updateCartBadge();
     appliedCoupon = null;
     localStorage.removeItem('boeweb_applied_coupon');
     closeCheckout();
+
+    // Abrir WhatsApp en ventana aparte y mostrar comprobante interactivo
     window.open(waUrl, '_blank');
+    showWebOrderReceipt(newOrder, waUrl);
+  });
+
+  function deductWebOrderStock(items, orderId) {
+    try {
+      const rawCatalog = JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
+      let catalogChanged = false;
+
+      items.forEach(soldItem => {
+        const code = String(soldItem.product_id || soldItem.id || soldItem.product_code || '');
+        const barcode = String(soldItem.barcode || '');
+        const name = String(soldItem.name || '').toLowerCase();
+        const qty = Math.max(1, Number(soldItem.quantity) || 1);
+
+        if (Array.isArray(rawCatalog)) {
+          const intP = rawCatalog.find(p =>
+            (code && (String(p.id) === code || String(p.product_code) === code)) ||
+            (barcode && p.barcode === barcode) ||
+            (name && p.name && p.name.toLowerCase() === name)
+          );
+          if (intP) {
+            const prev = Number(intP.stock || 0);
+            intP.stock = Math.max(0, prev - qty);
+            intP.available = intP.stock > 0;
+            catalogChanged = true;
+          }
+        }
+
+        try {
+          const rawLocs = JSON.parse(localStorage.getItem('boeweb_product_locations') || '[]');
+          if (Array.isArray(rawLocs)) {
+            const loc = rawLocs.find(l =>
+              (code && (String(l.product_code) === code || String(l.product_id) === code)) ||
+              (barcode && l.barcode === barcode) ||
+              (name && l.name && l.name.toLowerCase() === name)
+            );
+            if (loc) {
+              loc.stock = Math.max(0, Number(loc.stock || 0) - qty);
+              localStorage.setItem('boeweb_product_locations', JSON.stringify(rawLocs));
+            }
+          }
+        } catch (_) {}
+      });
+
+      if (catalogChanged) {
+        localStorage.setItem('boeweb_internal_catalog', JSON.stringify(rawCatalog));
+      }
+    } catch (e) {
+      console.warn('Error al descontar stock en pedido web:', e);
+    }
+  }
+
+  let currentReceiptOrder = null;
+
+  function showWebOrderReceipt(order, waUrl) {
+    currentReceiptOrder = order;
+    const modal = document.getElementById('web-order-receipt-modal');
+    if (!modal) return;
+
+    const idEl = document.getElementById('receipt-order-id');
+    const dateEl = document.getElementById('receipt-date');
+    const nameEl = document.getElementById('receipt-customer-name');
+    const phoneEl = document.getElementById('receipt-customer-phone');
+    const deliveryEl = document.getElementById('receipt-delivery-type');
+    const paymentEl = document.getElementById('receipt-payment-method');
+    const itemsListEl = document.getElementById('receipt-items-list');
+    const subtotalEl = document.getElementById('receipt-subtotal');
+    const discountRow = document.getElementById('receipt-discount-row');
+    const discountLabel = document.getElementById('receipt-discount-label');
+    const discountEl = document.getElementById('receipt-discount');
+    const totalEl = document.getElementById('receipt-total');
+    const waLinkEl = document.getElementById('receipt-whatsapp-link');
+
+    if (idEl) idEl.textContent = order.order_id || order.id;
+    if (dateEl) dateEl.textContent = new Date(order.created_at || order.date).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+    if (nameEl) nameEl.textContent = order.customer_name || order.name || 'Cliente';
+    if (phoneEl) phoneEl.textContent = order.customer_phone || order.phone || '-';
+    if (deliveryEl) {
+      deliveryEl.textContent = order.delivery_type === 'shipping' || order.deliveryType === 'shipping'
+        ? `🚚 Envío a Domicilio: ${order.address || 'Sin especificar'}`
+        : '🏬 Retiro por el Local (BÔ Grow Club)';
+    }
+    if (paymentEl) paymentEl.textContent = order.payment_method || order.paymentMethod || 'Coordinar por WhatsApp';
+
+    if (itemsListEl) {
+      const items = order.items || [];
+      itemsListEl.innerHTML = items.map(it => `
+        <li style="display: flex; justify-content: space-between; align-items: center; font-size: 0.84rem; padding: 4px 0; border-bottom: 1px dashed rgba(255,255,255,0.08);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <img src="${it.image || 'assets/logo.jpg'}" alt="${it.name}" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px; background: #000;" onerror="this.onerror=null;this.src='assets/logo.jpg';">
+            <span><strong>${it.quantity}x</strong> ${it.name}</span>
+          </div>
+          <strong style="color: var(--color-accent-gold);">$${formatPrice(Number(it.price || 0) * Number(it.quantity || 1))}</strong>
+        </li>
+      `).join('');
+    }
+
+    if (subtotalEl) subtotalEl.textContent = `$${formatPrice(order.subtotal || order.total)}`;
+    if (discountRow) {
+      if (order.discount && Number(order.discount) > 0) {
+        discountRow.style.display = 'flex';
+        if (discountLabel) discountLabel.textContent = `Descuento:`;
+        if (discountEl) discountEl.textContent = `-$${formatPrice(order.discount)}`;
+      } else {
+        discountRow.style.display = 'none';
+      }
+    }
+    if (totalEl) totalEl.textContent = `$${formatPrice(order.total || order.total_amount)}`;
+    if (waLinkEl) waLinkEl.href = waUrl;
+
+    modal.style.display = 'flex';
+  }
+
+  function closeWebOrderReceipt() {
+    const modal = document.getElementById('web-order-receipt-modal');
+    if (modal) modal.style.display = 'none';
+  }
+  window.closeWebOrderReceipt = closeWebOrderReceipt;
+
+  function printWebOrderReceipt() {
+    if (!currentReceiptOrder) return;
+    const o = currentReceiptOrder;
+    const itemsHtml = (o.items || []).map(it => `
+      <tr>
+        <td style="padding: 6px; border-bottom: 1px solid #ddd;">${it.quantity}x ${it.name}</td>
+        <td style="padding: 6px; text-align: right; border-bottom: 1px solid #ddd;">$${formatPrice(Number(it.price || 0) * Number(it.quantity || 1))}</td>
+      </tr>
+    `).join('');
+
+    const printContent = `
+      <html>
+        <head>
+          <title>Comprobante de Pre-compra #${o.order_id || o.id} - BÔ Grow Club</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; color: #333; max-width: 500px; margin: auto; }
+            .header { text-align: center; border-bottom: 2px solid #2e7d32; padding-bottom: 12px; margin-bottom: 16px; }
+            .title { font-size: 20px; font-weight: 800; color: #1b5e20; margin: 0; }
+            .sub { font-size: 12px; color: #666; margin-top: 4px; }
+            .info { font-size: 13px; margin-bottom: 16px; line-height: 1.5; background: #f9f9f9; padding: 12px; border-radius: 8px; }
+            table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+            .totals { font-size: 14px; text-align: right; margin-top: 8px; line-height: 1.6; }
+            .badge { display: inline-block; background: #e8f5e9; color: #2e7d32; border: 1px solid #81c784; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 11px; margin-top: 4px; }
+            .note { font-size: 11px; color: #777; margin-top: 24px; text-align: center; border-top: 1px solid #eee; padding-top: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">BÔ GROW CLUB</div>
+            <div class="sub">Comprobante de Pre-compra y Reserva de Stock</div>
+            <span class="badge">RESERVA PENDIENTE DE PAGO / RETIRO</span>
+          </div>
+          <div class="info">
+            <div><strong>Orden:</strong> #${o.order_id || o.id}</div>
+            <div><strong>Fecha:</strong> ${new Date(o.created_at || o.date).toLocaleString('es-AR')}</div>
+            <div><strong>Cliente:</strong> ${o.customer_name || o.name || 'Cliente'}</div>
+            <div><strong>Teléfono:</strong> ${o.customer_phone || o.phone || '-'}</div>
+            <div><strong>Entrega:</strong> ${o.delivery_type === 'shipping' ? `Envío a domicilio (${o.address || ''})` : 'Retiro por el local'}</div>
+            <div><strong>Método de pago:</strong> ${o.payment_method || 'Coordinar por WhatsApp'}</div>
+          </div>
+          <table>
+            <thead>
+              <tr style="background: #eee; font-weight: 700;">
+                <th style="padding: 6px; text-align: left;">Producto</th>
+                <th style="padding: 6px; text-align: right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+          <div class="totals">
+            <div>Subtotal: $${formatPrice(o.subtotal || o.total)}</div>
+            ${o.discount ? `<div style="color: #2e7d32;">Descuento: -$${formatPrice(o.discount)}</div>` : ''}
+            <div style="font-size: 18px; font-weight: 900; margin-top: 6px; color: #1b5e20;">Total Final: $${formatPrice(o.total || o.total_amount)}</div>
+          </div>
+          <div class="note">
+            Presentá este comprobante o envialo a nuestro WhatsApp (+54 9 3813 02-3185) junto con tu comprobante de pago para retirar o coordinar el envío.<br>
+            ¡Muchas gracias por cultivar con BÔ Grow Club!
+          </div>
+        </body>
+      </html>
+    `;
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+      printWin.document.write(printContent);
+      printWin.document.close();
+      printWin.focus();
+      setTimeout(() => { printWin.print(); }, 350);
+    }
+  }
+  window.printWebOrderReceipt = printWebOrderReceipt;
   });
 
   // Global Helper: Add Gift Item to Cart ($0)

@@ -8302,7 +8302,12 @@ function renderWebOrders() {
     let statusBadgeColor = '#ffb74d';
     let statusBg = 'rgba(255,183,77,0.15)';
     const statusLower = status.toLowerCase();
-    if (statusLower.includes('comprobado') || statusLower.includes('pago aprobado') || statusLower.includes('pago verificado') || statusLower.includes('pagado')) {
+    const isCancelled = statusLower.includes('cancelado');
+
+    if (isCancelled) {
+      statusBadgeColor = '#ef5350';
+      statusBg = 'rgba(239,83,80,0.18)';
+    } else if (statusLower.includes('comprobado') || statusLower.includes('pago aprobado') || statusLower.includes('pago verificado') || statusLower.includes('pagado')) {
       statusBadgeColor = '#25d366';
       statusBg = 'rgba(37,211,102,0.18)';
     } else if (statusLower.includes('completado') || statusLower.includes('entregado')) {
@@ -8339,7 +8344,7 @@ function renderWebOrders() {
     const waLink = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(`¡Hola ${customerName}! Te escribimos de BÔ Grow Club respecto a tu pedido #${orderId}.`)}` : '#';
 
     return `
-      <article class="web-order-card" style="background: var(--color-card-bg); border: 1.5px solid var(--color-border-subtle); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; box-shadow: var(--shadow-sm); transition: transform 0.2s ease;">
+      <article class="web-order-card" style="background: var(--color-card-bg); border: 1.5px solid ${isCancelled ? 'rgba(239,83,80,0.4)' : 'var(--color-border-subtle)'}; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; box-shadow: var(--shadow-sm); transition: transform 0.2s ease;">
         <div>
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
             <div>
@@ -8366,6 +8371,15 @@ function renderWebOrders() {
               ${itemsHtml}
             </ul>
           </div>
+
+          ${isCancelled ? `
+            <div style="background: rgba(239,83,80,0.12); border: 1px solid #ef5350; border-radius: 10px; padding: 10px 12px; font-size: 0.82rem; color: #ffcdd2; margin-top: 6px;">
+              <strong style="color: #ef5350; display: block; margin-bottom: 2px;">🚫 Pedido Cancelado (Stock Restituido)</strong>
+              <div><strong>Motivo:</strong> ${escapeStockHtml(order.cancellation_reason || 'Sin especificar')}</div>
+              ${order.cancellation_notes ? `<div><strong>Detalle:</strong> "${escapeStockHtml(order.cancellation_notes)}"</div>` : ''}
+              ${order.cancelled_by ? `<small style="color: rgba(255,255,255,0.6); display: block; margin-top: 2px;">Por: ${escapeStockHtml(order.cancelled_by)}</small>` : ''}
+            </div>
+          ` : ''}
         </div>
 
         <div style="border-top: 1px solid var(--color-border-accent); padding-top: 12px;">
@@ -8374,31 +8388,263 @@ function renderWebOrders() {
             <strong style="font-size: 1.3rem; color: var(--color-accent-gold); font-weight: 900;">$${total.toLocaleString('es-AR')}</strong>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-            <button type="button" class="btn btn-primary" onclick="loadWebOrderToPos('${orderId}')" style="grid-column: 1 / -1; padding: 10px; font-weight: 800; font-size: 0.88rem; background: #2e7d32; border-color: #2e7d32; color: #fff; border-radius: 10px; cursor: pointer;">
-              💳 Pasar a Caja POS / Cobrar
-            </button>
-            <button type="button" class="btn btn-secondary" onclick="updateWebOrderStatus('${orderId}', 'Pago Comprobado')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #25d366; border-color: #25d366; font-weight: 700;">
-              ✅ Pago Comprobado
-            </button>
-            <button type="button" class="btn btn-secondary" onclick="updateWebOrderStatus('${orderId}', 'En Preparación')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer;">
-              📋 En Preparación
-            </button>
-            <button type="button" class="btn btn-secondary" onclick="updateWebOrderStatus('${orderId}', 'Listo para Retiro')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #ab47bc; border-color: #ab47bc;">
-              🟢 Listo para Retiro
-            </button>
-            <button type="button" class="btn btn-secondary" onclick="updateWebOrderStatus('${orderId}', 'Completado')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #66bb6a; border-color: #66bb6a;">
-              ✓ Completado
-            </button>
-            <button type="button" class="btn btn-secondary" onclick="sendWebOrderWhatsApp('${orderId}')" style="grid-column: 1 / -1; padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #25d366; border-color: #25d366;">
-              💬 Notificar WhatsApp
-            </button>
-          </div>
+          ${!isCancelled ? `
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <button type="button" class="btn btn-primary" onclick="loadWebOrderToPos('${orderId}')" style="grid-column: 1 / -1; padding: 10px; font-weight: 800; font-size: 0.88rem; background: #2e7d32; border-color: #2e7d32; color: #fff; border-radius: 10px; cursor: pointer;">
+                💳 Pasar a Caja POS / Cobrar
+              </button>
+              <button type="button" class="btn btn-secondary" onclick="updateWebOrderStatus('${orderId}', 'Pago Comprobado')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #25d366; border-color: #25d366; font-weight: 700;">
+                ✅ Pago Comprobado
+              </button>
+              <button type="button" class="btn btn-secondary" onclick="updateWebOrderStatus('${orderId}', 'En Preparación')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer;">
+                📋 En Preparación
+              </button>
+              <button type="button" class="btn btn-secondary" onclick="updateWebOrderStatus('${orderId}', 'Listo para Retiro')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #ab47bc; border-color: #ab47bc;">
+                🟢 Listo para Retiro
+              </button>
+              <button type="button" class="btn btn-secondary" onclick="updateWebOrderStatus('${orderId}', 'Completado')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #66bb6a; border-color: #66bb6a;">
+                ✓ Completado
+              </button>
+              <button type="button" class="btn btn-secondary" onclick="sendWebOrderWhatsApp('${orderId}')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #25d366; border-color: #25d366;">
+                💬 Notificar WhatsApp
+              </button>
+              <button type="button" class="btn btn-secondary" onclick="openCancelWebOrderModal('${orderId}')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #ef5350; border-color: #ef5350; font-weight: 800;">
+                🚫 Cancelar Pedido
+              </button>
+            </div>
+          ` : `
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn btn-secondary" onclick="sendWebOrderWhatsApp('${orderId}')" style="flex: 1; padding: 8px; font-size: 0.78rem; border-radius: 8px; cursor: pointer; color: #25d366; border-color: #25d366;">
+                💬 Avisar por WhatsApp
+              </button>
+            </div>
+          `}
         </div>
       </article>
     `;
   }).join('');
 }
+
+let currentCancelOrderId = null;
+
+function openCancelWebOrderModal(orderId) {
+  const order = webOrdersList.find(o => (o.id || o.order_id) === orderId);
+  if (!order) {
+    if (window.showToast) window.showToast('⚠️ Pedido no encontrado.');
+    return;
+  }
+
+  currentCancelOrderId = orderId;
+  const modal = document.getElementById('modal-cancel-web-order');
+  if (!modal) return;
+
+  const idEl = document.getElementById('cancel-order-id-display');
+  const clientEl = document.getElementById('cancel-order-client-display');
+  const totalEl = document.getElementById('cancel-order-total-display');
+  const itemsListEl = document.getElementById('cancel-order-items-list');
+  const reasonSelect = document.getElementById('cancel-order-reason-select');
+  const notesTextarea = document.getElementById('cancel-order-notes-input');
+
+  if (idEl) idEl.textContent = order.id || order.order_id;
+  if (clientEl) clientEl.textContent = order.customer_name || order.name || 'Cliente';
+  if (totalEl) totalEl.textContent = `$${Number(order.total_amount || order.total || 0).toLocaleString('es-AR')}`;
+  
+  if (reasonSelect) reasonSelect.value = 'Cliente no respondió / no envió comprobante';
+  if (notesTextarea) notesTextarea.value = '';
+
+  const items = order.items || order.items_json || [];
+  if (itemsListEl) {
+    itemsListEl.innerHTML = items.map(it => `
+      <li style="display: flex; justify-content: space-between; font-size: 0.85rem; padding: 4px 0; border-bottom: 1px dashed rgba(255,255,255,0.1);">
+        <span>📦 <strong>${it.quantity}x</strong> ${it.name}</span>
+        <span style="color: #81c784; font-weight: 700;">+${it.quantity} u. al stock</span>
+      </li>
+    `).join('');
+  }
+
+  modal.style.display = 'flex';
+}
+window.openCancelWebOrderModal = openCancelWebOrderModal;
+
+function closeCancelWebOrderModal() {
+  const modal = document.getElementById('modal-cancel-web-order');
+  if (modal) modal.style.display = 'none';
+  currentCancelOrderId = null;
+}
+window.closeCancelWebOrderModal = closeCancelWebOrderModal;
+
+// Dictado por voz para el motivo de cancelación
+function startCancelVoiceDictation() {
+  const notesTextarea = document.getElementById('cancel-order-notes-input');
+  const voiceBtn = document.getElementById('btn-cancel-voice');
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    if (window.showToast) window.showToast('⚠️ Tu navegador no soporta reconocimiento de voz.');
+    return;
+  }
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SpeechRec();
+  recognition.lang = 'es-AR';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  if (voiceBtn) {
+    voiceBtn.style.background = '#c62828';
+    voiceBtn.textContent = '🔴 Escuchando...';
+  }
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    if (notesTextarea) {
+      notesTextarea.value = notesTextarea.value ? `${notesTextarea.value} ${transcript}` : transcript;
+    }
+    if (window.showToast) window.showToast(`🎙️ Motivo captado: "${transcript}"`);
+  };
+
+  recognition.onerror = () => {
+    if (window.showToast) window.showToast('⚠️ Error al captar audio.');
+  };
+
+  recognition.onend = () => {
+    if (voiceBtn) {
+      voiceBtn.style.background = '';
+      voiceBtn.textContent = '🎙️ Dictar por voz';
+    }
+  };
+
+  recognition.start();
+}
+window.startCancelVoiceDictation = startCancelVoiceDictation;
+
+async function confirmCancelWebOrder() {
+  if (!currentCancelOrderId) return;
+  const order = webOrdersList.find(o => (o.id || o.order_id) === currentCancelOrderId);
+  if (!order) return;
+
+  const reasonSelect = document.getElementById('cancel-order-reason-select');
+  const notesTextarea = document.getElementById('cancel-order-notes-input');
+  const reason = reasonSelect?.value || 'Cancelado por el vendedor';
+  const notes = notesTextarea?.value.trim() || '';
+
+  if (reason.includes('Otro') && !notes) {
+    if (window.showToast) window.showToast('⚠️ Por favor especificá el motivo obligatorio en el campo de texto.');
+    notesTextarea?.focus();
+    return;
+  }
+
+  const vendorName = (typeof getCurrentMapUser === 'function') ? getCurrentMapUser() : (sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor');
+
+  // Restituir stock si estaba descontado (o por defecto si fue generado en la web)
+  if (order.stock_deducted !== false) {
+    const items = order.items || order.items_json || [];
+    items.forEach(item => {
+      const code = String(item.product_id || item.id || item.product_code || '');
+      const barcode = String(item.barcode || '');
+      const name = String(item.name || '').toLowerCase();
+      const qty = Math.max(1, Number(item.quantity) || 1);
+
+      // 1. Catálogo interno
+      if (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts)) {
+        const intP = internalCatalogProducts.find(p => 
+          (code && (String(p.id) === code || String(p.product_code) === code)) ||
+          (barcode && p.barcode === barcode) ||
+          (name && p.name && p.name.toLowerCase() === name)
+        );
+        if (intP) {
+          intP.stock = (Number(intP.stock) || 0) + qty;
+          intP.available = true;
+        }
+      }
+
+      // 2. Ubicaciones físicas locales
+      if (typeof readLocalProductLocations === 'function' && typeof saveLocalProductLocation === 'function') {
+        const locs = readLocalProductLocations();
+        const loc = locs.find(l => 
+          (code && (String(l.product_code) === code || String(l.product_id) === code)) ||
+          (barcode && l.barcode === barcode) ||
+          (name && l.name && l.name.toLowerCase() === name)
+        );
+        if (loc) {
+          loc.stock = (Number(loc.stock) || 0) + qty;
+          saveLocalProductLocation(loc);
+        }
+      }
+
+      // 3. Mapa interactivo
+      if (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) {
+        const mapLoc = window.storeLocationProducts.find(l => 
+          (code && (String(l.product_code) === code || String(l.product_id) === code)) ||
+          (barcode && l.barcode === barcode) ||
+          (name && l.name && l.name.toLowerCase() === name)
+        );
+        if (mapLoc) {
+          mapLoc.stock = (Number(mapLoc.stock) || 0) + qty;
+        }
+      }
+
+      // Registrar auditoría de restitución
+      if (typeof saveRetiredProductAdjustment === 'function') {
+        saveRetiredProductAdjustment({
+          id: `restock_cancel_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          date: new Date().toISOString().slice(0, 10),
+          created_at: new Date().toISOString(),
+          product_id: item.product_id || item.id || '',
+          product_code: item.product_code || '',
+          product_name: item.name || 'Producto Web',
+          barcode: item.barcode || '',
+          type: 'add',
+          quantity: qty,
+          reason: 'restitucion',
+          reason_label: `Restitución: Cancelación Pedido #${order.id || order.order_id}`,
+          notes: `Motivo: ${reason}. Aclaración: ${notes || 'Sin notas'} (Vendedor: ${vendorName})`,
+          vendor_name: vendorName
+        });
+      }
+    });
+
+    order.stock_deducted = false;
+    order.stock_restored = true;
+
+    try {
+      localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
+    } catch (_) {}
+  }
+
+  order.status = 'Cancelado';
+  order.cancellation_reason = reason;
+  order.cancellation_notes = notes;
+  order.cancelled_at = new Date().toISOString();
+  order.cancelled_by = vendorName;
+
+  try {
+    localStorage.setItem('boeweb_web_orders', JSON.stringify(webOrdersList));
+  } catch (_) {}
+
+  if (supabaseClient) {
+    try {
+      await supabaseClient
+        .from('orders')
+        .update({
+          status: 'Cancelado',
+          notes: order.notes ? `${order.notes}\n[CANCELADO]: ${reason} - ${notes}` : `[CANCELADO]: ${reason} - ${notes}`,
+          updated_at: new Date().toISOString()
+        })
+        .eq('order_id', currentCancelOrderId);
+    } catch (sbErr) {
+      console.warn('Aviso al actualizar orden cancelada en Supabase:', sbErr);
+    }
+  }
+
+  closeCancelWebOrderModal();
+  if (window.showToast) window.showToast(`🚫 Pedido #${currentCancelOrderId} cancelado. Stock restituido al inventario.`);
+
+  refreshWebOrdersBadges();
+  renderWebOrders();
+  if (typeof renderInternalCatalogGrid === 'function') renderInternalCatalogGrid();
+  if (typeof renderStockProducts === 'function') renderStockProducts();
+  if (typeof loadStoreMapData === 'function') await loadStoreMapData(true);
+  if (typeof rerenderStoreMap === 'function') rerenderStoreMap();
+}
+window.confirmCancelWebOrder = confirmCancelWebOrder;
 
 function loadWebOrderToPos(orderId) {
   const order = webOrdersList.find(o => (o.id || o.order_id) === orderId);

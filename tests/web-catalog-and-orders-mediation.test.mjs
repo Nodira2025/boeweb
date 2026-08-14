@@ -265,4 +265,65 @@ test('7. Catálogo Web Unificado: Producto con stock 0 sin B2B queda SIN_STOCK y
   assert.equal(canWithdraw, false, 'No debe permitir retiro cuando stock es 0 o excede disponible');
 });
 
+test('8. Cancelación de Pedido Web por Vendedor y Restitución Atómica de Stock con Motivo Auditado', () => {
+  const internalCatalog = [
+    { id: 'PROD-SUST-50', product_code: 'PROD-SUST-50', name: 'Sustrato Light 50L', stock: 10, available: true }
+  ];
+  const locations = [
+    { product_code: 'PROD-SUST-50', shelf_code: 'B-02', stock: 10 }
+  ];
+
+  // 1. Cliente compra 3 unidades por la web -> Stock se descuenta inmediatamente
+  const webOrder = {
+    id: 'ORD-999',
+    order_id: 'ORD-999',
+    customer_name: 'Carlos Benítez',
+    items: [{ product_code: 'PROD-SUST-50', name: 'Sustrato Light 50L', quantity: 3 }],
+    status: 'Pendiente Vendedor',
+    stock_deducted: true
+  };
+
+  // Descuento inmediato
+  internalCatalog[0].stock -= 3;
+  locations[0].stock -= 3;
+  assert.equal(internalCatalog[0].stock, 7);
+  assert.equal(locations[0].stock, 7);
+
+  // 2. El vendedor cancela el pedido por falta de respuesta del cliente
+  const cancellationReason = 'Cliente no respondió / no envió comprobante';
+  const cancellationNotes = 'Se esperó 48hs sin recepción de comprobante de pago.';
+  const vendorName = 'Franco';
+
+  // Simulación de confirmCancelWebOrder
+  if (webOrder.stock_deducted) {
+    webOrder.items.forEach(item => {
+      const p = internalCatalog.find(x => x.product_code === item.product_code);
+      if (p) {
+        p.stock += item.quantity;
+        p.available = true;
+      }
+      const loc = locations.find(x => x.product_code === item.product_code);
+      if (loc) {
+        loc.stock += item.quantity;
+      }
+    });
+    webOrder.stock_deducted = false;
+    webOrder.stock_restored = true;
+  }
+  webOrder.status = 'Cancelado';
+  webOrder.cancellation_reason = cancellationReason;
+  webOrder.cancellation_notes = cancellationNotes;
+  webOrder.cancelled_by = vendorName;
+
+  // 3. Verificaciones
+  assert.equal(internalCatalog[0].stock, 10, 'El stock del catálogo debe restituirse a 10');
+  assert.equal(locations[0].stock, 10, 'El stock físico WMS debe restituirse a 10');
+  assert.equal(webOrder.status, 'Cancelado');
+  assert.equal(webOrder.stock_deducted, false);
+  assert.equal(webOrder.stock_restored, true);
+  assert.equal(webOrder.cancellation_reason, 'Cliente no respondió / no envió comprobante');
+  assert.match(webOrder.cancellation_notes, /48hs/);
+  assert.equal(webOrder.cancelled_by, 'Franco');
+});
+
 
