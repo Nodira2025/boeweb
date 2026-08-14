@@ -5684,6 +5684,36 @@ function normalizeInternalCatalogProduct(supplier, product, draft, location) {
   };
 }
 
+const DELETED_INTERNAL_PRODUCTS_KEY = 'boeweb_deleted_internal_product_ids_v1';
+
+function getDeletedInternalProductIds() {
+  try {
+    const list = JSON.parse(localStorage.getItem(DELETED_INTERNAL_PRODUCTS_KEY) || '[]');
+    return new Set(Array.isArray(list) ? list.map(s => String(s).trim().toLowerCase()) : []);
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function addDeletedInternalProductIds(ids) {
+  try {
+    const set = getDeletedInternalProductIds();
+    (Array.isArray(ids) ? ids : [ids]).filter(Boolean).forEach(id => set.add(String(id).trim().toLowerCase()));
+    localStorage.setItem(DELETED_INTERNAL_PRODUCTS_KEY, JSON.stringify(Array.from(set)));
+  } catch (_) {}
+}
+
+function isProductTombstoned(idOrCode) {
+  if (!idOrCode) return false;
+  const clean = String(idOrCode).trim().toLowerCase();
+  const set = getDeletedInternalProductIds();
+  return set.has(clean);
+}
+
+window.getDeletedInternalProductIds = getDeletedInternalProductIds;
+window.addDeletedInternalProductIds = addDeletedInternalProductIds;
+window.isProductTombstoned = isProductTombstoned;
+
 async function loadInternalCatalog() {
   const grid = document.getElementById('internal-catalog-grid');
   if (grid) {
@@ -5699,7 +5729,14 @@ async function loadInternalCatalog() {
         .order('name', { ascending: true });
       if (error) throw new Error(error.message);
 
-      const rows = supplierRows || [];
+      const deletedIds = getDeletedInternalProductIds();
+      const rawRows = supplierRows || [];
+      const rows = rawRows.filter(supplier => {
+        const pId = String(supplier.mapped_product_id || supplier.supplier_product_id || '').toLowerCase();
+        const sId = String(supplier.id || '').toLowerCase();
+        return !deletedIds.has(pId) && !deletedIds.has(sId);
+      });
+
       const productIds = internalCatalogProductIds(rows);
       const related = await fetchInternalCatalogRelations(productIds);
       const productsById = new Map(related.products.map(product => [String(product.id), product]));
@@ -5714,6 +5751,10 @@ async function loadInternalCatalog() {
           draftsByCode.get(productId),
           locationsByCode.get(productId)
         );
+      }).filter(p => {
+        const pId = String(p.id || '').toLowerCase();
+        const sId = String(p.supplierRowId || '').toLowerCase();
+        return !deletedIds.has(pId) && !deletedIds.has(sId);
       });
 
       try {
@@ -5723,7 +5764,13 @@ async function loadInternalCatalog() {
       const cached = localStorage.getItem('boeweb_internal_catalog');
       if (cached) {
         try {
-          internalCatalogProducts = JSON.parse(cached);
+          const parsed = JSON.parse(cached);
+          const deletedIds = getDeletedInternalProductIds();
+          internalCatalogProducts = (Array.isArray(parsed) ? parsed : []).filter(p => {
+            const pId = String(p.id || '').toLowerCase();
+            const sId = String(p.supplierRowId || '').toLowerCase();
+            return !deletedIds.has(pId) && !deletedIds.has(sId);
+          });
         } catch (_) {}
       }
     }
@@ -5738,7 +5785,13 @@ async function loadInternalCatalog() {
     const cached = localStorage.getItem('boeweb_internal_catalog');
     if (cached) {
       try {
-        internalCatalogProducts = JSON.parse(cached);
+        const parsed = JSON.parse(cached);
+        const deletedIds = getDeletedInternalProductIds();
+        internalCatalogProducts = (Array.isArray(parsed) ? parsed : []).filter(p => {
+          const pId = String(p.id || '').toLowerCase();
+          const sId = String(p.supplierRowId || '').toLowerCase();
+          return !deletedIds.has(pId) && !deletedIds.has(sId);
+        });
       } catch (_) {}
     }
     if (grid) {
@@ -5864,7 +5917,12 @@ function logSecureAuditEvent({
 window.logSecureAuditEvent = logSecureAuditEvent;
 
 function getFilteredInternalCatalogProducts() {
+  const deletedIds = getDeletedInternalProductIds();
   return internalCatalogProducts.filter(product => {
+    const pId = String(product.id || '').toLowerCase();
+    const sId = String(product.supplierRowId || '').toLowerCase();
+    if (deletedIds.has(pId) || deletedIds.has(sId)) return false;
+
     const matchesCategory = internalCatalogFilterCategory === 'all' || product.category === internalCatalogFilterCategory;
     const searchText = [product.name, product.brand, product.presentation, product.category, product.id, product.barcode].filter(Boolean).join(' ').toLowerCase();
     const matchesSearch = !internalCatalogFilterQuery || searchText.includes(internalCatalogFilterQuery);
@@ -5944,7 +6002,7 @@ async function deleteSingleInternalCatalogProduct(productId) {
     return;
   }
 
-  const product = internalCatalogProducts.find(p => String(p.id) === String(productId));
+  const product = internalCatalogProducts.find(p => String(p.id) === String(productId) || String(p.supplierRowId) === String(productId));
   if (!product) {
     showToast('❌ Producto no encontrado en el catálogo.');
     return;
@@ -5953,26 +6011,71 @@ async function deleteSingleInternalCatalogProduct(productId) {
   const confirmMsg = `¿Confirmás la eliminación de "${product.name}"?\n\nEsta acción quitará el producto del catálogo y quedará registrada en la bitácora de auditoría.${!isAdmin ? `\n(Te quedarán ${remaining - 1} eliminaciones de tu cupo).` : ''}`;
   if (!confirm(confirmMsg)) return;
 
-  // 1. Quitar de la lista local y persistir
-  internalCatalogProducts = internalCatalogProducts.filter(p => String(p.id) !== String(productId));
-  selectedInternalCatalogIds.delete(String(productId));
+  const targetId = String(product.id);
+  const supplierRowId = product.supplierRowId ? String(product.supplierRowId) : null;
+  const draftId = product.draftId ? String(product.draftId) : null;
+  const barcode = product.barcode ? String(product.barcode) : null;
+
+  // 1. Guardar en Tombstone permanente
+  addDeletedInternalProductIds([targetId, supplierRowId, draftId, barcode]);
+
+  // 2. Quitar del array local y cache
+  internalCatalogProducts = internalCatalogProducts.filter(p => 
+    String(p.id) !== targetId && 
+    String(p.supplierRowId || '') !== targetId &&
+    (!supplierRowId || String(p.supplierRowId || '') !== supplierRowId)
+  );
+  selectedInternalCatalogIds.delete(targetId);
   localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
 
-  // 2. Quitar de Supabase si está conectado
+  // 3. Quitar de las ubicaciones físicas locales (WMS / Tienda local)
+  try {
+    const locs = readLocalProductLocations().filter(l => 
+      String(l.product_code || '') !== targetId && 
+      String(l.product_id || '') !== targetId &&
+      (!barcode || String(l.barcode || '') !== barcode)
+    );
+    localStorage.setItem(LOCAL_PRODUCT_LOCATIONS_KEY, JSON.stringify(locs));
+  } catch (_) {}
+
+  // 4. Quitar del mapa interactivo
+  if (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) {
+    window.storeLocationProducts = window.storeLocationProducts.filter(l => 
+      String(l.product_code || '') !== targetId && 
+      String(l.product_id || '') !== targetId &&
+      (!barcode || String(l.barcode || '') !== barcode)
+    );
+  }
+
+  // 5. Quitar de Supabase en todas las tablas vinculadas
   if (supabaseClient) {
     try {
-      await supabaseClient.from('products').delete().eq('id', productId);
+      // a. supplier_products (es de donde lee el catálogo interno)
+      await supabaseClient
+        .from('supplier_products')
+        .delete()
+        .eq('supplier_id', 'local_store')
+        .or(`supplier_product_id.eq.${targetId},mapped_product_id.eq.${targetId}${supplierRowId ? `,id.eq.${supplierRowId}` : ''}`);
+
+      // b. product_drafts
+      if (draftId) {
+        await supabaseClient.from('product_drafts').delete().eq('id', draftId);
+      }
+      await supabaseClient.from('product_drafts').delete().eq('product_code', targetId);
+
+      // c. products
+      await supabaseClient.from('products').delete().eq('id', targetId);
     } catch (err) {
-      console.warn('Error eliminando en Supabase products:', err);
+      console.warn('Aviso eliminando en Supabase:', err);
     }
   }
 
-  // 3. Incrementar cuota del usuario
+  // 6. Incrementar cuota del usuario
   if (!isAdmin) {
     incrementUserCatalogDeletionCount(activeVendor, 1);
   }
 
-  // 4. Registrar en la Bitácora de Auditoría
+  // 7. Registrar en la Bitácora de Auditoría
   logSecureAuditEvent({
     event_type: 'PRODUCT_DELETED',
     category: 'CATALOG',
@@ -5980,9 +6083,11 @@ async function deleteSingleInternalCatalogProduct(productId) {
     actor_name: activeVendor,
     description: `Eliminación de producto individual: "${product.name}" (${product.category || 'Sin categoría'}, $${product.price}, Stock: ${product.stock} u.)`,
     entity_type: 'product',
-    entity_id: productId,
+    entity_id: targetId,
     details: {
-      id: product.id,
+      id: targetId,
+      supplierRowId,
+      draftId,
       name: product.name,
       brand: product.brand,
       category: product.category,
@@ -6019,12 +6124,20 @@ async function deleteSelectedInternalCatalogProducts() {
   if (!confirm(confirmMsg)) return;
 
   const deletedProductsDetails = [];
+  const targetIdsToDelete = [];
+  const supplierRowIdsToDelete = [];
+  const draftIdsToDelete = [];
+  const barcodesToDelete = [];
 
-  // 1. Filtrar y eliminar
+  // 1. Filtrar y recolectar identificadores
   internalCatalogProducts = internalCatalogProducts.filter(p => {
-    if (selectedInternalCatalogIds.has(String(p.id))) {
+    const pId = String(p.id);
+    const sId = p.supplierRowId ? String(p.supplierRowId) : null;
+    if (selectedInternalCatalogIds.has(pId) || (sId && selectedInternalCatalogIds.has(sId))) {
       deletedProductsDetails.push({
         id: p.id,
+        supplierRowId: p.supplierRowId,
+        draftId: p.draftId,
         name: p.name,
         brand: p.brand,
         category: p.category,
@@ -6032,28 +6145,89 @@ async function deleteSelectedInternalCatalogProducts() {
         stock: p.stock,
         barcode: p.barcode
       });
+      targetIdsToDelete.push(pId);
+      if (sId) supplierRowIdsToDelete.push(sId);
+      if (p.draftId) draftIdsToDelete.push(String(p.draftId));
+      if (p.barcode) barcodesToDelete.push(String(p.barcode));
       return false;
     }
     return true;
   });
 
+  const allTombstoneIds = [...targetIdsToDelete, ...supplierRowIdsToDelete, ...draftIdsToDelete, ...barcodesToDelete];
+  addDeletedInternalProductIds(allTombstoneIds);
+
   localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
 
-  // 2. Borrar en Supabase
+  // 2. Limpiar de ubicaciones locales
+  try {
+    const delSet = new Set(allTombstoneIds.map(s => s.toLowerCase()));
+    const locs = readLocalProductLocations().filter(l => 
+      !delSet.has(String(l.product_code || '').toLowerCase()) && 
+      !delSet.has(String(l.product_id || '').toLowerCase()) &&
+      (!l.barcode || !delSet.has(String(l.barcode).toLowerCase()))
+    );
+    localStorage.setItem(LOCAL_PRODUCT_LOCATIONS_KEY, JSON.stringify(locs));
+  } catch (_) {}
+
+  // 3. Limpiar del mapa interactivo
+  if (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) {
+    const delSet = new Set(allTombstoneIds.map(s => s.toLowerCase()));
+    window.storeLocationProducts = window.storeLocationProducts.filter(l => 
+      !delSet.has(String(l.product_code || '').toLowerCase()) && 
+      !delSet.has(String(l.product_id || '').toLowerCase()) &&
+      (!l.barcode || !delSet.has(String(l.barcode).toLowerCase()))
+    );
+  }
+
+  // 4. Borrar en Supabase en todas las tablas
   if (supabaseClient) {
     try {
-      await supabaseClient.from('products').delete().in('id', selectedList);
+      // a. supplier_products
+      if (targetIdsToDelete.length > 0) {
+        await supabaseClient
+          .from('supplier_products')
+          .delete()
+          .eq('supplier_id', 'local_store')
+          .in('supplier_product_id', targetIdsToDelete);
+
+        await supabaseClient
+          .from('supplier_products')
+          .delete()
+          .eq('supplier_id', 'local_store')
+          .in('mapped_product_id', targetIdsToDelete);
+      }
+      if (supplierRowIdsToDelete.length > 0) {
+        await supabaseClient
+          .from('supplier_products')
+          .delete()
+          .eq('supplier_id', 'local_store')
+          .in('id', supplierRowIdsToDelete);
+      }
+
+      // b. product_drafts
+      if (draftIdsToDelete.length > 0) {
+        await supabaseClient.from('product_drafts').delete().in('id', draftIdsToDelete);
+      }
+      if (targetIdsToDelete.length > 0) {
+        await supabaseClient.from('product_drafts').delete().in('product_code', targetIdsToDelete);
+      }
+
+      // c. products
+      if (targetIdsToDelete.length > 0) {
+        await supabaseClient.from('products').delete().in('id', targetIdsToDelete);
+      }
     } catch (err) {
       console.warn('Error bulk deleting from Supabase:', err);
     }
   }
 
-  // 3. Incrementar cuota
+  // 5. Incrementar cuota
   if (!isAdmin) {
     incrementUserCatalogDeletionCount(activeVendor, selectedList.length);
   }
 
-  // 4. Registrar en Auditoría
+  // 6. Registrar en Auditoría
   logSecureAuditEvent({
     event_type: 'PRODUCT_BULK_DELETED',
     category: 'CATALOG',

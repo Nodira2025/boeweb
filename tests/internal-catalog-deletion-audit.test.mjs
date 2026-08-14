@@ -172,3 +172,13 @@ test('5. Admin Investigation & Audit Modal is restricted and properly defined in
   assert.match(vendedorJs, /handleAdminAuditUnlock/, 'Debe existir la validación de contraseña de administrador');
   assert.match(vendedorJs, /exportAdminAuditLogJSON/, 'Debe existir la función de exportar auditoría a JSON');
 });
+
+test('6. Tombstone persistence and multi-table deletion prevents reappearance on refresh', () => {
+  assert.match(vendedorJs, /boeweb_deleted_internal_product_ids_v1/, 'Debe usar el tombstone key persistente');
+  assert.match(vendedorJs, /getDeletedInternalProductIds/, 'Debe existir getDeletedInternalProductIds');
+  assert.match(vendedorJs, /addDeletedInternalProductIds/, 'Debe existir addDeletedInternalProductIds');
+  assert.match(vendedorJs, /\.from\('supplier_products'\)\s*\.delete\(\)/, 'Debe eliminar de supplier_products');
+  assert.match(vendedorJs, /\.from\('product_drafts'\)\s*\.delete\(\)/, 'Debe eliminar de product_drafts');
+  assert.match(vendedorJs, /\.from\('products'\)\s*\.delete\(\)/, 'Debe eliminar de products');
+});
+
