@@ -9023,6 +9023,33 @@ function playScannerBeep() {
 
 async function openUniversalCameraScanner(mode = 'pos') {
   universalCameraActiveMode = mode;
+
+  // Detect mobile: touchscreen + small viewport or mobile user agent
+  const isMobile = (('ontouchstart' in window) || navigator.maxTouchPoints > 0) &&
+    (window.innerWidth < 900 || /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+
+  if (isMobile) {
+    // On mobile, skip the modal entirely and trigger the native camera app
+    // This is the most reliable way — no WebRTC permissions, no getUserMedia, no CDN dependency
+    let fileInput = document.getElementById('mobile-camera-barcode-input');
+    if (!fileInput) {
+      fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.id = 'mobile-camera-barcode-input';
+      fileInput.accept = 'image/*';
+      fileInput.capture = 'environment';
+      fileInput.style.display = 'none';
+      fileInput.addEventListener('change', (evt) => {
+        handleCameraScannerFile(evt);
+      });
+      document.body.appendChild(fileInput);
+    }
+    fileInput.value = '';
+    fileInput.click();
+    return;
+  }
+
+  // Desktop: show the full modal with live video stream
   const modal = document.getElementById('modal-universal-camera-scanner');
   const titleEl = document.getElementById('camera-scanner-modal-title');
   const hintEl = document.getElementById('camera-scanner-modal-hint');
@@ -9052,7 +9079,7 @@ async function openUniversalCameraScanner(mode = 'pos') {
   } catch (err) {
     console.error('Error starting camera reader:', err);
     if (feedbackEl) {
-      feedbackEl.innerHTML = '<span style="color: #ff8a80;">⚠️ No se pudo iniciar la cámara en vivo. Podés usar el botón "📁 Subir foto" para tomar una foto del código.</span>';
+      feedbackEl.innerHTML = '<span style="color: #ff8a80;">⚠️ No se pudo iniciar la cámara. Probá con el botón "📸 Sacar foto al código".</span>';
     }
   }
 }
