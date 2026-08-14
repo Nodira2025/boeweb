@@ -52,6 +52,12 @@ let currentExpirationsFilter = 'all';
 let activeNearbyStoreFilter = 'all';
 let currentSelectedCcId = null;
 
+// Retired products & stock adjustment state (hoisted)
+let retiredProductsFilterReason = 'all';
+let retiredProductsSearchQuery = '';
+let currentStockAdjustmentProduct = null;
+let currentStockAdjustmentAction = 'remove';
+
 // Supplier display names mapping
 const supplierNames = {
   'astrogrow': 'AstroGrow',
@@ -1288,11 +1294,12 @@ function switchVendorTab(tab) {
   const vcardWebOrders = document.getElementById('vcard-weborders');
   const vcardExpirations = document.getElementById('vcard-expirations');
   const vcardNearbyStores = document.getElementById('vcard-nearbystores');
+  const vcardRetired = document.getElementById('vcard-retired');
 
   const allBtns = [btnCatalog, btnMap, btnScan];
   allBtns.forEach(btn => { if (btn) btn.classList.remove('active'); });
 
-  const allCards = [vcardPos, vcardCatalog, vcardPortfolio, vcardCash, vcardMap, vcardScan, vcardFastUpload, vcardLocationAssistant, vcardDraftsReview, vcardInternalCatalog, vcardWebOrders, vcardExpirations, vcardNearbyStores];
+  const allCards = [vcardPos, vcardCatalog, vcardPortfolio, vcardCash, vcardMap, vcardScan, vcardFastUpload, vcardLocationAssistant, vcardDraftsReview, vcardInternalCatalog, vcardWebOrders, vcardExpirations, vcardNearbyStores, vcardRetired];
   allCards.forEach(card => {
     if (card) {
       card.style.borderColor = 'rgba(255,255,255,0.15)';
@@ -1315,6 +1322,8 @@ function switchVendorTab(tab) {
   if (expirationsSection) expirationsSection.style.display = 'none';
   const nearbyStoresSection = document.getElementById('vendor-nearby-stores-section');
   if (nearbyStoresSection) nearbyStoresSection.style.display = 'none';
+  const retiredSection = document.getElementById('vendor-retired-products-section');
+  if (retiredSection) retiredSection.style.display = 'none';
   const wmsSection = document.getElementById('vendor-wms-inventory-section');
   if (wmsSection) wmsSection.style.display = 'none';
   const tenantProfileSection = document.getElementById('vendor-tenant-profile-section');
@@ -1467,6 +1476,18 @@ function switchVendorTab(tab) {
       vcardNearbyStores.style.transform = 'scale(1.02)';
     }
     renderNearbyStoresSection();
+  } else if (tab === 'retired-products' || tab === 'retired' || tab === 'mermas') {
+    const retSection = document.getElementById('vendor-retired-products-section');
+    if (retSection) {
+      retSection.style.display = 'block';
+      targetSection = retSection;
+    }
+    const vcardRet = document.getElementById('vcard-retired');
+    if (vcardRet) {
+      vcardRet.style.borderColor = '#c2a246';
+      vcardRet.style.transform = 'scale(1.02)';
+    }
+    renderRetiredProductsUI();
   } else if (tab === 'wms-inventory' || tab === 'wms') {
     if (wmsSection) {
       wmsSection.style.display = 'block';
@@ -1895,6 +1916,15 @@ function renderStoreMapLocationCard(info) {
           <img src="${escapeFn(info.shelfPhoto)}" alt="Foto del estante" style="max-height: 180px; width: auto; max-width: 100%; border-radius: 10px; border: 1.5px solid #c2a246; object-fit: cover;">
         </div>
       ` : ''}
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+        <button type="button" onclick="openStockAdjustmentModal('${escapeFn(info.productBarcode || info.productName || info.rawCode)}', 'add')" style="padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; background: rgba(76,175,80,0.2); border: 1.5px solid #81c784; color: #a5d6a7; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          ➕ Agregar stock
+        </button>
+        <button type="button" onclick="openStockAdjustmentModal('${escapeFn(info.productBarcode || info.productName || info.rawCode)}', 'remove')" style="padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; background: rgba(239,83,80,0.2); border: 1.5px solid #ef5350; color: #ef9a9a; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          ➖ Quitar stock
+        </button>
+      </div>
 
       <div>
         <button type="button" onclick="closeStoreMapLocationCard()" style="width: 100%; min-height: 52px; padding: 14px 20px; font-size: 1.05rem; font-weight: 900; background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: #ffffff; border: 2px solid #81c784; border-radius: 14px; cursor: pointer; box-shadow: 0 6px 20px rgba(46,125,50,0.45); display: flex; align-items: center; justify-content: center; gap: 10px;">
@@ -9853,6 +9883,506 @@ window.generateAndPrintCcPdf = generateAndPrintCcPdf;
 window.handlePosPaymentMethodChange = handlePosPaymentMethodChange;
 window.updatePosCurrentAccountInfo = updatePosCurrentAccountInfo;
 
+/* ==========================================================================
+   PRODUCTOS RETIRADOS & AJUSTES DE STOCK (MERMAS, ROTURAS, VENCIMIENTOS)
+   ========================================================================== */
+
+const RETIRED_PRODUCTS_STORAGE_KEY = 'boeweb_retired_products_history_v1';
+
+function getRetiredProductsHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(RETIRED_PRODUCTS_STORAGE_KEY) || '[]');
+  } catch (err) {
+    return [];
+  }
+}
+
+function saveRetiredProductAdjustment(adjustment) {
+  const history = getRetiredProductsHistory();
+  history.unshift(adjustment);
+  localStorage.setItem(RETIRED_PRODUCTS_STORAGE_KEY, JSON.stringify(history));
+  return history;
+}
+
+function openStockAdjustmentModal(productIdentifier = null, actionType = 'remove') {
+  currentStockAdjustmentAction = actionType === 'add' ? 'add' : 'remove';
+  const modal = document.getElementById('modal-stock-adjustment');
+  const form = document.getElementById('stock-adjustment-form');
+  if (form) form.reset();
+
+  const dateInput = document.getElementById('adjustment-date');
+  if (dateInput) {
+    dateInput.value = new Date().toISOString().slice(0, 10);
+  }
+
+  setAdjustmentAction(currentStockAdjustmentAction);
+
+  const reasonSelect = document.getElementById('adjustment-reason');
+  if (reasonSelect) {
+    reasonSelect.value = currentStockAdjustmentAction === 'add' ? 'otro' : 'vendido';
+  }
+
+  const voiceStatus = document.getElementById('adjustment-voice-status');
+  if (voiceStatus) voiceStatus.textContent = '';
+
+  const allProducts = [...(internalCatalogProducts || []), ...(storeLocationProducts || []), ...(baseProducts || [])];
+  let found = null;
+  if (productIdentifier) {
+    const raw = String(productIdentifier).trim().toLowerCase();
+    found = allProducts.find(p => 
+      (p.barcode && p.barcode.toLowerCase() === raw) ||
+      (p.product_code && p.product_code.toLowerCase() === raw) ||
+      (p.name && p.name.toLowerCase().includes(raw)) ||
+      (p.id && String(p.id).toLowerCase() === raw) ||
+      (p.wms_code && p.wms_code.toLowerCase() === raw) ||
+      (p.location && p.location.toLowerCase().includes(raw))
+    );
+  }
+
+  const nameEl = document.getElementById('adjustment-product-name');
+  const metaEl = document.getElementById('adjustment-product-meta');
+  const stockEl = document.getElementById('adjustment-product-current-stock');
+  const idInput = document.getElementById('adjustment-product-id');
+  const codeInput = document.getElementById('adjustment-product-code');
+  const dropdownContainer = document.getElementById('adjustment-product-selector-container');
+  const dropdown = document.getElementById('adjustment-product-select-dropdown');
+
+  if (found) {
+    currentStockAdjustmentProduct = found;
+    if (nameEl) nameEl.textContent = found.name;
+    if (metaEl) metaEl.textContent = `SKU: ${found.product_code || found.id} · Ubicación: ${found.location_label || found.location || found.shelf_code || 'Sin asignar'}`;
+    const currentStock = Math.max(0, Number(found.stock ?? found.on_hand) || 0);
+    if (stockEl) stockEl.textContent = `${currentStock} u.`;
+    if (idInput) idInput.value = found.id || '';
+    if (codeInput) codeInput.value = found.product_code || found.barcode || '';
+    if (dropdownContainer) dropdownContainer.style.display = 'none';
+  } else {
+    currentStockAdjustmentProduct = null;
+    if (dropdownContainer) {
+      dropdownContainer.style.display = 'block';
+      if (dropdown) {
+        dropdown.innerHTML = '<option value="">-- Seleccionar un producto del local --</option>' + 
+          allProducts.map(p => `<option value="${p.id || p.product_code}">${p.name} (Stock: ${p.stock || 0} u.)</option>`).join('');
+      }
+    }
+    if (nameEl) nameEl.textContent = 'Seleccioná un producto de la lista';
+    if (metaEl) metaEl.textContent = 'SKU: - · Ubicación: -';
+    if (stockEl) stockEl.textContent = '- u.';
+    if (idInput) idInput.value = '';
+    if (codeInput) codeInput.value = '';
+  }
+
+  if (modal) modal.style.display = 'flex';
+}
+
+function handleAdjustmentProductDropdownChange(val) {
+  if (!val) return;
+  const allProducts = [...(internalCatalogProducts || []), ...(storeLocationProducts || []), ...(baseProducts || [])];
+  const found = allProducts.find(p => String(p.id) === String(val) || p.product_code === val);
+  if (found) {
+    currentStockAdjustmentProduct = found;
+    const nameEl = document.getElementById('adjustment-product-name');
+    const metaEl = document.getElementById('adjustment-product-meta');
+    const stockEl = document.getElementById('adjustment-product-current-stock');
+    const idInput = document.getElementById('adjustment-product-id');
+    const codeInput = document.getElementById('adjustment-product-code');
+    if (nameEl) nameEl.textContent = found.name;
+    if (metaEl) metaEl.textContent = `SKU: ${found.product_code || found.id} · Ubicación: ${found.location_label || found.location || found.shelf_code || 'Sin asignar'}`;
+    const currentStock = Math.max(0, Number(found.stock ?? found.on_hand) || 0);
+    if (stockEl) stockEl.textContent = `${currentStock} u.`;
+    if (idInput) idInput.value = found.id || '';
+    if (codeInput) codeInput.value = found.product_code || found.barcode || '';
+  }
+}
+
+function closeStockAdjustmentModal() {
+  const modal = document.getElementById('modal-stock-adjustment');
+  if (modal) modal.style.display = 'none';
+  currentStockAdjustmentProduct = null;
+}
+
+function setAdjustmentAction(action) {
+  currentStockAdjustmentAction = action === 'add' ? 'add' : 'remove';
+  const typeInput = document.getElementById('adjustment-action-type');
+  if (typeInput) typeInput.value = currentStockAdjustmentAction;
+
+  const btnRemove = document.getElementById('adj-btn-remove');
+  const btnAdd = document.getElementById('adj-btn-add');
+  const title = document.getElementById('adjustment-modal-title');
+  const subtitle = document.getElementById('adjustment-modal-subtitle');
+  const icon = document.getElementById('adjustment-modal-icon');
+  const submitBtn = document.getElementById('adjustment-submit-btn');
+
+  if (currentStockAdjustmentAction === 'remove') {
+    if (btnRemove) {
+      btnRemove.style.border = '2px solid #ef5350';
+      btnRemove.style.background = 'rgba(239,83,80,0.25)';
+      btnRemove.style.color = '#ffffff';
+    }
+    if (btnAdd) {
+      btnAdd.style.border = '2px solid rgba(255,255,255,0.2)';
+      btnAdd.style.background = 'rgba(0,0,0,0.2)';
+      btnAdd.style.color = 'rgba(255,255,255,0.7)';
+    }
+    if (title) title.textContent = 'Retirar Producto / Baja de Stock';
+    if (subtitle) subtitle.textContent = 'Registrar salida por venta, rotura, vencimiento u otro';
+    if (icon) icon.textContent = '🗑️';
+    if (submitBtn) {
+      submitBtn.textContent = '💾 Confirmar Retiro';
+      submitBtn.style.background = 'linear-gradient(135deg, #c62828 0%, #8e0000 100%)';
+      submitBtn.style.borderColor = '#ef5350';
+      submitBtn.style.color = '#ffffff';
+    }
+  } else {
+    if (btnAdd) {
+      btnAdd.style.border = '2px solid #81c784';
+      btnAdd.style.background = 'rgba(76,175,80,0.25)';
+      btnAdd.style.color = '#ffffff';
+    }
+    if (btnRemove) {
+      btnRemove.style.border = '2px solid rgba(255,255,255,0.2)';
+      btnRemove.style.background = 'rgba(0,0,0,0.2)';
+      btnRemove.style.color = 'rgba(255,255,255,0.7)';
+    }
+    if (title) title.textContent = 'Agregar Más Stock al Inventario';
+    if (subtitle) subtitle.textContent = 'Ingresar unidades por reposición, conteo o devolución';
+    if (icon) icon.textContent = '📥';
+    if (submitBtn) {
+      submitBtn.textContent = '💾 Confirmar Ingreso de Stock';
+      submitBtn.style.background = 'linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%)';
+      submitBtn.style.borderColor = '#81c784';
+      submitBtn.style.color = '#ffffff';
+    }
+  }
+}
+
+function adjustAdjustmentQty(delta) {
+  const input = document.getElementById('adjustment-quantity');
+  if (!input) return;
+  const current = Math.max(1, parseInt(input.value, 10) || 1);
+  const next = Math.max(1, current + delta);
+  input.value = next;
+}
+
+function handleAdjustmentReasonChange() {
+  const reasonSelect = document.getElementById('adjustment-reason');
+  const notesTextarea = document.getElementById('adjustment-notes');
+  if (!reasonSelect || !notesTextarea) return;
+  const val = reasonSelect.value;
+  if (val === 'otro' && !notesTextarea.value.trim()) {
+    notesTextarea.placeholder = 'Especificá el motivo aquí (ej: donación, muestra comercial, consumo del local)...';
+    notesTextarea.focus();
+  }
+}
+
+function startStockAdjustmentDictation() {
+  const statusEl = document.getElementById('adjustment-voice-status');
+  const voiceBtn = document.getElementById('adjustment-voice-btn');
+  const textarea = document.getElementById('adjustment-notes');
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert('Tu navegador no tiene activado el dictado por voz. Podés escribir en el cuadro de texto.');
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'es-AR';
+  recognition.interimResults = false;
+
+  if (statusEl) statusEl.textContent = '🎙️ Escuchando... Hablá ahora con claridad.';
+  if (voiceBtn) {
+    voiceBtn.style.background = '#ef5350';
+    voiceBtn.style.color = '#fff';
+  }
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    if (textarea) {
+      const existing = textarea.value.trim();
+      textarea.value = existing ? `${existing}. ${transcript}` : transcript;
+    }
+    if (statusEl) statusEl.textContent = `✅ Dictado: "${transcript}"`;
+  };
+
+  recognition.onerror = () => {
+    if (statusEl) statusEl.textContent = '⚠️ No pudimos capturar el audio. Intentá de nuevo.';
+  };
+
+  recognition.onend = () => {
+    if (voiceBtn) {
+      voiceBtn.style.background = 'rgba(194,162,70,0.2)';
+      voiceBtn.style.color = '#ffd54f';
+    }
+    setTimeout(() => {
+      if (statusEl && statusEl.textContent.includes('Escuchando')) {
+        statusEl.textContent = '';
+      }
+    }, 4000);
+  };
+
+  recognition.start();
+}
+
+function handleStockAdjustmentSubmit(event) {
+  event.preventDefault();
+  const actionType = document.getElementById('adjustment-action-type')?.value || 'remove';
+  const qty = Math.max(1, parseInt(document.getElementById('adjustment-quantity')?.value, 10) || 1);
+  const dateVal = document.getElementById('adjustment-date')?.value || new Date().toISOString().slice(0, 10);
+  const reason = document.getElementById('adjustment-reason')?.value || 'otro';
+  const notes = document.getElementById('adjustment-notes')?.value.trim() || '';
+
+  const prodId = document.getElementById('adjustment-product-id')?.value;
+  const prodCode = document.getElementById('adjustment-product-code')?.value;
+
+  const allProducts = [...(internalCatalogProducts || []), ...(storeLocationProducts || []), ...(baseProducts || [])];
+  const product = currentStockAdjustmentProduct || allProducts.find(p => String(p.id) === String(prodId) || p.product_code === prodCode);
+
+  if (!product) {
+    showToast('Seleccioná un producto válido antes de guardar.');
+    return;
+  }
+
+  const prevStock = Math.max(0, Number(product.stock ?? product.on_hand) || 0);
+  let newStock = prevStock;
+  if (actionType === 'remove') {
+    newStock = Math.max(0, prevStock - qty);
+  } else {
+    newStock = prevStock + qty;
+  }
+
+  product.stock = newStock;
+  if (Array.isArray(internalCatalogProducts)) {
+    const intItem = internalCatalogProducts.find(p => String(p.id) === String(product.id) || p.product_code === product.product_code);
+    if (intItem) intItem.stock = newStock;
+    localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
+  }
+
+  const reasonLabels = {
+    'vendido': 'Vendido (Mostrador)',
+    'defectuoso': 'Defectuoso / Roto',
+    'vencido': 'Vencido',
+    'otro': 'Otro motivo'
+  };
+
+  const currentVendor = localStorage.getItem('boeweb_active_vendor_name') || 'Vendedor';
+
+  const adjustmentRecord = {
+    id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    date: dateVal,
+    created_at: new Date().toISOString(),
+    product_id: product.id || '',
+    product_code: product.product_code || '',
+    product_name: product.name || 'Producto',
+    barcode: product.barcode || '',
+    type: actionType,
+    quantity: qty,
+    previous_stock: prevStock,
+    new_stock: newStock,
+    reason: reason,
+    reason_label: reasonLabels[reason] || reason,
+    notes: notes,
+    vendor_name: currentVendor
+  };
+
+  saveRetiredProductAdjustment(adjustmentRecord);
+
+  closeStockAdjustmentModal();
+  showToast(actionType === 'remove' 
+    ? `🗑️ Retiro registrado: -${qty} u. de "${product.name}". Nuevo stock: ${newStock} u.`
+    : `📥 Stock agregado: +${qty} u. de "${product.name}". Nuevo stock: ${newStock} u.`
+  );
+
+  renderRetiredProductsUI();
+  if (document.getElementById('store-map-search-result-card')?.style.display !== 'none') {
+    const info = decodeHumanWmsLocation(product.product_code || product.name, product);
+    renderStoreMapLocationCard(info);
+  }
+}
+
+function renderRetiredProductsUI() {
+  const tbody = document.getElementById('retired-products-table-body');
+  const history = getRetiredProductsHistory();
+
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+
+  let totalRemoved = 0;
+  let damagedUnits = 0;
+  let expiredUnits = 0;
+  let soldUnits = 0;
+
+  history.forEach(item => {
+    const itemDate = new Date(item.date + 'T00:00:00');
+    if (item.type === 'remove') {
+      if (itemDate >= thirtyDaysAgo) totalRemoved += item.quantity;
+      if (item.reason === 'defectuoso') damagedUnits += item.quantity;
+      else if (item.reason === 'vencido') expiredUnits += item.quantity;
+      else if (item.reason === 'vendido') soldUnits += item.quantity;
+    }
+  });
+
+  const kpiTotal = document.getElementById('retired-kpi-total-units');
+  const kpiDamaged = document.getElementById('retired-kpi-damaged-units');
+  const kpiExpired = document.getElementById('retired-kpi-expired-units');
+  const kpiSold = document.getElementById('retired-kpi-sold-units');
+
+  if (kpiTotal) kpiTotal.textContent = `${totalRemoved} u.`;
+  if (kpiDamaged) kpiDamaged.textContent = `${damagedUnits} u.`;
+  if (kpiExpired) kpiExpired.textContent = `${expiredUnits} u.`;
+  if (kpiSold) kpiSold.textContent = `${soldUnits} u.`;
+
+  if (!tbody) return;
+
+  const filtered = history.filter(item => {
+    const matchesReason = (retiredProductsFilterReason === 'all') || (item.reason === retiredProductsFilterReason);
+    const q = retiredProductsSearchQuery.toLowerCase();
+    const matchesQuery = !q || 
+      (item.product_name && item.product_name.toLowerCase().includes(q)) ||
+      (item.product_code && item.product_code.toLowerCase().includes(q)) ||
+      (item.barcode && item.barcode.toLowerCase().includes(q)) ||
+      (item.notes && item.notes.toLowerCase().includes(q)) ||
+      (item.vendor_name && item.vendor_name.toLowerCase().includes(q));
+    return matchesReason && matchesQuery;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align: center; padding: 32px 10px; color: var(--color-text-muted);">
+          <span style="font-size: 2rem; display: block; margin-bottom: 8px;">📦</span>
+          <strong>No hay registros de productos retirados o ajustes que coincidan.</strong><br>
+          <small>Podés registrar un nuevo retiro o ajuste tocando en "+ Nuevo Retiro / Ajuste".</small>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  const reasonBadgeStyles = {
+    'vendido': 'background: rgba(76,175,80,0.2); color: #81c784; border: 1px solid #81c784;',
+    'defectuoso': 'background: rgba(239,83,80,0.2); color: #ef5350; border: 1px solid #ef5350;',
+    'vencido': 'background: rgba(255,193,7,0.2); color: #ffd54f; border: 1px solid #ffd54f;',
+    'otro': 'background: rgba(158,158,158,0.2); color: #e0e0e0; border: 1px solid #9e9e9e;'
+  };
+
+  const escapeFn = typeof escapeMapHtml === 'function' ? escapeMapHtml : (v => String(v || ''));
+
+  tbody.innerHTML = filtered.map(item => {
+    const isRemove = item.type === 'remove';
+    const movementBadge = isRemove 
+      ? `<span style="color: #ef5350; font-weight: 800;">-${item.quantity} u.</span> <small style="color: var(--color-text-muted);">(${item.previous_stock} → ${item.new_stock})</small>`
+      : `<span style="color: #81c784; font-weight: 800;">+${item.quantity} u.</span> <small style="color: var(--color-text-muted);">(${item.previous_stock} → ${item.new_stock})</small>`;
+
+    const badgeStyle = reasonBadgeStyles[item.reason] || reasonBadgeStyles['otro'];
+
+    return `
+      <tr style="border-bottom: 1px solid var(--color-border-subtle);">
+        <td style="padding: 12px 10px; white-space: nowrap;">
+          <strong style="color: var(--color-text-main);">${escapeFn(item.date)}</strong>
+        </td>
+        <td style="padding: 12px 10px;">
+          <strong style="display: block; color: var(--color-text-main);">${escapeFn(item.product_name)}</strong>
+          <small style="color: var(--color-text-muted); font-family: monospace;">SKU: ${escapeFn(item.product_code || item.barcode || '-')}</small>
+        </td>
+        <td style="padding: 12px 10px;">
+          ${movementBadge}
+        </td>
+        <td style="padding: 12px 10px;">
+          <span style="padding: 3px 8px; border-radius: 8px; font-size: 0.76rem; font-weight: 700; display: inline-block; ${badgeStyle}">
+            ${escapeFn(item.reason_label || item.reason)}
+          </span>
+        </td>
+        <td style="padding: 12px 10px; max-width: 250px;">
+          ${item.notes ? `<span style="font-size: 0.85rem; color: var(--color-text-main);">${escapeFn(item.notes)}</span>` : '<span style="color: var(--color-text-muted); font-size: 0.8rem;">-</span>'}
+        </td>
+        <td style="padding: 12px 10px; white-space: nowrap; color: var(--color-text-muted); font-size: 0.82rem;">
+          🧑‍💼 ${escapeFn(item.vendor_name || 'Vendedor')}
+        </td>
+        <td style="padding: 12px 10px; text-align: right; white-space: nowrap;">
+          <button type="button" onclick="revertRetiredProductAdjustment('${item.id}')" style="padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.08); border: 1px solid var(--color-border-subtle); color: var(--color-text-muted); font-size: 0.76rem; cursor: pointer;" title="Revertir este ajuste si fue un error">
+            ↩ Deshacer
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function filterRetiredProducts(reason) {
+  retiredProductsFilterReason = reason;
+  const chips = document.querySelectorAll('#retired-filter-chips .b2b-filter-chip');
+  chips.forEach(chip => chip.classList.remove('active'));
+  const activeBtn = document.getElementById(`ret-filter-${reason}`);
+  if (activeBtn) activeBtn.classList.add('active');
+  renderRetiredProductsUI();
+}
+
+function handleRetiredSearchInput(val) {
+  retiredProductsSearchQuery = String(val || '').trim();
+  renderRetiredProductsUI();
+}
+
+function revertRetiredProductAdjustment(adjustmentId) {
+  if (!confirm('¿Deseás deshacer este ajuste de stock y restaurar las unidades?')) return;
+  const history = getRetiredProductsHistory();
+  const index = history.findIndex(h => h.id === adjustmentId);
+  if (index === -1) return;
+
+  const item = history[index];
+  if (Array.isArray(internalCatalogProducts)) {
+    const product = internalCatalogProducts.find(p => String(p.id) === String(item.product_id) || p.product_code === item.product_code);
+    if (product) {
+      if (item.type === 'remove') {
+        product.stock = Math.max(0, (Number(product.stock) || 0) + item.quantity);
+      } else {
+        product.stock = Math.max(0, (Number(product.stock) || 0) - item.quantity);
+      }
+      localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
+    }
+  }
+
+  history.splice(index, 1);
+  localStorage.setItem(RETIRED_PRODUCTS_STORAGE_KEY, JSON.stringify(history));
+  showToast('↩ Ajuste revertido correctamente.');
+  renderRetiredProductsUI();
+}
+
+function exportRetiredProductsCsv() {
+  const history = getRetiredProductsHistory();
+  if (!history.length) {
+    showToast('No hay registros para exportar.');
+    return;
+  }
+  const headers = ['ID', 'Fecha', 'Producto', 'SKU', 'Codigo_Barra', 'Tipo', 'Cantidad', 'Stock_Anterior', 'Stock_Nuevo', 'Motivo', 'Aclaracion', 'Vendedor'];
+  const rows = history.map(h => [
+    h.id,
+    h.date,
+    `"${(h.product_name || '').replace(/"/g, '""')}"`,
+    h.product_code || '',
+    h.barcode || '',
+    h.type === 'remove' ? 'RETIRO' : 'INGRESO',
+    h.quantity,
+    h.previous_stock,
+    h.new_stock,
+    `"${(h.reason_label || h.reason || '').replace(/"/g, '""')}"`,
+    `"${(h.notes || '').replace(/"/g, '""')}"`,
+    h.vendor_name || ''
+  ]);
+
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `boeweb_productos_retirados_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('📥 Reporte CSV descargado con éxito.');
+}
+
 window.openVendorPasswordModal = openVendorPasswordModal;
 window.closeVendorPasswordModal = closeVendorPasswordModal;
 window.handleVendorChangePassword = handleVendorChangePassword;
@@ -9860,3 +10390,19 @@ window.handleVendorChangePassword = handleVendorChangePassword;
 window.decodeHumanWmsLocation = decodeHumanWmsLocation;
 window.renderStoreMapLocationCard = renderStoreMapLocationCard;
 window.closeStoreMapLocationCard = closeStoreMapLocationCard;
+
+window.getRetiredProductsHistory = getRetiredProductsHistory;
+window.saveRetiredProductAdjustment = saveRetiredProductAdjustment;
+window.openStockAdjustmentModal = openStockAdjustmentModal;
+window.handleAdjustmentProductDropdownChange = handleAdjustmentProductDropdownChange;
+window.closeStockAdjustmentModal = closeStockAdjustmentModal;
+window.setAdjustmentAction = setAdjustmentAction;
+window.adjustAdjustmentQty = adjustAdjustmentQty;
+window.handleAdjustmentReasonChange = handleAdjustmentReasonChange;
+window.startStockAdjustmentDictation = startStockAdjustmentDictation;
+window.handleStockAdjustmentSubmit = handleStockAdjustmentSubmit;
+window.renderRetiredProductsUI = renderRetiredProductsUI;
+window.filterRetiredProducts = filterRetiredProducts;
+window.handleRetiredSearchInput = handleRetiredSearchInput;
+window.revertRetiredProductAdjustment = revertRetiredProductAdjustment;
+window.exportRetiredProductsCsv = exportRetiredProductsCsv;

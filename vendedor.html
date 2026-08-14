@@ -1479,10 +1479,22 @@
           </div>
         </button>
 
-        <!-- 10. Tiendas Cerca -->
-        <button type="button" class="vendor-flow-card" id="vcard-nearbystores" onclick="switchVendorTab('nearby-stores')">
+        <!-- 10. Productos Retirados -->
+        <button type="button" class="vendor-flow-card" id="vcard-retired" onclick="switchVendorTab('retired-products')">
           <div class="vendor-flow-top">
             <span class="vendor-flow-num">10</span>
+            <span class="vendor-flow-icon">🗑️📉</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Productos Retirados</strong>
+            <span class="vendor-flow-desc">Mermas · Roturas · Vencidos · Salidas con voz</span>
+          </div>
+        </button>
+
+        <!-- 11. Tiendas Cerca -->
+        <button type="button" class="vendor-flow-card" id="vcard-nearbystores" onclick="switchVendorTab('nearby-stores')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-num">11</span>
             <span class="vendor-flow-icon">🏪</span>
           </div>
           <div>
@@ -1491,10 +1503,10 @@
           </div>
         </button>
 
-        <!-- 11. Promos TV -->
+        <!-- 12. Promos TV -->
         <a href="tv.html" target="_blank" rel="noopener" class="vendor-flow-card">
           <div class="vendor-flow-top">
-            <span class="vendor-flow-num">11</span>
+            <span class="vendor-flow-num">12</span>
             <span class="vendor-flow-icon">📺</span>
           </div>
           <div>
@@ -1503,10 +1515,10 @@
           </div>
         </a>
 
-        <!-- 12. Tablet promos -->
+        <!-- 13. Tablet promos -->
         <a href="tablet.html" target="_blank" rel="noopener" class="vendor-flow-card">
           <div class="vendor-flow-top">
-            <span class="vendor-flow-num">12</span>
+            <span class="vendor-flow-num">13</span>
             <span class="vendor-flow-icon">📱</span>
           </div>
           <div>
@@ -1515,10 +1527,10 @@
           </div>
         </a>
 
-        <!-- 13. BÔ Caffè Club -->
+        <!-- 14. BÔ Caffè Club -->
         <a href="coffee.html" target="_blank" rel="noopener" class="vendor-flow-card">
           <div class="vendor-flow-top">
-            <span class="vendor-flow-num">13</span>
+            <span class="vendor-flow-num">14</span>
             <span class="vendor-flow-icon">☕</span>
           </div>
           <div>
@@ -3034,6 +3046,86 @@
       </div>
     </section>
 
+    <!-- SECTION: PRODUCTOS RETIRADOS Y AJUSTES DE STOCK -->
+    <section id="vendor-retired-products-section" class="vendor-workspace-section" style="display: none; max-width: 1400px; margin: 30px auto; padding: 0 20px;" aria-labelledby="vendor-retired-title">
+      <div style="background: var(--color-card-bg); border: 1.5px solid #c2a246; border-radius: 20px; padding: 24px; box-shadow: var(--shadow-md); color: var(--color-text-main);">
+        
+        <!-- Header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
+          <div>
+            <span style="background: rgba(194,162,70,0.15); border: 1px solid #c2a246; color: #c2a246; padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 800;">GESTIÓN DE INVENTARIO & MERMAS</span>
+            <h2 id="vendor-retired-title" style="font-family: var(--font-serif); color: var(--color-text-main); font-size: 1.6rem; margin: 6px 0 0 0;">📦 Productos Retirados y Ajustes de Stock</h2>
+            <p style="font-size: 0.88rem; color: var(--color-text-muted); margin: 4px 0 0 0;">Registro y control de salidas de stock por venta fuera de sistema, productos defectuosos, vencidos u otros motivos con dictado por voz.</p>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button type="button" class="btn btn-primary" onclick="openStockAdjustmentModal(null, 'remove')" style="background: #2e7d32; border-color: #81c784; font-weight: 800; font-size: 0.88rem; padding: 10px 18px; border-radius: 12px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+              ➕ Nuevo Retiro / Ajuste
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="exportRetiredProductsCsv()" style="font-weight: 700; font-size: 0.85rem; padding: 10px 14px; border-radius: 12px; cursor: pointer;" title="Exportar historial a CSV">
+              📥 Exportar
+            </button>
+            <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
+          </div>
+        </div>
+
+        <!-- Summary KPIs -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 22px;">
+          <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 14px 18px;">
+            <span style="font-size: 0.76rem; text-transform: uppercase; color: var(--color-text-muted); font-weight: 700;">Total Retirados (30 días)</span>
+            <strong id="retired-kpi-total-units" style="display: block; font-size: 1.5rem; color: #ef5350; margin-top: 4px;">0 u.</strong>
+          </div>
+          <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 14px 18px;">
+            <span style="font-size: 0.76rem; text-transform: uppercase; color: var(--color-text-muted); font-weight: 700;">Defectuosos / Rotos</span>
+            <strong id="retired-kpi-damaged-units" style="display: block; font-size: 1.5rem; color: #ff9800; margin-top: 4px;">0 u.</strong>
+          </div>
+          <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 14px 18px;">
+            <span style="font-size: 0.76rem; text-transform: uppercase; color: var(--color-text-muted); font-weight: 700;">Vencidos</span>
+            <strong id="retired-kpi-expired-units" style="display: block; font-size: 1.5rem; color: #ffd54f; margin-top: 4px;">0 u.</strong>
+          </div>
+          <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 14px 18px;">
+            <span style="font-size: 0.76rem; text-transform: uppercase; color: var(--color-text-muted); font-weight: 700;">Ventas Mostrador / Otros</span>
+            <strong id="retired-kpi-sold-units" style="display: block; font-size: 1.5rem; color: #81c784; margin-top: 4px;">0 u.</strong>
+          </div>
+        </div>
+
+        <!-- Filters & Search -->
+        <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="retired-filter-chips">
+            <button type="button" class="b2b-filter-chip active" id="ret-filter-all" onclick="filterRetiredProducts('all')">Todos</button>
+            <button type="button" class="b2b-filter-chip" id="ret-filter-vendido" onclick="filterRetiredProducts('vendido')" style="border-color: #81c784; color: #81c784;">🛒 Vendidos</button>
+            <button type="button" class="b2b-filter-chip" id="ret-filter-defectuoso" onclick="filterRetiredProducts('defectuoso')" style="border-color: #ef5350; color: #ef5350;">⚠️ Defectuosos</button>
+            <button type="button" class="b2b-filter-chip" id="ret-filter-vencido" onclick="filterRetiredProducts('vencido')" style="border-color: #ffd54f; color: #ffd54f;">⏳ Vencidos</button>
+            <button type="button" class="b2b-filter-chip" id="ret-filter-otro" onclick="filterRetiredProducts('otro')">📝 Otros</button>
+          </div>
+          <div style="position: relative; min-width: 240px; flex: 1; max-width: 360px;">
+            <input type="search" id="retired-search-input" placeholder="Buscar por producto, código o detalle..." oninput="handleRetiredSearchInput(this.value)" style="width: 100%; padding: 8px 12px 8px 32px; border-radius: 10px; background: rgba(0,0,0,0.3); border: 1px solid var(--color-border-subtle); color: #fff; font-size: 0.88rem;">
+            <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 0.9rem; opacity: 0.6;">🔍</span>
+          </div>
+        </div>
+
+        <!-- Table / Cards List -->
+        <div style="overflow-x: auto; background: var(--color-card-bg-alt); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 12px;">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+            <thead>
+              <tr style="border-bottom: 1.5px solid var(--color-border-accent); color: var(--color-text-muted);">
+                <th style="padding: 10px;">Fecha</th>
+                <th style="padding: 10px;">Producto</th>
+                <th style="padding: 10px;">Movimiento</th>
+                <th style="padding: 10px;">Motivo</th>
+                <th style="padding: 10px;">Aclaración / Dictado</th>
+                <th style="padding: 10px;">Vendedor</th>
+                <th style="padding: 10px; text-align: right;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="retired-products-table-body">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
     <!-- CASH REGISTER & SHIFT CLOSING MODULE -->
     <section id="vendor-cash-section" class="cash-shell vendor-workspace-section" style="display: none;" aria-labelledby="cash-title">
       <header class="cash-hero">
@@ -3691,6 +3783,109 @@
         </div>
       </form>
     </div>
+  <!-- Modal Ajustar y Retirar Stock de Producto -->
+  <div id="modal-stock-adjustment" style="display: none; position: fixed !important; inset: 0 !important; z-index: 99999999 !important; background: rgba(0,0,0,0.85) !important; backdrop-filter: blur(6px) !important; -webkit-backdrop-filter: blur(6px) !important; align-items: center !important; justify-content: center !important; padding: 16px !important; box-sizing: border-box !important;">
+    <div style="max-width: 520px; width: 100%; border-radius: 22px; border: 2px solid var(--color-accent-gold, #c2a246); background: #152d24; color: #ffffff; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,0.8); margin: auto; position: relative; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box;">
+      
+      <!-- Modal Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid rgba(194,162,70,0.3); padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.4rem;" id="adjustment-modal-icon">📦</span>
+          <div>
+            <h3 id="adjustment-modal-title" style="margin: 0; font-size: 1.15rem; color: #c2a246; font-weight: 800;">Ajustar Stock / Retiro</h3>
+            <small id="adjustment-modal-subtitle" style="color: rgba(247,246,242,0.8); font-size: 0.78rem;">Modificar unidades en inventario</small>
+          </div>
+        </div>
+        <button type="button" onclick="closeStockAdjustmentModal()" style="background: rgba(255,255,255,0.15); border: none; color: #fff; font-size: 1.2rem; border-radius: 50%; width: 34px; height: 34px; cursor: pointer; display: flex; align-items: center; justify-content: center;" aria-label="Cerrar">✕</button>
+      </div>
+
+      <!-- Modal Body -->
+      <form id="stock-adjustment-form" onsubmit="handleStockAdjustmentSubmit(event)" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px; padding-right: 4px;">
+        
+        <!-- Product Quick Details -->
+        <div id="adjustment-product-info-box" style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.18); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <div style="flex: 1; min-width: 0;">
+            <strong id="adjustment-product-name" style="display: block; font-size: 0.95rem; color: #ffffff; word-break: break-word;">Seleccionar producto...</strong>
+            <small id="adjustment-product-meta" style="color: rgba(255,255,255,0.7); font-size: 0.78rem;">SKU: - · Ubicación: -</small>
+          </div>
+          <div style="text-align: right; white-space: nowrap;">
+            <span style="display: block; font-size: 0.7rem; color: rgba(255,255,255,0.6); text-transform: uppercase;">Stock actual</span>
+            <strong id="adjustment-product-current-stock" style="font-size: 1.15rem; color: #81c784;">0 u.</strong>
+          </div>
+        </div>
+
+        <!-- Product Selector if opened without pre-selected item -->
+        <div id="adjustment-product-selector-container" style="display: none;">
+          <label for="adjustment-product-select-dropdown" style="display: block; font-size: 0.8rem; font-weight: 700; color: #c2a246; margin-bottom: 5px;">Elegir Producto</label>
+          <select id="adjustment-product-select-dropdown" onchange="handleAdjustmentProductDropdownChange(this.value)" style="width: 100%; padding: 10px; border-radius: 10px; background: rgba(0,0,0,0.4); border: 1.5px solid #c2a246; color: #fff; font-size: 0.88rem;">
+            <!-- Populated dynamically -->
+          </select>
+        </div>
+
+        <input type="hidden" id="adjustment-product-id" value="">
+        <input type="hidden" id="adjustment-product-code" value="">
+
+        <!-- Action Type Toggle: Agregar vs Quitar -->
+        <div>
+          <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #c2a246; margin-bottom: 6px;">Tipo de movimiento</label>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <button type="button" id="adj-btn-remove" onclick="setAdjustmentAction('remove')" style="padding: 10px; border-radius: 10px; font-weight: 800; font-size: 0.88rem; border: 2px solid #ef5350; background: rgba(239,83,80,0.25); color: #ffffff; cursor: pointer;">
+              ➖ Quitar / Retirar
+            </button>
+            <button type="button" id="adj-btn-add" onclick="setAdjustmentAction('add')" style="padding: 10px; border-radius: 10px; font-weight: 800; font-size: 0.88rem; border: 2px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.2); color: rgba(255,255,255,0.7); cursor: pointer;">
+              ➕ Agregar Stock
+            </button>
+          </div>
+          <input type="hidden" id="adjustment-action-type" value="remove">
+        </div>
+
+        <!-- Quantity & Date Grid -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label for="adjustment-quantity" style="display: block; font-size: 0.8rem; font-weight: 700; color: #ffffff; margin-bottom: 5px;">Cantidad *</label>
+            <div style="display: flex; align-items: center;">
+              <button type="button" onclick="adjustAdjustmentQty(-1)" style="min-width: 38px; height: 42px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); color: #fff; border-radius: 8px 0 0 8px; font-size: 1.1rem; cursor: pointer;">-</button>
+              <input type="number" id="adjustment-quantity" min="1" step="1" value="1" required style="width: 100%; height: 42px; text-align: center; font-size: 1.1rem; font-weight: 800; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.25); border-left: none; border-right: none; color: #ffffff;">
+              <button type="button" onclick="adjustAdjustmentQty(1)" style="min-width: 38px; height: 42px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); color: #fff; border-radius: 0 8px 8px 0; font-size: 1.1rem; cursor: pointer;">+</button>
+            </div>
+          </div>
+          <div>
+            <label for="adjustment-date" style="display: block; font-size: 0.8rem; font-weight: 700; color: #ffffff; margin-bottom: 5px;">Fecha *</label>
+            <input type="date" id="adjustment-date" required style="width: 100%; height: 42px; padding: 0 10px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1.5px solid rgba(255,255,255,0.25); color: #ffffff; font-size: 0.85rem; box-sizing: border-box;">
+          </div>
+        </div>
+
+        <!-- Reason Selector: vendido, defectuoso, vencido, otro -->
+        <div>
+          <label for="adjustment-reason" style="display: block; font-size: 0.8rem; font-weight: 700; color: #ffffff; margin-bottom: 5px;">Motivo *</label>
+          <select id="adjustment-reason" onchange="handleAdjustmentReasonChange()" required style="width: 100%; height: 42px; padding: 0 10px; border-radius: 8px; background: #0f2019; border: 1.5px solid #c2a246; color: #ffffff; font-size: 0.88rem; font-weight: 700; box-sizing: border-box;">
+            <option value="vendido">🛒 Vendido (Venta mostrador / fuera de sistema)</option>
+            <option value="defectuoso">⚠️ Defectuoso (Roto / Dañado / Falla de fábrica)</option>
+            <option value="vencido">⏳ Vencido (Caducidad cumplida)</option>
+            <option value="otro">📝 Otro motivo (Aclarar abajo)</option>
+          </select>
+        </div>
+
+        <!-- Notes with Voice Dictation Button 🎙️ -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label for="adjustment-notes" style="font-size: 0.8rem; font-weight: 700; color: #ffffff;">Aclaración / Detalle</label>
+            <button type="button" id="adjustment-voice-btn" onclick="startStockAdjustmentDictation()" style="background: rgba(194,162,70,0.2); border: 1px solid #c2a246; color: #ffd54f; padding: 4px 10px; border-radius: 8px; font-size: 0.76rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              🎙️ Dictar por voz
+            </button>
+          </div>
+          <textarea id="adjustment-notes" rows="2" placeholder="Escribí o dictá una aclaración o detalle..." style="width: 100%; padding: 8px 10px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1.5px solid rgba(255,255,255,0.25); color: #ffffff; font-size: 0.85rem; resize: vertical; line-height: 1.35; box-sizing: border-box;"></textarea>
+          <div id="adjustment-voice-status" style="font-size: 0.74rem; color: #ffd54f; margin-top: 3px; min-height: 14px;"></div>
+        </div>
+
+        <!-- Submit Footer -->
+        <div style="display: flex; gap: 8px; margin-top: 6px;">
+          <button type="button" onclick="closeStockAdjustmentModal()" class="btn btn-secondary" style="flex: 1; min-height: 44px; padding: 8px 14px; font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: #fff; border-radius: 10px; cursor: pointer;">Cancelar</button>
+          <button type="submit" id="adjustment-submit-btn" class="btn btn-primary" style="flex: 1.5; min-height: 44px; padding: 8px 16px; font-size: 0.9rem; background: #2e7d32; border: 1.5px solid #81c784; color: #fff; font-weight: 800; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 12px rgba(46,125,50,0.4);">💾 Confirmar Ajuste</button>
+        </div>
+
+      </form>
+    </div>
   </div>
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -3707,6 +3902,6 @@
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=location_card_v29"></script>
+  <script src="vendedor.js?v=retired_products_v30"></script>
 </body>
 </html>
