@@ -1930,8 +1930,12 @@ function renderStoreMapLocationCard(info) {
     ? `${escapeFn(info.productName)}`
     : `Ubicación: ${escapeFn(info.rawCode)}`;
 
+  const isOutOfStock = info.hasMatchedProduct && info.stockCount === 0;
   const stockBadgeHtml = info.hasMatchedProduct
-    ? `<strong style="color: #81c784; font-size: 1.18rem; font-weight: 900;">${info.stockCount} unidades disponibles</strong>`
+    ? (info.stockCount > 0
+        ? `<strong style="color: #81c784; font-size: 1.18rem; font-weight: 900;">${info.stockCount} unidades disponibles</strong>`
+        : `<span style="background: #c62828; color: #fff; padding: 4px 10px; border-radius: 8px; font-weight: 900; font-size: 0.95rem;">🔴 AGOTADO / SIN STOCK (0 u.)</span>`
+      )
     : `<span style="color: #ffd54f; font-weight: 700;">0 u. (Espacio disponible para asignar)</span>`;
 
   cardContainer.innerHTML = `
@@ -1989,13 +1993,15 @@ function renderStoreMapLocationCard(info) {
         </div>
       ` : ''}
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-        <button type="button" onclick="openStockAdjustmentModal('${escapeFn(info.productId || info.productBarcode || info.productName || info.rawCode)}', 'add')" style="padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; background: rgba(76,175,80,0.25); border: 1.5px solid #81c784; color: #a5d6a7; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-          ➕ Agregar stock
+      <div style="display: grid; grid-template-columns: ${isOutOfStock ? '1fr' : '1fr 1fr'}; gap: 10px; margin-bottom: 12px;">
+        <button type="button" onclick="openStockAdjustmentModal('${escapeFn(info.productId || info.productBarcode || info.productName || info.rawCode)}', 'add')" style="padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 0.92rem; background: ${isOutOfStock ? '#2e7d32' : 'rgba(76,175,80,0.25)'}; border: 1.5px solid #81c784; color: #ffffff; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          ${isOutOfStock ? '🔄 Reponer / Ingresar stock' : '➕ Agregar stock'}
         </button>
-        <button type="button" onclick="openStockAdjustmentModal('${escapeFn(info.productId || info.productBarcode || info.productName || info.rawCode)}', 'remove')" style="padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; background: rgba(239,83,80,0.25); border: 1.5px solid #ef5350; color: #ef9a9a; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-          ➖ Quitar stock
-        </button>
+        ${!isOutOfStock ? `
+          <button type="button" onclick="openStockAdjustmentModal('${escapeFn(info.productId || info.productBarcode || info.productName || info.rawCode)}', 'remove')" style="padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; background: rgba(239,83,80,0.25); border: 1.5px solid #ef5350; color: #ef9a9a; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            ➖ Quitar stock
+          </button>
+        ` : ''}
       </div>
 
       <div>
@@ -2087,6 +2093,9 @@ const CASH_TYPE_CONFIG = {
   apertura: { label: 'Fondo inicial', flow: 'in' },
   venta_efectivo: { label: 'Venta en efectivo', flow: 'in' },
   venta_transf: { label: 'Venta por transferencia', flow: 'transfer' },
+  venta_tarjeta: { label: 'Venta débito / crédito', flow: 'transfer' },
+  venta_mp: { label: 'Venta MercadoPago / QR', flow: 'transfer' },
+  cuenta_corriente: { label: 'Venta en cuenta corriente', flow: 'transfer' },
   membresia: { label: 'Membresía en efectivo', flow: 'in' },
   membresia_efectivo: { label: 'Membresía en efectivo', flow: 'in' },
   membresia_transf: { label: 'Membresía por transferencia', flow: 'transfer' },
@@ -2110,6 +2119,7 @@ function getEmptyCashData(dateKey = getTodayDateKey()) {
     schemaVersion: CASH_SCHEMA_VERSION,
     date: dateKey,
     movements: [],
+    sales: [],
     closed: false,
     validated: false,
     closedBy: null,
@@ -2120,17 +2130,36 @@ function getEmptyCashData(dateKey = getTodayDateKey()) {
 
 function normalizeCashData(value, dateKey = getTodayDateKey()) {
   const base = value && typeof value === 'object' ? value : {};
-  const movements = Array.isArray(base.movements)
+  let movements = Array.isArray(base.movements)
     ? base.movements.filter(movement => movement && Number.isFinite(Number(movement.amount))).map(movement => ({
         ...movement,
         id: movement.id || `legacy_${Date.now()}_${Math.random().toString(16).slice(2)}`,
         amount: Number(movement.amount),
-        desc: String(movement.desc || 'Movimiento sin detalle'),
-        vendor: String(movement.vendor || 'Vendedor'),
+        desc: String(movement.desc || movement.itemsSummary || 'Movimiento sin detalle'),
+        vendor: String(movement.vendor || movement.seller || 'Vendedor'),
         type: CASH_TYPE_CONFIG[movement.type] ? movement.type : 'venta_efectivo',
         voided: Boolean(movement.voided)
       }))
     : [];
+
+  // Migración y rescate: si hay ventas en base.sales que no estén en movements, sumarlas
+  if (Array.isArray(base.sales) && base.sales.length > 0) {
+    base.sales.forEach(sale => {
+      const exists = movements.some(m => m.id === sale.id || (sale.id && String(m.desc || '').includes(String(sale.id))));
+      if (!exists && Number.isFinite(Number(sale.amount))) {
+        movements.push({
+          id: sale.id || `sale_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          createdAt: sale.createdAt || new Date().toISOString(),
+          time: sale.time || '--:--',
+          type: sale.paymentMethod === 'TRANSFERENCIA' ? 'venta_transf' : 'venta_efectivo',
+          amount: Number(sale.amount),
+          desc: sale.itemsSummary ? `Venta #${sale.id} (${sale.itemsSummary})` : `Venta Mostrador #${sale.id}`,
+          vendor: String(sale.seller || sale.vendor || 'Vendedor'),
+          voided: false
+        });
+      }
+    });
+  }
 
   return {
     ...getEmptyCashData(dateKey),
@@ -2138,6 +2167,7 @@ function normalizeCashData(value, dateKey = getTodayDateKey()) {
     schemaVersion: CASH_SCHEMA_VERSION,
     date: base.date || dateKey,
     movements,
+    sales: Array.isArray(base.sales) ? base.sales : [],
     closed: Boolean(base.closed),
     validated: Boolean(base.validated)
   };
@@ -7755,25 +7785,62 @@ async function submitPosSaleDraft() {
 
   const stockChanges = [];
   draft.items.forEach(soldItem => {
-    const code = String(soldItem.product_id || soldItem.id);
-    const qty = soldItem.quantity;
+    const code = String(soldItem.product_id || soldItem.id || soldItem.product_code || '');
+    const barcode = String(soldItem.barcode || '');
+    const name = String(soldItem.name || '').toLowerCase();
+    const qty = Math.max(1, Number(soldItem.quantity) || 1);
 
+    // 1. Catálogo interno
     if (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts)) {
-      const intP = internalCatalogProducts.find(prod => String(prod.id) === code || String(prod.product_code) === code || prod.barcode === code);
+      const intP = internalCatalogProducts.find(prod => 
+        (code && (String(prod.id) === code || String(prod.product_code) === code)) ||
+        (barcode && prod.barcode === barcode) ||
+        (name && prod.name && prod.name.toLowerCase() === name)
+      );
       if (intP) {
         const prev = Number(intP.stock || 0);
         intP.stock = Math.max(0, prev - qty);
+        intP.own_stock = intP.stock;
         stockChanges.push(`${intP.name}: de ${prev} u. a ${intP.stock} u.`);
       }
     }
 
+    // 2. Ubicaciones físicas locales
     if (typeof readLocalProductLocations === 'function' && typeof saveLocalProductLocation === 'function') {
       const locs = readLocalProductLocations();
-      const loc = locs.find(l => String(l.product_code) === code || l.barcode === code);
+      const loc = locs.find(l => 
+        (code && (String(l.product_code) === code || String(l.product_id) === code)) ||
+        (barcode && l.barcode === barcode) ||
+        (name && l.name && l.name.toLowerCase() === name)
+      );
       if (loc) {
         loc.stock = Math.max(0, Number(loc.stock || 0) - qty);
         saveLocalProductLocation(loc);
       }
+    }
+
+    // 3. Mapa interactivo
+    if (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) {
+      const mapItem = window.storeLocationProducts.find(l => 
+        (code && (String(l.product_code) === code || String(l.product_id) === code)) ||
+        (barcode && l.barcode === barcode) ||
+        (name && l.name && l.name.toLowerCase() === name)
+      );
+      if (mapItem) {
+        mapItem.stock = Math.max(0, Number(mapItem.stock || 0) - qty);
+      }
+    }
+
+    // 4. Sincronizar tabla supplier_products en Supabase (tienda local)
+    if (supabaseClient && code) {
+      try {
+        const targetSku = code;
+        supabaseClient.from('supplier_products')
+          .update({ stock: Math.max(0, Number(soldItem.stock || 0) - qty), updated_at: new Date().toISOString() })
+          .eq('supplier_id', 'local_store')
+          .or(`mapped_product_id.eq.${targetSku},supplier_product_id.eq.${targetSku}`)
+          .then();
+      } catch (_) {}
     }
   });
 
@@ -7781,17 +7848,56 @@ async function submitPosSaleDraft() {
     localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
   } catch (_) {}
 
+  // 5. Registrar en el historial de retiros/ventas de auditoría
+  draft.items.forEach(soldItem => {
+    saveRetiredProductAdjustment({
+      id: `pos_sale_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      date: new Date().toISOString().slice(0, 10),
+      created_at: new Date().toISOString(),
+      product_id: soldItem.product_id || soldItem.id || '',
+      product_code: soldItem.product_code || '',
+      product_name: soldItem.name || 'Producto Mostrador',
+      barcode: soldItem.barcode || '',
+      type: 'remove',
+      quantity: Math.max(1, Number(soldItem.quantity) || 1),
+      reason: 'vendido',
+      reason_label: `Venta Mostrador POS #${draft.draft_id}`,
+      notes: `Venta presencial (${draft.payment_method})`,
+      vendor_name: draft.salesperson_name_snapshot || localStorage.getItem('boeweb_vendor_name') || 'Vendedor'
+    });
+  });
+
+  // 6. Registrar movimiento de caja en turno de hoy
   try {
     const today = getTodayDateKey();
     const cashData = getVendorCashData(today);
-    cashData.sales.push({
-      id: draft.draft_id,
-      amount: draft.total,
-      time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+    const now = new Date();
+    const paymentMethod = draft.payment_method || 'EFECTIVO';
+    let movementType = 'venta_efectivo';
+    if (paymentMethod === 'TRANSFERENCIA' || paymentMethod === 'DIGITAL') movementType = 'venta_transf';
+    else if (paymentMethod === 'TARJETA' || paymentMethod === 'DEBITO' || paymentMethod === 'CREDITO') movementType = 'venta_tarjeta';
+    else if (paymentMethod === 'MERCADOPAGO' || paymentMethod === 'QR') movementType = 'venta_mp';
+    else if (paymentMethod === 'CUENTA_CORRIENTE') movementType = 'cuenta_corriente';
+
+    const saleEntry = {
+      id: `cash_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      createdAt: now.toISOString(),
+      time: now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+      type: movementType,
+      amount: Number(draft.total) || 0,
+      desc: `Venta Mostrador #${draft.draft_id} (${draft.items.map(i => `${i.quantity}x ${i.name}`).join(', ')})`,
+      vendor: draft.salesperson_name_snapshot || localStorage.getItem('boeweb_vendor_name') || 'Vendedor',
       paymentMethod: draft.payment_method,
       seller: draft.salesperson_name_snapshot,
-      itemsSummary: draft.items.map(i => `${i.quantity}x ${i.name}`).join(', ')
-    });
+      itemsSummary: draft.items.map(i => `${i.quantity}x ${i.name}`).join(', '),
+      voided: false
+    };
+
+    if (!Array.isArray(cashData.movements)) cashData.movements = [];
+    cashData.movements.unshift(saleEntry);
+    if (!Array.isArray(cashData.sales)) cashData.sales = [];
+    cashData.sales.push(saleEntry);
+
     saveVendorCashData(cashData, today);
   } catch (cashErr) {
     console.warn('Aviso registrando caja local:', cashErr);
@@ -7837,6 +7943,19 @@ async function submitPosSaleDraft() {
   renderPosSearchResults('');
   if (typeof renderStockProducts === 'function') renderStockProducts();
   if (typeof renderInternalCatalogGrid === 'function') renderInternalCatalogGrid();
+  if (typeof renderRetiredProductsUI === 'function') renderRetiredProductsUI();
+  if (typeof renderCashSectionUI === 'function') renderCashSectionUI();
+  if (typeof loadStoreMapData === 'function') await loadStoreMapData(true);
+  if (typeof rerenderStoreMap === 'function') rerenderStoreMap();
+
+  if (document.getElementById('store-map-search-result-card')?.style.display !== 'none') {
+    const firstItem = draft.items[0];
+    if (firstItem) {
+      const info = decodeHumanWmsLocation(firstItem.product_code || firstItem.name, firstItem);
+      renderStoreMapLocationCard(info);
+    }
+  }
+
   if (typeof renderVendorHomeUI === 'function') renderVendorHomeUI();
   switchVendorTab('home');
 }

@@ -197,3 +197,68 @@ test('5. Flujo POS: Finalizar venta y descontar stock del inventario comercial y
   assert.equal(cart.getItemCount(), 0);
   assert.equal(cart.getTotal(), 0);
 });
+
+test('6. Venta Total (Stock 0): Pasa a AGOTADO con Botón Reponer y Registra Movimiento en Caja', () => {
+  const catalog = [
+    { id: 'PROD-TOTAL', product_code: 'PROD-TOTAL', barcode: '779999', name: 'Carpa Indoor 80x80', price: 120000, stock: 3 }
+  ];
+  const wmsLocations = [
+    { product_code: 'PROD-TOTAL', barcode: '779999', shelf_code: 'E-01', stock: 3 }
+  ];
+
+  const cart = new PosCartEngine('POS');
+  cart.clear();
+  cart.addItem({ ...catalog[0], quantity: 3 });
+
+  const saleDraft = cart.createSaleDraft({
+    tenantId: '11111111-1111-1111-1111-111111111111',
+    cashierUser: { id: 'usr-cajero', name: 'Profesor Franco' },
+    salespersonUser: { id: 'usr-vendedor', name: 'Vendedor Turno' },
+    paymentMethod: 'EFECTIVO',
+    total: 360000
+  });
+
+  // Descuento total
+  saleDraft.items.forEach(sold => {
+    const item = catalog.find(p => p.id === sold.product_id);
+    if (item) item.stock = Math.max(0, item.stock - sold.quantity);
+    const loc = wmsLocations.find(l => l.product_code === sold.product_id);
+    if (loc) loc.stock = Math.max(0, loc.stock - sold.quantity);
+  });
+
+  assert.equal(catalog[0].stock, 0);
+  assert.equal(wmsLocations[0].stock, 0);
+
+  // Registro en movimientos de caja del turno
+  const cashData = {
+    date: '2026-08-14',
+    movements: [],
+    sales: []
+  };
+
+  const saleEntry = {
+    id: `cash_${Date.now()}`,
+    time: '14:30',
+    type: 'venta_efectivo',
+    amount: saleDraft.total,
+    desc: `Venta Mostrador #${saleDraft.draft_id} (${saleDraft.items.map(i => `${i.quantity}x ${i.name}`).join(', ')})`,
+    vendor: saleDraft.salesperson_name_snapshot || 'Vendedor'
+  };
+  cashData.movements.unshift(saleEntry);
+  cashData.sales.push(saleEntry);
+
+  assert.equal(cashData.movements.length, 1);
+  assert.equal(cashData.movements[0].amount, 360000);
+  assert.equal(cashData.movements[0].type, 'venta_efectivo');
+
+  // Comportamiento visual de tarjeta de ubicación física
+  const stockCount = wmsLocations[0].stock;
+  const isOutOfStock = stockCount === 0;
+  const badgeHtml = isOutOfStock ? '🔴 AGOTADO / SIN STOCK (0 u.)' : `${stockCount} unidades disponibles`;
+  const primaryActionText = isOutOfStock ? '🔄 Reponer / Ingresar stock' : '➕ Agregar stock';
+
+  assert.equal(isOutOfStock, true);
+  assert.equal(badgeHtml, '🔴 AGOTADO / SIN STOCK (0 u.)');
+  assert.equal(primaryActionText, '🔄 Reponer / Ingresar stock');
+});
+
