@@ -3193,10 +3193,13 @@
         <label for="map-search-input">Buscar producto o ubicación</label>
         <div>
           <span aria-hidden="true">⌕</span>
-          <input type="search" id="map-search-input" placeholder="Nombre, QR, código de barras o estante (ej: B-2 medio)" onkeydown="if(event.key==='Enter') searchShelfOnMap()">
+          <input type="search" id="map-search-input" placeholder="Nombre, QR, código de barras o estante (ej: DP-D-P3-E3-N3-D)" onkeydown="if(event.key==='Enter') searchShelfOnMap()">
           <button type="button" onclick="searchShelfOnMap()">Ubicar</button>
         </div>
       </div>
+
+      <!-- Persistent Humanized Location Result Card -->
+      <div id="store-map-search-result-card" style="display: none; margin: 15px 0 20px 0;" aria-live="assertive"></div>
 
       <div id="store-map-render-container" aria-live="polite"></div>
     </section>
@@ -3704,6 +3707,6 @@
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=photo_compression_v28"></script>
+  <script src="vendedor.js?v=location_card_v29"></script>
 </body>
 </html>

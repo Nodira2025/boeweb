@@ -1686,53 +1686,279 @@ async function renderStoreMapUI(activeZone = null, activeShelf = null, targetLev
   }
 }
 
+function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
+  const raw = String(queryOrCode || (matchedProduct?.wms_code || matchedProduct?.location || matchedProduct?.shelf_code || '')).trim();
+  const upper = raw.toUpperCase();
+
+  // 1. Check full WMS code pattern: DP-D-P3-E3-N3-D or TI-I-P4-E1-N1-C
+  const fullParts = upper.split('-');
+  let zoneCode = 'TI';
+  let compassCode = 'F';
+  let wallCode = 'P1';
+  let shelfCode = 'E1';
+  let levelNum = 1;
+  let sectorCode = 'C';
+
+  if (fullParts.length >= 6) {
+    zoneCode = fullParts[0];
+    compassCode = fullParts[1];
+    wallCode = fullParts[2];
+    shelfCode = fullParts[3];
+    levelNum = Number(fullParts[4].replace(/\D/g, '')) || 1;
+    sectorCode = fullParts[5];
+  } else {
+    if (upper.includes('DP') || upper.includes('DEP')) zoneCode = 'DP';
+    else if (upper.includes('TI') || upper.includes('TIE')) zoneCode = 'TI';
+
+    const wallMatch = upper.match(/P([1-4])/);
+    if (wallMatch) wallCode = `P${wallMatch[1]}`;
+
+    const shelfMatch = upper.match(/(E[1-5]|HEL\d*|VIT\d*|PIS\d*|[A-E][-_]?[1-5])/);
+    if (shelfMatch) shelfCode = shelfMatch[1].replace('-', '');
+
+    const levelMatch = upper.match(/N([1-6])/) || upper.match(/NIVEL\s*([1-6])/);
+    if (levelMatch) levelNum = Number(levelMatch[1]);
+
+    if (upper.includes('IZQ') || upper.endsWith('-I')) sectorCode = 'I';
+    else if (upper.includes('DER') || upper.endsWith('-D')) sectorCode = 'D';
+    else if (upper.includes('CEN') || upper.endsWith('-C')) sectorCode = 'C';
+  }
+
+  // Area: Tienda vs Deposito
+  const floorLevel = (zoneCode === 'DP' || zoneCode === 'DEPÓSITO') ? 2 : 1;
+  const areaLabel = floorLevel === 2 ? 'el Depósito General' : 'la Tienda';
+
+  // Wall text
+  const wallMap = {
+    'P1': 'Pared etiqueta 1 (Pared frontal / Norte)',
+    'P2': 'Pared etiqueta 2 (Pared de fondo / Sur)',
+    'P3': 'Pared etiqueta 3 (es la pared lateral derecha)',
+    'P4': 'Pared etiqueta 4 (es la pared lateral izquierda)'
+  };
+  const wallLabel = wallMap[wallCode] || `Pared ${wallCode}`;
+
+  // Compass explanation relative to central PC
+  let compassText = 'al frente de la PC central (Norte)';
+  if (compassCode === 'D' || wallCode === 'P3') {
+    compassText = 'es la pared derecha respecto a la PC central';
+  } else if (compassCode === 'I' || wallCode === 'P4') {
+    compassText = 'es la pared izquierda respecto a la PC central';
+  } else if (compassCode === 'A' || wallCode === 'P2') {
+    compassText = 'es la pared del fondo respecto a la PC central';
+  } else if (compassCode === 'F' || wallCode === 'P1') {
+    compassText = 'es la pared frontal respecto a la PC central';
+  }
+
+  // Furniture / Type text
+  let furnitureType = 'Estante de pared';
+  if (shelfCode.startsWith('HEL')) {
+    furnitureType = 'Heladera / Equipo de frío';
+  } else if (shelfCode.startsWith('VIT')) {
+    furnitureType = 'Vitrina / Mostrador vidriado';
+  } else if (shelfCode.startsWith('PIS')) {
+    furnitureType = 'Pallet de piso (sustratos / bultos)';
+  } else if (shelfCode.startsWith('E')) {
+    const num = shelfCode.replace('E', '');
+    furnitureType = `Estante de pared (Estante ${num})`;
+  } else {
+    furnitureType = `Módulo de estantería ${shelfCode}`;
+  }
+
+  // Level description (N1 is bottom/floor)
+  const levelDescriptions = {
+    1: 'nivel piso / abajo',
+    2: 'nivel bajo',
+    3: 'nivel medio (a la altura de la vista y manos)',
+    4: 'nivel medio-alto',
+    5: 'nivel alto',
+    6: 'tope superior (arriba del todo)'
+  };
+  const levelLabel = `Nivel ${levelNum}`;
+  const levelDesc = levelDescriptions[levelNum] || `Nivel ${levelNum}`;
+
+  // Sector horizontal description
+  const sectorDescriptions = {
+    'I': 'en el sector izquierdo de la balda',
+    'C': 'en el centro',
+    'D': 'en el sector derecho de la balda'
+  };
+  const sectorText = sectorDescriptions[sectorCode] || 'en el centro';
+
+  // Physical shelf code on the floor layout (e.g. P3-E3 or E3)
+  const layoutShelfCode = `${wallCode}-${shelfCode}`.replace(/P\d-P/, 'P');
+
+  // Stock count & product name
+  let stockCount = matchedProduct?.stock ?? matchedProduct?.on_hand ?? null;
+  let productName = matchedProduct?.name || null;
+  let productBarcode = matchedProduct?.barcode || matchedProduct?.product_code || null;
+
+  if (stockCount === null) {
+    const allProducts = [...(internalCatalogProducts || []), ...(storeLocationProducts || [])];
+    const match = allProducts.find(p => 
+      p.wms_code === raw || 
+      p.shelf_code === layoutShelfCode || 
+      p.shelf_code === shelfCode ||
+      (p.barcode && p.barcode === raw) ||
+      (p.product_code && p.product_code === raw)
+    );
+    if (match) {
+      stockCount = Math.max(0, Number(match.stock) || 0);
+      productName = productName || match.name;
+      productBarcode = productBarcode || match.barcode || match.product_code;
+    }
+  }
+
+  // Photo
+  let shelfPhoto = null;
+  try {
+    const photos = JSON.parse(localStorage.getItem('boeweb_store_shelf_photos_v1') || '{}');
+    shelfPhoto = photos[layoutShelfCode] || photos[shelfCode] || matchedProduct?.placement_photo_url || null;
+  } catch (err) {}
+
+  return {
+    rawCode: raw,
+    floorLevel,
+    zoneCode,
+    areaLabel,
+    compassCode,
+    compassText,
+    wallCode,
+    wallLabel,
+    shelfCode,
+    layoutShelfCode,
+    furnitureType,
+    levelNum,
+    levelLabel,
+    levelDesc,
+    sectorCode,
+    sectorText,
+    stockCount: stockCount !== null ? stockCount : 'Disponible',
+    productName,
+    productBarcode,
+    shelfPhoto
+  };
+}
+
+function renderStoreMapLocationCard(info) {
+  const cardContainer = document.getElementById('store-map-search-result-card');
+  if (!cardContainer) return;
+
+  const escapeFn = typeof escapeMapHtml === 'function' ? escapeMapHtml : (v => String(v || ''));
+  const title = info.productName 
+    ? `${escapeFn(info.productName)}`
+    : `Ubicación: ${escapeFn(info.rawCode)}`;
+
+  const stockBadge = typeof info.stockCount === 'number'
+    ? `${info.stockCount} unidades disponibles`
+    : `${info.stockCount}`;
+
+  cardContainer.innerHTML = `
+    <div class="location-found-card" style="background: linear-gradient(135deg, #152d24 0%, #1c3c30 100%); border: 2px solid #c2a246; border-radius: 20px; padding: 22px; color: #ffffff; box-shadow: 0 14px 40px rgba(0,0,0,0.4);">
+      
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; border-bottom: 1px solid rgba(194,162,70,0.3); padding-bottom: 12px;">
+        <div>
+          <span style="background: rgba(194,162,70,0.25); color: #c2a246; border: 1px solid #c2a246; padding: 3px 10px; border-radius: 8px; font-size: 0.76rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
+            📍 Guía de Ubicación Física
+          </span>
+          <h3 style="margin: 8px 0 0 0; font-size: 1.22rem; color: #ffffff; font-weight: 800; line-height: 1.3;">
+            ${title}
+          </h3>
+          ${info.productBarcode ? `<small style="color: rgba(247,246,242,0.7); font-size: 0.8rem; font-family: monospace;">SKU / Código: ${escapeFn(info.productBarcode)}</small>` : ''}
+        </div>
+        <span style="font-size: 2.2rem; line-height: 1;">🗺️</span>
+      </div>
+
+      <div style="background: rgba(0,0,0,0.3); border-radius: 14px; padding: 16px; border: 1px solid rgba(255,255,255,0.12); margin-bottom: 18px; font-size: 0.95rem; line-height: 1.7;">
+        <div style="margin-bottom: 10px;">
+          🏢 <strong>Lugar:</strong> El producto se encuentra en <span style="color: #c2a246; font-weight: 800;">${escapeFn(info.areaLabel)}</span>.
+        </div>
+        <div style="margin-bottom: 10px;">
+          🧭 <strong>Pared y Orientación:</strong> <span style="color: #a5d6a7; font-weight: 700;">${escapeFn(info.wallLabel)}</span> (${escapeFn(info.compassText)}).
+        </div>
+        <div style="margin-bottom: 10px;">
+          🪵 <strong>Tipo de Mueble:</strong> <span style="color: #ffffff; font-weight: 700;">${escapeFn(info.furnitureType)}</span>.
+        </div>
+        <div style="margin-bottom: 10px;">
+          ↕️ <strong>Nivel / Altura:</strong> <span style="color: #ffd54f; font-weight: 800;">${escapeFn(info.levelLabel)}</span> (${escapeFn(info.levelDesc)}).
+        </div>
+        <div style="margin-bottom: 10px;">
+          ↔️ <strong>Posición:</strong> <span style="color: #ffffff; font-weight: 700;">${escapeFn(info.sectorText)}</span>.
+        </div>
+        <div>
+          📦 <strong>Unidades disponibles:</strong> <strong style="color: #81c784; font-size: 1.1rem;">${escapeFn(stockBadge)}</strong>.
+        </div>
+      </div>
+
+      ${info.shelfPhoto ? `
+        <div style="margin-bottom: 18px; text-align: center; background: rgba(0,0,0,0.25); padding: 12px; border-radius: 14px;">
+          <span style="display: block; font-size: 0.8rem; color: rgba(255,255,255,0.8); margin-bottom: 8px; font-weight: 600;">📸 Foto de la estantería:</span>
+          <img src="${escapeFn(info.shelfPhoto)}" alt="Foto del estante" style="max-height: 180px; width: auto; max-width: 100%; border-radius: 10px; border: 1.5px solid #c2a246; object-fit: cover;">
+        </div>
+      ` : ''}
+
+      <div>
+        <button type="button" onclick="closeStoreMapLocationCard()" style="width: 100%; min-height: 52px; padding: 14px 20px; font-size: 1.05rem; font-weight: 900; background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: #ffffff; border: 2px solid #81c784; border-radius: 14px; cursor: pointer; box-shadow: 0 6px 20px rgba(46,125,50,0.45); display: flex; align-items: center; justify-content: center; gap: 10px;">
+          ✅ Encontrado
+        </button>
+      </div>
+    </div>
+  `;
+  cardContainer.style.display = 'block';
+  cardContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeStoreMapLocationCard() {
+  const cardContainer = document.getElementById('store-map-search-result-card');
+  if (cardContainer) {
+    cardContainer.style.display = 'none';
+    cardContainer.innerHTML = '';
+  }
+}
+
 function searchShelfOnMap() {
   const input = document.getElementById('map-search-input');
   if (!input) return;
   const rawVal = input.value.trim();
   if (!rawVal) {
+    closeStoreMapLocationCard();
     renderStoreMapUI();
     return;
   }
-  
-  const upperVal = rawVal.toUpperCase();
 
+  // 1. Check if it's a product in storeLocationProducts or internalCatalog
+  let productMatch = null;
   if (window.findStoreMapProduct) {
-    const productMatch = window.findStoreMapProduct(rawVal);
-    if (productMatch) {
-      renderStoreMapUI(null, productMatch.shelfCode, productMatch.level);
-      showToast(`Producto encontrado: ${productMatch.product.name} · ${productMatch.shelfCode} · nivel ${productMatch.level}.`);
-      return;
-    }
+    const res = window.findStoreMapProduct(rawVal);
+    if (res) productMatch = res.product;
   }
-  
-  // Check for shelf pattern e.g. "A-1", "A-1 NIVEL 2", "B-2"
-  const shelfMatch = upperVal.match(/([A-E])[-_]?([1-4])/);
-  let targetLevel = null;
-  
-  if (upperVal.includes('NIVEL 3') || upperVal.includes('SUPERIOR')) targetLevel = 3;
-  else if (upperVal.includes('NIVEL 2') || upperVal.includes('MEDIO')) targetLevel = 2;
-  else if (upperVal.includes('NIVEL 1') || upperVal.includes('INFERIOR')) targetLevel = 1;
+  if (!productMatch && typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts)) {
+    const q = rawVal.toLowerCase();
+    productMatch = internalCatalogProducts.find(p => 
+      (p.name && p.name.toLowerCase().includes(q)) ||
+      (p.barcode && p.barcode.toLowerCase() === q) ||
+      (p.product_code && p.product_code.toLowerCase() === q) ||
+      (p.id && String(p.id).toLowerCase() === q) ||
+      (p.wms_code && p.wms_code.toLowerCase() === q) ||
+      (p.location && p.location.toLowerCase().includes(q))
+    );
+  }
 
-  if (shelfMatch) {
-    const zoneCode = shelfMatch[1];
-    const shelfCode = `${zoneCode}-${shelfMatch[2]}`;
-    
-    renderStoreMapUI(zoneCode, shelfCode, targetLevel);
-    
-    const levelStr = targetLevel ? ` → Nivel ${targetLevel}` : '';
-    showToast(`📍 Estante ${shelfCode}${levelStr} ubicado en Zona ${zoneCode} (Planta Baja).`);
-  } else {
-    // Check if zone code alone e.g. "A", "B"
-    const firstChar = upperVal.charAt(0);
-    if (['A', 'B', 'C', 'D', 'E'].includes(firstChar)) {
-      renderStoreMapUI(firstChar, `${firstChar}-1`, targetLevel);
-      showToast(`📍 Zona ${firstChar} encontrada en Planta Baja.`);
-    } else {
-      showToast(`No encontramos "${rawVal}" entre los productos o ubicaciones registradas.`);
-    }
+  // 2. Decode human location information
+  const info = decodeHumanWmsLocation(rawVal, productMatch);
+
+  // 3. Render persistent card
+  renderStoreMapLocationCard(info);
+
+  // 4. Update the interactive 2D/3D map
+  if (window.setFloorLevel) {
+    window.setFloorLevel(info.floorLevel);
   }
+  if (window.selectShelf) {
+    window.selectShelf(info.layoutShelfCode || info.shelfCode, info.levelNum);
+  }
+  renderStoreMapUI(info.wallCode || info.zoneCode, info.layoutShelfCode || info.shelfCode, info.levelNum);
 }
+
 
 function simulateCustomerQRScan() {
   const resultBox = document.getElementById('customer-scan-result');
@@ -9631,5 +9857,6 @@ window.openVendorPasswordModal = openVendorPasswordModal;
 window.closeVendorPasswordModal = closeVendorPasswordModal;
 window.handleVendorChangePassword = handleVendorChangePassword;
 
-
-
+window.decodeHumanWmsLocation = decodeHumanWmsLocation;
+window.renderStoreMapLocationCard = renderStoreMapLocationCard;
+window.closeStoreMapLocationCard = closeStoreMapLocationCard;
