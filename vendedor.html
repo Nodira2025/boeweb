@@ -3821,6 +3821,7 @@
         <!-- Product Selector if opened without pre-selected item -->
         <div id="adjustment-product-selector-container" style="display: none;">
           <label for="adjustment-product-select-dropdown" style="display: block; font-size: 0.8rem; font-weight: 700; color: #c2a246; margin-bottom: 5px;">Elegir Producto</label>
+          <input type="text" id="adjustment-product-search-filter" oninput="filterAdjustmentProductDropdown(this.value)" placeholder="🔍 Filtrar por nombre, SKU o código de barra..." style="width: 100%; padding: 8px 10px; margin-bottom: 6px; border-radius: 8px; background: rgba(0,0,0,0.5); border: 1px solid rgba(194,162,70,0.5); color: #fff; font-size: 0.84rem; box-sizing: border-box;">
           <select id="adjustment-product-select-dropdown" onchange="handleAdjustmentProductDropdownChange(this.value)" style="width: 100%; padding: 10px; border-radius: 10px; background: rgba(0,0,0,0.4); border: 1.5px solid #c2a246; color: #fff; font-size: 0.88rem;">
             <!-- Populated dynamically -->
           </select>
@@ -3921,7 +3922,7 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="mapa-local.js?v=gba_leafgreen_v4"></script>
+  <script src="mapa-local.js?v=gba_leafgreen_v5"></script>
   <script src="saas-auth.js?v=saas_v2"></script>
   <script src="business-verticals.js?v=verticals_v1"></script>
   <script src="tenant-theme.js?v=theme_v1"></script>
@@ -3933,6 +3934,6 @@
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=retired_products_v34"></script>
+  <script src="vendedor.js?v=retired_products_v35"></script>
 </body>
 </html>

@@ -1679,6 +1679,31 @@ async function loadStoreMapData(forceReload = false) {
       const knownDetails = mergedByCode.get(item.product_code) || {};
       mergedByCode.set(item.product_code, { ...knownDetails, ...item });
     });
+    // Also include located products from internalCatalogProducts
+    if (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts)) {
+      internalCatalogProducts.forEach(p => {
+        if (p.shelf_code || p.location || p.wms_code || p.location_label) {
+          const code = p.product_code || p.id;
+          const known = mergedByCode.get(code) || {};
+          mergedByCode.set(code, {
+            ...known,
+            product_id: p.id || code,
+            product_code: code,
+            name: p.name || code,
+            image_url: p.image || p.image_url || known.image_url || '',
+            barcode: p.barcode || known.barcode || null,
+            floor_level: Number(p.floor_level) || (String(p.wms_code || '').startsWith('DP') ? 2 : 1),
+            shelf_code: p.shelf_code || known.shelf_code || '',
+            shelf_level: Number(p.shelf_level || p.level) || known.shelf_level || 1,
+            stock: Math.max(0, Number(p.stock ?? p.on_hand) || 0),
+            shelf_position: p.shelf_position || known.shelf_position || null,
+            location_label: p.location_label || p.location || known.location_label || null,
+            wms_code: p.wms_code || known.wms_code || null
+          });
+        }
+      });
+    }
+
     const syncLabel = draftsResult.error
       ? 'Modo local · sin conexión al inventario'
       : 'Inventario sincronizado';
@@ -4701,6 +4726,7 @@ async function persistLocationAssistant() {
       location_label: locationLabel,
       updated_at: updatedAt
     };
+    productLocation.wms_code = wmsCode;
     saveLocalProductLocation(productLocation);
 
     if (Array.isArray(internalCatalogProducts)) {
@@ -4710,7 +4736,15 @@ async function persistLocationAssistant() {
         internalItem.location_label = locationLabel;
         internalItem.shelf_code = `${wallCode}-${shelf}`;
         internalItem.shelf_level = levelNum;
+        internalItem.wms_code = wmsCode;
       }
+    }
+
+    if (window.ensureShelfExistsForLocation) {
+      window.ensureShelfExistsForLocation(`${wallCode}-${shelf}`, floorLevel, locationLabel);
+    }
+    if (window.logMapHistoryAction) {
+      window.logMapHistoryAction('ASISTENTE_UBICACION', 'Ubicación de producto asignada', `Producto "${draft.name}" ubicado en ${wmsCode}`, `${wallCode}-${shelf}`, floorLevel);
     }
 
     storeMapDataLoaded = false;
@@ -9978,35 +10012,53 @@ function openStockAdjustmentModal(productIdentifier = null, actionType = 'remove
   const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
   const localLocs = typeof readLocalProductLocations === 'function' ? readLocalProductLocations() : [];
   const allProducts = [...(internalCatalogProducts || []), ...storeLocs, ...localLocs, ...(baseProducts || [])];
+  
   let found = null;
+  let availableDropdownProducts = allProducts;
+
   if (productIdentifier) {
     const raw = String(productIdentifier).trim().toLowerCase();
     const upper = raw.toUpperCase();
+
+    // 1. Check exact product code, SKU, barcode, id, name or wms_code
     found = allProducts.find(p => 
       (p.barcode && p.barcode.toLowerCase() === raw) ||
       (p.product_code && p.product_code.toLowerCase() === raw) ||
       (p.id && String(p.id).toLowerCase() === raw) ||
-      (p.name && p.name.toLowerCase().includes(raw)) ||
-      (p.wms_code && p.wms_code.toLowerCase() === raw) ||
-      (p.location && p.location.toLowerCase().includes(raw))
+      (p.name && p.name.toLowerCase() === raw) ||
+      (p.wms_code && p.wms_code.toLowerCase() === raw)
     );
 
+    // 2. If not exact, check if it matches a shelf/level location (e.g. DP-D-P3-E3-N3-D or P3-E3)
     if (!found) {
-      // Try matching by WMS shelf and level
       const shelfMatch = upper.match(/(E[1-5]|HEL\d*|VIT\d*|PIS\d*|[A-E][-_]?[1-5])/);
+      const wallMatch = upper.match(/P([1-4])/);
       const levelMatch = upper.match(/N([1-6])/);
+      
       if (shelfMatch) {
         const sCode = shelfMatch[1].replace('-', '');
+        const wCode = wallMatch ? `P${wallMatch[1]}` : '';
         const lNum = levelMatch ? Number(levelMatch[1]) : null;
-        found = allProducts.find(p => {
+
+        const locationProducts = allProducts.filter(p => {
           const pShelf = String(p.shelf_code || '').toUpperCase();
-          const shelfOk = pShelf.includes(sCode);
+          const pWms = String(p.wms_code || '').toUpperCase();
+          const pLoc = String(p.location_label || p.location || '').toUpperCase();
+          const shelfOk = pShelf.includes(sCode) || pWms.includes(sCode) || pLoc.includes(sCode);
           const levelOk = !lNum || Number(p.shelf_level ?? p.level) === lNum;
           return shelfOk && levelOk;
         });
+
+        if (locationProducts.length === 1) {
+          found = locationProducts[0];
+        } else if (locationProducts.length > 1) {
+          availableDropdownProducts = locationProducts;
+        }
       }
     }
   }
+
+  window.currentModalAvailableProducts = availableDropdownProducts;
 
   const nameEl = document.getElementById('adjustment-product-name');
   const metaEl = document.getElementById('adjustment-product-meta');
@@ -10017,6 +10069,8 @@ function openStockAdjustmentModal(productIdentifier = null, actionType = 'remove
   const codeInput = document.getElementById('adjustment-product-code');
   const dropdownContainer = document.getElementById('adjustment-product-selector-container');
   const dropdown = document.getElementById('adjustment-product-select-dropdown');
+  const searchFilter = document.getElementById('adjustment-product-search-filter');
+  if (searchFilter) searchFilter.value = '';
 
   if (found) {
     currentStockAdjustmentProduct = found;
@@ -10044,8 +10098,8 @@ function openStockAdjustmentModal(productIdentifier = null, actionType = 'remove
     if (dropdownContainer) {
       dropdownContainer.style.display = 'block';
       if (dropdown) {
-        dropdown.innerHTML = '<option value="">-- Seleccionar un producto del local --</option>' + 
-          allProducts.map(p => `<option value="${p.id || p.product_code}">${p.name} (Stock actual: ${p.stock || 0} u.)</option>`).join('');
+        dropdown.innerHTML = `<option value="">-- Seleccionar producto (${availableDropdownProducts.length} disponibles) --</option>` + 
+          availableDropdownProducts.map(p => `<option value="${p.id || p.product_code}">${p.name} (Stock: ${p.stock || 0} u. | ${p.shelf_code || 'Sin ubic.'})</option>`).join('');
       }
     }
     if (nameEl) nameEl.textContent = productIdentifier ? `Asignar producto a: ${productIdentifier}` : 'Seleccioná un producto de la lista';
@@ -10057,6 +10111,32 @@ function openStockAdjustmentModal(productIdentifier = null, actionType = 'remove
 
   if (modal) modal.style.display = 'flex';
 }
+
+function filterAdjustmentProductDropdown(query) {
+  const dropdown = document.getElementById('adjustment-product-select-dropdown');
+  const prods = window.currentModalAvailableProducts || internalCatalogProducts || [];
+  if (!dropdown || !Array.isArray(prods)) return;
+
+  const q = String(query || '').trim().toLowerCase();
+  const filtered = q
+    ? prods.filter(p => 
+        (p.name && p.name.toLowerCase().includes(q)) ||
+        (p.product_code && p.product_code.toLowerCase().includes(q)) ||
+        (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+        (p.shelf_code && p.shelf_code.toLowerCase().includes(q))
+      )
+    : prods;
+
+  dropdown.innerHTML = `<option value="">-- Seleccionar producto (${filtered.length} encontrados) --</option>` + 
+    filtered.map(p => `<option value="${p.id || p.product_code}">${p.name} (Stock: ${p.stock || 0} u. | ${p.shelf_code || 'Sin ubic.'})</option>`).join('');
+
+  if (filtered.length === 1) {
+    dropdown.value = filtered[0].id || filtered[0].product_code;
+    handleAdjustmentProductDropdownChange(dropdown.value);
+  }
+}
+window.filterAdjustmentProductDropdown = filterAdjustmentProductDropdown;
+
 
 function handleAdjustmentProductDropdownChange(val) {
   if (!val) return;

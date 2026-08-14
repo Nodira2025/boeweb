@@ -2079,6 +2079,116 @@
   border-radius: 10px;
 }
 
+/* GBA Map Editor Controls */
+.gba-editor-arrows {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  display: flex;
+  gap: 2px;
+  z-index: 10;
+}
+
+.gba-editor-arrows button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1.5px solid #142e20;
+  border-radius: 4px;
+  background: #ffd54f;
+  color: #000;
+  font-size: 0.6rem;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 2px 0 #000;
+}
+
+.gba-shelf-delete-btn {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1.5px solid #ffffff;
+  border-radius: 50%;
+  background: #e53935;
+  color: #fff;
+  font-size: 0.65rem;
+  cursor: pointer;
+  z-index: 12;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gba-shelf-delete-btn:hover {
+  background: #b71c1c;
+  transform: scale(1.15);
+}
+
+/* History / Audit Log Table */
+.gba-history-container {
+  background: #0f2318;
+  border: 2px solid #2e6b4d;
+  border-radius: 16px;
+  padding: 18px;
+  margin: 12px 0;
+}
+
+.gba-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid rgba(46,107,77,0.5);
+  padding-bottom: 10px;
+}
+
+.gba-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  color: #e8f5e9;
+}
+
+.gba-history-table th {
+  background: rgba(0,0,0,0.4);
+  color: #c2a246;
+  padding: 10px 12px;
+  text-align: left;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.52rem;
+  border-bottom: 2px solid #2e6b4d;
+}
+
+.gba-history-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.gba-history-table tr:hover td {
+  background: rgba(255,255,255,0.03);
+}
+
+.gba-history-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.gba-badge-create { background: rgba(76,175,80,0.25); color: #81c784; border: 1px solid #4caf50; }
+.gba-badge-delete { background: rgba(244,67,54,0.25); color: #ef9a9a; border: 1px solid #e53935; }
+.gba-badge-move { background: rgba(33,150,243,0.25); color: #90caf9; border: 1px solid #2196f3; }
+.gba-badge-locate { background: rgba(255,193,7,0.25); color: #ffe082; border: 1px solid #ffc107; }
+.gba-badge-reset { background: rgba(255,87,34,0.25); color: #ffab91; border: 1px solid #ff5722; }
+
 /* Retro Bottom HUD */
 .gba-bottom-hud {
   display: flex;
