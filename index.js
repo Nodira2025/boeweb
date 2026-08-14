@@ -15,6 +15,16 @@ if (window.supabase) {
   }
 }
 
+window.toggleNavMoreMenu = function() {
+  const dropdown = document.getElementById('nav-more-menu-dropdown');
+  if (dropdown) dropdown.classList.toggle('active');
+};
+
+window.closeNavMoreMenu = function() {
+  const dropdown = document.getElementById('nav-more-menu-dropdown');
+  if (dropdown) dropdown.classList.remove('active');
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   // --- STATE MANAGEMENT ---
   let products = [];
@@ -196,7 +206,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- INITIALIZE & FETCH CATALOG ---
   async function loadCatalog() {
-    let initialLoaded = false;
+    try {
+      let initialLoaded = false;
 
     // 1. Instant Load from Local/Cached Storage or products.json
     try {
@@ -1676,7 +1687,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
   window.printWebOrderReceipt = printWebOrderReceipt;
-  });
 
   // Global Helper: Add Gift Item to Cart ($0)
   window.addGiftToCart = function(giftProduct) {
