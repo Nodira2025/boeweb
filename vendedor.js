@@ -3049,7 +3049,33 @@ function canvasToJpegBlob(canvas, quality) {
   });
 }
 
-async function compressImageFile(file, maxWidth = 1000, maxHeight = 1000, quality = 0.75) {
+async function compressImageFile(file, maxWidth = 800, maxHeight = 800, quality = 0.70) {
+  // Method 1: Hardware-accelerated downscaling via createImageBitmap (ultra-low memory footprint on mobile)
+  if (typeof window !== 'undefined' && 'createImageBitmap' in window) {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, maxWidth / bitmap.width, maxHeight / bitmap.height);
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d', { alpha: false });
+      if (context) {
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, width, height);
+        context.drawImage(bitmap, 0, 0, width, height);
+        if (typeof bitmap.close === 'function') bitmap.close();
+        return await canvasToJpegBlob(canvas, quality);
+      }
+      if (typeof bitmap.close === 'function') bitmap.close();
+    } catch (bitmapErr) {
+      console.warn('createImageBitmap downscale fallback:', bitmapErr);
+    }
+  }
+
+  // Method 2: Fallback downscaling via HTMLImageElement
   const compatibleFile = await prepareFastUploadImage(file);
   const decoded = await decodeFastUploadImage(compatibleFile);
   try {
@@ -4203,8 +4229,11 @@ async function handleLocationAssistantPhotoChange(event) {
       status.dataset.state = 'loading';
       status.textContent = 'Comprimiendo la foto para que ocupe menos espacio…';
     }
-    const compressed = await compressImageFile(file, 1200, 900, 0.72);
-    const previewUrl = await blobToDataUrl(compressed);
+    const compressed = await compressImageFile(file, 800, 800, 0.70);
+    if (locationAssistantState.photoPreviewUrl && locationAssistantState.photoPreviewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(locationAssistantState.photoPreviewUrl);
+    }
+    const previewUrl = URL.createObjectURL(compressed);
     locationAssistantState.photoBlob = compressed;
     locationAssistantState.photoPreviewUrl = previewUrl;
     locationAssistantState.photoPath = null;
@@ -4650,9 +4679,8 @@ async function handleShelfPhotoChange(event, shelfCode) {
   if (!file) return;
   try {
     showToast(`Preparando foto del estante ${shelfCode}…`);
-    const compressed = await compressImageFile(file, 1100, 800, 0.72);
-    const localDataUrl = await blobToDataUrl(compressed);
-    let photoUrl = localDataUrl;
+    const compressed = await compressImageFile(file, 800, 800, 0.70);
+    let photoUrl = URL.createObjectURL(compressed);
     let photoPath = null;
     if (supabaseClient) {
       photoPath = `shelves/${shelfCode.toLowerCase()}_${Date.now()}.jpg`;
