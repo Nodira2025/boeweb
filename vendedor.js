@@ -8165,6 +8165,85 @@ function loadWebOrderToPos(orderId) {
 async function updateWebOrderStatus(orderId, newStatus) {
   const order = webOrdersList.find(o => (o.id || o.order_id) === orderId);
   if (order) {
+    const isNowCompleted = (newStatus.toLowerCase().includes('completado') || newStatus.toLowerCase().includes('entregado'));
+    
+    // Si se pasa a Completado / Entregado y aún no se descontó el stock:
+    if (isNowCompleted && !order.stock_deducted) {
+      const items = order.items || order.items_json || [];
+      const stockChanges = [];
+
+      items.forEach(soldItem => {
+        const code = String(soldItem.product_id || soldItem.id || soldItem.product_code || '');
+        const barcode = String(soldItem.barcode || '');
+        const name = String(soldItem.name || '').toLowerCase();
+        const qty = Math.max(1, Number(soldItem.quantity) || 1);
+
+        // 1. Actualizar catálogo interno
+        if (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts)) {
+          const intP = internalCatalogProducts.find(p => 
+            (code && (String(p.id) === code || String(p.product_code) === code)) ||
+            (barcode && p.barcode === barcode) ||
+            (name && p.name && p.name.toLowerCase() === name)
+          );
+          if (intP) {
+            const prev = Number(intP.stock || 0);
+            intP.stock = Math.max(0, prev - qty);
+            stockChanges.push(`${intP.name}: ${prev} u. ➔ ${intP.stock} u.`);
+          }
+        }
+
+        // 2. Actualizar ubicaciones físicas locales
+        if (typeof readLocalProductLocations === 'function' && typeof saveLocalProductLocation === 'function') {
+          const locs = readLocalProductLocations();
+          const loc = locs.find(l => 
+            (code && (String(l.product_code) === code || String(l.product_id) === code)) ||
+            (barcode && l.barcode === barcode) ||
+            (name && l.name && l.name.toLowerCase() === name)
+          );
+          if (loc) {
+            loc.stock = Math.max(0, Number(loc.stock || 0) - qty);
+            saveLocalProductLocation(loc);
+          }
+        }
+
+        // 3. Actualizar productos del mapa interactivo
+        if (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) {
+          const mapLoc = window.storeLocationProducts.find(l => 
+            (code && (String(l.product_code) === code || String(l.product_id) === code)) ||
+            (barcode && l.barcode === barcode) ||
+            (name && l.name && l.name.toLowerCase() === name)
+          );
+          if (mapLoc) {
+            mapLoc.stock = Math.max(0, Number(mapLoc.stock || 0) - qty);
+          }
+        }
+      });
+
+      order.stock_deducted = true;
+      try {
+        localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
+      } catch (_) {}
+
+      // Registrar salida en el historial de retiros/ventas
+      items.forEach(soldItem => {
+        saveRetiredProductAdjustment({
+          id: `web_sale_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          date: new Date().toISOString().slice(0, 10),
+          created_at: new Date().toISOString(),
+          product_id: soldItem.product_id || soldItem.id || '',
+          product_code: soldItem.product_code || '',
+          product_name: soldItem.name || 'Producto Web',
+          barcode: soldItem.barcode || '',
+          type: 'remove',
+          quantity: Math.max(1, Number(soldItem.quantity) || 1),
+          reason: 'vendido',
+          reason_label: `Pedido Web #${orderId}`,
+          notes: `Venta online completada por ${order.customer_name || 'Cliente'}`,
+          vendor_name: (typeof getCurrentMapUser === 'function') ? getCurrentMapUser() : 'Vendedor'
+        });
+      });
+    }
+
     order.status = newStatus;
     try {
       localStorage.setItem('boeweb_web_orders', JSON.stringify(webOrdersList));
@@ -8174,7 +8253,7 @@ async function updateWebOrderStatus(orderId, newStatus) {
       try {
         await supabaseClient
           .from('orders')
-          .update({ status: newStatus })
+          .update({ status: newStatus, updated_at: new Date().toISOString() })
           .eq('order_id', orderId);
       } catch (err) {
         console.warn('Aviso al actualizar estado remoto:', err);
@@ -8183,7 +8262,14 @@ async function updateWebOrderStatus(orderId, newStatus) {
 
     refreshWebOrdersBadges();
     renderWebOrders();
-    if (window.showToast) window.showToast(`✓ Estado actualizado: ${newStatus}`);
+    if (typeof renderInternalCatalog === 'function') renderInternalCatalog();
+    if (typeof loadStoreMapData === 'function') await loadStoreMapData(true);
+    if (typeof rerenderStoreMap === 'function') rerenderStoreMap();
+
+    const toastMsg = isNowCompleted
+      ? `✓ Pedido #${orderId} completado y stock descontado del inventario.`
+      : `✓ Estado actualizado: ${newStatus}`;
+    if (window.showToast) window.showToast(toastMsg);
   }
 }
 
@@ -10300,7 +10386,7 @@ function startStockAdjustmentDictation() {
   recognition.start();
 }
 
-function handleStockAdjustmentSubmit(event) {
+async function handleStockAdjustmentSubmit(event) {
   event.preventDefault();
   const actionType = document.getElementById('adjustment-action-type')?.value || 'remove';
   const qty = Math.max(1, parseInt(document.getElementById('adjustment-quantity')?.value, 10) || 1);
@@ -10312,7 +10398,8 @@ function handleStockAdjustmentSubmit(event) {
   const prodCode = document.getElementById('adjustment-product-code')?.value;
 
   const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
-  const allProducts = [...(internalCatalogProducts || []), ...storeLocs, ...(baseProducts || [])];
+  const localLocs = typeof readLocalProductLocations === 'function' ? readLocalProductLocations() : [];
+  const allProducts = [...(internalCatalogProducts || []), ...storeLocs, ...localLocs, ...(baseProducts || [])];
   const product = currentStockAdjustmentProduct || allProducts.find(p => String(p.id) === String(prodId) || p.product_code === prodCode);
 
   if (!product) {
@@ -10329,10 +10416,39 @@ function handleStockAdjustmentSubmit(event) {
   }
 
   product.stock = newStock;
+  
+  // 1. Actualizar catálogo interno
   if (Array.isArray(internalCatalogProducts)) {
-    const intItem = internalCatalogProducts.find(p => String(p.id) === String(product.id) || p.product_code === product.product_code);
+    const intItem = internalCatalogProducts.find(p => String(p.id) === String(product.id) || p.product_code === product.product_code || (product.barcode && p.barcode === product.barcode));
     if (intItem) intItem.stock = newStock;
-    localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
+    try {
+      localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
+    } catch (_) {}
+  }
+
+  // 2. Actualizar ubicaciones físicas locales
+  if (typeof readLocalProductLocations === 'function' && typeof saveLocalProductLocation === 'function') {
+    const locs = readLocalProductLocations();
+    const loc = locs.find(l => String(l.product_code) === String(product.product_code || product.id) || l.product_id === product.id || (product.barcode && l.barcode === product.barcode));
+    if (loc) {
+      loc.stock = newStock;
+      saveLocalProductLocation(loc);
+    }
+  }
+
+  // 3. Actualizar productos del mapa interactivo
+  if (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) {
+    const mapItem = window.storeLocationProducts.find(l => String(l.product_code) === String(product.product_code || product.id) || l.product_id === product.id || (product.barcode && l.barcode === product.barcode));
+    if (mapItem) {
+      mapItem.stock = newStock;
+    }
+  }
+
+  // 4. Actualizar Supabase si está disponible
+  if (supabaseClient && product.id) {
+    try {
+      supabaseClient.from('product_drafts').update({ stock: newStock, updated_at: new Date().toISOString() }).eq('id', product.id).then();
+    } catch (_) {}
   }
 
   const reasonLabels = {
@@ -10342,7 +10458,7 @@ function handleStockAdjustmentSubmit(event) {
     'otro': 'Otro motivo'
   };
 
-  const currentVendor = localStorage.getItem('boeweb_active_vendor_name') || 'Vendedor';
+  const currentVendor = localStorage.getItem('boeweb_active_vendor_name') || (typeof getCurrentMapUser === 'function' ? getCurrentMapUser() : 'Vendedor');
 
   const adjustmentRecord = {
     id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -10371,6 +10487,10 @@ function handleStockAdjustmentSubmit(event) {
   );
 
   renderRetiredProductsUI();
+  if (typeof renderInternalCatalog === 'function') renderInternalCatalog();
+  if (typeof loadStoreMapData === 'function') await loadStoreMapData(true);
+  if (typeof rerenderStoreMap === 'function') rerenderStoreMap();
+
   if (document.getElementById('store-map-search-result-card')?.style.display !== 'none') {
     const info = decodeHumanWmsLocation(product.product_code || product.name, product);
     renderStoreMapLocationCard(info);

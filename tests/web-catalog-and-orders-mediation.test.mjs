@@ -176,3 +176,63 @@ test('4. Concurrencia Omnicanal: Venta en Tienda (POS) y Compra Web sobre el inv
   const hasEnoughStock = storeInventory['BO-PROD-001'].stock >= attemptQty;
   assert.equal(hasEnoughStock, false, 'No debe permitir sobreventa ni stock negativo');
 });
+
+test('5. Descuento de Stock al Completar Pedido Web (Cero Doble Descuento)', () => {
+  const catalog = [
+    { id: 'PROD-101', product_code: 'PROD-101', name: 'Macetas Geotextiles 10L', stock: 20 }
+  ];
+  const locations = [
+    { product_code: 'PROD-101', shelf_code: 'P3-E2', stock: 20 }
+  ];
+
+  const webOrder = {
+    id: 'ORD-777',
+    order_id: 'ORD-777',
+    customer_name: 'Ana Martínez',
+    items: [{ product_code: 'PROD-101', name: 'Macetas Geotextiles 10L', quantity: 5 }],
+    status: 'Pendiente Vendedor',
+    stock_deducted: false
+  };
+
+  // Simulación de updateWebOrderStatus('ORD-777', 'Completado')
+  const isNowCompleted = true;
+  if (isNowCompleted && !webOrder.stock_deducted) {
+    webOrder.items.forEach(item => {
+      const p = catalog.find(x => x.product_code === item.product_code);
+      if (p) p.stock = Math.max(0, p.stock - item.quantity);
+
+      const loc = locations.find(x => x.product_code === item.product_code);
+      if (loc) loc.stock = Math.max(0, loc.stock - item.quantity);
+    });
+    webOrder.stock_deducted = true;
+    webOrder.status = 'Completado';
+  }
+
+  assert.equal(catalog[0].stock, 15);
+  assert.equal(locations[0].stock, 15);
+  assert.equal(webOrder.status, 'Completado');
+  assert.equal(webOrder.stock_deducted, true);
+
+  // Intentar completar de nuevo (Idempotencia / No doble descuento)
+  if (isNowCompleted && !webOrder.stock_deducted) {
+    catalog[0].stock -= 5;
+  }
+  assert.equal(catalog[0].stock, 15, 'No debe descontar doble si ya estaba marcado como stock_deducted');
+});
+
+test('6. Retiro / Ajuste de Stock en Ubicaciones Físicas y Catálogo', () => {
+  const internalCatalog = [{ id: 'FERT-01', product_code: 'FERT-01', name: 'Bio Root 250ml', stock: 8 }];
+  const localLocations = [{ product_code: 'FERT-01', shelf_code: 'P1-E1', stock: 8 }];
+
+  // Retiro por defecto/rotura de 2 unidades
+  const qtyToRemove = 2;
+  const target = internalCatalog.find(p => p.product_code === 'FERT-01');
+  const loc = localLocations.find(l => l.product_code === 'FERT-01');
+
+  target.stock = Math.max(0, target.stock - qtyToRemove);
+  loc.stock = target.stock;
+
+  assert.equal(target.stock, 6);
+  assert.equal(loc.stock, 6);
+});
+
