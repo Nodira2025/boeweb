@@ -62,26 +62,52 @@ const mobileCartCountEl = document.getElementById('b2b-mobile-cart-count');
 // --- INITIALIZE PORTAL ---
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    if (!window.supabase) {
-      throw new Error('No se pudo cargar la librería de Supabase.');
+    if (window.supabase && typeof window.supabase.createClient === 'function') {
+      supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+      if (window.SaasAuth?.hydrateFromSupabase) {
+        try {
+          await window.SaasAuth.hydrateFromSupabase(supabaseClient);
+        } catch (authErr) {
+          console.warn('SaasAuth optional hydration notice:', authErr);
+        }
+      }
     }
+  } catch (clientErr) {
+    console.warn('Supabase client optional notice:', clientErr);
+  }
 
-    supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
-    if (window.SaasAuth?.hydrateFromSupabase) {
-      await window.SaasAuth.hydrateFromSupabase(supabaseClient);
-    }
+  setupEventListeners();
 
-    setupEventListeners();
+  try {
     await fetchB2BProducts(true);
+  } catch (b2bErr) {
+    console.warn('B2B products load notice:', b2bErr);
+  }
+
+  try {
     updateCartBadge();
     renderCart();
     updateCategoryCounts();
+  } catch (cartErr) {
+    console.warn('Cart badge notice:', cartErr);
+  }
+
+  try {
     await loadPendingProductDrafts();
+  } catch (draftErr) {
+    console.warn('Product drafts notice:', draftErr);
+  }
+
+  try {
     initializeFastUploadForm();
+  } catch (formErr) {
+    console.warn('Fast upload form notice:', formErr);
+  }
+
+  try {
     await refreshPendingLocationBadge();
-  } catch (error) {
-    console.error('No se pudo inicializar el portal:', error);
-    showToast('No pudimos conectar todos los servicios. Recargá la página en unos segundos.');
+  } catch (locErr) {
+    console.warn('Location badge notice:', locErr);
   }
 });
 
@@ -9240,15 +9266,41 @@ async function toggleUniversalCameraTorch() {
   }
 }
 
+function triggerNativeMobileCamera() {
+  const fileInput = document.getElementById('universal-camera-native-file-input');
+  if (fileInput) {
+    fileInput.value = '';
+    fileInput.click();
+  }
+}
+
 async function handleCameraScannerFile(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
 
   const feedbackEl = document.getElementById('camera-scanner-feedback');
   if (feedbackEl) {
-    feedbackEl.innerHTML = '<span style="color: #ffd54f;">⌛ Analizando imagen…</span>';
+    feedbackEl.innerHTML = '<span style="color: #ffd54f;">⌛ Procesando y decodificando foto…</span>';
   }
 
+  // 1. Usar BarcodeDetector nativo si está disponible en el navegador
+  if ('BarcodeDetector' in window) {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const barcodeDetector = new window.BarcodeDetector({
+        formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'qr_code', 'upc_a', 'upc_e', 'data_matrix']
+      });
+      const detected = await barcodeDetector.detect(bitmap);
+      if (detected && detected.length > 0) {
+        handleUniversalCameraScanSuccess(detected[0].rawValue);
+        return;
+      }
+    } catch (detErr) {
+      console.warn('Native BarcodeDetector photo scan fallback:', detErr);
+    }
+  }
+
+  // 2. Usar Html5Qrcode.scanFile si está disponible
   if (window.Html5Qrcode) {
     try {
       const html5QrCode = new window.Html5Qrcode('universal-camera-reader-viewport');
@@ -9262,7 +9314,7 @@ async function handleCameraScannerFile(event) {
   }
 
   if (feedbackEl) {
-    feedbackEl.innerHTML = '<span style="color: #ff8a80;">⚠️ No se encontró ningún código legible en la imagen. Probá con otra foto o usá la cámara en vivo.</span>';
+    feedbackEl.innerHTML = '<span style="color: #ff8a80;">⚠️ No se pudo leer el código en la foto. Asegurate de que esté bien iluminado y enfocado, o intentá nuevamente.</span>';
   }
 }
 
@@ -9312,6 +9364,7 @@ window.closeUniversalCameraScanner = closeUniversalCameraScanner;
 window.switchUniversalCamera = switchUniversalCamera;
 window.toggleUniversalCameraTorch = toggleUniversalCameraTorch;
 window.handleCameraScannerFile = handleCameraScannerFile;
+window.triggerNativeMobileCamera = triggerNativeMobileCamera;
 window.playScannerBeep = playScannerBeep;
 window.getNearbyStores = getNearbyStores;
 window.saveNearbyStore = saveNearbyStore;

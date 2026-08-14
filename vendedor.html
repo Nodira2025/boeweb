@@ -3526,14 +3526,14 @@
   </div>
 
   <!-- Modal Escáner Universal por Cámara (Celulares y PC) -->
-  <div id="modal-universal-camera-scanner" class="b2b-modal" style="display: none; z-index: 999999; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);">
-    <div class="b2b-modal-content" style="max-width: 480px; width: 92%; border-radius: 24px; border: 2px solid var(--color-accent-gold, #c2a246); background: #152d24; color: #ffffff; padding: 22px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.7); margin: 30px auto;">
+  <div id="modal-universal-camera-scanner" style="position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 99999999 !important; background: rgba(0,0,0,0.92) !important; backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important; display: none; align-items: center !important; justify-content: center !important; padding: 16px !important; box-sizing: border-box !important; overflow-y: auto !important;">
+    <div style="position: relative; max-width: 480px; width: 100%; border-radius: 24px; border: 2px solid var(--color-accent-gold, #c2a246); background: #152d24; color: #ffffff; padding: 22px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.8); margin: auto;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 1.5rem;" aria-hidden="true">📷</span>
           <h3 id="camera-scanner-modal-title" style="margin: 0; font-size: 1.15rem; color: #c2a246; font-weight: 800;">Escanear Código con Cámara</h3>
         </div>
-        <button type="button" onclick="closeUniversalCameraScanner()" style="background: rgba(255,255,255,0.15); border: none; color: #fff; font-size: 1.3rem; border-radius: 50%; width: 34px; height: 34px; cursor: pointer; display: flex; align-items: center; justify-content: center;" aria-label="Cerrar cámara">✕</button>
+        <button type="button" onclick="closeUniversalCameraScanner()" style="background: rgba(255,255,255,0.15); border: none; color: #fff; font-size: 1.3rem; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;" aria-label="Cerrar cámara">✕</button>
       </div>
 
       <p id="camera-scanner-modal-hint" style="font-size: 0.85rem; color: rgba(247,246,242,0.85); margin: 0 0 14px 0;">
@@ -3541,7 +3541,7 @@
       </p>
 
       <!-- Viewport de Video / Escáner -->
-      <div style="position: relative; width: 100%; aspect-ratio: 4/3; max-height: 290px; background: #000; border-radius: 16px; overflow: hidden; border: 2px solid #7ea642; margin-bottom: 12px;">
+      <div style="position: relative; width: 100%; aspect-ratio: 4/3; max-height: 290px; background: #000; border-radius: 16px; overflow: hidden; border: 2px solid #7ea642; margin-bottom: 14px;">
         <div id="universal-camera-reader-viewport" style="width: 100%; height: 100%;"></div>
         
         <!-- Láser y marco visor -->
@@ -3554,18 +3554,20 @@
         <span>⚡ Buscando código de barras o QR…</span>
       </div>
 
+      <!-- Input invisible para captura nativa directa en celular -->
+      <input type="file" id="universal-camera-native-file-input" accept="image/*" capture="environment" onchange="handleCameraScannerFile(event)" style="display: none;">
+
       <!-- Controles de Cámara -->
       <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+        <button type="button" onclick="triggerNativeMobileCamera()" style="background: #2e7d32; color: #ffffff; border: 1.5px solid #81c784; padding: 10px 16px; border-radius: 12px; font-size: 0.88rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(46,125,50,0.4);">
+          📸 Sacar foto al código
+        </button>
         <button type="button" id="camera-switch-btn" onclick="switchUniversalCamera()" style="background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.25); padding: 8px 14px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; cursor: pointer;">
           🔄 Cambiar cámara
         </button>
         <button type="button" id="camera-torch-btn" onclick="toggleUniversalCameraTorch()" style="background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.25); padding: 8px 14px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; cursor: pointer;">
           💡 Linterna
         </button>
-        <label style="background: #7ea642; color: #152d24; border: none; padding: 8px 14px; border-radius: 10px; font-size: 0.82rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-          📁 Subir foto
-          <input type="file" accept="image/*" capture="environment" onchange="handleCameraScannerFile(event)" hidden>
-        </label>
       </div>
     </div>
   </div>
