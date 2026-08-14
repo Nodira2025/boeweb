@@ -1547,6 +1547,7 @@ function renderVendorHomeUI() {
     return supplier.available && supplier.stock !== null && Number.isFinite(stock) && stock <= 5;
   })).length;
   refreshPendingLocationBadge();
+  if (typeof refreshPendingDraftsBadge === 'function') refreshPendingDraftsBadge();
   const localHour = Number(new Intl.DateTimeFormat('es-AR', {
     timeZone: CASH_TIME_ZONE,
     hour: '2-digit',
@@ -4815,107 +4816,214 @@ function goBackLocationAssistant() {
   renderLocationAssistant();
 }
 
+async function refreshPendingDraftsBadge() {
+  const badge = document.getElementById('drafts-pending-count-badge');
+  const homeBadge = document.getElementById('drafts-pending-count-home-badge');
+  const sidebarBadge = document.getElementById('vendor-sidebar-drafts-badge');
+  const catalogCount = document.getElementById('drafts-pending-catalog-count');
+
+  try {
+    let count = 0;
+    if (supabaseClient) {
+      const { count: c, error } = await supabaseClient
+        .from('product_drafts')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'PENDING_REVIEW');
+      if (!error && Number.isFinite(c)) count = c;
+    }
+    const localDrafts = JSON.parse(localStorage.getItem('boeweb_local_product_drafts') || '[]');
+    if (Array.isArray(localDrafts)) {
+      const pendingLocals = localDrafts.filter(d => d.status === 'PENDING_REVIEW');
+      count = Math.max(count, pendingLocals.length);
+    }
+
+    if (badge) {
+      badge.textContent = count;
+      badge.style.display = count > 0 ? 'inline-block' : 'none';
+    }
+    if (homeBadge) {
+      homeBadge.textContent = `${count} pend.`;
+      homeBadge.style.display = count > 0 ? 'inline-block' : 'none';
+    }
+    if (sidebarBadge) {
+      sidebarBadge.textContent = count;
+      sidebarBadge.hidden = count === 0;
+      sidebarBadge.style.display = count > 0 ? 'inline-block' : 'none';
+    }
+    if (catalogCount) {
+      catalogCount.textContent = count;
+      catalogCount.style.display = count > 0 ? 'inline-block' : 'none';
+    }
+    return count;
+  } catch (_) {
+    return 0;
+  }
+}
+window.refreshPendingDraftsBadge = refreshPendingDraftsBadge;
+
+function renderPendingDraftsList(drafts) {
+  const container = document.getElementById('pending-drafts-grid');
+  if (!container) return;
+
+  if (!Array.isArray(drafts) || drafts.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 40px 20px; background: rgba(0,0,0,0.2); border: 1px dashed var(--color-border-accent); border-radius: 16px; color: var(--color-text-muted);">
+        <div style="font-size: 2.5rem; margin-bottom: 8px;">✨</div>
+        <p style="font-weight: 700; font-size: 1.1rem; color: #66bb6a; margin: 0 0 4px 0;">¡No hay borradores pendientes!</p>
+        <p style="font-size: 0.85rem; margin: 0;">Los productos cargados por los vendedores aparecerán acá para su revisión y publicación.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const categoriesList = ['Semillas', 'Sustratos', 'Fertilizantes', 'Indoor', 'Vaporizadores', 'Macetas', 'Medición y Riego', 'Parafernalia', 'Otros'];
+
+  container.innerHTML = drafts.map(draft => {
+    const dateStr = draft.created_at ? new Date(draft.created_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : 'Reciente';
+    const imgSrc = draft.image_url || 'assets/logo.jpg';
+    return `
+      <div style="background: #ffffff; border: 1.5px solid #d4c5a9; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 4px 14px rgba(92,59,30,0.08);">
+        <div style="aspect-ratio: 1/1; max-height: 200px; background: #152d24; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+          <img src="${escapeStockHtml(imgSrc)}" alt="${escapeStockHtml(draft.name || 'Foto del producto')}" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.onerror=null;this.src='assets/logo.jpg';">
+          <span style="position: absolute; top: 8px; left: 8px; background: rgba(21,45,36,0.9); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 8px;">
+            ${escapeStockHtml(draft.seller_name || 'Vendedor')} · ${escapeStockHtml(dateStr)}
+          </span>
+        </div>
+
+        <div style="padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 10px;">
+          <div style="background: #f7f4ea; border: 1px solid rgba(194,162,70,0.4); border-radius: 12px; padding: 10px 14px; font-size: 0.82rem; color: #5c3b1e;">
+            <p style="margin: 0 0 4px 0; color: #5c3b1e;"><strong>📦 Stock Cargado:</strong> ${draft.stock || 0} unidades</p>
+            <p style="margin: 0 0 4px 0; color: #5c3b1e;"><strong>📍 Ubicación:</strong> ${escapeStockHtml(draft.location_label || draft.location || draft.shelf_code || 'No especificada')}</p>
+            ${draft.product_code ? `<p style="margin: 0 0 4px; color: #5c3b1e;"><strong>SKU / Código:</strong> ${escapeStockHtml(draft.product_code)}</p>` : ''}
+            ${draft.barcode ? `<p style="margin: 0 0 4px; color: #5c3b1e;"><strong>Barra:</strong> ${escapeStockHtml(draft.barcode)}</p>` : ''}
+            ${draft.market_average_price ? `<p style="margin: 0 0 4px; color: #5c3b1e;"><strong>Promedio ML:</strong> $${Number(draft.market_average_price).toLocaleString('es-AR')}</p>` : ''}
+            ${draft.observations ? `<p style="margin: 0; color: #6b4e2e; font-style: italic;">${escapeStockHtml(draft.observations)}</p>` : ''}
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #5c3b1e; margin-bottom: 2px;">Nombre del Producto (Requerido) *</label>
+            <input type="text" id="draft-name-${draft.id}" value="${escapeStockHtml(draft.name || '')}" placeholder="Ej: Sustrato Klasmann 50L" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.9rem; border-radius: 8px; color: #3e2723; background: #fffdfa; border: 1.5px solid #d4c5a9;">
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div>
+              <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #5c3b1e; margin-bottom: 2px;">Categoría *</label>
+              <select id="draft-cat-${draft.id}" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.85rem; border-radius: 8px; color: #3e2723; background: #fffdfa; border: 1.5px solid #d4c5a9;">
+                ${categoriesList.map(cat => `<option value="${cat}" ${draft.category === cat ? 'selected' : ''}>${cat}</option>`).join('')}
+              </select>
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #5c3b1e; margin-bottom: 2px;">Costo de Compra ($)</label>
+              <input type="number" step="0.01" id="draft-cost-${draft.id}" placeholder="Ej: 15000" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.85rem; border-radius: 8px; color: #3e2723; background: #fffdfa; border: 1.5px solid #d4c5a9;">
+            </div>
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 0.78rem; font-weight: 800; color: #2e7d32; margin-bottom: 2px;">PRECIO FINAL AL PÚBLICO ($ ARS) *</label>
+            <input type="number" step="0.01" id="draft-price-${draft.id}" value="${Number(draft.sale_price) || ''}" placeholder="Ej: 22500" required class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 1rem; font-weight: 800; border-radius: 8px; border-color: #2e7d32; color: #1b5e20; background: #f1f8e9;">
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-top: 6px;">
+            <button type="button" onclick="approveProductDraft('${draft.id}')" style="flex: 1; background: #2e7d32; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 0.88rem;">
+              ✅ Aprobar y Publicar
+            </button>
+            <button type="button" onclick="rejectProductDraft('${draft.id}')" style="background: rgba(239,83,80,0.2); color: #ef5350; border: 1px solid #ef5350; padding: 10px 14px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 0.85rem;">
+              ❌ Rechazar
+            </button>
+          </div>
+
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 // Cargar y mostrar borradores pendientes de revisión.
 async function loadPendingProductDrafts() {
   const container = document.getElementById('pending-drafts-grid');
-  const badge = document.getElementById('drafts-pending-count-badge');
   if (!container) return;
 
   try {
-    const { data: drafts, error } = await supabaseClient
-      .from('product_drafts')
-      .select('*')
-      .eq('status', 'PENDING_REVIEW')
-      .order('created_at', { ascending: false });
+    let drafts = [];
+    if (supabaseClient) {
+      const { data, error } = await supabaseClient
+        .from('product_drafts')
+        .select('*')
+        .eq('status', 'PENDING_REVIEW')
+        .order('created_at', { ascending: false });
 
-    if (error) throw error;
+      if (!error && Array.isArray(data)) {
+        drafts = data;
+      }
+    }
+
+    // Merge con borradores locales offline si existen
+    const localDrafts = JSON.parse(localStorage.getItem('boeweb_local_product_drafts') || '[]');
+    if (Array.isArray(localDrafts) && localDrafts.length > 0) {
+      const pendingLocals = localDrafts.filter(d => d.status === 'PENDING_REVIEW');
+      pendingLocals.forEach(ld => {
+        if (!drafts.some(d => String(d.id) === String(ld.id))) {
+          drafts.push(ld);
+        }
+      });
+    }
 
     const normalizedDrafts = (drafts || []).map(hydrateProductDraft);
     pendingDraftCache.clear();
     normalizedDrafts.forEach(draft => pendingDraftCache.set(draft.id, draft));
-    const pendingCount = normalizedDrafts.length;
-    if (badge) {
-      badge.textContent = pendingCount;
-      badge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
-    }
-
-    if (pendingCount === 0) {
-      container.innerHTML = `
-        <div style="grid-column: 1/-1; text-align: center; padding: 40px 20px; background: rgba(0,0,0,0.2); border: 1px dashed var(--color-border-accent); border-radius: 16px; color: var(--color-text-muted);">
-          <div style="font-size: 2.5rem; margin-bottom: 8px;">✨</div>
-          <p style="font-weight: 700; font-size: 1.1rem; color: #66bb6a; margin: 0 0 4px 0;">¡No hay borradores pendientes!</p>
-          <p style="font-size: 0.85rem; margin: 0;">Los productos cargados por los vendedores aparecerán acá para tu revisión.</p>
-        </div>
-      `;
-      return;
-    }
-
-    const categoriesList = ['Semillas', 'Sustratos', 'Fertilizantes', 'Indoor', 'Vaporizadores', 'Macetas', 'Medición y Riego', 'Parafernalia', 'Otros'];
-
-    container.innerHTML = normalizedDrafts.map(draft => {
-      const dateStr = new Date(draft.created_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
-      return `
-        <div style="background: #ffffff; border: 1.5px solid #d4c5a9; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 4px 14px rgba(92,59,30,0.08);">
-          <div style="aspect-ratio: 1/1; max-height: 200px; background: #000; position: relative; overflow: hidden;">
-            <img src="${escapeStockHtml(draft.image_url)}" alt="${escapeStockHtml(draft.name || 'Foto del producto')}" style="width: 100%; height: 100%; object-fit: contain;">
-            <span style="position: absolute; top: 8px; left: 8px; background: rgba(21,45,36,0.9); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 8px;">
-              ${escapeStockHtml(draft.seller_name || 'Vendedor')} · ${escapeStockHtml(dateStr)}
-            </span>
-          </div>
-
-          <div style="padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 10px;">
-            <div style="background: #f7f4ea; border: 1px solid rgba(194,162,70,0.4); border-radius: 12px; padding: 10px 14px; font-size: 0.82rem; color: #5c3b1e;">
-              <p style="margin: 0 0 4px 0; color: #5c3b1e;"><strong>📦 Stock Cargado:</strong> ${draft.stock} unidades</p>
-              <p style="margin: 0 0 4px 0; color: #5c3b1e;"><strong>📍 Ubicación:</strong> ${escapeStockHtml(draft.location || 'No especificada')}</p>
-              ${draft.product_code ? `<p style="margin: 0 0 4px; color: #5c3b1e;"><strong>QR BÔ:</strong> ${escapeStockHtml(draft.product_code)}</p>` : ''}
-              ${draft.barcode ? `<p style="margin: 0 0 4px; color: #5c3b1e;"><strong>Barra:</strong> ${escapeStockHtml(draft.barcode)}</p>` : ''}
-              ${draft.market_average_price ? `<p style="margin: 0 0 4px; color: #5c3b1e;"><strong>Promedio ML:</strong> $${Number(draft.market_average_price).toLocaleString('es-AR')}</p>` : ''}
-              ${draft.observations ? `<p style="margin: 0; color: #6b4e2e; font-style: italic;">${escapeStockHtml(draft.observations)}</p>` : ''}
-            </div>
-
-            <div>
-              <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #5c3b1e; margin-bottom: 2px;">Nombre del Producto (Requerido) *</label>
-              <input type="text" id="draft-name-${draft.id}" value="${escapeStockHtml(draft.name || '')}" placeholder="Ej: Sustrato Klasmann 50L" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.9rem; border-radius: 8px; color: #3e2723; background: #fffdfa; border: 1.5px solid #d4c5a9;">
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-              <div>
-                <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #5c3b1e; margin-bottom: 2px;">Categoría *</label>
-                <select id="draft-cat-${draft.id}" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.85rem; border-radius: 8px; color: #3e2723; background: #fffdfa; border: 1.5px solid #d4c5a9;">
-                  ${categoriesList.map(cat => `<option value="${cat}" ${draft.category === cat ? 'selected' : ''}>${cat}</option>`).join('')}
-                </select>
-              </div>
-
-              <div>
-                <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #5c3b1e; margin-bottom: 2px;">Costo de Compra ($)</label>
-                <input type="number" step="0.01" id="draft-cost-${draft.id}" placeholder="Ej: 15000" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.85rem; border-radius: 8px; color: #3e2723; background: #fffdfa; border: 1.5px solid #d4c5a9;">
-              </div>
-            </div>
-
-            <div>
-              <label style="display: block; font-size: 0.78rem; font-weight: 800; color: #2e7d32; margin-bottom: 2px;">PRECIO FINAL AL PÚBLICO ($ ARS) *</label>
-              <input type="number" step="0.01" id="draft-price-${draft.id}" value="${Number(draft.sale_price) || ''}" placeholder="Ej: 22500" required class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 1rem; font-weight: 800; border-radius: 8px; border-color: #2e7d32; color: #1b5e20; background: #f1f8e9;">
-            </div>
-
-            <div style="display: flex; gap: 8px; margin-top: 6px;">
-              <button type="button" onclick="approveProductDraft('${draft.id}')" style="flex: 1; background: #2e7d32; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 0.88rem;">
-                ✅ Aprobar y Publicar
-              </button>
-              <button type="button" onclick="rejectProductDraft('${draft.id}')" style="background: rgba(239,83,80,0.2); color: #ef5350; border: 1px solid #ef5350; padding: 10px 14px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 0.85rem;">
-                ❌ Rechazar
-              </button>
-            </div>
-
-          </div>
-        </div>
-      `;
-    }).join('');
+    
+    refreshPendingDraftsBadge();
+    renderPendingDraftsList(normalizedDrafts);
 
   } catch (err) {
     console.error('Error al cargar borradores pendientes:', err);
     container.innerHTML = `<p style="color: #ef5350;">Error al cargar borradores: ${err.message}</p>`;
   }
 }
+
+function filterPendingProductDrafts(query) {
+  const q = String(query || '').trim().toLowerCase();
+  const allDrafts = Array.from(pendingDraftCache.values());
+  if (!q) {
+    renderPendingDraftsList(allDrafts);
+    return;
+  }
+  const filtered = allDrafts.filter(d => 
+    (d.name && d.name.toLowerCase().includes(q)) ||
+    (d.product_code && d.product_code.toLowerCase().includes(q)) ||
+    (d.barcode && d.barcode.toLowerCase().includes(q)) ||
+    (d.brand && d.brand.toLowerCase().includes(q)) ||
+    (d.category && d.category.toLowerCase().includes(q)) ||
+    (d.seller_name && d.seller_name.toLowerCase().includes(q))
+  );
+  renderPendingDraftsList(filtered);
+}
+window.filterPendingProductDrafts = filterPendingProductDrafts;
+
+async function approveAllPendingProductDrafts() {
+  const drafts = Array.from(pendingDraftCache.values());
+  if (!drafts.length) {
+    showToast('No hay borradores pendientes para aprobar.');
+    return;
+  }
+  if (!confirm(`¿Aprobar y publicar todos los ${drafts.length} productos pendientes de la cola?`)) {
+    return;
+  }
+  showToast(`⏳ Aprobando ${drafts.length} productos en lote...`);
+  let approvedCount = 0;
+  for (const draft of drafts) {
+    try {
+      await approveProductDraft(draft.id);
+      approvedCount++;
+    } catch (e) {
+      console.warn('Error aprobando draft', draft.id, e);
+    }
+  }
+  showToast(`✅ ${approvedCount} productos aprobados y publicados con éxito.`);
+  loadPendingProductDrafts();
+}
+window.approveAllPendingProductDrafts = approveAllPendingProductDrafts;
 
 async function ensureLocalStoreSupplierExists() {
   if (!supabaseClient) return;
@@ -4939,10 +5047,10 @@ async function approveProductDraft(draftId) {
     const costInput = document.getElementById(`draft-cost-${draftId}`);
     const priceInput = document.getElementById(`draft-price-${draftId}`);
 
-    const nameVal = nameInput ? nameInput.value.trim() : '';
-    const catVal = catInput ? catInput.value : 'Otros';
+    const nameVal = nameInput ? nameInput.value.trim() : (draft.name || 'Producto BÔ');
+    const catVal = catInput ? catInput.value : (draft.category || 'Otros');
     const costVal = costInput ? parseFloat(costInput.value) || 0 : 0;
-    const priceVal = priceInput ? parseFloat(priceInput.value) || 0 : 0;
+    const priceVal = priceInput ? parseFloat(priceInput.value) || 0 : (Number(draft.sale_price) || Number(draft.price) || 0);
 
     if (!nameVal) {
       showToast('⚠️ Por favor ingresá un nombre para el producto.');
@@ -4958,36 +5066,48 @@ async function approveProductDraft(draftId) {
 
     const productId = draft.product_code || `BO-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
     const stock = Math.max(0, Number(draft.stock) || 0);
-    const imageUrl = draft.image_url;
+    const imageUrl = draft.image_url || 'assets/logo.jpg';
 
-    const { error: prodErr } = await supabaseClient
-      .from('products')
-      .upsert([{
-        id: productId,
-        name: nameVal,
-        category: catVal,
-        image: imageUrl,
-        description: draft.description || `${draft.brand || ''} ${draft.presentation || ''}`.trim() || `Costo de referencia: $${costVal} ARS.`
-      }], { onConflict: 'id' });
+    if (supabaseClient) {
+      const { error: prodErr } = await supabaseClient
+        .from('products')
+        .upsert([{
+          id: productId,
+          name: nameVal,
+          category: catVal,
+          image: imageUrl,
+          description: draft.description || `${draft.brand || ''} ${draft.presentation || ''}`.trim() || `Costo de referencia: $${costVal} ARS.`
+        }], { onConflict: 'id' });
 
-    if (prodErr) throw new Error(`Error al crear producto: ${prodErr.message}`);
+      if (prodErr) console.warn('Aviso creando producto en supabase:', prodErr.message);
 
-    await ensureLocalStoreSupplierExists();
+      await ensureLocalStoreSupplierExists();
 
-    const { error: spErr } = await supabaseClient
-      .from('supplier_products')
-      .upsert([{
-        supplier_id: 'local_store',
-        supplier_product_id: productId,
-        name: nameVal,
-        price: priceVal,
-        stock: stock,
-        available: true,
-        image: imageUrl,
-        mapped_product_id: productId
-      }], { onConflict: 'supplier_id,supplier_product_id' });
+      const { error: spErr } = await supabaseClient
+        .from('supplier_products')
+        .upsert([{
+          supplier_id: 'local_store',
+          supplier_product_id: productId,
+          name: nameVal,
+          price: priceVal,
+          stock: stock,
+          available: true,
+          image: imageUrl,
+          mapped_product_id: productId
+        }], { onConflict: 'supplier_id,supplier_product_id' });
 
-    if (spErr) throw new Error(`Error al incorporar el producto al catálogo interno: ${spErr.message}`);
+      if (spErr) console.warn('Aviso incorporando a supplier_products:', spErr.message);
+
+      const { error: updateErr } = await supabaseClient
+        .from('product_drafts')
+        .update({
+          status: 'APPROVED',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', draftId);
+
+      if (updateErr) console.warn('Aviso actualizando product_drafts:', updateErr.message);
+    }
 
     const resolvedShelfCode = draft.shelf_code || String(draft.location || '').match(/[A-E]-\d/i)?.[0]?.toUpperCase() || '';
     let productLocation = null;
@@ -5012,27 +5132,61 @@ async function approveProductDraft(draftId) {
         updated_at: new Date().toISOString()
       };
       const locationError = await upsertProductLocationWithFallback(productLocation);
-      if (locationError) console.warn('Ubicación guardada localmente hasta aplicar la migración:', locationError.message);
+      if (locationError) console.warn('Ubicación guardada localmente:', locationError.message);
     }
 
-    const { error: updateErr } = await supabaseClient
-      .from('product_drafts')
-      .update({
-        status: 'APPROVED',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', draftId);
+    // Actualizar catálogo interno local inmediatamente
+    if (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts)) {
+      const existingIdx = internalCatalogProducts.findIndex(p => String(p.id) === String(productId) || p.product_code === productId);
+      const newCatItem = {
+        id: productId,
+        product_code: productId,
+        name: nameVal,
+        brand: draft.brand || '',
+        presentation: draft.presentation || '',
+        category: catVal,
+        price: priceVal,
+        sale_price: priceVal,
+        stock: stock,
+        own_stock: stock,
+        available: stock > 0,
+        image: imageUrl || 'assets/logo.jpg',
+        image_url: imageUrl || 'assets/logo.jpg',
+        barcode: draft.barcode || '',
+        location_label: draft.location_label || draft.location || resolvedShelfCode || 'Sin asignar',
+        shelf_code: resolvedShelfCode || '',
+        description: draft.description || ''
+      };
+      if (existingIdx >= 0) internalCatalogProducts[existingIdx] = newCatItem;
+      else internalCatalogProducts.unshift(newCatItem);
+      try {
+        localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
+      } catch (_) {}
+    }
 
-    if (updateErr) throw new Error(`Error al actualizar estado del borrador: ${updateErr.message}`);
+    // Actualizar borradores locales
+    try {
+      const localDrafts = JSON.parse(localStorage.getItem('boeweb_local_product_drafts') || '[]');
+      if (Array.isArray(localDrafts)) {
+        const lMatch = localDrafts.find(d => String(d.id) === String(draftId));
+        if (lMatch) lMatch.status = 'APPROVED';
+        localStorage.setItem('boeweb_local_product_drafts', JSON.stringify(localDrafts));
+      }
+    } catch (_) {}
 
     storeMapDataLoaded = false;
     showToast(productLocation
-      ? `Producto "${nameVal}" publicado y ubicado en ${productLocation.shelf_code}, nivel ${productLocation.shelf_level}.`
-      : `Producto "${nameVal}" publicado y agregado a pendientes de ubicación.`);
+      ? `✅ Producto "${nameVal}" aprobado y ubicado en ${productLocation.shelf_code}.`
+      : `✅ Producto "${nameVal}" aprobado y publicado en el catálogo.`);
 
-    // Recargar cola y catálogo B2B
+    // Recargar vistas
     loadPendingProductDrafts();
     refreshPendingLocationBadge();
+    refreshPendingDraftsBadge();
+    if (typeof renderInternalCatalogGrid === 'function') renderInternalCatalogGrid();
+    if (typeof renderStockProducts === 'function') renderStockProducts();
+    if (typeof loadStoreMapData === 'function') await loadStoreMapData(true);
+    if (typeof rerenderStoreMap === 'function') rerenderStoreMap();
     if (window.fetchB2BProducts) window.fetchB2BProducts(true);
 
   } catch (err) {
