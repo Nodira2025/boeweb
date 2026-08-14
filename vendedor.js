@@ -9313,42 +9313,102 @@ async function handleCameraScannerFile(event) {
 
   const feedbackEl = document.getElementById('camera-scanner-feedback');
   if (feedbackEl) {
-    feedbackEl.innerHTML = '<span style="color: #ffd54f;">⌛ Procesando y decodificando foto…</span>';
+    feedbackEl.innerHTML = '<span style="color: #ffd54f;">⌛ Procesando foto…</span>';
   }
 
-  // 1. Usar BarcodeDetector nativo si está disponible en el navegador
-  if ('BarcodeDetector' in window) {
-    try {
-      const bitmap = await createImageBitmap(file);
-      const barcodeDetector = new window.BarcodeDetector({
-        formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'qr_code', 'upc_a', 'upc_e', 'data_matrix']
-      });
-      const detected = await barcodeDetector.detect(bitmap);
-      if (detected && detected.length > 0) {
-        handleUniversalCameraScanSuccess(detected[0].rawValue);
-        return;
+  try {
+    // Step 1: Resize the photo to max 1200px to prevent out-of-memory on mobile
+    const resizedBlob = await resizeImageForBarcode(file, 1200);
+
+    // Step 2: Try BarcodeDetector (native, available on Android Chrome)
+    if ('BarcodeDetector' in window) {
+      try {
+        const bitmap = await createImageBitmap(resizedBlob);
+        const detector = new window.BarcodeDetector({
+          formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'qr_code', 'upc_a', 'upc_e', 'data_matrix']
+        });
+        const results = await detector.detect(bitmap);
+        bitmap.close();
+        if (results && results.length > 0) {
+          handleUniversalCameraScanSuccess(results[0].rawValue);
+          return;
+        }
+      } catch (detErr) {
+        console.warn('BarcodeDetector on resized image:', detErr);
       }
-    } catch (detErr) {
-      console.warn('Native BarcodeDetector photo scan fallback:', detErr);
+    }
+
+    // Step 3: Try Html5Qrcode.scanFile with the resized file
+    if (window.Html5Qrcode) {
+      try {
+        const resizedFile = new File([resizedBlob], 'scan.jpg', { type: 'image/jpeg' });
+        const html5QrCode = new window.Html5Qrcode('universal-camera-reader-viewport');
+        const result = await html5QrCode.scanFile(resizedFile, true);
+        html5QrCode.clear();
+        handleUniversalCameraScanSuccess(result);
+        return;
+      } catch (err) {
+        console.warn('Html5Qrcode scanFile on resized image:', err);
+      }
+    }
+
+    if (feedbackEl) {
+      feedbackEl.innerHTML = '<span style="color: #ff8a80;">⚠️ No se pudo leer el código. Sacá la foto más cerca del código de barras, con buena luz.</span>';
+    }
+  } catch (resizeErr) {
+    console.error('Image resize failed:', resizeErr);
+    if (feedbackEl) {
+      feedbackEl.innerHTML = '<span style="color: #ff8a80;">⚠️ Error al procesar la foto. Intentá de nuevo.</span>';
     }
   }
+}
 
-  // 2. Usar Html5Qrcode.scanFile si está disponible
-  if (window.Html5Qrcode) {
-    try {
-      const html5QrCode = new window.Html5Qrcode('universal-camera-reader-viewport');
-      const result = await html5QrCode.scanFile(file, true);
-      html5QrCode.clear();
-      handleUniversalCameraScanSuccess(result);
-      return;
-    } catch (err) {
-      console.warn('Html5Qrcode scanFile failed:', err);
-    }
-  }
+/**
+ * Resize an image file/blob to fit within maxPx on its longest side.
+ * Returns a JPEG Blob suitable for barcode detection.
+ */
+function resizeImageForBarcode(fileOrBlob, maxPx) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(fileOrBlob);
 
-  if (feedbackEl) {
-    feedbackEl.innerHTML = '<span style="color: #ff8a80;">⚠️ No se pudo leer el código en la foto. Asegurate de que esté bien iluminado y enfocado, o intentá nuevamente.</span>';
-  }
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+
+      // Only downscale, never upscale
+      if (width > maxPx || height > maxPx) {
+        const ratio = Math.min(maxPx / width, maxPx / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Canvas toBlob returned null'));
+          }
+        },
+        'image/jpeg',
+        0.85
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load image for resizing'));
+    };
+
+    img.src = url;
+  });
 }
 
 // Exports
