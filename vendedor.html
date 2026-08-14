@@ -1030,7 +1030,7 @@
     }
   </style>
   <link rel="stylesheet" href="vendedor-caja.css?v=camera_pos_v23">
-  <link rel="stylesheet" href="vendedor-portal.css?v=flow_order_v25">
+  <link rel="stylesheet" href="vendedor-portal.css?v=flow_order_v26">
   <link rel="stylesheet" href="vendedor-stock.css?v=mobile_gba_v1">
   <style id="vendor-rescue-critical-styles">
     .saas-prototype-only,
@@ -1242,67 +1242,67 @@
     <header class="b2b-header">
       <div class="b2b-header-container">
         <div class="b2b-logo-area">
-          <a href="index.html" style="display: flex; align-items: center; gap: 12px; text-decoration: none;">
-            <img src="assets/logo.jpg" alt="BO growclub" class="b2b-logo-img">
+          <a href="index.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
+            <img src="assets/logo.jpg" alt="BÔ Grow Club" class="b2b-logo-img" style="width: 38px; height: 38px; border-radius: 8px; object-fit: cover;">
             <div class="b2b-logo-text">
-              <h1>BO growclub</h1>
-              <p>Portal Vendedores B2B</p>
+              <h1 style="font-size: 1.1rem; margin: 0; color: var(--color-text-main); font-weight: 800; line-height: 1.1;">BÔ Grow Club</h1>
+              <p style="font-size: 0.68rem; margin: 0; color: var(--color-accent-gold); font-weight: 700; text-transform: uppercase;">Portal Vendedores</p>
             </div>
           </a>
-        </div>
-
         <!-- SaaS Context Bar (Multi-tenant & Role Status) -->
-        <div id="saas-header-bar" class="vendor-header-context saas-prototype-only" aria-hidden="true" style="display: flex; align-items: center; gap: 12px; background: rgba(21,45,36,0.06); padding: 6px 14px; border-radius: 12px; border: 1px solid var(--vendor-line);">
-          <div style="display: flex; flex-direction: column;">
-            <span style="font-size: 0.7rem; color: var(--vendor-muted); font-weight: 700; text-transform: uppercase;">🏢 Tenant / Empresa</span>
-            <strong id="saas-active-tenant-name" style="font-size: 0.88rem; color: var(--vendor-forest);">BÔ Grow Club</strong>
-            <select id="saas-tenant-switcher" style="display: none; font-size: 0.8rem; font-weight: 800; border-radius: 8px; border: 1px solid var(--vendor-line); padding: 2px 6px; background: #fff;" onchange="SaasAuth.switchActiveTenant(this.value)">
-              <option value="11111111-1111-1111-1111-111111111111">BÔ Grow Club (Tenant #1)</option>
-              <option value="22222222-2222-2222-2222-222222222222">Empresa B Demo (Ferretería)</option>
-            </select>
-          </div>
-
-          <div style="display: flex; flex-direction: column; border-left: 1px solid var(--vendor-line); padding-left: 10px;">
-            <span style="font-size: 0.7rem; color: var(--vendor-muted); font-weight: 700; text-transform: uppercase;">👤 Usuario Autenticado</span>
-            <strong id="saas-active-user-name" style="font-size: 0.88rem; color: var(--vendor-forest);">Profesor Franco</strong>
-          </div>
-
-          <span class="wms-level-badge" id="saas-active-user-role" style="font-size: 0.75rem; background: var(--vendor-forest); color: #fff; padding: 4px 8px; border-radius: 8px; font-weight: 800;">SUPERADMIN</span>
-          
-          <button type="button" class="wms-btn" style="padding: 4px 8px; font-size: 0.74rem;" onclick="openSaasLoginModal()">🔑 Cambiar</button>
+        <div id="saas-header-bar" class="vendor-header-context saas-prototype-only" aria-hidden="true" style="display: none !important;">
+          <strong id="saas-active-tenant-name">BÔ Grow Club</strong>
+          <select id="saas-tenant-switcher" style="display: none;"></select>
+          <strong id="saas-active-user-name">Profesor Franco</strong>
+          <span class="wms-level-badge" id="saas-active-user-role">SUPERADMIN</span>
+          <button type="button" class="wms-btn" onclick="openSaasLoginModal()">🔑 Cambiar</button>
         </div>
+
+        <div style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
+          <!-- Botón Centro de Notificaciones y Alertas -->
+          <div class="vendor-notifications-wrapper" style="position: relative;">
+            <button type="button" id="vendor-notifications-bell-btn" class="vendor-nav-icon-btn" onclick="toggleVendorNotificationPanel()" title="Alertas y Notificaciones del Local" aria-label="Notificaciones">
+              <span style="font-size: 1.15rem;">🔔</span>
+              <span id="vendor-nav-notifications-badge" class="vendor-nav-bell-badge" style="display: none;">0</span>
+            </button>
+
+            <!-- Dropdown / Panel de Notificaciones -->
+            <div id="vendor-notifications-dropdown" class="vendor-notifications-dropdown" style="display: none;">
+              <div class="vendor-notif-dropdown-header">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span style="font-size: 1.1rem;">🔔</span>
+                  <strong style="font-size: 0.92rem; color: var(--color-text-main);">Centro de Alertas</strong>
+                </div>
+                <span id="vendor-notif-total-count-badge" style="font-size: 0.72rem; font-weight: 800; background: rgba(194,162,70,0.18); color: var(--color-accent-gold); padding: 2px 8px; border-radius: 10px;">0 activas</span>
+              </div>
+
+              <div id="vendor-notif-items-list" class="vendor-notif-items-list">
+                <div style="text-align: center; padding: 14px 8px; color: var(--color-text-muted); font-size: 0.8rem;">
+                  No hay alertas pendientes en este turno.
+                </div>
+              </div>
+            </div>
+          </div>
 
           <!-- Light / Dark Theme Switcher Button -->
-          <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Oscuro">
+          <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Oscuro" style="min-height: 38px; padding: 0 12px; font-size: 0.78rem;">
             🌙 Modo Oscuro
           </button>
 
           <div id="vendor-user-status" style="display: flex; align-items: center; gap: 6px;">
-            <span id="active-vendor-display-name" style="background: rgba(195,155,75,0.2); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 5px 10px; border-radius: 10px; font-weight: 700; font-size: 0.8rem;">
-              🧑‍💼 Vendedor: Sin Iniciar
+            <span id="active-vendor-display-name" style="background: rgba(195,155,75,0.15); border: 1px solid var(--color-accent-gold); color: var(--color-text-main); padding: 5px 10px; border-radius: 9px; font-weight: 800; font-size: 0.78rem;">
+              🧑‍💼 Vendedor
             </span>
-            <button type="button" onclick="openVendorPasswordModal()" title="Cambiar mi contraseña" style="background: rgba(194,162,70,0.18); border: 1px solid var(--color-accent-gold, #c2a246); color: #c2a246; padding: 5px 9px; border-radius: 9px; font-size: 0.85rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" aria-label="Cambiar contraseña">
-              🔑 <span class="no-mobile" style="font-size: 0.76rem;">Clave</span>
-            </button>
-            <button type="button" onclick="vendorLogout()" class="btn btn-secondary" style="font-size: 0.76rem; border-color: #ef5350; color: #ef5350; padding: 5px 8px; border-radius: 9px; cursor: pointer;" title="Cerrar sesión">
+            <button type="button" onclick="vendorLogout()" class="btn btn-secondary" style="font-size: 0.74rem; border-color: #ef5350; color: #ef5350; padding: 5px 8px; border-radius: 9px; cursor: pointer;" title="Cerrar sesión">
               🔒 <span class="no-mobile">Salir</span>
             </button>
           </div>
 
-          <button type="button" onclick="switchVendorTab('pos')" class="vendor-header-sell-action" style="background: #2e7d32; color: #ffffff; border: 1.5px solid #1b5e20; border-radius: 12px; font-weight: 800; font-size: 0.85rem; padding: 7px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(46,125,50,0.25);">
+          <button type="button" onclick="switchVendorTab('pos')" class="vendor-header-sell-action" style="background: #2e7d32; color: #ffffff; border: 1.5px solid #1b5e20; border-radius: 10px; font-weight: 800; font-size: 0.82rem; padding: 6px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(46,125,50,0.25);">
             <span>🏷️</span><span>Vender</span>
           </button>
-
-          <button class="b2b-cart-trigger" id="b2b-cart-trigger-btn">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="9" cy="21" r="1"></circle>
-              <circle cx="20" cy="21" r="1"></circle>
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-            </svg>
-            <span class="no-mobile">Pedido</span>
-            <span class="b2b-cart-count-badge" id="b2b-cart-count">0</span>
-          </button>
         </div>
+      </div>
     </header>
 
     <!-- VENDOR HOME / CENTRO OPERATIVO -->
@@ -1372,22 +1372,9 @@
 
       <div class="vendor-2col-grid">
         
-        <!-- 1. Ingresar producto -->
-        <button type="button" class="vendor-flow-card" id="vcard-fastupload" onclick="switchVendorTab('fast-upload')">
-          <div class="vendor-flow-top">
-            <span class="vendor-flow-num">1</span>
-            <span class="vendor-flow-icon">📥</span>
-          </div>
-          <div>
-            <strong class="vendor-flow-title">Ingresar producto</strong>
-            <span class="vendor-flow-desc">Foto IA · Código de barra · Datos y stock guiados</span>
-          </div>
-        </button>
-
-        <!-- 2. Vender producto -->
+        <!-- 1. Vender producto (POS) -->
         <button type="button" class="vendor-flow-card vendor-flow-card-featured" id="vcard-pos" onclick="switchVendorTab('pos')">
           <div class="vendor-flow-top">
-            <span class="vendor-flow-num">2</span>
             <span class="vendor-flow-icon">🏷️🛒</span>
           </div>
           <div>
@@ -1396,10 +1383,31 @@
           </div>
         </button>
 
-        <!-- 3. Ubicar producto -->
+        <!-- 2. Ingresar producto -->
+        <button type="button" class="vendor-flow-card" id="vcard-fastupload" onclick="switchVendorTab('fast-upload')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-icon">📥</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Ingresar producto</strong>
+            <span class="vendor-flow-desc">Foto IA · Código de barra · Datos y stock guiados</span>
+          </div>
+        </button>
+
+        <!-- 3. Caja & Arqueo Diario -->
+        <button type="button" class="vendor-flow-card" id="vcard-cash" onclick="switchVendorTab('cash')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-icon">💰💵</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Caja & Arqueo Diario</strong>
+            <span class="vendor-flow-desc">Apertura · Ventas POS · Gastos · Cierre de caja en vivo</span>
+          </div>
+        </button>
+
+        <!-- 4. Ubicar producto -->
         <button type="button" class="vendor-flow-card" id="vcard-locationassistant" onclick="switchVendorTab('location-assistant')">
           <div class="vendor-flow-top">
-            <span class="vendor-flow-num">3</span>
             <span class="vendor-flow-icon">⌖</span>
             <span class="vendor-flow-badge" data-pending-location-count hidden>0</span>
           </div>
@@ -1409,11 +1417,10 @@
           </div>
         </button>
 
-        <!-- 4. Buscar producto en local -->
+        <!-- 5. Buscar producto en local -->
         <button type="button" class="vendor-flow-card" id="vcard-map" onclick="switchVendorTab('map')">
           <div class="vendor-flow-top">
-            <span class="vendor-flow-num">4</span>
-            <span class="vendor-flow-icon">📍</span>
+            <span class="vendor-flow-icon">🗺️</span>
           </div>
           <div>
             <strong class="vendor-flow-title">Buscar Producto en local</strong>
@@ -1421,22 +1428,9 @@
           </div>
         </button>
 
-        <!-- 5. Comprar productos (catálogo B2B) -->
-        <button type="button" class="vendor-flow-card" id="vcard-catalog" onclick="switchVendorTab('catalog')">
-          <div class="vendor-flow-top">
-            <span class="vendor-flow-num">5</span>
-            <span class="vendor-flow-icon">📦</span>
-          </div>
-          <div>
-            <strong class="vendor-flow-title">Comprar productos</strong>
-            <span class="vendor-flow-desc">Catálogo B2B · Mayoristas y distribuidores</span>
-          </div>
-        </button>
-
         <!-- 6. Buscar en catálogo tienda física -->
         <button type="button" class="vendor-flow-card" id="vcard-internalcatalog" onclick="switchVendorTab('internal-catalog')">
           <div class="vendor-flow-top">
-            <span class="vendor-flow-num">6</span>
             <span class="vendor-flow-icon">🏷️</span>
           </div>
           <div>
@@ -1448,7 +1442,6 @@
         <!-- 7. Ver pedidos web -->
         <button type="button" class="vendor-flow-card" id="vcard-weborders" onclick="switchVendorTab('web-orders')">
           <div class="vendor-flow-top">
-            <span class="vendor-flow-num">7</span>
             <span class="vendor-flow-icon">🛍️</span>
             <span class="vendor-flow-badge" id="vendor-pending-web-orders-badge-action" hidden>0</span>
           </div>
@@ -1458,59 +1451,9 @@
           </div>
         </button>
 
-        <!-- 8. Gestionar Clientes (propios y cuenta corriente) -->
-        <button type="button" class="vendor-flow-card" id="vcard-portfolio" onclick="switchVendorTab('portfolio')">
-          <div class="vendor-flow-top">
-            <span class="vendor-flow-num">8</span>
-            <span class="vendor-flow-icon">👥</span>
-          </div>
-          <div>
-            <strong class="vendor-flow-title">Gestionar Clientes</strong>
-            <span class="vendor-flow-desc">Clientes propios · Cuentas Corrientes · WhatsApp</span>
-          </div>
-        </button>
-
-        <!-- 9. Productos a Vencer -->
-        <button type="button" class="vendor-flow-card" id="vcard-expirations" onclick="switchVendorTab('expirations')">
-          <div class="vendor-flow-top">
-            <span class="vendor-flow-num">9</span>
-            <span class="vendor-flow-icon">⏳</span>
-            <span class="vendor-flow-badge" id="expirations-badge-kpi" style="display: none;">0</span>
-          </div>
-          <div>
-            <strong class="vendor-flow-title">Productos a Vencer</strong>
-            <span class="vendor-flow-desc">Control de lotes · 3 meses a críticos · Promos</span>
-          </div>
-        </button>
-
-        <!-- 10. Productos Retirados -->
-        <button type="button" class="vendor-flow-card" id="vcard-retired" onclick="switchVendorTab('retired-products')">
-          <div class="vendor-flow-top">
-            <span class="vendor-flow-num">10</span>
-            <span class="vendor-flow-icon">🗑️📉</span>
-          </div>
-          <div>
-            <strong class="vendor-flow-title">Productos Retirados</strong>
-            <span class="vendor-flow-desc">Mermas · Roturas · Vencidos · Salidas con voz</span>
-          </div>
-        </button>
-
-        <!-- 11. Tiendas Cerca -->
-        <button type="button" class="vendor-flow-card" id="vcard-nearbystores" onclick="switchVendorTab('nearby-stores')">
-          <div class="vendor-flow-top">
-            <span class="vendor-flow-num">11</span>
-            <span class="vendor-flow-icon">🏪</span>
-          </div>
-          <div>
-            <strong class="vendor-flow-title">Tiendas Cerca</strong>
-            <span class="vendor-flow-desc">Red de locales asociados · Stock en 48 hs</span>
-          </div>
-        </button>
-
-        <!-- 12. Cola de Aprobación de Productos -->
+        <!-- 8. Cola de Aprobación de Productos -->
         <button type="button" class="vendor-flow-card" id="vcard-draftsreview" onclick="switchVendorTab('drafts-review')">
           <div class="vendor-flow-top">
-            <span class="vendor-flow-num">12</span>
             <span class="vendor-flow-icon">👑📋</span>
             <span class="vendor-flow-badge" id="drafts-pending-count-home-badge" style="display: none; background: #c62828; color: #fff;">0</span>
           </div>
@@ -1520,10 +1463,65 @@
           </div>
         </button>
 
-        <!-- 13. Promos TV -->
+        <!-- 9. Gestionar Clientes (propios y cuenta corriente) -->
+        <button type="button" class="vendor-flow-card" id="vcard-portfolio" onclick="switchVendorTab('portfolio')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-icon">👥</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Gestionar Clientes</strong>
+            <span class="vendor-flow-desc">Clientes propios · Cuentas Corrientes · WhatsApp</span>
+          </div>
+        </button>
+
+        <!-- 10. Productos a Vencer -->
+        <button type="button" class="vendor-flow-card" id="vcard-expirations" onclick="switchVendorTab('expirations')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-icon">⏳</span>
+            <span class="vendor-flow-badge" id="expirations-badge-kpi" style="display: none;">0</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Productos a Vencer</strong>
+            <span class="vendor-flow-desc">Control de lotes · 3 meses a críticos · Promos</span>
+          </div>
+        </button>
+
+        <!-- 11. Productos Retirados -->
+        <button type="button" class="vendor-flow-card" id="vcard-retired" onclick="switchVendorTab('retired-products')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-icon">🗑️📉</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Productos Retirados</strong>
+            <span class="vendor-flow-desc">Mermas · Roturas · Vencidos · Salidas con voz</span>
+          </div>
+        </button>
+
+        <!-- 12. Comprar productos (catálogo B2B) -->
+        <button type="button" class="vendor-flow-card" id="vcard-catalog" onclick="switchVendorTab('catalog')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-icon">📦</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Comprar productos</strong>
+            <span class="vendor-flow-desc">Catálogo B2B · Mayoristas y distribuidores</span>
+          </div>
+        </button>
+
+        <!-- 13. Tiendas Cerca -->
+        <button type="button" class="vendor-flow-card" id="vcard-nearbystores" onclick="switchVendorTab('nearby-stores')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-icon">🏪</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Tiendas Cerca</strong>
+            <span class="vendor-flow-desc">Red de locales asociados · Stock en 48 hs</span>
+          </div>
+        </button>
+
+        <!-- 14. Promos TV -->
         <a href="tv.html" target="_blank" rel="noopener" class="vendor-flow-card">
           <div class="vendor-flow-top">
-            <span class="vendor-flow-num">13</span>
             <span class="vendor-flow-icon">📺</span>
           </div>
           <div>
@@ -1532,10 +1530,9 @@
           </div>
         </a>
 
-        <!-- 13. Tablet promos -->
+        <!-- 15. Tablet promos -->
         <a href="tablet.html" target="_blank" rel="noopener" class="vendor-flow-card">
           <div class="vendor-flow-top">
-            <span class="vendor-flow-num">13</span>
             <span class="vendor-flow-icon">📱</span>
           </div>
           <div>
@@ -1544,10 +1541,9 @@
           </div>
         </a>
 
-        <!-- 14. BÔ Caffè Club -->
+        <!-- 16. BÔ Caffè Club -->
         <a href="coffee.html" target="_blank" rel="noopener" class="vendor-flow-card">
           <div class="vendor-flow-top">
-            <span class="vendor-flow-num">14</span>
             <span class="vendor-flow-icon">☕</span>
           </div>
           <div>
@@ -4080,6 +4076,129 @@
     </div>
   </div>
 
+    <!-- ================= FIXED MOBILE BOTTOM NAVIGATION BAR ================= -->
+    <nav id="vendor-mobile-bottom-nav" class="vendor-mobile-bottom-nav" aria-label="Navegación principal en móviles">
+      <button type="button" class="vendor-mobile-nav-item active" id="mob-nav-home" onclick="switchVendorTab('home')">
+        <span class="vendor-mob-icon">🏠</span>
+        <span class="vendor-mob-label">Inicio</span>
+      </button>
+      <button type="button" class="vendor-mobile-nav-item" id="mob-nav-pos" onclick="switchVendorTab('pos')">
+        <span class="vendor-mob-icon">🏷️</span>
+        <span class="vendor-mob-label">Vender</span>
+      </button>
+      <button type="button" class="vendor-mobile-nav-item" id="mob-nav-fastupload" onclick="switchVendorTab('fast-upload')">
+        <span class="vendor-mob-icon">📥</span>
+        <span class="vendor-mob-label">Ingresar</span>
+      </button>
+      <button type="button" class="vendor-mobile-nav-item" id="mob-nav-location" onclick="switchVendorTab('location-assistant')">
+        <span class="vendor-mob-icon">📍</span>
+        <span class="vendor-mob-label">Localizar</span>
+      </button>
+      <button type="button" class="vendor-mobile-nav-item" id="mob-nav-more" onclick="toggleVendorMobileOperationsMenu()">
+        <span class="vendor-mob-icon">☰</span>
+        <span class="vendor-mob-label">Operaciones</span>
+      </button>
+    </nav>
+
+    <!-- ================= MODAL / BOTTOM SHEET DE RESTO DE OPERACIONES ================= -->
+    <div id="vendor-mobile-operations-sheet" class="vendor-operations-sheet-overlay" style="display: none;" onclick="closeVendorMobileOperationsMenu(event)">
+      <div class="vendor-operations-sheet-card" onclick="event.stopPropagation()">
+        <div class="vendor-operations-sheet-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.3rem;">⚡</span>
+            <div>
+              <h3 style="margin: 0; font-size: 1.05rem; color: var(--color-text-main); font-weight: 800;">Operaciones del Local</h3>
+              <small style="color: var(--color-text-muted); font-size: 0.72rem;">Herramientas operativas BÔ Grow Club</small>
+            </div>
+          </div>
+          <button type="button" class="pos-confirm-modal-close" onclick="closeVendorMobileOperationsMenu()" aria-label="Cerrar menú" style="background: rgba(0,0,0,0.06); border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 1.1rem; cursor: pointer;">✕</button>
+        </div>
+
+        <div class="vendor-operations-sheet-grid">
+          <button type="button" class="vendor-sheet-op-btn" onclick="switchVendorTab('cash'); closeVendorMobileOperationsMenu();">
+            <span class="vendor-sheet-icon">💰</span>
+            <div>
+              <strong>Caja & Arqueo</strong>
+              <small>Cierre de turno y arqueo</small>
+            </div>
+          </button>
+
+          <button type="button" class="vendor-sheet-op-btn" onclick="switchVendorTab('web-orders'); closeVendorMobileOperationsMenu();">
+            <span class="vendor-sheet-icon">🛍️</span>
+            <div>
+              <strong>Pedidos Web</strong>
+              <small>Mediar pedidos online</small>
+            </div>
+          </button>
+
+          <button type="button" class="vendor-sheet-op-btn" onclick="switchVendorTab('internal-catalog'); closeVendorMobileOperationsMenu();">
+            <span class="vendor-sheet-icon">🏷️</span>
+            <div>
+              <strong>Catálogo Local</strong>
+              <small>Stock tienda física</small>
+            </div>
+          </button>
+
+          <button type="button" class="vendor-sheet-op-btn" onclick="switchVendorTab('drafts-review'); closeVendorMobileOperationsMenu();">
+            <span class="vendor-sheet-icon">👑</span>
+            <div>
+              <strong>Cola Aprobación</strong>
+              <small>Autorizar borradores</small>
+            </div>
+          </button>
+
+          <button type="button" class="vendor-sheet-op-btn" onclick="switchVendorTab('map'); closeVendorMobileOperationsMenu();">
+            <span class="vendor-sheet-icon">🗺️</span>
+            <div>
+              <strong>Mapa WMS</strong>
+              <small>Estanterías y local</small>
+            </div>
+          </button>
+
+          <button type="button" class="vendor-sheet-op-btn" onclick="switchVendorTab('catalog'); closeVendorMobileOperationsMenu();">
+            <span class="vendor-sheet-icon">📦</span>
+            <div>
+              <strong>Catálogo B2B</strong>
+              <small>Mayoristas y pedidos</small>
+            </div>
+          </button>
+
+          <button type="button" class="vendor-sheet-op-btn" onclick="switchVendorTab('portfolio'); closeVendorMobileOperationsMenu();">
+            <span class="vendor-sheet-icon">👥</span>
+            <div>
+              <strong>Clientes & CC</strong>
+              <small>Cuentas corrientes</small>
+            </div>
+          </button>
+
+          <button type="button" class="vendor-sheet-op-btn" onclick="switchVendorTab('expirations'); closeVendorMobileOperationsMenu();">
+            <span class="vendor-sheet-icon">⏳</span>
+            <div>
+              <strong>Vencimientos</strong>
+              <small>Lotes y caducidades</small>
+            </div>
+          </button>
+
+          <button type="button" class="vendor-sheet-op-btn" onclick="switchVendorTab('retired-products'); closeVendorMobileOperationsMenu();">
+            <span class="vendor-sheet-icon">🗑️</span>
+            <div>
+              <strong>Mermas / Retiros</strong>
+              <small>Salidas de inventario</small>
+            </div>
+          </button>
+
+          <button type="button" class="vendor-sheet-op-btn" onclick="switchVendorTab('nearby-stores'); closeVendorMobileOperationsMenu();">
+            <span class="vendor-sheet-icon">🏪</span>
+            <div>
+              <strong>Tiendas Cerca</strong>
+              <small>Red asociada 48h</small>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="mapa-local.js?v=gba_leafgreen_v5"></script>
@@ -4094,6 +4213,6 @@
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=pos_mobile_v42"></script>
+  <script src="vendedor.js?v=pos_mobile_v43"></script>
 </body>
 </html>

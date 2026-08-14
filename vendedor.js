@@ -1525,6 +1525,24 @@ function switchVendorTab(tab) {
     button.classList.toggle('active', button.dataset.vendorTab === activeSidebarTab);
   });
 
+  const mobTabMap = {
+    'home': 'mob-nav-home',
+    'pos': 'mob-nav-pos',
+    'new-sale': 'mob-nav-pos',
+    'vender': 'mob-nav-pos',
+    'vender-producto': 'mob-nav-pos',
+    'fast-upload': 'mob-nav-fastupload',
+    'ingresar-producto': 'mob-nav-fastupload',
+    'ingreso': 'mob-nav-fastupload',
+    'location-assistant': 'mob-nav-location',
+    'ubicar': 'mob-nav-location',
+    'ubicar-producto': 'mob-nav-location'
+  };
+  const activeMobNavId = mobTabMap[tab] || 'mob-nav-more';
+  document.querySelectorAll('.vendor-mobile-nav-item').forEach(item => {
+    item.classList.toggle('active', item.id === activeMobNavId);
+  });
+
   if (targetSection) {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const scrollBehavior = reducedMotion ? 'auto' : 'smooth';
@@ -1535,6 +1553,149 @@ function switchVendorTab(tab) {
     }
   }
 }
+
+function updateVendorNotificationCenter() {
+  let pendingOrders = 0;
+  try {
+    const rawStored = JSON.parse(localStorage.getItem('boeweb_web_orders') || localStorage.getItem('boeweb_order_history') || '[]');
+    const combined = (typeof webOrdersList !== 'undefined' && webOrdersList.length > 0 ? webOrdersList : rawStored);
+    pendingOrders = combined.filter(o => {
+      const st = String(o.status || '').toLowerCase();
+      return !st.includes('completado') && !st.includes('entregado') && !st.includes('cancelado');
+    }).length;
+  } catch (_) {}
+
+  let pendingDrafts = 0;
+  try {
+    const drafts = JSON.parse(localStorage.getItem('boeweb_pending_product_drafts') || '[]');
+    pendingDrafts = drafts.filter(d => (d.status || '').toUpperCase() === 'PENDING').length;
+  } catch (_) {}
+
+  let pendingExpirations = 0;
+  try {
+    const rawInv = JSON.parse(localStorage.getItem('boeweb_internal_inventory') || '[]');
+    const now = new Date();
+    rawInv.forEach(p => {
+      if (p.expiry_date) {
+        const exp = new Date(p.expiry_date);
+        const diffDays = Math.round((exp - now) / (1000 * 60 * 60 * 24));
+        if (diffDays <= 30) pendingExpirations++;
+      }
+    });
+  } catch (_) {}
+
+  let pendingWms = 0;
+  try {
+    const rawLocations = JSON.parse(localStorage.getItem('boeweb_wms_product_locations') || '[]');
+    pendingWms = rawLocations.filter(l => !l.shelf_code || l.shelf_code === 'SIN_ASIGNAR').length;
+  } catch (_) {}
+
+  const totalAlerts = pendingOrders + pendingDrafts + pendingExpirations + pendingWms;
+
+  const bellBadge = document.getElementById('vendor-nav-notifications-badge');
+  const countBadge = document.getElementById('vendor-notif-total-count-badge');
+  const listEl = document.getElementById('vendor-notif-items-list');
+
+  if (bellBadge) {
+    if (totalAlerts > 0) {
+      bellBadge.textContent = totalAlerts > 99 ? '99+' : totalAlerts;
+      bellBadge.style.display = 'block';
+    } else {
+      bellBadge.style.display = 'none';
+    }
+  }
+
+  if (countBadge) {
+    countBadge.textContent = `${totalAlerts} ${totalAlerts === 1 ? 'activa' : 'activas'}`;
+  }
+
+  if (listEl) {
+    if (totalAlerts === 0) {
+      listEl.innerHTML = `
+        <div style="text-align: center; padding: 18px 8px; color: var(--color-text-muted, #68756e); font-size: 0.8rem;">
+          ✨ No hay alertas operativas pendientes en este turno.
+        </div>
+      `;
+    } else {
+      let itemsHtml = '';
+      if (pendingOrders > 0) {
+        itemsHtml += `
+          <div class="vendor-notif-item" onclick="switchVendorTab('web-orders'); toggleVendorNotificationPanel();">
+            <span style="font-size: 1.3rem;">📦</span>
+            <div style="flex: 1;">
+              <strong style="display: block; font-size: 0.82rem; color: var(--color-text-main);">Pedidos Web (${pendingOrders})</strong>
+              <small style="color: var(--color-text-muted); font-size: 0.7rem;">Preparar y cobrar compras online</small>
+            </div>
+            <span style="background: #e53935; color: #fff; font-size: 0.7rem; font-weight: 800; padding: 2px 7px; border-radius: 8px;">${pendingOrders}</span>
+          </div>
+        `;
+      }
+      if (pendingDrafts > 0) {
+        itemsHtml += `
+          <div class="vendor-notif-item" onclick="switchVendorTab('drafts-review'); toggleVendorNotificationPanel();">
+            <span style="font-size: 1.3rem;">👑</span>
+            <div style="flex: 1;">
+              <strong style="display: block; font-size: 0.82rem; color: var(--color-text-main);">Cola de Aprobación (${pendingDrafts})</strong>
+              <small style="color: var(--color-text-muted); font-size: 0.7rem;">Borradores pendientes de revisión</small>
+            </div>
+            <span style="background: #c62828; color: #fff; font-size: 0.7rem; font-weight: 800; padding: 2px 7px; border-radius: 8px;">${pendingDrafts}</span>
+          </div>
+        `;
+      }
+      if (pendingExpirations > 0) {
+        itemsHtml += `
+          <div class="vendor-notif-item" onclick="switchVendorTab('expirations'); toggleVendorNotificationPanel();">
+            <span style="font-size: 1.3rem;">⏳</span>
+            <div style="flex: 1;">
+              <strong style="display: block; font-size: 0.82rem; color: var(--color-text-main);">Vencimientos Críticos (${pendingExpirations})</strong>
+              <small style="color: var(--color-text-muted); font-size: 0.7rem;">Lotes próximos a caducar</small>
+            </div>
+            <span style="background: #e65100; color: #fff; font-size: 0.7rem; font-weight: 800; padding: 2px 7px; border-radius: 8px;">${pendingExpirations}</span>
+          </div>
+        `;
+      }
+      if (pendingWms > 0) {
+        itemsHtml += `
+          <div class="vendor-notif-item" onclick="switchVendorTab('location-assistant'); toggleVendorNotificationPanel();">
+            <span style="font-size: 1.3rem;">⌖</span>
+            <div style="flex: 1;">
+              <strong style="display: block; font-size: 0.82rem; color: var(--color-text-main);">Pendientes WMS (${pendingWms})</strong>
+              <small style="color: var(--color-text-muted); font-size: 0.7rem;">Asignar estantería y nivel</small>
+            </div>
+            <span style="background: #f57c00; color: #fff; font-size: 0.7rem; font-weight: 800; padding: 2px 7px; border-radius: 8px;">${pendingWms}</span>
+          </div>
+        `;
+      }
+      listEl.innerHTML = itemsHtml;
+    }
+  }
+}
+window.updateVendorNotificationCenter = updateVendorNotificationCenter;
+
+function toggleVendorNotificationPanel() {
+  const dropdown = document.getElementById('vendor-notifications-dropdown');
+  if (!dropdown) return;
+  const isVisible = dropdown.style.display === 'block';
+  dropdown.style.display = isVisible ? 'none' : 'block';
+  if (!isVisible) {
+    updateVendorNotificationCenter();
+  }
+}
+window.toggleVendorNotificationPanel = toggleVendorNotificationPanel;
+
+function toggleVendorMobileOperationsMenu() {
+  const sheet = document.getElementById('vendor-mobile-operations-sheet');
+  if (!sheet) return;
+  const isVisible = sheet.style.display === 'flex';
+  sheet.style.display = isVisible ? 'none' : 'flex';
+}
+window.toggleVendorMobileOperationsMenu = toggleVendorMobileOperationsMenu;
+
+function closeVendorMobileOperationsMenu(e) {
+  const sheet = document.getElementById('vendor-mobile-operations-sheet');
+  if (sheet) sheet.style.display = 'none';
+}
+window.closeVendorMobileOperationsMenu = closeVendorMobileOperationsMenu;
 
 function renderVendorHomeUI() {
   const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'vendedor';
@@ -1578,6 +1739,7 @@ function renderVendorHomeUI() {
   setText('vendor-header-shift', cashData.closed ? 'Caja cerrada' : 'Turno en curso');
   setText('vendor-sidebar-shift-copy', cashData.closed ? 'Caja cerrada' : 'Turno activo');
   if (typeof refreshWebOrdersBadges === 'function') refreshWebOrdersBadges();
+  updateVendorNotificationCenter();
 
   const shiftPill = document.getElementById('vendor-home-shift-pill');
   if (shiftPill) {
@@ -8278,6 +8440,9 @@ function refreshWebOrdersBadges() {
   if (actionBadge) {
     actionBadge.textContent = pendingCount;
     actionBadge.hidden = pendingCount === 0;
+  }
+  if (typeof updateVendorNotificationCenter === 'function') {
+    updateVendorNotificationCenter();
   }
 }
 
