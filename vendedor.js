@@ -20,6 +20,18 @@ const itemsPerPage = 24;
 let filterSupplier = 'all';
 let filterOnlyStock = false;
 
+// Web orders state (hoisted to avoid TDZ when called from renderVendorHomeUI)
+let webOrdersList = [];
+let webOrdersFilterStatus = 'all';
+let webOrdersFilterQuery = '';
+
+// Camera scanner state (hoisted to avoid TDZ when called from onclick handlers)
+let universalCameraScannerInstance = null;
+let universalCameraFacingMode = 'environment';
+let universalCameraActiveMode = 'pos';
+let universalCameraTorchOn = false;
+let universalCameraStream = null;
+
 // Supplier display names mapping
 const supplierNames = {
   'astrogrow': 'AstroGrow',
@@ -4676,7 +4688,7 @@ window.printProductQrByCode = printProductQrByCode;
 window.handleShelfPhotoChange = handleShelfPhotoChange;
 window.loadPendingLocationProducts = loadPendingLocationProducts;
 window.selectPendingLocationProduct = selectPendingLocationProduct;
-window.chooseLocationAssistantArea = chooseLocationAssistantArea;
+// window.chooseLocationAssistantArea — function not yet implemented
 window.chooseLocationAssistantWall = chooseLocationAssistantWall;
 window.chooseLocationAssistantShelf = chooseLocationAssistantShelf;
 window.chooseLocationAssistantLevel = chooseLocationAssistantLevel;
@@ -7374,9 +7386,7 @@ window.clearPosDiscount = clearPosDiscount;
    BÔ GROW CLUB — MEDIACIÓN DE PEDIDOS WEB & E-COMMERCE (WEB + VENDEDOR)
    ========================================================================== */
 
-let webOrdersList = [];
-let webOrdersFilterStatus = 'all';
-let webOrdersFilterQuery = '';
+// webOrdersList, webOrdersFilterStatus, webOrdersFilterQuery — declared at top of file
 
 function setWebOrdersStatus(message, state = 'info') {
   const statusEl = document.getElementById('web-orders-status');
@@ -8995,11 +9005,7 @@ function updatePosCurrentAccountInfo() {
 // 📷 ESCÁNER UNIVERSAL POR CÁMARA (CELULARES Y PC)
 // ==========================================
 
-let universalCameraScannerInstance = null;
-let universalCameraFacingMode = 'environment';
-let universalCameraActiveMode = 'pos';
-let universalCameraTorchOn = false;
-let universalCameraStream = null;
+// universalCameraScanner state — declared at top of file
 
 function playScannerBeep() {
   try {
