@@ -1808,27 +1808,50 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
   // Physical shelf code on the floor layout (e.g. P3-E3 or E3)
   const layoutShelfCode = `${wallCode}-${shelfCode}`.replace(/P\d-P/, 'P');
 
-  // Match product from internal catalog or locations
+  // Match product from internal catalog, local locations, or store map
   let matched = matchedProduct;
   const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
-  const allProducts = [...(internalCatalogProducts || []), ...storeLocs, ...(baseProducts || [])];
+  const localLocs = typeof readLocalProductLocations === 'function' ? readLocalProductLocations() : [];
+  const allProducts = [...(internalCatalogProducts || []), ...storeLocs, ...localLocs, ...(baseProducts || [])];
+  
   if (!matched) {
+    // 1. Direct WMS code, SKU, barcode, name or ID match
     matched = allProducts.find(p => 
-      p.wms_code === raw || 
-      p.shelf_code === layoutShelfCode || 
-      p.shelf_code === shelfCode ||
-      (p.barcode && p.barcode === raw) ||
-      (p.product_code && p.product_code === raw) ||
-      (p.name && p.name.toLowerCase().includes(raw.toLowerCase())) ||
-      (p.id && String(p.id).toLowerCase() === raw.toLowerCase())
+      (p.wms_code && p.wms_code.toUpperCase() === upper) ||
+      (p.barcode && p.barcode.toUpperCase() === upper) ||
+      (p.product_code && p.product_code.toUpperCase() === upper) ||
+      (p.id && String(p.id).toUpperCase() === upper) ||
+      (p.name && p.name.toUpperCase() === upper) ||
+      (p.name && p.name.toLowerCase().includes(raw.toLowerCase()))
     );
   }
 
+  if (!matched) {
+    // 2. Matching by physical shelf code and level
+    matched = allProducts.find(p => {
+      const pShelf = String(p.shelf_code || '').toUpperCase().replace(/[-_ ]/g, '');
+      const tShelf1 = `${wallCode}${shelfCode}`.toUpperCase().replace(/[-_ ]/g, '');
+      const tShelf2 = `${shelfCode}`.toUpperCase().replace(/[-_ ]/g, '');
+      const shelfMatch = pShelf === tShelf1 || pShelf === tShelf2 || pShelf.includes(tShelf2);
+      const pLevel = Number(p.shelf_level ?? p.level) || 0;
+      const levelMatch = !pLevel || pLevel === levelNum;
+      return shelfMatch && levelMatch;
+    });
+  }
+
+  if (!matched) {
+    // 3. Fallback: match by shelf only
+    matched = allProducts.find(p => {
+      const pShelf = String(p.shelf_code || '').toUpperCase();
+      return pShelf.includes(shelfCode) || pShelf.includes(layoutShelfCode);
+    });
+  }
+
   // Stock count & product properties
-  let stockCount = matched?.stock ?? matched?.on_hand ?? null;
+  let stockCount = matched ? Math.max(0, Number(matched.stock ?? matched.on_hand) || 0) : null;
   let productName = matched?.name || null;
   let productBarcode = matched?.barcode || matched?.product_code || null;
-  let productImage = matched?.image || matched?.image_url || null;
+  let productImage = matched?.image || matched?.image_url || matched?.placement_photo_url || null;
   let productCategory = matched?.category || '';
   let productPrice = matched?.price || matched?.sale_price || 0;
   let productDesc = matched?.description || '';
@@ -1859,7 +1882,8 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
     levelDesc,
     sectorCode,
     sectorText,
-    stockCount: stockCount !== null ? stockCount : 'Disponible',
+    stockCount: stockCount !== null ? stockCount : 0,
+    hasMatchedProduct: !!matched,
     productName,
     productBarcode,
     productImage,
@@ -1881,32 +1905,32 @@ function renderStoreMapLocationCard(info) {
     ? `${escapeFn(info.productName)}`
     : `Ubicación: ${escapeFn(info.rawCode)}`;
 
-  const stockBadge = typeof info.stockCount === 'number'
-    ? `${info.stockCount} unidades disponibles`
-    : `${info.stockCount}`;
+  const stockBadgeHtml = info.hasMatchedProduct
+    ? `<strong style="color: #81c784; font-size: 1.18rem; font-weight: 900;">${info.stockCount} unidades disponibles</strong>`
+    : `<span style="color: #ffd54f; font-weight: 700;">0 u. (Espacio disponible para asignar)</span>`;
 
   cardContainer.innerHTML = `
-    <div class="location-found-card" style="background: linear-gradient(135deg, #152d24 0%, #1c3c30 100%); border: 2px solid #c2a246; border-radius: 20px; padding: 22px; color: #ffffff; box-shadow: 0 14px 40px rgba(0,0,0,0.4);">
+    <div class="location-found-card" style="background: linear-gradient(135deg, #152d24 0%, #1c3c30 100%); border: 2px solid #c2a246; border-radius: 20px; padding: 20px; color: #ffffff; box-shadow: 0 14px 40px rgba(0,0,0,0.4);">
       
       <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; border-bottom: 1px solid rgba(194,162,70,0.3); padding-bottom: 12px;">
-        <div style="display: flex; gap: 12px; align-items: center; min-width: 0;">
+        <div style="display: flex; gap: 12px; align-items: center; min-width: 0; flex: 1;">
           ${info.productImage ? `
             <img src="${escapeFn(info.productImage)}" alt="${title}" style="width: 58px; height: 58px; border-radius: 12px; border: 1.5px solid #c2a246; object-fit: cover; background: #fff; flex-shrink: 0;">
           ` : `
             <div style="width: 58px; height: 58px; border-radius: 12px; border: 1.5px solid #c2a246; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; flex-shrink: 0;">📦</div>
           `}
-          <div style="min-width: 0;">
+          <div style="min-width: 0; flex: 1;">
             <span style="background: rgba(194,162,70,0.25); color: #c2a246; border: 1px solid #c2a246; padding: 2px 8px; border-radius: 8px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase;">
               📍 Guía de Ubicación Física
             </span>
             <h3 style="margin: 4px 0 0 0; font-size: 1.15rem; color: #ffffff; font-weight: 800; line-height: 1.3; word-break: break-word;">
               ${title}
             </h3>
-            ${info.productBarcode ? `<small style="color: rgba(247,246,242,0.7); font-size: 0.78rem; font-family: monospace;">SKU / Código: ${escapeFn(info.productBarcode)}</small>` : ''}
+            ${info.productBarcode ? `<small style="color: rgba(247,246,242,0.7); font-size: 0.78rem; font-family: monospace;">SKU / Código: ${escapeFn(info.productBarcode)}</small>` : `<small style="color: #ffd54f; font-size: 0.75rem;">Código WMS: ${escapeFn(info.rawCode)}</small>`}
           </div>
         </div>
-        ${info.productId || info.productBarcode || info.productName ? `
-          <button type="button" onclick="openProductFullInfoModal('${escapeFn(info.productId || info.productBarcode || info.productName)}')" style="padding: 7px 12px; border-radius: 10px; background: rgba(194,162,70,0.25); border: 1.5px solid #c2a246; color: #ffd54f; font-size: 0.78rem; font-weight: 800; cursor: pointer; white-space: nowrap; flex-shrink: 0; display: flex; align-items: center; gap: 4px;">
+        ${info.productId ? `
+          <button type="button" onclick="openProductFullInfoModal('${escapeFn(info.productId)}')" style="padding: 7px 12px; border-radius: 10px; background: rgba(194,162,70,0.25); border: 1.5px solid #c2a246; color: #ffd54f; font-size: 0.78rem; font-weight: 800; cursor: pointer; white-space: nowrap; flex-shrink: 0; display: flex; align-items: center; gap: 4px;">
             ℹ️ Ver más info
           </button>
         ` : ''}
@@ -1929,7 +1953,7 @@ function renderStoreMapLocationCard(info) {
           ↔️ <strong>Posición:</strong> <span style="color: #ffffff; font-weight: 700;">${escapeFn(info.sectorText)}</span>.
         </div>
         <div>
-          📦 <strong>Unidades disponibles:</strong> <strong style="color: #81c784; font-size: 1.1rem;">${escapeFn(stockBadge)}</strong>.
+          📦 <strong>Unidades disponibles:</strong> ${stockBadgeHtml}.
         </div>
       </div>
 
@@ -1941,10 +1965,10 @@ function renderStoreMapLocationCard(info) {
       ` : ''}
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-        <button type="button" onclick="openStockAdjustmentModal('${escapeFn(info.productBarcode || info.productName || info.rawCode)}', 'add')" style="padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; background: rgba(76,175,80,0.2); border: 1.5px solid #81c784; color: #a5d6a7; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+        <button type="button" onclick="openStockAdjustmentModal('${escapeFn(info.productId || info.productBarcode || info.productName || info.rawCode)}', 'add')" style="padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; background: rgba(76,175,80,0.25); border: 1.5px solid #81c784; color: #a5d6a7; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
           ➕ Agregar stock
         </button>
-        <button type="button" onclick="openStockAdjustmentModal('${escapeFn(info.productBarcode || info.productName || info.rawCode)}', 'remove')" style="padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; background: rgba(239,83,80,0.2); border: 1.5px solid #ef5350; color: #ef9a9a; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+        <button type="button" onclick="openStockAdjustmentModal('${escapeFn(info.productId || info.productBarcode || info.productName || info.rawCode)}', 'remove')" style="padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; background: rgba(239,83,80,0.25); border: 1.5px solid #ef5350; color: #ef9a9a; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
           ➖ Quitar stock
         </button>
       </div>
@@ -9952,18 +9976,36 @@ function openStockAdjustmentModal(productIdentifier = null, actionType = 'remove
   if (voiceStatus) voiceStatus.textContent = '';
 
   const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
-  const allProducts = [...(internalCatalogProducts || []), ...storeLocs, ...(baseProducts || [])];
+  const localLocs = typeof readLocalProductLocations === 'function' ? readLocalProductLocations() : [];
+  const allProducts = [...(internalCatalogProducts || []), ...storeLocs, ...localLocs, ...(baseProducts || [])];
   let found = null;
   if (productIdentifier) {
     const raw = String(productIdentifier).trim().toLowerCase();
+    const upper = raw.toUpperCase();
     found = allProducts.find(p => 
       (p.barcode && p.barcode.toLowerCase() === raw) ||
       (p.product_code && p.product_code.toLowerCase() === raw) ||
-      (p.name && p.name.toLowerCase().includes(raw)) ||
       (p.id && String(p.id).toLowerCase() === raw) ||
+      (p.name && p.name.toLowerCase().includes(raw)) ||
       (p.wms_code && p.wms_code.toLowerCase() === raw) ||
       (p.location && p.location.toLowerCase().includes(raw))
     );
+
+    if (!found) {
+      // Try matching by WMS shelf and level
+      const shelfMatch = upper.match(/(E[1-5]|HEL\d*|VIT\d*|PIS\d*|[A-E][-_]?[1-5])/);
+      const levelMatch = upper.match(/N([1-6])/);
+      if (shelfMatch) {
+        const sCode = shelfMatch[1].replace('-', '');
+        const lNum = levelMatch ? Number(levelMatch[1]) : null;
+        found = allProducts.find(p => {
+          const pShelf = String(p.shelf_code || '').toUpperCase();
+          const shelfOk = pShelf.includes(sCode);
+          const levelOk = !lNum || Number(p.shelf_level ?? p.level) === lNum;
+          return shelfOk && levelOk;
+        });
+      }
+    }
   }
 
   const nameEl = document.getElementById('adjustment-product-name');
@@ -10003,12 +10045,12 @@ function openStockAdjustmentModal(productIdentifier = null, actionType = 'remove
       dropdownContainer.style.display = 'block';
       if (dropdown) {
         dropdown.innerHTML = '<option value="">-- Seleccionar un producto del local --</option>' + 
-          allProducts.map(p => `<option value="${p.id || p.product_code}">${p.name} (Stock: ${p.stock || 0} u.)</option>`).join('');
+          allProducts.map(p => `<option value="${p.id || p.product_code}">${p.name} (Stock actual: ${p.stock || 0} u.)</option>`).join('');
       }
     }
-    if (nameEl) nameEl.textContent = 'Seleccioná un producto de la lista';
-    if (metaEl) metaEl.textContent = 'SKU: - · Ubicación: -';
-    if (stockEl) stockEl.textContent = '- u.';
+    if (nameEl) nameEl.textContent = productIdentifier ? `Asignar producto a: ${productIdentifier}` : 'Seleccioná un producto de la lista';
+    if (metaEl) metaEl.textContent = `SKU: - · Ubicación: ${productIdentifier || '-'}`;
+    if (stockEl) stockEl.textContent = '0 u.';
     if (idInput) idInput.value = '';
     if (codeInput) codeInput.value = '';
   }
