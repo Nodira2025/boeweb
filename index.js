@@ -234,6 +234,9 @@ document.addEventListener('DOMContentLoaded', () => {
               }
             } catch (_) {}
 
+            const ownRows = allSupplierRows.filter(r => r.supplier_id === 'local_store' || r.supplier_id === 'propio' || !r.supplier_id);
+            const b2bRows = allSupplierRows.filter(r => r.supplier_id && r.supplier_id !== 'local_store' && r.supplier_id !== 'propio');
+
             const ownParsed = ownRows.map(r => {
               const pid = String(r.mapped_product_id || r.supplier_product_id || r.id);
               const meta = metadataMap.get(pid) || {};

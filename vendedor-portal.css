@@ -1103,8 +1103,8 @@
   height: 60px;
   background: var(--vendor-paper, #ffffff);
   border-top: 1.5px solid var(--color-border-accent, #e5d7a8);
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
-  z-index: 9999;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 99999;
   justify-content: space-around;
   align-items: center;
   padding: 0 4px;
@@ -1112,12 +1112,37 @@
 
 @media (max-width: 1099px) {
   .vendor-mobile-bottom-nav {
-    display: flex;
+    display: flex !important;
   }
   
   #vendedor-portal-app {
     padding-bottom: 74px !important;
   }
+}
+
+[data-theme="dark"] .vendor-mobile-bottom-nav {
+  background: #0f2019;
+  border-top-color: rgba(194, 162, 70, 0.35);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .vendor-mobile-nav-item {
+  color: #a3b899;
+}
+
+[data-theme="dark"] .vendor-mobile-nav-item.active {
+  color: #ffd54f;
+}
+
+[data-theme="dark"] .vendor-operations-sheet-card {
+  background: #0f2019;
+  color: #f7f4ea;
+}
+
+[data-theme="dark"] .vendor-sheet-op-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f7f4ea;
 }
 
 .vendor-mobile-nav-item {
