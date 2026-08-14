@@ -104,14 +104,74 @@ class PosCartEngine {
     return this.items.reduce((sum, item) => sum + ((Number(item.price) || 0) * (Number(item.quantity) || 0)), 0);
   }
 
-  setDiscount(type = 'PERCENT', value = 0) {
-    const normType = String(type).toUpperCase() === 'FIXED' || String(type).toUpperCase() === 'AMOUNT' ? 'FIXED' : 'PERCENT';
+  setAdjustment(type = 'NONE', value = 0) {
+    const rawType = String(type).toUpperCase();
+    let normType = 'NONE';
+    if (rawType === 'DISCOUNT_PERCENT' || rawType === 'PERCENT') {
+      normType = 'DISCOUNT_PERCENT';
+    } else if (rawType === 'DISCOUNT_FIXED' || rawType === 'FIXED' || rawType === 'AMOUNT') {
+      normType = 'DISCOUNT_FIXED';
+    } else if (rawType === 'INCREASE_PERCENT') {
+      normType = 'INCREASE_PERCENT';
+    } else if (rawType === 'INCREASE_FIXED') {
+      normType = 'INCREASE_FIXED';
+    } else {
+      normType = 'NONE';
+    }
+
     const numVal = Math.max(0, Number(value) || 0);
-    this.discount = { type: normType, value: numVal };
+    this.adjustment = { type: normType, value: numVal };
+    // Backward compatibility for this.discount
+    if (normType === 'DISCOUNT_PERCENT') {
+      this.discount = { type: 'PERCENT', value: numVal };
+    } else if (normType === 'DISCOUNT_FIXED') {
+      this.discount = { type: 'FIXED', value: numVal };
+    } else {
+      this.discount = { type: 'PERCENT', value: 0 };
+    }
+  }
+
+  setDiscount(type = 'PERCENT', value = 0) {
+    const rawType = String(type).toUpperCase();
+    if (rawType === 'FIXED' || rawType === 'AMOUNT' || rawType === 'DISCOUNT_FIXED') {
+      this.setAdjustment('DISCOUNT_FIXED', value);
+    } else if (rawType === 'INCREASE_PERCENT') {
+      this.setAdjustment('INCREASE_PERCENT', value);
+    } else if (rawType === 'INCREASE_FIXED') {
+      this.setAdjustment('INCREASE_FIXED', value);
+    } else if (rawType === 'NONE') {
+      this.setAdjustment('NONE', 0);
+    } else {
+      this.setAdjustment('DISCOUNT_PERCENT', value);
+    }
+  }
+
+  getAdjustment() {
+    return { ...(this.adjustment || { type: 'NONE', value: 0 }) };
   }
 
   getDiscount() {
     return { ...(this.discount || { type: 'PERCENT', value: 0 }) };
+  }
+
+  getAdjustmentAmount() {
+    const subtotal = this.getSubtotal();
+    const adj = this.adjustment || { type: 'NONE', value: 0 };
+    const val = Number(adj.value) || 0;
+
+    if (adj.type === 'DISCOUNT_PERCENT') {
+      return -((subtotal * val) / 100);
+    }
+    if (adj.type === 'DISCOUNT_FIXED') {
+      return -Math.min(subtotal, val);
+    }
+    if (adj.type === 'INCREASE_PERCENT') {
+      return (subtotal * val) / 100;
+    }
+    if (adj.type === 'INCREASE_FIXED') {
+      return val;
+    }
+    return 0;
   }
 
   getDiscountAmount(customDiscount = null) {
@@ -119,26 +179,34 @@ class PosCartEngine {
     if (customDiscount !== null && typeof customDiscount === 'number') {
       return (subtotal * customDiscount) / 100;
     }
-    const disc = this.discount || { type: 'PERCENT', value: 0 };
-    if (disc.type === 'PERCENT') {
-      return (subtotal * (disc.value || 0)) / 100;
-    }
-    return Math.min(subtotal, disc.value || 0);
+    const adjAmt = this.getAdjustmentAmount();
+    return adjAmt < 0 ? Math.abs(adjAmt) : 0;
+  }
+
+  getIncreaseAmount() {
+    const adjAmt = this.getAdjustmentAmount();
+    return adjAmt > 0 ? adjAmt : 0;
   }
 
   getTotal(discountPercent = null) {
     const subtotal = this.getSubtotal();
-    const discountAmount = this.getDiscountAmount(discountPercent);
-    return Math.max(0, subtotal - discountAmount);
+    if (discountPercent !== null && typeof discountPercent === 'number') {
+      const discAmt = (subtotal * discountPercent) / 100;
+      return Math.max(0, subtotal - discAmt);
+    }
+    const adjAmt = this.getAdjustmentAmount();
+    return Math.max(0, subtotal + adjAmt);
   }
 
   createSaleDraft(options = {}) {
     const cashierUser = options.cashierUser || { id: 'anonymous', name: 'Cajero' };
     const salespersonUser = options.salespersonUser || { id: 'anonymous', name: 'Vendedor' };
     const subtotal = this.getSubtotal();
+    const adj = this.getAdjustment();
+    const adjAmt = this.getAdjustmentAmount();
     const discountAmount = options.discount !== undefined ? Number(options.discount) : this.getDiscountAmount();
     const discountType = options.discountType || (this.discount ? this.discount.type : 'PERCENT');
-    const total = options.total !== undefined ? Number(options.total) : Math.max(0, subtotal - discountAmount);
+    const total = options.total !== undefined ? Number(options.total) : this.getTotal();
     const dateNow = new Date();
 
     return {
@@ -157,8 +225,12 @@ class PosCartEngine {
         availability: i.availability || 'EN_STOCK'
       })),
       subtotal,
+      adjustment_type: adj.type || 'NONE',
+      adjustment_value: adj.value || 0,
+      adjustment_amount: adjAmt,
       discount: discountAmount,
       discount_type: discountType,
+      surcharge: this.getIncreaseAmount(),
       total,
       payment_method: options.paymentMethod || 'EFECTIVO',
       notes: options.notes || '',

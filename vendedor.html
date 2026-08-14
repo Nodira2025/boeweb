@@ -1029,7 +1029,7 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="vendedor-caja.css?v=camera_pos_v22">
+  <link rel="stylesheet" href="vendedor-caja.css?v=camera_pos_v23">
   <link rel="stylesheet" href="vendedor-portal.css?v=flow_order_v25">
   <link rel="stylesheet" href="vendedor-stock.css?v=mobile_gba_v1">
   <style id="vendor-rescue-critical-styles">
@@ -1670,30 +1670,35 @@
         </div>
 
         <!-- Columna Derecha: Ítems del Carrito POS & Formulario de Cierre Draft -->
+        <!-- Columna Derecha: Ítems del Carrito POS & Formulario de Cierre Draft (Ticket Centrado) -->
         <div id="pos-ticket-column" class="pos-workspace-column pos-ticket-column">
           <div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 8px;">
-              <h3 style="font-size: 1.15rem; margin: 0; color: var(--color-text-main);">🛒 Ticket de Venta</h3>
-              <button type="button" onclick="switchPosMobileView('catalog')" class="btn btn-secondary" style="display: none; padding: 4px 10px; font-size: 0.75rem; border-radius: 8px;" id="pos-back-to-catalog-btn">
-                + Agregar más productos
-              </button>
+            <div class="pos-ticket-header">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 1.3rem;">🧾</span>
+                <button type="button" onclick="switchPosMobileView('catalog')" class="btn btn-secondary" style="display: none; padding: 4px 10px; font-size: 0.75rem; border-radius: 8px;" id="pos-back-to-catalog-btn">
+                  + Agregar productos
+                </button>
+              </div>
+              <h3 class="pos-ticket-title">TICKET DE VENTA</h3>
+              <span class="pos-ticket-subtitle">BÔ GROW CLUB · MOSTRADOR POS</span>
             </div>
 
             <!-- Selección de Vendedor e Identidad -->
-            <div style="margin-bottom: 15px; background: rgba(21,45,36,0.04); padding: 12px; border-radius: 10px; border: 1px solid var(--color-border-subtle);">
-              <label for="pos-salesperson-select" style="font-size: 0.8rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 4px;">👤 Atendió el Cliente (Vendedor):</label>
-              <select id="pos-salesperson-select" class="b2b-form-input" style="font-size: 0.9rem; font-weight: 700; background: #fff; margin-bottom: 8px;">
+            <div style="margin-bottom: 14px; background: rgba(21,45,36,0.04); padding: 10px 12px; border-radius: 12px; border: 1px solid var(--color-border-subtle);">
+              <label for="pos-salesperson-select" style="font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 4px;">👤 Atendió el Cliente (Vendedor):</label>
+              <select id="pos-salesperson-select" class="b2b-form-input" style="font-size: 0.88rem; font-weight: 700; background: #fff; margin-bottom: 6px;">
                 <!-- Poblado dinámicamente con SaasAuth.getTenantUsers() -->
               </select>
 
-              <div style="font-size: 0.8rem; color: var(--color-text-muted);">
+              <div style="font-size: 0.78rem; color: var(--color-text-muted); text-align: center;">
                 <span>🔑 Cobró / Cajero (Auth): </span>
                 <strong id="pos-cashier-display" style="color: var(--color-text-main);">Profesor Franco</strong>
               </div>
             </div>
 
             <!-- Listado de Ítems POS -->
-            <div id="pos-cart-items-list" style="max-height: 250px; overflow-y: auto; margin-bottom: 15px;">
+            <div id="pos-cart-items-list" style="max-height: 220px; overflow-y: auto; margin-bottom: 14px; border: 1px solid var(--color-border-subtle); border-radius: 12px; padding: 8px 12px; background: #fff;">
               <div id="pos-cart-empty-state" style="text-align: center; padding: 20px; color: #888; font-size: 0.88rem;">
                 El carrito está vacío.<br>Escaneá o buscá un producto.
               </div>
@@ -1701,29 +1706,50 @@
                 <!-- Ítems agregados -->
               </ul>
             </div>
+
+            <!-- Ajuste de Precio: Descuento o Aumento (Porcentaje o Pesos) -->
+            <div class="pos-adjustment-container">
+              <label for="pos-adjustment-type" style="font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 6px; text-align: center;">
+                🏷️ Ajuste de Precio (Descuento o Aumento):
+              </label>
+              <div style="display: grid; grid-template-columns: 1.35fr 1fr; gap: 8px;">
+                <select id="pos-adjustment-type" class="b2b-form-input" style="font-size: 0.82rem; font-weight: 700; background: #fff;" onchange="handlePosAdjustmentChange()">
+                  <option value="NONE">Sin ajuste (0)</option>
+                  <option value="DISCOUNT_PERCENT">📉 Descontar en %</option>
+                  <option value="DISCOUNT_FIXED">💸 Descontar en $</option>
+                  <option value="INCREASE_PERCENT">📈 Aumentar en %</option>
+                  <option value="INCREASE_FIXED">💵 Aumentar en $</option>
+                </select>
+                <div style="position: relative;">
+                  <input type="number" id="pos-adjustment-value" class="b2b-form-input" placeholder="0" min="0" step="any" style="font-size: 0.88rem; font-weight: 800; padding-right: 28px; text-align: right; background: #fff;" oninput="handlePosAdjustmentChange()">
+                  <span id="pos-adjustment-unit-badge" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-weight: 800; font-size: 0.82rem; color: var(--color-text-muted); pointer-events: none;">%</span>
+                </div>
+              </div>
+              <div id="pos-adjustment-feedback" style="display: none; font-size: 0.76rem; font-weight: 700; margin-top: 6px; text-align: center;"></div>
+            </div>
           </div>
 
           <div>
             <!-- Resumen de Importes -->
-            <div style="border-top: 2px solid var(--color-border-accent); padding-top: 12px; margin-bottom: 15px;">
+            <div style="border-top: 2px dashed var(--color-border-accent, #e5d7a8); padding-top: 12px; margin-bottom: 14px;">
               <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 6px;">
                 <span>Subtotal:</span>
                 <strong id="pos-summary-subtotal">$0,00</strong>
               </div>
-              <div id="pos-summary-discount-row" style="display: none; justify-content: space-between; font-size: 0.9rem; margin-bottom: 6px; color: #2e7d32;">
-                <span id="pos-summary-discount-label">Descuento:</span>
+              <div id="pos-summary-discount-row" style="display: none; justify-content: space-between; font-size: 0.9rem; margin-bottom: 6px;">
+                <span id="pos-summary-discount-label">Ajuste:</span>
                 <strong id="pos-summary-discount">-$0,00</strong>
               </div>
-              <div style="display: flex; justify-content: space-between; font-size: 1.25rem; font-weight: 900; color: var(--color-accent-gold);">
+              <div style="display: flex; justify-content: space-between; font-size: 1.3rem; font-weight: 900; color: var(--color-accent-gold); border-top: 1px solid rgba(0,0,0,0.06); padding-top: 8px; margin-top: 6px;">
                 <span>TOTAL:</span>
                 <strong id="pos-summary-total">$0,00</strong>
               </div>
             </div>
 
             <!-- Método de Pago & Observación -->
-            <div style="margin-bottom: 15px;">
-              <label for="pos-payment-method-select" style="font-size: 0.8rem; font-weight: 800; text-transform: uppercase; display: block; margin-bottom: 4px;">Forma de Pago:</label>
-              <select id="pos-payment-method-select" class="b2b-form-input" style="font-size: 0.9rem; font-weight: 700; background: #fff; margin-bottom: 8px;" onchange="handlePosPaymentMethodChange()">
+            <div style="margin-bottom: 14px;">
+              <label for="pos-payment-method-select" style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; display: block; margin-bottom: 4px;">Forma de Pago:</label>
+              <select id="pos-payment-method-select" class="b2b-form-input" style="font-size: 0.88rem; font-weight: 700; background: #fff; margin-bottom: 8px;" onchange="handlePosPaymentMethodChange()">
                 <option value="EFECTIVO">💵 Efectivo</option>
                 <option value="TRANSFERENCIA">🏦 Transferencia Bancaria</option>
                 <option value="DEBITO">💳 Tarjeta de Débito</option>
@@ -4064,10 +4090,10 @@
   <script src="migration-rollback.js?v=migration_v1"></script>
   <script src="migration-center.js?v=migration_v1"></script>
   <script src="tenant-onboarding.js?v=onboarding_v1"></script>
-  <script src="pos-cart-engine.js?v=cart_v1"></script>
+  <script src="pos-cart-engine.js?v=cart_v2"></script>
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=pos_mobile_v41"></script>
+  <script src="vendedor.js?v=pos_mobile_v42"></script>
 </body>
 </html>

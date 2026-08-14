@@ -7842,25 +7842,51 @@ function renderPosCartItems() {
   `).join('');
 
   const subtotal = cart.getSubtotal();
-  const discountAmount = cart.getDiscountAmount();
+  const adj = typeof cart.getAdjustment === 'function' ? cart.getAdjustment() : { type: 'NONE', value: 0 };
+  const adjAmt = typeof cart.getAdjustmentAmount === 'function' ? cart.getAdjustmentAmount() : -cart.getDiscountAmount();
   const total = cart.getTotal();
-  const discountInfo = cart.getDiscount();
 
   if (subtotalEl) subtotalEl.textContent = `$${subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
 
+  const feedbackEl = document.getElementById('pos-adjustment-feedback');
+  const unitBadgeEl = document.getElementById('pos-adjustment-unit-badge');
+
+  if (unitBadgeEl) {
+    unitBadgeEl.textContent = (adj.type === 'DISCOUNT_FIXED' || adj.type === 'INCREASE_FIXED') ? '$' : '%';
+  }
+
   if (discountRow) {
-    if (discountAmount > 0) {
+    if (adjAmt !== 0) {
       discountRow.style.display = 'flex';
-      if (discountLabelEl) {
-        discountLabelEl.textContent = discountInfo.type === 'PERCENT'
-          ? `Descuento (${discountInfo.value}%):`
-          : 'Descuento ($ fijo):';
-      }
-      if (discountEl) {
-        discountEl.textContent = `-$${discountAmount.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+      if (adjAmt < 0) {
+        const absAmt = Math.abs(adjAmt);
+        if (discountLabelEl) {
+          discountLabelEl.innerHTML = `<span style="color: #2e7d32; font-weight: 700;">📉 Descuento (${adj.type === 'DISCOUNT_PERCENT' ? `${adj.value}%` : '$'}):</span>`;
+        }
+        if (discountEl) {
+          discountEl.innerHTML = `<strong style="color: #2e7d32; font-weight: 800;">-$${absAmt.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</strong>`;
+        }
+        if (feedbackEl) {
+          feedbackEl.style.display = 'block';
+          feedbackEl.style.color = '#2e7d32';
+          feedbackEl.textContent = `✓ Descuento aplicado: -$${absAmt.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+        }
+      } else {
+        if (discountLabelEl) {
+          discountLabelEl.innerHTML = `<span style="color: #e65100; font-weight: 700;">📈 Aumento / Recargo (${adj.type === 'INCREASE_PERCENT' ? `${adj.value}%` : '$'}):</span>`;
+        }
+        if (discountEl) {
+          discountEl.innerHTML = `<strong style="color: #e65100; font-weight: 800;">+$${adjAmt.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</strong>`;
+        }
+        if (feedbackEl) {
+          feedbackEl.style.display = 'block';
+          feedbackEl.style.color = '#e65100';
+          feedbackEl.textContent = `✓ Aumento/Recargo aplicado: +$${adjAmt.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+        }
       }
     } else {
       discountRow.style.display = 'none';
+      if (feedbackEl) feedbackEl.style.display = 'none';
     }
   }
 
@@ -7894,30 +7920,55 @@ function removePosPosCartItem(id) {
 }
 window.removePosCartItem = removePosPosCartItem;
 
-function handlePosDiscountChange() {
+function handlePosAdjustmentChange() {
   const cart = getPosCartEngine();
   if (!cart) return;
 
-  const typeSelect = document.getElementById('pos-discount-type');
-  const valueInput = document.getElementById('pos-discount-value');
+  const typeSelect = document.getElementById('pos-adjustment-type');
+  const valueInput = document.getElementById('pos-adjustment-value');
+  const unitBadge = document.getElementById('pos-adjustment-unit-badge');
 
-  const discType = typeSelect?.value || 'PERCENT';
-  const discValue = Math.max(0, parseFloat(valueInput?.value) || 0);
+  const adjType = typeSelect?.value || 'NONE';
+  const adjValue = Math.max(0, parseFloat(valueInput?.value) || 0);
 
-  cart.setDiscount(discType, discValue);
+  if (unitBadge) {
+    unitBadge.textContent = (adjType === 'DISCOUNT_FIXED' || adjType === 'INCREASE_FIXED') ? '$' : '%';
+  }
+
+  if (typeof cart.setAdjustment === 'function') {
+    cart.setAdjustment(adjType, adjValue);
+  } else {
+    cart.setDiscount(adjType, adjValue);
+  }
+
   renderPosCartItems();
 }
+window.handlePosAdjustmentChange = handlePosAdjustmentChange;
+
+function handlePosDiscountChange() {
+  handlePosAdjustmentChange();
+}
+window.handlePosDiscountChange = handlePosDiscountChange;
 
 function clearPosDiscount() {
   const cart = getPosCartEngine();
   if (!cart) return;
 
-  const valueInput = document.getElementById('pos-discount-value');
+  const typeSelect = document.getElementById('pos-adjustment-type') || document.getElementById('pos-discount-type');
+  const valueInput = document.getElementById('pos-adjustment-value') || document.getElementById('pos-discount-value');
+
+  if (typeSelect) typeSelect.value = 'NONE';
   if (valueInput) valueInput.value = '';
 
-  cart.setDiscount('PERCENT', 0);
+  if (typeof cart.setAdjustment === 'function') {
+    cart.setAdjustment('NONE', 0);
+  } else {
+    cart.setDiscount('PERCENT', 0);
+  }
+
   renderPosCartItems();
 }
+window.clearPosDiscount = clearPosDiscount;
 
 async function submitPosSaleDraft() {
   const cart = getPosCartEngine();

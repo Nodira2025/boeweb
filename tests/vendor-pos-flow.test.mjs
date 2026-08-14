@@ -128,8 +128,22 @@ test('4. Flujo POS: Aplicar descuento en porcentaje (%) y en monto fijo ($)', ()
   assert.equal(cart.getDiscountAmount(), 20000);
   assert.equal(cart.getTotal(), 0);
 
-  // D. Quitar descuento
-  cart.setDiscount('PERCENT', 0);
+  // D. Aumento porcentual (+15%)
+  cart.setAdjustment('INCREASE_PERCENT', 15);
+  assert.equal(cart.getAdjustment().type, 'INCREASE_PERCENT');
+  assert.equal(cart.getAdjustment().value, 15);
+  assert.equal(cart.getAdjustmentAmount(), 3000);
+  assert.equal(cart.getTotal(), 23000);
+
+  // E. Aumento en monto fijo (+$2.500)
+  cart.setAdjustment('INCREASE_FIXED', 2500);
+  assert.equal(cart.getAdjustment().type, 'INCREASE_FIXED');
+  assert.equal(cart.getAdjustment().value, 2500);
+  assert.equal(cart.getAdjustmentAmount(), 2500);
+  assert.equal(cart.getTotal(), 22500);
+
+  // F. Quitar ajuste
+  cart.setAdjustment('NONE', 0);
   assert.equal(cart.getTotal(), 20000);
 });
 
