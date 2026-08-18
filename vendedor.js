@@ -198,45 +198,53 @@ document.addEventListener('DOMContentLoaded', async () => {
 function setupEventListeners() {
   // Search with debounce
   let searchTimeout;
-  searchInput.addEventListener('input', (e) => {
-    clearTimeout(searchTimeout);
-    searchQuery = e.target.value.trim();
-    searchTimeout = setTimeout(() => {
-      fetchB2BProducts(true); // Reset search and clear grid
-    }, 400);
-  });
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      searchQuery = e.target.value.trim();
+      searchTimeout = setTimeout(() => {
+        fetchB2BProducts(true); // Reset search and clear grid
+      }, 400);
+    });
+  }
 
   // Category Filtering
-  categoryButtons.forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      categoryButtons.forEach(b => b.classList.remove('active'));
-      
-      const targetBtn = e.target.closest('.b2b-category-btn');
-      targetBtn.classList.add('active');
-      currentCategory = targetBtn.dataset.category;
-      
-      fetchB2BProducts(true); // Reset category and clear grid
+  if (categoryButtons && categoryButtons.length) {
+    categoryButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        categoryButtons.forEach(b => b.classList.remove('active'));
+        
+        const targetBtn = e.target.closest('.b2b-category-btn');
+        if (targetBtn) {
+          targetBtn.classList.add('active');
+          currentCategory = targetBtn.dataset.category;
+          
+          fetchB2BProducts(true); // Reset category and clear grid
 
-      // Close sidebar filter drawer on mobile after selecting category
-      if (window.innerWidth <= 992) {
-        closeFilters();
-      }
+          // Close sidebar filter drawer on mobile after selecting category
+          if (window.innerWidth <= 992) {
+            closeFilters();
+          }
+        }
+      });
     });
-  });
+  }
 
   // Load More Button
-  loadMoreBtn.addEventListener('click', () => {
-    currentPage++;
-    fetchB2BProducts(false); // Fetch next page, do not clear grid
-  });
+  if (loadMoreBtn) {
+    loadMoreBtn.addEventListener('click', () => {
+      currentPage++;
+      fetchB2BProducts(false); // Fetch next page, do not clear grid
+    });
+  }
 
   // Cart Drawer open/close
-  cartTriggerBtn.addEventListener('click', openCart);
-  cartCloseBtn.addEventListener('click', closeCart);
-  cartOverlay.addEventListener('click', closeCart);
+  if (cartTriggerBtn) cartTriggerBtn.addEventListener('click', openCart);
+  if (cartCloseBtn) cartCloseBtn.addEventListener('click', closeCart);
+  if (cartOverlay) cartOverlay.addEventListener('click', closeCart);
 
   // Checkout submit
-  checkoutForm.addEventListener('submit', handleCheckout);
+  if (checkoutForm) checkoutForm.addEventListener('submit', handleCheckout);
 
   // Supplier filter
   if (filterSupplierSelect) {
@@ -262,7 +270,7 @@ function setupEventListeners() {
   // Mobile Bottom Navigation Event Listeners
   if (mobileFilterBtn) {
     mobileFilterBtn.addEventListener('click', () => {
-      if (sidebarCard.classList.contains('open')) {
+      if (sidebarCard && sidebarCard.classList.contains('open')) {
         closeFilters();
       } else {
         openFilters();
@@ -282,7 +290,7 @@ function setupEventListeners() {
   if (mobileCartBtn) {
     mobileCartBtn.addEventListener('click', () => {
       closeFilters();
-      if (cartDrawer.classList.contains('open')) {
+      if (cartDrawer && cartDrawer.classList.contains('open')) {
         closeCart();
       } else {
         openCart();
@@ -302,11 +310,11 @@ function setupEventListeners() {
 // --- DATA FETCHING ---
 async function fetchB2BProducts(clearGrid = true) {
   showLoader(true);
-  noResults.style.display = 'none';
-  loadMoreContainer.style.display = 'none';
+  if (noResults) noResults.style.display = 'none';
+  if (loadMoreContainer) loadMoreContainer.style.display = 'none';
   
   if (clearGrid) {
-    productGrid.innerHTML = '';
+    if (productGrid) productGrid.innerHTML = '';
     baseProducts = [];
     currentPage = 1;
   }
@@ -388,28 +396,32 @@ async function fetchB2BProducts(clearGrid = true) {
 
     baseProducts = baseProducts.concat(fetchedProducts);
 
-    renderProductsList(fetchedProducts, clearGrid);
+    if (productGrid) renderProductsList(fetchedProducts, clearGrid);
     renderVendorHomeUI();
 
     // Show/hide Load More button
-    if ((data || []).length === itemsPerPage) {
-      loadMoreContainer.style.display = 'block';
-    } else {
-      loadMoreContainer.style.display = 'none';
+    if (loadMoreContainer) {
+      if ((data || []).length === itemsPerPage) {
+        loadMoreContainer.style.display = 'block';
+      } else {
+        loadMoreContainer.style.display = 'none';
+      }
     }
 
-    if (baseProducts.length === 0) {
+    if (baseProducts.length === 0 && noResults) {
       noResults.style.display = 'block';
     }
   } catch (err) {
     console.error('Error fetching B2B catalog:', err.message);
-    productGrid.innerHTML = `
-      <div style="grid-column: 1/-1; text-align: center; padding: 40px 20px; color: #721c24; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px;">
-        <p style="font-weight: bold; margin-bottom: 8px;">Error al conectar con la base de datos de Supabase</p>
-        <p style="font-size: 0.9rem; margin-bottom: 12px;">${err.message || err}</p>
-        <button onclick="window.fetchB2BProducts && window.fetchB2BProducts(true)" style="padding: 8px 16px; background: #721c24; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">Reintentar Carga</button>
-      </div>
-    `;
+    if (productGrid) {
+      productGrid.innerHTML = `
+        <div style="grid-column: 1/-1; text-align: center; padding: 40px 20px; color: #721c24; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px;">
+          <p style="font-weight: bold; margin-bottom: 8px;">Error al conectar con la base de datos de Supabase</p>
+          <p style="font-size: 0.9rem; margin-bottom: 12px;">${err.message || err}</p>
+          <button onclick="window.fetchB2BProducts && window.fetchB2BProducts(true)" style="padding: 8px 16px; background: #721c24; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">Reintentar Carga</button>
+        </div>
+      `;
+    }
   } finally {
     showLoader(false);
   }
@@ -635,7 +647,7 @@ function saveCart() {
 
 function updateCartBadge() {
   const count = cart.reduce((total, item) => total + item.quantity, 0);
-  cartCountEl.textContent = count;
+  if (cartCountEl) cartCountEl.textContent = count;
   if (mobileCartCountEl) {
     mobileCartCountEl.textContent = count;
   }
@@ -644,6 +656,7 @@ function updateCartBadge() {
 
 // --- CART RENDER & EDITING ---
 function renderCart() {
+  if (!cartBody) return;
   if (cart.length === 0) {
     cartBody.innerHTML = `
       <div class="b2b-empty-cart">
@@ -655,7 +668,7 @@ function renderCart() {
         <p>El pedido está vacío</p>
       </div>
     `;
-    cartTotalEl.textContent = '$0';
+    if (cartTotalEl) cartTotalEl.textContent = '$0';
     return;
   }
 
@@ -728,7 +741,7 @@ function renderCart() {
   }
 
   cartBody.innerHTML = cartHtml;
-  cartTotalEl.textContent = `$${formatPrice(overallTotal)}`;
+  if (cartTotalEl) cartTotalEl.textContent = `$${formatPrice(overallTotal)}`;
 }
 
 window.changeCartItemSupplier = function(productId, oldSupplierId, newSupplierId) {
@@ -1018,19 +1031,19 @@ function generateComparativePDF() {
 
 // --- UI HELPERS ---
 function showLoader(show) {
-  loader.style.display = show ? 'flex' : 'none';
+  if (loader) loader.style.display = show ? 'flex' : 'none';
 }
 
 function openCart() {
-  cartDrawer.classList.add('open');
-  cartOverlay.classList.add('open');
-  updateMobileNavActive(mobileCartBtn);
+  if (cartDrawer) cartDrawer.classList.add('open');
+  if (cartOverlay) cartOverlay.classList.add('open');
+  if (mobileCartBtn) updateMobileNavActive(mobileCartBtn);
 }
 
 function closeCart() {
-  cartDrawer.classList.remove('open');
-  cartOverlay.classList.remove('open');
-  updateMobileNavActive(mobileHomeBtn);
+  if (cartDrawer) cartDrawer.classList.remove('open');
+  if (cartOverlay) cartOverlay.classList.remove('open');
+  if (mobileHomeBtn) updateMobileNavActive(mobileHomeBtn);
 }
 
 // Mobile specific drawer toggles
@@ -5890,11 +5903,11 @@ function normalizeInternalCatalogProduct(supplier, product, draft, location) {
     supplierRowId: supplier.id,
     draftId: draft?.id || null,
     name: product?.name || supplier.name || draft?.name || productId,
-    brand: draft?.brand || '',
-    presentation: draft?.presentation || '',
+    brand: draft?.brand || product?.brand || '',
+    presentation: draft?.presentation || product?.presentation || '',
     category: product?.category || draft?.category || 'Otros',
     description: product?.description || draft?.description || '',
-    barcode: draft?.barcode || location?.barcode || '',
+    barcode: draft?.barcode || location?.barcode || product?.barcode || supplier?.barcode || '',
     image: product?.image || supplier.image || draft?.image_url || location?.image_url || '',
     imagePath: draft?.image_path || '',
     price: Number(supplier.price) || Number(draft?.sale_price) || 0,
@@ -6773,12 +6786,13 @@ async function uploadInternalCatalogImage(productId, currentImage) {
 }
 
 function internalCatalogFormValues() {
+  const rawBarcode = (document.getElementById('internal-editor-barcode')?.value || '').trim();
   return {
     name: document.getElementById('internal-editor-name')?.value.trim() || '',
     brand: document.getElementById('internal-editor-brand')?.value.trim() || null,
     presentation: document.getElementById('internal-editor-presentation')?.value.trim() || null,
     category: document.getElementById('internal-editor-category')?.value || 'Otros',
-    barcode: cleanStockBarcode(document.getElementById('internal-editor-barcode')?.value || '') || null,
+    barcode: rawBarcode || null,
     price: Number(document.getElementById('internal-editor-price')?.value || 0),
     stock: Number.parseInt(document.getElementById('internal-editor-stock')?.value || '0', 10),
     description: document.getElementById('internal-editor-description')?.value.trim() || null
@@ -6786,53 +6800,107 @@ function internalCatalogFormValues() {
 }
 
 async function updateInternalCatalogRelations(product, values, image) {
-  const productResult = await supabaseClient.from('products').update({
+  if (!supabaseClient) return;
+
+  const productPayload = {
     name: values.name,
     category: values.category,
     description: values.description,
     image: image.url
-  }).eq('id', product.id);
-  if (productResult.error) throw new Error(`No se pudo actualizar la ficha: ${productResult.error.message}`);
+  };
 
-  const supplierResult = await supabaseClient.from('supplier_products').update({
-    name: values.name,
-    price: values.price,
-    stock: values.stock,
-    available: values.stock > 0,
-    image: image.url
-  }).eq('id', product.supplierRowId);
-  if (supplierResult.error) throw new Error(`No se pudo actualizar precio y stock: ${supplierResult.error.message}`);
+  try {
+    let productResult = await supabaseClient.from('products').update({ ...productPayload, barcode: values.barcode }).eq('id', product.id);
+    if (productResult.error && /column.*barcode|schema/i.test(productResult.error.message || '')) {
+      productResult = await supabaseClient.from('products').update(productPayload).eq('id', product.id);
+    }
+    if (productResult.error) throw new Error(`No se pudo actualizar la ficha: ${productResult.error.message}`);
+  } catch (prodErr) {
+    console.warn('Ficha de producto notice:', prodErr.message);
+  }
 
-  if (product.draftId) {
-    const draftPayload = {
+  if (product.supplierRowId) {
+    const supplierPayload = {
       name: values.name,
-      brand: values.brand,
-      presentation: values.presentation,
-      category: values.category,
-      description: values.description,
-      barcode: values.barcode,
-      image_url: image.url,
+      price: values.price,
       stock: values.stock,
-      sale_price: values.price,
-      updated_at: new Date().toISOString()
+      available: values.stock > 0,
+      image: image.url
     };
-    if (image.path) draftPayload.image_path = image.path;
-    const draftResult = await supabaseClient.from('product_drafts').update(draftPayload).eq('id', product.draftId);
-    if (draftResult.error) console.warn('No se pudo sincronizar el borrador aprobado:', draftResult.error.message);
+    try {
+      let supplierResult = await supabaseClient.from('supplier_products').update({ ...supplierPayload, barcode: values.barcode }).eq('id', product.supplierRowId);
+      if (supplierResult.error && /column.*barcode|schema/i.test(supplierResult.error.message || '')) {
+        supplierResult = await supabaseClient.from('supplier_products').update(supplierPayload).eq('id', product.supplierRowId);
+      }
+      if (supplierResult.error) throw new Error(`No se pudo actualizar precio y stock: ${supplierResult.error.message}`);
+    } catch (supErr) {
+      console.warn('Proveedor de producto notice:', supErr.message);
+    }
+  }
+
+  const draftPayload = {
+    product_code: String(product.id),
+    name: values.name,
+    brand: values.brand,
+    presentation: values.presentation,
+    category: values.category,
+    description: values.description,
+    barcode: values.barcode,
+    image_url: image.url,
+    stock: values.stock,
+    sale_price: values.price,
+    status: 'APPROVED',
+    updated_at: new Date().toISOString()
+  };
+  if (image.path) draftPayload.image_path = image.path;
+
+  try {
+    if (product.draftId) {
+      const draftResult = await supabaseClient.from('product_drafts').update(draftPayload).eq('id', product.draftId);
+      if (draftResult.error) {
+        console.warn('No se pudo actualizar por draftId, buscando por product_code:', draftResult.error.message);
+        await supabaseClient.from('product_drafts').update(draftPayload).eq('product_code', String(product.id));
+      }
+    } else {
+      const { data: existingDrafts } = await supabaseClient.from('product_drafts').select('id').eq('product_code', String(product.id)).limit(1);
+      if (existingDrafts && existingDrafts.length > 0) {
+        product.draftId = existingDrafts[0].id;
+        await supabaseClient.from('product_drafts').update(draftPayload).eq('id', existingDrafts[0].id);
+      } else {
+        const { data: insertedDrafts } = await supabaseClient.from('product_drafts').insert([draftPayload]).select('id');
+        if (insertedDrafts && insertedDrafts.length > 0) {
+          product.draftId = insertedDrafts[0].id;
+        }
+      }
+    }
+  } catch (draftErr) {
+    console.warn('Product draft sync notice:', draftErr.message);
   }
 }
 
 function updateInternalCatalogLocalLocation(product, values, imageUrl) {
-  const location = readLocalProductLocations().find(item => String(item.product_code) === String(product.id));
-  if (!location) return;
-  saveLocalProductLocation({
-    ...location,
-    name: values.name,
-    barcode: values.barcode,
-    image_url: imageUrl,
-    stock: values.stock,
-    updated_at: new Date().toISOString()
-  });
+  const locations = readLocalProductLocations();
+  const existing = locations.find(item => String(item.product_code) === String(product.id));
+  if (existing) {
+    saveLocalProductLocation({
+      ...existing,
+      name: values.name,
+      barcode: values.barcode,
+      image_url: imageUrl || existing.image_url,
+      stock: values.stock,
+      updated_at: new Date().toISOString()
+    });
+  } else {
+    saveLocalProductLocation({
+      product_id: product.id,
+      product_code: product.id,
+      name: values.name,
+      barcode: values.barcode,
+      image_url: imageUrl || product.image || '',
+      stock: values.stock,
+      updated_at: new Date().toISOString()
+    });
+  }
 }
 
 async function saveInternalCatalogProduct(event) {
@@ -6853,6 +6921,21 @@ async function saveInternalCatalogProduct(event) {
     const image = await uploadInternalCatalogImage(product.id, product.image);
     await updateInternalCatalogRelations(product, values, image);
     updateInternalCatalogLocalLocation(product, values, image.url);
+
+    // Update in-memory product immediately
+    product.name = values.name;
+    product.brand = values.brand || '';
+    product.presentation = values.presentation || '';
+    product.category = values.category;
+    product.barcode = values.barcode || '';
+    product.price = values.price;
+    product.stock = values.stock;
+    product.description = values.description || '';
+    product.image = image.url;
+    try {
+      localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
+    } catch (_) {}
+
     storeMapDataLoaded = false;
     closeInternalCatalogEditor();
     await loadInternalCatalog();
