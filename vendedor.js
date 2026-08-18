@@ -1209,9 +1209,9 @@ function handleVendorLogin(e) {
 
   if (vendorData) {
     const customPass = localStorage.getItem('boeweb_vendor_password_' + vendorData.name.toLowerCase());
-    const isPassValid = (customPass && typedPass === customPass.toLowerCase()) ||
-                        (typedPass === vendorData.pass.toLowerCase()) || 
-                        (vendorData.altPass && typedPass === vendorData.altPass.toLowerCase());
+    const isPassValid = customPass
+      ? typedPass === customPass.toLowerCase()
+      : (typedPass === vendorData.pass.toLowerCase() || (vendorData.altPass && typedPass === vendorData.altPass.toLowerCase()));
 
     if (isPassValid) {
       sessionStorage.setItem('boeweb_vendor_name', vendorData.name);
@@ -1290,9 +1290,11 @@ function handleVendorChangePassword(e) {
   }
 
   const customStored = localStorage.getItem('boeweb_vendor_password_' + activeVendor.toLowerCase());
-  const validCurrent = customStored || vendorData.pass;
+  const isOldPassValid = customStored
+    ? oldPass.toLowerCase() === customStored.toLowerCase()
+    : (oldPass.toLowerCase() === vendorData.pass.toLowerCase() || (vendorData.altPass && oldPass.toLowerCase() === vendorData.altPass.toLowerCase()));
 
-  if (oldPass.toLowerCase() !== validCurrent.toLowerCase() && (!vendorData.altPass || oldPass.toLowerCase() !== vendorData.altPass.toLowerCase())) {
+  if (!isOldPassValid) {
     showModalMsg('La contraseña actual ingresada es incorrecta.');
     oldPassEl?.select();
     return;
@@ -6521,7 +6523,11 @@ function handleAdminAuditUnlock(event) {
   const pass = (passInput?.value || '').trim().toLowerCase();
 
   const VALID_ADMIN_PASSWORDS = ['admin123', 'admin', '1234', 'boegrow2026', 'raul123'];
-  const isValid = VALID_ADMIN_PASSWORDS.includes(pass) || AUTHORIZED_VENDEDORES.some(v => v.isAdmin && (v.pass.toLowerCase() === pass || v.altPass?.toLowerCase() === pass));
+  const isValid = VALID_ADMIN_PASSWORDS.includes(pass) || AUTHORIZED_VENDEDORES.some(v => {
+    if (!v.isAdmin) return false;
+    const customPass = localStorage.getItem('boeweb_vendor_password_' + v.name.toLowerCase());
+    return customPass ? pass === customPass.toLowerCase() : (v.pass.toLowerCase() === pass || v.altPass?.toLowerCase() === pass);
+  });
 
   if (!isValid) {
     if (errorEl) {

@@ -50,3 +50,23 @@ test('5. CSS Responsive: Barra de navegación compacta y bottom bar en móviles'
   assert.match(portalCss, /\.vendor-operations-sheet-overlay\s*\{/);
   assert.match(portalCss, /\.vendor-nav-bell-badge\s*\{/);
 });
+
+test('6. Seguridad de Acceso: Contraseña personalizada anula e invalida la contraseña por defecto', () => {
+  // Simular la lógica de autenticación de vendedor
+  const vendor = { name: 'Gino', pass: 'gino123', altPass: null };
+  
+  // Caso 1: Sin contraseña personalizada -> acepta la por defecto
+  const storage1 = {};
+  const isAuthDefault = (typed) => {
+    const custom = storage1['boeweb_vendor_password_' + vendor.name.toLowerCase()];
+    return custom ? typed.toLowerCase() === custom.toLowerCase() : (typed.toLowerCase() === vendor.pass.toLowerCase());
+  };
+  assert.equal(isAuthDefault('gino123'), true, 'Debe aceptar password por defecto si no se cambió');
+  assert.equal(isAuthDefault('GINOXDPROFE20276'), false, 'No debe aceptar password nuevo antes de cambiarlo');
+
+  // Caso 2: Se cambia la contraseña a GINOXDPROFE20276 -> SOLO acepta la nueva, RECHAZA la vieja
+  storage1['boeweb_vendor_password_gino'] = 'GINOXDPROFE20276';
+  assert.equal(isAuthDefault('GINOXDPROFE20276'), true, 'Debe aceptar la nueva contraseña');
+  assert.equal(isAuthDefault('gino123'), false, 'Debe RECHAZAR la contraseña vieja por defecto');
+});
+
