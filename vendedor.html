@@ -1951,12 +1951,15 @@
             </div>
 
             <div class="stock-noai-card" aria-labelledby="stock-noai-title">
-              <div class="stock-noai-heading">
+              <div class="stock-noai-heading" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid rgba(194,162,70,0.2);">
                 <div>
-                  <span class="stock-noai-badge">Internet · Growshops AR</span>
-                  <h4 id="stock-noai-title">Buscar datos del producto</h4>
+                  <span class="stock-noai-badge" id="stock-criterion-badge" style="display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.85rem; background: rgba(194,162,70,0.2); color: #c2a246; border: 1px solid rgba(194,162,70,0.4);">🇦🇷 Argentina · 🌿 Growshop</span>
+                  <h4 id="stock-noai-title" style="margin: 6px 0 0 0; font-size: 1.05rem;">Buscar datos del producto</h4>
                 </div>
-                <span class="stock-noai-source">Google Argentina + growshops</span>
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <button type="button" class="stock-entry-secondary-btn" id="btn-open-stock-criterion" onclick="openStockCriterionModal()" style="font-size: 0.85rem; padding: 7px 13px; border: 1.5px solid #c2a246; background: #c2a246; color: #152d24; font-weight: 800; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: inline-flex; align-items: center; gap: 6px;" title="Cambiar país y rubro para mejorar la búsqueda">⚙️ Cambiar criterio</button>
+                  <span class="stock-noai-source" id="stock-criterion-source-label" style="font-size: 0.8rem; font-weight: 600; opacity: 0.85;">Google + Mercado Libre</span>
+                </div>
               </div>
 
               <label for="fastupload-barcode-input">Código de barras</label>
@@ -1975,6 +1978,7 @@
               <label for="fastupload-manual-query-input">Nombre, marca o SKU</label>
               <div class="stock-noai-action-row stock-noai-manual-row">
                 <input type="search" id="fastupload-manual-query-input" class="b2b-form-input" placeholder="Ej: BioBizz Bio Grow 1 L" enterkeyhint="search" autocomplete="off">
+                <button type="button" class="stock-entry-secondary-btn" id="fastupload-voice-btn" onclick="startFastUploadVoiceDictation()" title="Dictar nombre por voz" aria-label="Dictar por voz" style="font-size: 1.1rem; padding: 6px 12px;">🎙️</button>
                 <button type="button" class="stock-lookup-btn" data-stock-lookup-button onclick="lookupFastUploadProductWithoutAi('manual')">Buscar por nombre</button>
               </div>
               <div id="fastupload-lookup-status" class="stock-lookup-status" role="status" aria-live="polite" hidden></div>
@@ -4382,6 +4386,86 @@
 
       </div>
 
+  <!-- ================= MODAL CAMBIAR CRITERIO DE INGRESO (PAÍS Y RUBRO) ================= -->
+  <div id="modal-stock-search-criterion" style="display: none; position: fixed !important; inset: 0 !important; z-index: 99999999 !important; background: rgba(0,0,0,0.85) !important; backdrop-filter: blur(6px) !important; -webkit-backdrop-filter: blur(6px) !important; align-items: center !important; justify-content: center !important; padding: 16px !important; box-sizing: border-box !important;">
+    <div style="max-width: 480px; width: 100%; border-radius: 20px; border: 2px solid var(--vendor-gold, #c2a246); background: var(--vendor-bg-card, #152d24); color: var(--vendor-cream, #f7f6f2); padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.8); margin: auto; position: relative; display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(194,162,70,0.3); padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.5rem;">⚙️</span>
+          <div>
+            <h3 style="margin: 0; font-size: 1.15rem; color: var(--vendor-gold, #c2a246); font-family: var(--font-display, serif); font-weight: 700;">Criterio de Búsqueda</h3>
+            <small style="color: var(--vendor-muted, #a2b29f); font-size: 0.78rem;">Ajustá el país y rubro para búsquedas e IA certeras</small>
+          </div>
+        </div>
+        <button type="button" onclick="closeStockCriterionModal()" style="background: rgba(255,255,255,0.1); border: none; color: #fff; font-size: 1.2rem; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;" aria-label="Cerrar modal">✕</button>
+      </div>
+
+      <form onsubmit="handleSaveStockCriterion(event)" style="display: flex; flex-direction: column; gap: 14px;">
+        <div>
+          <label for="criterion-country-select" style="display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 6px; color: var(--vendor-cream, #f7f6f2);">
+            📍 País / Mercado
+          </label>
+          <select id="criterion-country-select" class="b2b-form-input" style="width: 100%; padding: 10px; border-radius: 8px; font-size: 0.92rem; background: var(--vendor-surface, #0f1c16); color: #fff; border: 1px solid rgba(194,162,70,0.4);" required>
+            <option value="AR">🇦🇷 Argentina (ARS · Mercado Libre MLA)</option>
+            <option value="PE">🇵🇪 Perú (PEN · Mercado Libre MPE)</option>
+            <option value="CL">🇨🇱 Chile (CLP · Mercado Libre MLC)</option>
+            <option value="CO">🇨🇴 Colombia (COP · Mercado Libre MCO)</option>
+            <option value="MX">🇲🇽 México (MXN · Mercado Libre MLM)</option>
+            <option value="UY">🇺🇾 Uruguay (UYU · Mercado Libre MLU)</option>
+            <option value="ES">🇪🇸 España (EUR · Google España)</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="criterion-vertical-select" style="display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 6px; color: var(--vendor-cream, #f7f6f2);">
+            🏷️ Rubro / Especialidad
+          </label>
+          <select id="criterion-vertical-select" class="b2b-form-input" style="width: 100%; padding: 10px; border-radius: 8px; font-size: 0.92rem; background: var(--vendor-surface, #0f1c16); color: #fff; border: 1px solid rgba(194,162,70,0.4);" required>
+            <option value="growshop">🌿 Growshop & Botánica Premium</option>
+            <option value="farmacia">💊 Farmacia & Medicamentos</option>
+            <option value="verduleria">🥦 Verdulería & Frutería</option>
+            <option value="ferreteria">🔩 Ferretería & Herramientas</option>
+            <option value="repuestos">🚗 Autopartes & Repuestos</option>
+            <option value="indumentaria">👕 Indumentaria & Moda</option>
+            <option value="almacen">🛒 Almacén & Supermercado</option>
+          </select>
+        </div>
+
+        <div style="background: rgba(0,0,0,0.25); border-radius: 8px; padding: 10px; font-size: 0.8rem; color: var(--vendor-muted, #a2b29f); line-height: 1.4;">
+          💡 <strong>Efecto inmediato:</strong> Las búsquedas automáticas, consultas de precios online, el dictado por voz y el modelo de IA se enfocarán en este país y rubro.
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px;">
+          <button type="button" class="stock-entry-secondary-btn" onclick="closeStockCriterionModal()" style="padding: 9px 16px; border-radius: 8px; cursor: pointer;">Cancelar</button>
+          <button type="submit" class="stock-lookup-btn" style="padding: 9px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; background: var(--vendor-gold, #c2a246); color: #152d24;">✅ Aplicar Criterio</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL VER / IMPRIMIR QR DE PRODUCTO ================= -->
+  <div id="modal-product-qr-view" style="display: none; position: fixed !important; inset: 0 !important; z-index: 99999999 !important; background: rgba(0,0,0,0.85) !important; backdrop-filter: blur(6px) !important; -webkit-backdrop-filter: blur(6px) !important; align-items: center !important; justify-content: center !important; padding: 16px !important; box-sizing: border-box !important;">
+    <div style="max-width: 420px; width: 100%; border-radius: 20px; border: 2px solid var(--vendor-gold, #c2a246); background: #ffffff; color: #152d24; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.8); margin: auto; position: relative; display: flex; flex-direction: column; gap: 14px; text-align: center;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e0e0e0; padding-bottom: 8px;">
+        <h4 style="margin: 0; font-size: 1.1rem; color: #152d24; font-family: var(--font-display, serif); font-weight: 700;">Etiqueta QR de Producto</h4>
+        <button type="button" onclick="closeProductQrModal()" style="background: rgba(0,0,0,0.06); border: none; color: #333; font-size: 1.1rem; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; display: flex; align-items: center; justify-content: center;" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px; border: 1.5px dashed #c2a246; border-radius: 12px; background: #fafafa;">
+        <div id="product-modal-qr-container" style="width: 180px; height: 180px; display: flex; align-items: center; justify-content: center; background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);"></div>
+        <strong id="product-modal-qr-name" style="font-size: 1rem; color: #152d24; margin-top: 4px; word-break: break-word;"></strong>
+        <span id="product-modal-qr-code" style="font-family: monospace; font-size: 0.85rem; color: #666; background: #eee; padding: 2px 8px; border-radius: 4px;"></span>
+        <div id="product-modal-qr-price" style="font-size: 1.15rem; font-weight: 800; color: #2e7d32;"></div>
+      </div>
+
+      <small style="color: #666; font-size: 0.78rem;">
+        📱 Escaneable por <strong>clientes</strong> para ver la ficha técnica completa en la web, o por <strong>vendedores</strong> para cargarlo en el POS.
+      </small>
+
+      <div style="display: flex; gap: 10px; justify-content: center; margin-top: 4px;">
+        <button type="button" class="stock-entry-secondary-btn" onclick="closeProductQrModal()" style="padding: 8px 16px; border-radius: 8px; cursor: pointer;">Cerrar</button>
+        <button type="button" onclick="printCurrentModalQr()" style="padding: 8px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; background: #152d24; color: #ffd54f; border: 1px solid #c2a246;">🖨️ Imprimir Etiqueta</button>
+      </div>
     </div>
   </div>
 

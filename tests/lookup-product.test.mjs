@@ -188,3 +188,62 @@ test('el catálogo interno queda separado de proveedores y permite editar produc
   assert.match(sellerSource, /async function uploadInternalCatalogImage/);
   assert.match(sellerSource, /async function updateInternalCatalogRelations/);
 });
+
+test('lookup-product admite país y rubro dinámicos (ej: Perú + Verdulería)', async () => {
+  let capturedMlUrl = '';
+  globalThis.fetch = async url => {
+    const href = String(url);
+    if (href.includes('api.mercadolibre.com')) {
+      capturedMlUrl = href;
+      return jsonResponse({
+        results: [{
+          title: 'Palta Hass Peruana 1 Kg',
+          price: 15.50,
+          permalink: 'https://articulo.mercadolibre.com.pe/MPE-12345',
+          currency_id: 'PEN'
+        }]
+      });
+    }
+    return jsonResponse({}, 404);
+  };
+
+  const response = await lookupProduct(lookupRequest({
+    query: 'Palta Hass 1 Kg',
+    country: 'PE',
+    vertical: 'verduleria'
+  }), { ip: 'test-peru-verduleria' });
+  const result = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(result.country, 'PE');
+  assert.equal(result.vertical, 'verduleria');
+  assert.match(capturedMlUrl, /\/sites\/MPE\/search/);
+  assert.equal(result.market.currency, 'PEN');
+  assert.equal(result.market.provider, 'Mercado Libre');
+});
+
+test('la interfaz de vendedor incluye selector de criterio y modal de QR universal', async () => {
+  const [sellerHtml, sellerSource, indexSource] = await Promise.all([
+    readFile(new URL('../vendedor.html', import.meta.url), 'utf8'),
+    readFile(new URL('../vendedor.js', import.meta.url), 'utf8'),
+    readFile(new URL('../index.js', import.meta.url), 'utf8')
+  ]);
+
+  // Modal y controles de criterio en vendedor
+  assert.match(sellerHtml, /id="modal-stock-search-criterion"/);
+  assert.match(sellerHtml, /id="btn-open-stock-criterion"/);
+  assert.match(sellerHtml, /id="stock-criterion-badge"/);
+  assert.match(sellerHtml, /id="fastupload-voice-btn"/);
+  assert.match(sellerHtml, /id="modal-product-qr-view"/);
+
+  // Funciones de gestión de criterio y QR universal en vendedor.js
+  assert.match(sellerSource, /function getActiveStockCriterion/);
+  assert.match(sellerSource, /function saveActiveStockCriterion/);
+  assert.match(sellerSource, /function startFastUploadVoiceDictation/);
+  assert.match(sellerSource, /function openProductQrModal/);
+  assert.match(sellerSource, /function buildProductQrPayload/);
+
+  // Deep link y apertura automática de ficha técnica en index.js
+  assert.match(indexSource, /function handleUrlProductDeepLink/);
+  assert.match(indexSource, /openProductDetail\(productIdOrCode\)/);
+});

@@ -2974,7 +2974,7 @@ const STOCK_SCANNER_KEY_GAP_MS = 110;
 const HEIC_CONVERTER_URL = 'https://cdn.jsdelivr.net/npm/heic-to@1.5.2/dist/iife/heic-to.js';
 const HEIC_BRANDS = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1']);
 const MOBILE_PRODUCT_ASSISTANT_STEPS = ['method', 'identify', 'details', 'review'];
-const LOCATION_ASSISTANT_STEP_ORDER = ['list', 'zone', 'type', 'compass', 'wall', 'shelf', 'level', 'sector', 'review'];
+const LOCATION_ASSISTANT_STEP_ORDER = ['list', 'zone', 'type', 'compass', 'wall', 'level', 'sector', 'review'];
 
 const LOCATION_ZONE_OPTIONS = [
   { id: 'TI', label: '🏬 Tienda / Salón', help: 'Salón de ventas y mostrador de atención (PC al centro)', prefix: 'TI', floor_level: 1 },
@@ -3025,7 +3025,8 @@ const LOCATION_LEVEL_OPTIONS = [
 const LOCATION_SECTOR_OPTIONS = [
   { id: 'I', label: '⬅️ Izquierda (I)', help: 'Sector izquierdo de la balda' },
   { id: 'C', label: '⏺️ Centro (C)', help: 'Sector centro de la balda' },
-  { id: 'D', label: '➡️ Derecha (D)', help: 'Sector derecho de la balda' }
+  { id: 'D', label: '➡️ Derecha (D)', help: 'Sector derecho de la balda' },
+  { id: 'U', label: '👌 Es chico no hace falta', help: 'Espacio único o mueble chico sin división' }
 ];
 
 const LOCATION_SHELF_LABELS = {
@@ -3071,6 +3072,151 @@ function escapeStockHtml(value) {
     .replace(/'/g, '&#039;');
 }
 
+const STOCK_CRITERION_STORAGE_KEY = 'boe_stock_search_criterion';
+
+const STOCK_COUNTRY_METADATA = {
+  AR: { code: 'AR', name: 'Argentina', flag: '🇦🇷', lang: 'es-AR', currency: 'ARS' },
+  PE: { code: 'PE', name: 'Perú', flag: '🇵🇪', lang: 'es-PE', currency: 'PEN' },
+  CL: { code: 'CL', name: 'Chile', flag: '🇨🇱', lang: 'es-CL', currency: 'CLP' },
+  CO: { code: 'CO', name: 'Colombia', flag: '🇨🇴', lang: 'es-CO', currency: 'COP' },
+  MX: { code: 'MX', name: 'México', flag: '🇲🇽', lang: 'es-MX', currency: 'MXN' },
+  UY: { code: 'UY', name: 'Uruguay', flag: '🇺🇾', lang: 'es-UY', currency: 'UYU' },
+  ES: { code: 'ES', name: 'España', flag: '🇪🇸', lang: 'es-ES', currency: 'EUR' }
+};
+
+const STOCK_VERTICAL_METADATA = {
+  growshop: { code: 'growshop', name: 'Growshop', icon: '🌿' },
+  farmacia: { code: 'farmacia', name: 'Farmacia', icon: '💊' },
+  verduleria: { code: 'verduleria', name: 'Verdulería', icon: '🥦' },
+  ferreteria: { code: 'ferreteria', name: 'Ferretería', icon: '🔩' },
+  repuestos: { code: 'repuestos', name: 'Repuestos', icon: '🚗' },
+  indumentaria: { code: 'indumentaria', name: 'Indumentaria', icon: '👕' },
+  almacen: { code: 'almacen', name: 'Almacén', icon: '🛒' }
+};
+
+function getActiveStockCriterion() {
+  try {
+    const raw = localStorage.getItem(STOCK_CRITERION_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.country && parsed?.vertical) {
+        return {
+          country: String(parsed.country).toUpperCase(),
+          vertical: String(parsed.vertical).toLowerCase()
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('Error reading stock criterion:', e);
+  }
+  const defaultVertical = (typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext().vertical_code : null) || 'growshop';
+  return { country: 'AR', vertical: defaultVertical };
+}
+
+function saveActiveStockCriterion(country, vertical) {
+  const data = {
+    country: String(country || 'AR').toUpperCase(),
+    vertical: String(vertical || 'growshop').toLowerCase()
+  };
+  try {
+    localStorage.setItem(STOCK_CRITERION_STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn('Error saving stock criterion:', e);
+  }
+  updateStockCriterionUI();
+  return data;
+}
+
+function updateStockCriterionUI() {
+  const criterion = getActiveStockCriterion();
+  const country = STOCK_COUNTRY_METADATA[criterion.country] || STOCK_COUNTRY_METADATA.AR;
+  const vertical = STOCK_VERTICAL_METADATA[criterion.vertical] || { name: criterion.vertical, icon: '🏷️' };
+
+  const badge = document.getElementById('stock-criterion-badge');
+  if (badge) {
+    badge.textContent = `${country.flag} ${country.name} · ${vertical.icon} ${vertical.name}`;
+  }
+  const sourceLabel = document.getElementById('stock-criterion-source-label');
+  if (sourceLabel) {
+    sourceLabel.textContent = `Google ${country.name} + Mercado Libre (${country.currency})`;
+  }
+}
+
+function openStockCriterionModal() {
+  const modal = document.getElementById('modal-stock-search-criterion');
+  if (!modal) return;
+  const criterion = getActiveStockCriterion();
+  const countrySelect = document.getElementById('criterion-country-select');
+  const verticalSelect = document.getElementById('criterion-vertical-select');
+  if (countrySelect) countrySelect.value = criterion.country;
+  if (verticalSelect) verticalSelect.value = criterion.vertical;
+  modal.style.display = 'flex';
+}
+
+function closeStockCriterionModal() {
+  const modal = document.getElementById('modal-stock-search-criterion');
+  if (modal) modal.style.display = 'none';
+}
+
+function handleSaveStockCriterion(event) {
+  event.preventDefault();
+  const country = document.getElementById('criterion-country-select')?.value || 'AR';
+  const vertical = document.getElementById('criterion-vertical-select')?.value || 'growshop';
+  saveActiveStockCriterion(country, vertical);
+  closeStockCriterionModal();
+  if (window.showToast) {
+    const cMeta = STOCK_COUNTRY_METADATA[country] || STOCK_COUNTRY_METADATA.AR;
+    const vMeta = STOCK_VERTICAL_METADATA[vertical] || { name: vertical, icon: '🏷️' };
+    showToast(`✅ Criterio de búsqueda actualizado a ${cMeta.flag} ${cMeta.name} (${vMeta.icon} ${vMeta.name})`);
+  }
+}
+
+function startFastUploadVoiceDictation() {
+  const input = document.getElementById('fastupload-manual-query-input');
+  const voiceBtn = document.getElementById('fastupload-voice-btn');
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert('Tu navegador no soporta dictado por voz.');
+    return;
+  }
+  const criterion = getActiveStockCriterion();
+  const countryMeta = STOCK_COUNTRY_METADATA[criterion.country] || STOCK_COUNTRY_METADATA.AR;
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = countryMeta.lang || 'es-AR';
+  recognition.interimResults = false;
+
+  if (voiceBtn) {
+    voiceBtn.style.background = '#c62828';
+    voiceBtn.style.color = '#ffffff';
+    voiceBtn.textContent = '🔴';
+  }
+  if (window.showToast) showToast(`🎙️ Escuchando dictado (${countryMeta.name})... Hablá ahora.`);
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    if (input) {
+      input.value = transcript;
+      lookupFastUploadProductWithoutAi('manual');
+    }
+    if (window.showToast) showToast(`🎙️ Dictado: "${transcript}"`);
+  };
+
+  recognition.onerror = () => {
+    if (window.showToast) showToast('⚠️ Error al captar audio.');
+  };
+
+  recognition.onend = () => {
+    if (voiceBtn) {
+      voiceBtn.style.background = '';
+      voiceBtn.style.color = '';
+      voiceBtn.textContent = '🎙️';
+    }
+  };
+
+  recognition.start();
+}
+
 function createProductCode() {
   const date = new Date().toISOString().slice(2, 10).replace(/-/g, '');
   const randomPart = crypto.randomUUID().replace(/-/g, '').slice(0, 7).toUpperCase();
@@ -3078,11 +3224,17 @@ function createProductCode() {
 }
 
 function buildProductQrPayload(productCode) {
-  const url = new URL('vendedor.html', window.location.href);
-  url.search = '';
-  url.hash = '';
-  url.searchParams.set('product', productCode);
-  return url.toString();
+  if (!productCode) return window.location.origin;
+  try {
+    const url = new URL(window.location.origin);
+    url.pathname = '/';
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set('product', String(productCode).trim());
+    return url.toString();
+  } catch (e) {
+    return `${window.location.origin}/?product=${encodeURIComponent(productCode)}`;
+  }
 }
 
 function renderFastUploadQr() {
@@ -3207,6 +3359,7 @@ function initializeFastUploadForm() {
   if (!fastUploadProductCode) fastUploadProductCode = createProductCode();
   updateFastUploadLocationPreview();
   renderFastUploadQr();
+  updateStockCriterionUI();
   const barcodeInput = document.getElementById('fastupload-barcode-input');
   if (barcodeInput && !barcodeInput.dataset.scannerReady) {
     barcodeInput.dataset.scannerReady = 'true';
@@ -3885,12 +4038,18 @@ async function findLocalStockProduct(barcode, query) {
 async function fetchExternalStockLookup(barcode, query) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), 30_000);
+  const criterion = getActiveStockCriterion();
   try {
     const response = await fetch('/.netlify/functions/lookup-product', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
-      body: JSON.stringify({ barcode: barcode || null, query: query || null })
+      body: JSON.stringify({
+        barcode: barcode || null,
+        query: query || null,
+        country: criterion.country,
+        vertical: criterion.vertical
+      })
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.message || 'Las fuentes externas no respondieron.');
@@ -4207,6 +4366,7 @@ async function analyzeFastUploadPhoto() {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 65_000);
     let response;
+    const criterion = getActiveStockCriterion();
     try {
       response = await fetch('/.netlify/functions/analyze-product', {
         method: 'POST',
@@ -4215,6 +4375,8 @@ async function analyzeFastUploadPhoto() {
         body: JSON.stringify({
           imageDataUrl,
           barcode: document.getElementById('fastupload-barcode-input')?.value.trim() || null,
+          country: criterion.country,
+          vertical: criterion.vertical,
           hints: {
             name: document.getElementById('fastupload-name-input')?.value.trim() || null,
             brand: document.getElementById('fastupload-brand-input')?.value.trim() || null
@@ -4550,7 +4712,6 @@ function getLocationRouteLabels() {
     state.type?.label,
     state.compass?.label,
     state.wall?.label,
-    state.shelfCode ? (LOCATION_SHELF_LABELS[state.shelfCode] || `Estante ${state.shelfCode}`) : null,
     state.level?.label || (state.level?.id ? `Nivel ${state.level.id}` : null),
     state.sector?.label
   ].filter(Boolean);
@@ -4598,7 +4759,6 @@ function renderLocationReviewStep() {
   const type = state.type || LOCATION_TYPE_OPTIONS[0];
   const compass = state.compass || LOCATION_COMPASS_OPTIONS[0];
   const wall = state.wall || LOCATION_WALL_OPTIONS[0];
-  const shelf = state.shelfCode || 'E1';
   const level = state.level || LOCATION_LEVEL_OPTIONS[0];
   const sector = state.sector || LOCATION_SECTOR_OPTIONS[0];
 
@@ -4607,14 +4767,17 @@ function renderLocationReviewStep() {
   const wallCode = wall.id || 'P1';
   const levelNum = Number(level.id) || 1;
   const sectorCode = sector.id || 'C';
+  const isChico = sectorCode === 'U' || (sector.label && (sector.label.toLowerCase().includes('chico') || sector.label.toLowerCase().includes('no hace falta')));
 
-  // Código estándar: TI-D-P1-E2-N3-C
-  const wmsCode = `${zonePrefix}-${compassCode}-${wallCode}-${shelf}-N${levelNum}-${sectorCode}`;
-  const shelfName = LOCATION_SHELF_LABELS[shelf] || shelf;
-  const locationLabel = `📍 ${zone.label} · ${compass.compass} de la PC · ${wall.label} · ${shelfName} · Nivel ${levelNum} · Sector ${sector.label}`;
+  // Código estándar: TI-D-P1-N3-C (o TI-D-P1-N3-U)
+  const wmsCode = `${zonePrefix}-${compassCode}-${wallCode}-N${levelNum}-${sectorCode}`;
+  const locationLabel = isChico
+    ? `📍 ${zone.label} · ${compass.compass} de la PC · ${wall.label} · Nivel ${levelNum}`
+    : `📍 ${zone.label} · ${compass.compass} de la PC · ${wall.label} · Nivel ${levelNum} · Sector ${sector.label}`;
   
   const zoneNoun = zonePrefix === 'DP' ? 'el depósito' : 'la tienda';
-  const voicePhrase = `Está en ${zoneNoun}, a la ${compass.compass.toLowerCase()} de la PC, ${wall.label.toLowerCase()}, ${shelfName.toLowerCase()}, nivel ${levelNum}, sector ${sector.label.toLowerCase()}.`;
+  const sectorPhrase = isChico ? '' : `, sector ${sector.label.toLowerCase()}`;
+  const voicePhrase = `Está en ${zoneNoun}, a la ${compass.compass.toLowerCase()} de la PC, ${wall.label.toLowerCase()}, nivel ${levelNum}${sectorPhrase}.`;
 
   return `
     ${renderLocationAssistantProductHeader()}
@@ -4648,15 +4811,11 @@ function renderLocationReviewStep() {
           <strong style="color: var(--vendor-forest); font-size: 0.85rem;">${escapeStockHtml(wall.label || '-')}</strong>
         </div>
         <div style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3);">
-          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">5. Mueble</small>
-          <strong style="color: var(--vendor-forest); font-size: 0.85rem;">${escapeStockHtml(shelfName)}</strong>
-        </div>
-        <div style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3);">
-          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">6. Nivel</small>
+          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">5. Nivel</small>
           <strong style="color: var(--vendor-forest); font-size: 0.85rem;">Nivel ${levelNum}</strong>
         </div>
         <div style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3);">
-          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">7. Sector</small>
+          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">6. Sector</small>
           <strong style="color: var(--vendor-forest); font-size: 0.85rem;">${escapeStockHtml(sector.label || '-')}</strong>
         </div>
       </div>
@@ -4694,7 +4853,7 @@ function renderLocationAssistant() {
   const nav = document.getElementById('location-assistant-nav');
   if (!content) return;
   const step = locationAssistantState.step;
-  const choiceSteps = ['zone', 'type', 'compass', 'wall', 'shelf', 'level', 'sector'];
+  const choiceSteps = ['zone', 'type', 'compass', 'wall', 'level', 'sector'];
   const primaryButton = nav?.querySelector('.mobile-assistant-primary');
   if (count) count.textContent = `${pendingLocationProducts.length} pendiente${pendingLocationProducts.length === 1 ? '' : 's'}`;
   if (nav) nav.hidden = step === 'list' || step === 'review';
@@ -4718,15 +4877,12 @@ function renderLocationAssistant() {
   } else if (step === 'wall') {
     if (title) title.textContent = 'Paso 4: Elegí la pared';
     content.innerHTML = renderLocationChoiceCards('4. Elegí la pared', 'Pared 1 (Frente), Pared 2 (Fondo), Pared 3 (Derecha) o Pared 4 (Izquierda)', LOCATION_WALL_OPTIONS, 'chooseLocationAssistantWall');
-  } else if (step === 'shelf') {
-    if (title) title.textContent = 'Paso 4b: Elegí el mueble o estante';
-    content.innerHTML = renderLocationChoiceCards('4b. Elegí el mueble', '¿Qué número de estante o módulo específico es?', LOCATION_SHELF_OPTIONS, 'chooseLocationAssistantShelf');
   } else if (step === 'level') {
     if (title) title.textContent = 'Paso 5: Elegí el nivel de altura (N1 al N6)';
     content.innerHTML = renderLocationChoiceCards('5. Elegí el nivel (N1 siempre es abajo)', 'Desde Nivel 1 (Piso/Base) hasta Nivel 6 (Tope superior)', LOCATION_LEVEL_OPTIONS, 'chooseLocationAssistantLevel');
   } else if (step === 'sector') {
     if (title) title.textContent = 'Paso 5b: Elegí el sector dentro del nivel';
-    content.innerHTML = renderLocationChoiceCards('5b. Elegí el sector horizontal', 'En cada nivel elegí el sector: Izquierda (I), Centro (C) o Derecha (D)', LOCATION_SECTOR_OPTIONS, 'chooseLocationAssistantSector');
+    content.innerHTML = renderLocationChoiceCards('5b. Elegí el sector horizontal', 'En cada nivel elegí el sector: Izquierda (I), Centro (C), Derecha (D) o Es chico no hace falta', LOCATION_SECTOR_OPTIONS, 'chooseLocationAssistantSector');
   } else {
     if (title) title.textContent = 'Paso 6: El sistema genera el código';
     content.innerHTML = renderLocationReviewStep();
@@ -4794,7 +4950,7 @@ function chooseLocationAssistantWall(wallId) {
   const wall = LOCATION_WALL_OPTIONS.find(option => option.id === wallId);
   if (!wall) return;
   locationAssistantState.wall = wall;
-  locationAssistantState.step = 'shelf';
+  locationAssistantState.step = 'level';
   renderLocationAssistant();
 }
 
@@ -4936,7 +5092,7 @@ async function persistLocationAssistant() {
   const state = locationAssistantState;
   const draft = state.product;
   const status = document.getElementById('location-assistant-status');
-  if (!draft || !state.zone || !state.compass || !state.wall || !state.shelfCode || !state.level || !state.sector) {
+  if (!draft || !state.zone || !state.compass || !state.wall || !state.level || !state.sector) {
     showToast('Completá todos los pasos antes de guardar.');
     return;
   }
@@ -4953,7 +5109,6 @@ async function persistLocationAssistant() {
     const type = state.type || LOCATION_TYPE_OPTIONS[0];
     const compass = state.compass;
     const wall = state.wall;
-    const shelf = state.shelfCode;
     const level = state.level;
     const sector = state.sector;
     const levelNum = Number(level.id) || 1;
@@ -4963,16 +5118,18 @@ async function persistLocationAssistant() {
     const compassCode = compass.id || 'D';
     const wallCode = wall.id || 'P1';
     const sectorCode = sector.id || 'C';
-    const shelfLabel = LOCATION_SHELF_LABELS[shelf] || shelf;
+    const isChico = sectorCode === 'U' || (sector.label && (sector.label.toLowerCase().includes('chico') || sector.label.toLowerCase().includes('no hace falta')));
 
-    // Código estándar oficial: TI-D-P1-E2-N3-C
-    const wmsCode = `${zonePrefix}-${compassCode}-${wallCode}-${shelf}-N${levelNum}-${sectorCode}`;
-    const locationLabel = `📍 ${zone.label} · ${compass.compass} de la PC · ${wall.label} · ${shelfLabel} · Nivel ${levelNum} · Sector ${sector.label}`;
+    // Código estándar oficial: TI-D-P1-N3-C (o TI-D-P1-N3-U)
+    const wmsCode = `${zonePrefix}-${compassCode}-${wallCode}-N${levelNum}-${sectorCode}`;
+    const locationLabel = isChico
+      ? `📍 ${zone.label} · ${compass.compass} de la PC · ${wall.label} · Nivel ${levelNum}`
+      : `📍 ${zone.label} · ${compass.compass} de la PC · ${wall.label} · Nivel ${levelNum} · Sector ${sector.label}`;
 
     const updatedAt = new Date().toISOString();
     const overrides = {
       floor_level: floorLevel,
-      shelf_code: `${wallCode}-${shelf}`,
+      shelf_code: wallCode,
       shelf_level: levelNum,
       location_area: zone.label,
       location_wall: wall.label,
@@ -4987,7 +5144,7 @@ async function persistLocationAssistant() {
     const draftUpdate = {
       location: locationLabel,
       floor_level: floorLevel,
-      shelf_code: `${wallCode}-${shelf}`,
+      shelf_code: wallCode,
       shelf_level: levelNum,
       observations,
       updated_at: updatedAt
@@ -5001,7 +5158,7 @@ async function persistLocationAssistant() {
       image_url: draft.image_url || photo.url,
       barcode: draft.barcode || null,
       floor_level: floorLevel,
-      shelf_code: `${wallCode}-${shelf}`,
+      shelf_code: wallCode,
       shelf_level: levelNum,
       stock: Math.max(0, Number(draft.stock) || 0),
       qr_payload: draft.qr_payload || buildProductQrPayload(productCode),
@@ -5021,17 +5178,17 @@ async function persistLocationAssistant() {
       if (internalItem) {
         internalItem.location = locationLabel;
         internalItem.location_label = locationLabel;
-        internalItem.shelf_code = `${wallCode}-${shelf}`;
+        internalItem.shelf_code = wallCode;
         internalItem.shelf_level = levelNum;
         internalItem.wms_code = wmsCode;
       }
     }
 
     if (window.ensureShelfExistsForLocation) {
-      window.ensureShelfExistsForLocation(`${wallCode}-${shelf}`, floorLevel, locationLabel);
+      window.ensureShelfExistsForLocation(wallCode, floorLevel, locationLabel);
     }
     if (window.logMapHistoryAction) {
-      window.logMapHistoryAction('ASISTENTE_UBICACION', 'Ubicación de producto asignada', `Producto "${draft.name}" ubicado en ${wmsCode}`, `${wallCode}-${shelf}`, floorLevel);
+      window.logMapHistoryAction('ASISTENTE_UBICACION', 'Ubicación de producto asignada', `Producto "${draft.name}" ubicado en ${wmsCode}`, wallCode, floorLevel);
     }
 
     storeMapDataLoaded = false;
@@ -5526,12 +5683,68 @@ function printCurrentProductQr() {
   openQrPrintWindow(fastUploadProductCode, productName, fastUploadQrPayload, document.getElementById('fastupload-qr-preview'));
 }
 
+let currentModalQrProduct = null;
+
+function openProductQrModal(productCode, productName, price) {
+  const modal = document.getElementById('modal-product-qr-view');
+  const container = document.getElementById('product-modal-qr-container');
+  const nameEl = document.getElementById('product-modal-qr-name');
+  const codeEl = document.getElementById('product-modal-qr-code');
+  const priceEl = document.getElementById('product-modal-qr-price');
+  if (!modal || !productCode) return;
+
+  currentModalQrProduct = {
+    code: productCode,
+    name: productName || productCode,
+    price: price || null,
+    url: buildProductQrPayload(productCode)
+  };
+
+  if (nameEl) nameEl.textContent = currentModalQrProduct.name;
+  if (codeEl) codeEl.textContent = currentModalQrProduct.code;
+  if (priceEl) priceEl.textContent = price ? `$ ${Number(price).toLocaleString('es-AR')}` : '';
+
+  if (container) {
+    container.innerHTML = '';
+    if (window.QRCode) {
+      new window.QRCode(container, {
+        text: currentModalQrProduct.url,
+        width: 160,
+        height: 160,
+        colorDark: '#152d24',
+        colorLight: '#ffffff',
+        correctLevel: window.QRCode.CorrectLevel.M
+      });
+    } else {
+      container.textContent = currentModalQrProduct.code;
+    }
+  }
+
+  modal.style.display = 'flex';
+}
+
+function closeProductQrModal() {
+  const modal = document.getElementById('modal-product-qr-view');
+  if (modal) modal.style.display = 'none';
+  currentModalQrProduct = null;
+}
+
+function printCurrentModalQr() {
+  if (!currentModalQrProduct) return;
+  openQrPrintWindow(
+    currentModalQrProduct.code,
+    currentModalQrProduct.name,
+    currentModalQrProduct.url,
+    document.getElementById('product-modal-qr-container')
+  );
+}
+
 function printProductQrByCode(productCode) {
   const mapMatch = window.findStoreMapProduct ? window.findStoreMapProduct(productCode) : null;
   const product = mapMatch?.product
     || readLocalProductLocations().find(item => item.product_code === productCode)
     || { product_code: productCode, name: productCode, qr_payload: buildProductQrPayload(productCode) };
-  openQrPrintWindow(productCode, product.name, product.qr_payload || buildProductQrPayload(productCode));
+  openProductQrModal(productCode, product.name, product.price || product.sale_price);
 }
 
 function handleProductLocationDeepLink() {
@@ -5577,6 +5790,13 @@ window.checkVendorAuth = checkVendorAuth;
 window.handleVendorLogin = handleVendorLogin;
 window.vendorLogout = vendorLogout;
 window.switchVendorTab = switchVendorTab;
+window.openStockCriterionModal = openStockCriterionModal;
+window.closeStockCriterionModal = closeStockCriterionModal;
+window.handleSaveStockCriterion = handleSaveStockCriterion;
+window.startFastUploadVoiceDictation = startFastUploadVoiceDictation;
+window.openProductQrModal = openProductQrModal;
+window.closeProductQrModal = closeProductQrModal;
+window.printCurrentModalQr = printCurrentModalQr;
 window.renderVendorHomeUI = renderVendorHomeUI;
 window.openCashWithType = openCashWithType;
 window.searchShelfOnMap = searchShelfOnMap;
@@ -6462,7 +6682,10 @@ function renderInternalCatalogGrid() {
         ${product.barcode ? `<div style="font-size: 0.78rem; font-family: monospace; color: var(--color-text-muted);">Barra: ${escapeStockHtml(product.barcode)}</div>` : ''}
         <div style="margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08);">
           <span style="font-size: 1.1rem; font-weight: 900; color: #66bb6a;">$${Number(product.price).toLocaleString('es-AR')}</span>
-          <div style="display: flex; gap: 6px;">
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button type="button" onclick="openProductQrModal('${escapeStockHtml(product.product_code || product.barcode || product.id)}', '${escapeStockHtml(product.name)}', ${product.price || 0})" style="background: rgba(46,125,50,0.15); border: 1px solid #66bb6a; color: #66bb6a; padding: 6px 10px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer;" title="Ver e imprimir código QR">
+              🔲 QR
+            </button>
             <button type="button" onclick="openInternalCatalogEditor('${product.id}')" style="background: rgba(195,155,75,0.15); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 6px 10px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer;" title="Editar producto">
               ✏️ Editar
             </button>

@@ -1,9 +1,38 @@
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 const OPENROUTER_RESPONSES_URL = 'https://openrouter.ai/api/v1/responses';
-const MERCADOLIBRE_SEARCH_URL = 'https://api.mercadolibre.com/sites/MLA/search';
 const REQUEST_WINDOW_MS = 60_000;
 const REQUEST_LIMIT_PER_WINDOW = 12;
 const requestBuckets = new Map();
+
+const COUNTRY_CONFIGS = {
+  AR: { code: 'AR', name: 'Argentina', mlSite: 'MLA', currency: 'ARS', domainSuffix: '.ar', mlDomain: 'mercadolibre.com.ar', lang: 'es-AR' },
+  PE: { code: 'PE', name: 'Perú', mlSite: 'MPE', currency: 'PEN', domainSuffix: '.pe', mlDomain: 'mercadolibre.com.pe', lang: 'es-PE' },
+  CL: { code: 'CL', name: 'Chile', mlSite: 'MLC', currency: 'CLP', domainSuffix: '.cl', mlDomain: 'mercadolibre.cl', lang: 'es-CL' },
+  CO: { code: 'CO', name: 'Colombia', mlSite: 'MCO', currency: 'COP', domainSuffix: '.co', mlDomain: 'mercadolibre.com.co', lang: 'es-CO' },
+  MX: { code: 'MX', name: 'México', mlSite: 'MLM', currency: 'MXN', domainSuffix: '.mx', mlDomain: 'mercadolibre.com.mx', lang: 'es-MX' },
+  UY: { code: 'UY', name: 'Uruguay', mlSite: 'MLU', currency: 'UYU', domainSuffix: '.uy', mlDomain: 'mercadolibre.com.uy', lang: 'es-UY' },
+  ES: { code: 'ES', name: 'España', mlSite: 'MLA', currency: 'EUR', domainSuffix: '.es', mlDomain: 'mercadolibre.es', lang: 'es-ES' }
+};
+
+const VERTICAL_LABELS = {
+  growshop: 'Growshop & Botánica',
+  farmacia: 'Farmacia & Medicamentos',
+  verduleria: 'Verdulería & Frutería',
+  ferreteria: 'Ferretería & Herramientas',
+  repuestos: 'Autopartes & Repuestos',
+  indumentaria: 'Indumentaria & Moda',
+  almacen: 'Almacén & Supermercado'
+};
+
+function resolveCountryConfig(countryCode) {
+  const code = String(countryCode || 'AR').trim().toUpperCase();
+  return COUNTRY_CONFIGS[code] || COUNTRY_CONFIGS.AR;
+}
+
+function resolveVerticalLabel(verticalCode) {
+  const code = String(verticalCode || 'growshop').trim().toLowerCase();
+  return VERTICAL_LABELS[code] || code || 'Comercio General';
+}
 
 const productSchema = {
   type: 'object',
@@ -17,8 +46,7 @@ const productSchema = {
     brand: { type: ['string', 'null'] },
     presentation: { type: ['string', 'null'] },
     category: {
-      type: ['string', 'null'],
-      enum: ['Semillas', 'Sustratos', 'Fertilizantes', 'Indoor', 'Vaporizadores', 'Macetas', 'Medición y Riego', 'Parafernalia', 'Otros', null]
+      type: ['string', 'null']
     },
     description: { type: ['string', 'null'] },
     barcode: { type: ['string', 'null'] },
@@ -124,14 +152,17 @@ function getAiProviderConfig() {
   return null;
 }
 
-function buildAiRequestBody(imageDataUrl, barcode, hints, provider, model) {
+function buildAiRequestBody(imageDataUrl, barcode, hints, provider, model, countryCode = 'AR', verticalCode = 'growshop') {
+  const country = resolveCountryConfig(countryCode);
+  const vertical = resolveVerticalLabel(verticalCode);
   const prompt = [
-    'Analizá la foto de este producto para ayudar a un vendedor de Argentina a ingresarlo al stock.',
+    `Analizá la foto de este producto para ayudar a un vendedor de ${country.name} en el rubro ${vertical} a ingresarlo al stock.`,
     'Extraé únicamente datos visibles o que puedas verificar con una fuente pública confiable.',
+    'Identifica nombre completo del producto, marca/laboratorio, presentación/contenido neto/dosis, categoría relevante, código de barras y descripción factual.',
     'No inventes marca, presentación, código de barras ni URL. Usá null cuando no estés seguro.',
-    'La descripción debe ser breve, comercial y factual, sin afirmar propiedades médicas.',
+    'La descripción debe ser breve, comercial y factual.',
     'Si encontrás la página exacta del fabricante, official_url debe ser esa página; no uses tiendas ni redes sociales como página oficial.',
-    'market_query debe ser una búsqueda corta y específica útil para Mercado Libre Argentina.',
+    `market_query debe ser una búsqueda corta y específica útil para Mercado Libre ${country.name}.`,
     `Código de barras informado por el vendedor: ${barcode || 'no informado'}.`,
     `Pistas manuales: ${JSON.stringify(hints || {})}.`
   ].join('\n');
@@ -160,15 +191,15 @@ function buildAiRequestBody(imageDataUrl, barcode, hints, provider, model) {
   return requestBody;
 }
 
-async function analyzeWithModel(imageDataUrl, barcode, hints, provider, model) {
-  const requestBody = buildAiRequestBody(imageDataUrl, barcode, hints, provider, model);
+async function analyzeWithModel(imageDataUrl, barcode, hints, provider, model, countryCode = 'AR', verticalCode = 'growshop') {
+  const requestBody = buildAiRequestBody(imageDataUrl, barcode, hints, provider, model, countryCode, verticalCode);
   const headers = {
     Authorization: `Bearer ${provider.apiKey}`,
     'Content-Type': 'application/json'
   };
   if (provider.name === 'OpenRouter') {
     headers['HTTP-Referer'] = process.env.URL || process.env.DEPLOY_PRIME_URL || 'https://boeweb.netlify.app';
-    headers['X-Title'] = 'BÔ Grow Club · Ingreso de stock';
+    headers['X-Title'] = 'BÔ Cloud POS · Ingreso de stock';
   }
   const response = await fetch(provider.endpoint, {
     method: 'POST',
@@ -185,11 +216,11 @@ async function analyzeWithModel(imageDataUrl, barcode, hints, provider, model) {
   return { product: JSON.parse(outputText), sources: extractWebSources(payload), model };
 }
 
-async function analyzeWithAI(imageDataUrl, barcode, hints, provider) {
+async function analyzeWithAI(imageDataUrl, barcode, hints, provider, countryCode = 'AR', verticalCode = 'growshop') {
   const errors = [];
   for (const model of provider.models) {
     try {
-      return await analyzeWithModel(imageDataUrl, barcode, hints, provider, model);
+      return await analyzeWithModel(imageDataUrl, barcode, hints, provider, model, countryCode, verticalCode);
     } catch (error) {
       errors.push(`${model}: ${error.message}`);
       console.warn(`Falló el análisis con ${model}:`, error.message);
@@ -199,20 +230,22 @@ async function analyzeWithAI(imageDataUrl, barcode, hints, provider) {
   throw new Error('La IA no pudo procesar la foto. Reintentá en unos segundos.');
 }
 
-function calculateMarketStats(items) {
-  const arsItems = items.filter(item => item.currency_id === 'ARS' && Number.isFinite(Number(item.price)) && Number(item.price) > 0);
-  if (!arsItems.length) return { average: null, median: null, sample: [] };
-  const sorted = arsItems.map(item => Number(item.price)).sort((a, b) => a - b);
+function calculateMarketStats(items, currency = 'ARS') {
+  const matchingItems = items.filter(item => (!item.currency_id || item.currency_id === currency) && Number.isFinite(Number(item.price)) && Number(item.price) > 0);
+  if (!matchingItems.length) return { average: null, median: null, sample: [] };
+  const sorted = matchingItems.map(item => Number(item.price)).sort((a, b) => a - b);
   const midpoint = Math.floor(sorted.length / 2);
   const median = sorted.length % 2 ? sorted[midpoint] : (sorted[midpoint - 1] + sorted[midpoint]) / 2;
-  const comparable = arsItems.filter(item => Number(item.price) >= median * 0.35 && Number(item.price) <= median * 2.8);
-  const average = comparable.reduce((sum, item) => sum + Number(item.price), 0) / comparable.length;
+  const comparable = matchingItems.filter(item => Number(item.price) >= median * 0.35 && Number(item.price) <= median * 2.8);
+  const average = comparable.reduce((sum, item) => sum + Number(item.price), 0) / (comparable.length || 1);
   return { average, median, sample: comparable };
 }
 
-async function searchMercadoLibre(query) {
+async function searchMercadoLibre(query, countryCode = 'AR') {
   if (!query) return null;
-  const url = new URL(MERCADOLIBRE_SEARCH_URL);
+  const country = resolveCountryConfig(countryCode);
+  const mlUrl = `https://api.mercadolibre.com/sites/${country.mlSite}/search`;
+  const url = new URL(mlUrl);
   url.searchParams.set('q', query);
   url.searchParams.set('limit', '20');
   const headers = { Accept: 'application/json' };
@@ -220,12 +253,12 @@ async function searchMercadoLibre(query) {
   const response = await fetch(url, { headers });
   if (!response.ok) return null;
   const payload = await response.json();
-  const stats = calculateMarketStats(payload.results || []);
+  const stats = calculateMarketStats(payload.results || [], country.currency);
   if (!stats.sample.length) return null;
   return {
     query,
-    search_url: `https://listado.mercadolibre.com.ar/${encodeURIComponent(query).replace(/%20/g, '-')}`,
-    currency: 'ARS',
+    search_url: `https://listado.${country.mlDomain}/${encodeURIComponent(query).replace(/%20/g, '-')}`,
+    currency: country.currency,
     average_price: Math.round(stats.average),
     median_price: Math.round(stats.median),
     sample_size: stats.sample.length,
@@ -254,16 +287,30 @@ export default async function handler(request, context) {
     if (!validateImageDataUrl(body.imageDataUrl)) {
       return jsonResponse(400, { message: 'La imagen no es válida o es demasiado grande.' });
     }
-    const analysis = await analyzeWithAI(body.imageDataUrl, body.barcode, body.hints, aiProvider);
+    const countryCode = cleanText(body.country || 'AR', 10);
+    const verticalCode = cleanText(body.vertical || 'growshop', 50);
+
+    const analysis = await analyzeWithAI(body.imageDataUrl, body.barcode, body.hints, aiProvider, countryCode, verticalCode);
     let market = null;
     try {
-      market = await searchMercadoLibre(analysis.product.market_query || analysis.product.name);
+      market = await searchMercadoLibre(analysis.product.market_query || analysis.product.name, countryCode);
     } catch (marketError) {
       console.warn('No se pudo consultar Mercado Libre:', marketError.message);
     }
-    return jsonResponse(200, { ...analysis, market, provider: aiProvider.name });
+    return jsonResponse(200, {
+      ...analysis,
+      market,
+      country: countryCode.toUpperCase(),
+      vertical: verticalCode.toLowerCase(),
+      provider: aiProvider.name
+    });
   } catch (error) {
     console.error('Error al analizar producto:', error.message);
     return jsonResponse(502, { message: `No se pudo completar el análisis: ${error.message}` });
   }
+}
+
+function cleanText(value, maxLength = 200) {
+  if (typeof value !== 'string') return '';
+  return value.trim().slice(0, maxLength);
 }

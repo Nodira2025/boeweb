@@ -9,6 +9,37 @@ const REQUEST_WINDOW_MS = 60_000;
 const REQUEST_LIMIT_PER_WINDOW = 20;
 const EXTERNAL_TIMEOUT_MS = 12_000;
 const requestBuckets = new Map();
+
+const COUNTRY_CONFIGS = {
+  AR: { code: 'AR', name: 'Argentina', mlSite: 'MLA', currency: 'ARS', domainSuffix: '.ar', mlDomain: 'mercadolibre.com.ar', lang: 'es-AR' },
+  PE: { code: 'PE', name: 'Perú', mlSite: 'MPE', currency: 'PEN', domainSuffix: '.pe', mlDomain: 'mercadolibre.com.pe', lang: 'es-PE' },
+  CL: { code: 'CL', name: 'Chile', mlSite: 'MLC', currency: 'CLP', domainSuffix: '.cl', mlDomain: 'mercadolibre.cl', lang: 'es-CL' },
+  CO: { code: 'CO', name: 'Colombia', mlSite: 'MCO', currency: 'COP', domainSuffix: '.co', mlDomain: 'mercadolibre.com.co', lang: 'es-CO' },
+  MX: { code: 'MX', name: 'México', mlSite: 'MLM', currency: 'MXN', domainSuffix: '.mx', mlDomain: 'mercadolibre.com.mx', lang: 'es-MX' },
+  UY: { code: 'UY', name: 'Uruguay', mlSite: 'MLU', currency: 'UYU', domainSuffix: '.uy', mlDomain: 'mercadolibre.com.uy', lang: 'es-UY' },
+  ES: { code: 'ES', name: 'España', mlSite: 'MLA', currency: 'EUR', domainSuffix: '.es', mlDomain: 'mercadolibre.es', lang: 'es-ES' }
+};
+
+const VERTICAL_LABELS = {
+  growshop: 'Growshop',
+  farmacia: 'Farmacia',
+  verduleria: 'Verdulería',
+  ferreteria: 'Ferretería',
+  repuestos: 'Repuestos Automotores',
+  indumentaria: 'Indumentaria',
+  almacen: 'Almacén y Supermercado'
+};
+
+function resolveCountryConfig(countryCode) {
+  const code = String(countryCode || 'AR').trim().toUpperCase();
+  return COUNTRY_CONFIGS[code] || COUNTRY_CONFIGS.AR;
+}
+
+function resolveVerticalLabel(verticalCode) {
+  const code = String(verticalCode || 'growshop').trim().toLowerCase();
+  return VERTICAL_LABELS[code] || code || 'Growshop';
+}
+
 const KNOWN_GROWSHOP_DOMAINS = [
   'tomaco.com.ar', 'elgrowshop.com.ar', 'upgrowshop.com', 'gorigrow.com.ar',
   'juanijuana.com.ar', 'lustgrow.com.ar', 'oroverdegrow.ar', 'pulpot.com.ar',
@@ -279,9 +310,11 @@ function isGrowProduct(product) {
   }) >= 3;
 }
 
-function buildGrowshopQuery(value) {
+function buildGrowshopQuery(value, countryCode = 'AR', verticalCode = 'growshop') {
   const base = cleanText(value, 150);
-  return cleanText(`${base} growshop Argentina`, 190);
+  const country = resolveCountryConfig(countryCode);
+  const vertical = resolveVerticalLabel(verticalCode);
+  return cleanText(`${base} ${vertical} ${country.name}`, 190);
 }
 
 function normalizeLookupMatchText(value) {
@@ -663,8 +696,9 @@ function growshopResultFromItems(items, query, searchUrl, barcode, provider) {
   };
 }
 
-async function searchGoogleArgentinaGrowshops(value, barcode) {
-  const query = buildGrowshopQuery(value);
+async function searchGoogleArgentinaGrowshops(value, barcode, countryCode = 'AR', verticalCode = 'growshop') {
+  const country = resolveCountryConfig(countryCode);
+  const query = buildGrowshopQuery(value, countryCode, verticalCode);
   const searchUrl = buildGoogleArgentinaUrl(query);
   const apiKey = process.env.GOOGLE_SEARCH_API_KEY;
   const engineId = process.env.GOOGLE_SEARCH_ENGINE_ID;
@@ -674,21 +708,21 @@ async function searchGoogleArgentinaGrowshops(value, barcode) {
   url.searchParams.set('key', apiKey);
   url.searchParams.set('cx', engineId);
   url.searchParams.set('q', query);
-  url.searchParams.set('gl', 'ar');
-  url.searchParams.set('cr', 'countryAR');
+  url.searchParams.set('gl', country.code.toLowerCase());
+  url.searchParams.set('cr', `country${country.code.toUpperCase()}`);
   url.searchParams.set('hl', 'es');
   url.searchParams.set('lr', 'lang_es');
   url.searchParams.set('safe', 'active');
   url.searchParams.set('num', '10');
   const response = await fetchWithTimeout(url, { headers: { Accept: 'application/json' } });
   // Google cerró esta API para clientes nuevos. En ese caso continuamos con
-  // las fuentes públicas de growshops sin mostrarle un error técnico al vendedor.
+  // las fuentes públicas sin mostrarle un error técnico al vendedor.
   if (response.status === 403) return { result: null, searchUrl, configured: false };
-  if (!response.ok) throw new Error(`Google Argentina respondió con estado ${response.status}`);
+  if (!response.ok) throw new Error(`Google ${country.name} respondió con estado ${response.status}`);
   const payload = await response.json();
   const items = (payload.items || []).map(normalizeGrowshopSearchItem);
   return {
-    result: growshopResultFromItems(items, value, searchUrl, barcode, 'Google Argentina'),
+    result: growshopResultFromItems(items, value, searchUrl, barcode, `Google ${country.name}`),
     searchUrl,
     configured: true
   };
@@ -704,14 +738,15 @@ function resultUrlFromDuckDuckGo(value) {
   }
 }
 
-async function searchGrowshopWeb(value, barcode) {
-  const query = barcode ? barcode : buildGrowshopQuery(value);
+async function searchGrowshopWeb(value, barcode, countryCode = 'AR', verticalCode = 'growshop') {
+  const country = resolveCountryConfig(countryCode);
+  const query = barcode ? barcode : buildGrowshopQuery(value, countryCode, verticalCode);
   const response = await fetchWithTimeout(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
     method: 'GET',
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
       Accept: 'text/html,application/xhtml+xml',
-      'Accept-Language': 'es-AR,es;q=0.9'
+      'Accept-Language': `${country.lang},es;q=0.9`
     }
   });
   if (!response.ok) return null;
@@ -848,9 +883,9 @@ async function searchAstroCatalog(value) {
   );
 }
 
-function calculateMarketStats(items) {
+function calculateMarketStats(items, currency = 'ARS') {
   const prices = items
-    .filter(item => item.currency_id === 'ARS' && Number.isFinite(Number(item.price)) && Number(item.price) > 0)
+    .filter(item => (!item.currency_id || item.currency_id === currency) && Number.isFinite(Number(item.price)) && Number(item.price) > 0)
     .map(item => Number(item.price))
     .sort((a, b) => a - b);
   if (!prices.length) return { average: null, median: null, comparableItems: [] };
@@ -858,13 +893,13 @@ function calculateMarketStats(items) {
   const median = prices.length % 2 ? prices[midpoint] : (prices[midpoint - 1] + prices[midpoint]) / 2;
   const comparableItems = items.filter(item => {
     const price = Number(item.price);
-    return item.currency_id === 'ARS' && price >= median * 0.35 && price <= median * 2.8;
+    return (!item.currency_id || item.currency_id === currency) && price >= median * 0.35 && price <= median * 2.8;
   });
-  const average = comparableItems.reduce((sum, item) => sum + Number(item.price), 0) / comparableItems.length;
+  const average = comparableItems.reduce((sum, item) => sum + Number(item.price), 0) / (comparableItems.length || 1);
   return { average, median, comparableItems };
 }
 
-function mergePublicMarkets(markets, query) {
+function mergePublicMarkets(markets, query, currency = 'ARS') {
   const seen = new Set();
   const results = markets
     .filter(Boolean)
@@ -875,16 +910,16 @@ function mergePublicMarkets(markets, query) {
       seen.add(key);
       return true;
     });
-  const stats = calculateMarketStats(results);
+  const stats = calculateMarketStats(results, currency);
   if (!stats.comparableItems.length) return null;
   const providers = [...new Set(stats.comparableItems.map(item => item.source).filter(Boolean))];
   return {
     provider: providers.includes('Catálogo público Astro Grow')
-      ? 'Astro Grow + mercado argentino'
-      : providers.join(' + ') || 'Precios públicos argentinos',
+      ? 'Astro Grow + mercado online'
+      : (providers.length ? providers.join(' + ') : 'Mercado online'),
     query,
-    search_url: markets.find(market => market?.search_url)?.search_url || null,
-    currency: 'ARS',
+    search_url: markets.find(item => item?.search_url)?.search_url || '',
+    currency,
     average_price: Math.round(stats.average),
     median_price: Math.round(stats.median),
     sample_size: stats.comparableItems.length,
@@ -892,9 +927,11 @@ function mergePublicMarkets(markets, query) {
   };
 }
 
-async function searchMercadoLibre(query) {
+async function searchMercadoLibre(query, countryCode = 'AR') {
   if (!query) return null;
-  const url = new URL(MERCADOLIBRE_SEARCH_URL);
+  const country = resolveCountryConfig(countryCode);
+  const mlUrl = `https://api.mercadolibre.com/sites/${country.mlSite}/search`;
+  const url = new URL(mlUrl);
   url.searchParams.set('q', query);
   url.searchParams.set('limit', '20');
   const headers = { Accept: 'application/json' };
@@ -902,13 +939,13 @@ async function searchMercadoLibre(query) {
   const response = await fetchWithTimeout(url, { headers });
   if (!response.ok) return null;
   const payload = await response.json();
-  const stats = calculateMarketStats(payload.results || []);
+  const stats = calculateMarketStats(payload.results || [], country.currency);
   if (!stats.comparableItems.length) return null;
   return {
     provider: 'Mercado Libre',
     query,
-    search_url: `https://listado.mercadolibre.com.ar/${encodeURIComponent(query).replace(/%20/g, '-')}`,
-    currency: 'ARS',
+    search_url: `https://listado.${country.mlDomain}/${encodeURIComponent(query).replace(/%20/g, '-')}`,
+    currency: country.currency,
     average_price: Math.round(stats.average),
     median_price: Math.round(stats.median),
     sample_size: stats.comparableItems.length,
@@ -986,6 +1023,9 @@ export default async function handler(request, context) {
     const rawBarcode = cleanText(body.barcode, 24);
     const barcode = normalizeBarcode(rawBarcode);
     const query = cleanText(body.query, 160);
+    const countryCode = cleanText(body.country || 'AR', 10);
+    const verticalCode = cleanText(body.vertical || 'growshop', 50);
+
     if (rawBarcode && !barcode) {
       return jsonResponse(400, { message: 'El código debe contener entre 6 y 18 números.' });
     }
@@ -996,24 +1036,24 @@ export default async function handler(request, context) {
     const warnings = [];
     const lookupValue = query || barcode;
     const [googleAttempt, yahooAttempt, webAttempt, genericAttempt] = await Promise.allSettled([
-      searchGoogleArgentinaGrowshops(lookupValue, barcode),
-      searchYahooGrowshops(lookupValue, barcode),
-      searchGrowshopWeb(lookupValue, barcode),
+      searchGoogleArgentinaGrowshops(lookupValue, barcode, countryCode, verticalCode),
+      searchYahooGrowshops(lookupValue, barcode, countryCode, verticalCode),
+      searchGrowshopWeb(lookupValue, barcode, countryCode, verticalCode),
       searchValidatedGenericBarcode(barcode)
     ]);
     const googleSearch = googleAttempt.status === 'fulfilled'
       ? googleAttempt.value
       : {
           result: null,
-          searchUrl: buildGoogleArgentinaUrl(buildGrowshopQuery(lookupValue)),
+          searchUrl: buildGoogleArgentinaUrl(buildGrowshopQuery(lookupValue, countryCode, verticalCode)),
           configured: true
         };
     if (googleAttempt.status === 'rejected') {
-      console.warn('Falló Google Argentina:', googleAttempt.reason?.message);
-      warnings.push('Google Argentina no respondió; se usaron growshops argentinos de respaldo.');
+      console.warn('Falló Google:', googleAttempt.reason?.message);
+      warnings.push('Búsqueda principal no disponible; se usaron fuentes públicas de respaldo.');
     }
     if (webAttempt.status === 'rejected') {
-      console.warn('Falló la búsqueda web de growshops:', webAttempt.reason?.message);
+      console.warn('Falló la búsqueda web alternativa:', webAttempt.reason?.message);
     }
     const productResult = googleSearch.result
       || (yahooAttempt.status === 'fulfilled' ? yahooAttempt.value : null)
@@ -1023,8 +1063,8 @@ export default async function handler(request, context) {
     const primaryMarketQuery = buildMarketLookupQuery(productResult?.product, query || barcode);
     const [astroAttempt, publicPricesAttempt, mercadoLibreAttempt] = await Promise.allSettled([
       searchAstroCatalog(primaryMarketQuery),
-      searchYahooGrowshops(primaryMarketQuery),
-      searchMercadoLibre(primaryMarketQuery)
+      searchYahooGrowshops(primaryMarketQuery, '', countryCode, verticalCode),
+      searchMercadoLibre(primaryMarketQuery, countryCode)
     ]);
     const astroResult = astroAttempt.status === 'fulfilled' ? astroAttempt.value : null;
     const publicPricesResult = publicPricesAttempt.status === 'fulfilled' ? publicPricesAttempt.value : null;
@@ -1034,7 +1074,7 @@ export default async function handler(request, context) {
       publicPricesResult?.market,
       productResult?.market,
       mercadoLibreMarket
-    ], primaryMarketQuery);
+    ], primaryMarketQuery, resolveCountryConfig(countryCode).currency);
     if (!market) market = productResult?.market || mercadoLibreMarket || null;
     if (mercadoLibreAttempt.status === 'rejected') {
       console.warn('Falló la consulta de Mercado Libre:', mercadoLibreAttempt.reason?.message);
@@ -1047,7 +1087,7 @@ export default async function handler(request, context) {
       barcode
     );
     const sources = [
-      { label: 'Ver búsqueda en Google Argentina', url: googleSearch?.searchUrl },
+      { label: `Ver búsqueda en Google (${countryCode.toUpperCase()})`, url: googleSearch?.searchUrl },
       ...(productResult?.sources || []),
       ...(productResult?.source ? [productResult.source] : []),
       ...(astroResult?.sources || []),
@@ -1064,10 +1104,12 @@ export default async function handler(request, context) {
       market,
       sources: uniqueSources(sources),
       providers: [...new Set([
-        productResult?.provider || (productResult ? 'Base EAN validada para growshop' : null),
+        productResult?.provider || (productResult ? 'Base EAN validada' : null),
         market?.provider
       ].filter(Boolean))],
       google_search_configured: Boolean(googleSearch?.configured),
+      country: countryCode.toUpperCase(),
+      vertical: verticalCode.toLowerCase(),
       warnings
     });
   } catch (error) {

@@ -471,7 +471,23 @@ function parseLocationCode(code) {
       shelfCode: shelf,
       level: level.replace('N', 'Nivel '),
       levelNum: Number(level.replace(/\D/g, '')) || 1,
-      sector: sector === 'I' ? 'Izquierda' : sector === 'C' ? 'Centro' : sector === 'D' ? 'Derecha' : sector,
+      sector: sector === 'I' ? 'Izquierda' : sector === 'C' ? 'Centro' : sector === 'D' ? 'Derecha' : sector === 'U' ? 'Es chico / Sin sector' : sector,
+      sectorCode: sector
+    };
+  } else if (parts.length === 5) {
+    const [zone, compass, wall, level, sector] = parts;
+    return {
+      zone: zone === 'TI' ? 'Tienda' : zone === 'DP' ? 'Depósito' : zone,
+      zoneCode: zone,
+      compass: compass === 'D' ? 'Derecha' : compass === 'I' ? 'Izquierda' : compass === 'F' ? 'Frente' : compass === 'A' ? 'Atrás' : compass,
+      compassCode: compass,
+      wall: wall.replace('P', 'Pared '),
+      wallCode: wall,
+      shelf: wall.replace('P', 'Pared '),
+      shelfCode: wall,
+      level: level.replace('N', 'Nivel '),
+      levelNum: Number(level.replace(/\D/g, '')) || 1,
+      sector: sector === 'I' ? 'Izquierda' : sector === 'C' ? 'Centro' : sector === 'D' ? 'Derecha' : sector === 'U' ? 'Es chico / Sin sector' : sector,
       sectorCode: sector
     };
   }
@@ -487,10 +503,11 @@ function formatLocationVoiceText(loc) {
   const zone = loc.zone || (loc.zoneCode === 'DP' ? 'el depósito' : 'la tienda');
   const compass = loc.compass || 'frente';
   const wall = loc.wall || 'Pared 1';
-  const shelf = loc.shelf || 'Estante 1';
   const level = loc.level || `nivel ${loc.levelNum || 1}`;
-  const sector = loc.sector || 'centro';
-  return `Está en ${zone.toLowerCase()}, a la ${compass.toLowerCase()} de la PC, ${wall.toLowerCase()}, ${shelf.toLowerCase()}, ${level.toLowerCase()}, sector ${sector.toLowerCase()}.`;
+  const isChico = loc.sectorCode === 'U' || (loc.sector && (loc.sector.toLowerCase().includes('chico') || loc.sector.toLowerCase().includes('no hace falta')));
+  const sector = isChico ? '' : `, sector ${loc.sector.toLowerCase()}`;
+  const shelfStr = loc.shelf && loc.shelf !== loc.wall ? `, ${loc.shelf.toLowerCase()}` : '';
+  return `Está en ${zone.toLowerCase()}, a la ${compass.toLowerCase()} de la PC, ${wall.toLowerCase()}${shelfStr}, ${level.toLowerCase()}${sector}.`;
 }
 
 function renderShelfBlocks() {

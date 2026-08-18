@@ -391,6 +391,9 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Render Cart Badge count
       updateCartBadge();
+
+      // Deep link to product from universal QR code scan
+      handleUrlProductDeepLink();
     } catch (error) {
       console.error("Error loading products catalog:", error);
       
@@ -1907,8 +1910,14 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentDetailProduct = null;
   let currentDetailQty = 1;
 
-  function openProductDetail(productId) {
-    const product = products.find(p => p.id === productId);
+  function openProductDetail(productIdOrCode) {
+    if (!productIdOrCode) return;
+    const query = String(productIdOrCode).trim().toLowerCase();
+    const product = products.find(p => 
+      String(p.id).toLowerCase() === query || 
+      String(p.product_code || '').toLowerCase() === query ||
+      String(p.barcode || '').toLowerCase() === query
+    );
     if (!product) return;
     
     currentDetailProduct = product;
@@ -1956,10 +1965,26 @@ document.addEventListener('DOMContentLoaded', () => {
     showInlineStorefrontView(productDetailModal);
   }
 
+  function handleUrlProductDeepLink() {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const productCode = urlParams.get('product') || urlParams.get('p') || urlParams.get('id');
+      if (productCode) {
+        window.setTimeout(() => {
+          openProductDetail(productCode);
+        }, 150);
+      }
+    } catch (err) {
+      console.warn('Error handling product deep link:', err);
+    }
+  }
+
   function closeProductDetail() {
     productDetailModal.classList.remove('active');
     currentDetailProduct = null;
   }
+
+  window.openProductDetail = openProductDetail;
 
   // Bind Detail Modal Event Listeners
   closeDetailModal.addEventListener('click', closeProductDetail);
