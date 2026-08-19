@@ -27,6 +27,7 @@ const LEVEL_NAMES = {
 const MAP_LAYOUT_KEY = 'boeweb_custom_store_layout_gba_v7';
 const MAP_PHOTOS_KEY = 'boeweb_store_shelf_photos_v1';
 const MAP_HISTORY_KEY = 'boeweb_store_map_history_v1';
+const DELETED_SHELVES_KEY = 'boeweb_deleted_store_shelves_v1';
 
 let storeShelves = loadSavedStoreLayout();
 let storeLocationProducts = [];
@@ -38,7 +39,7 @@ let activeMapTab = 'interactive'; // 'interactive' | 'illustration' | 'history'
 let mapZoomLevel = 100;
 let isEditMode = false;
 let isAddShelfModalOpen = false;
-let storeMapSyncLabel = 'BRÚJULA CENTRAL CONECTADA';
+let storeMapSyncLabel = 'SISTEMA WMS EN LÍNEA';
 
 function escapeMapHtml(value) {
   return String(value ?? '')
@@ -47,6 +48,31 @@ function escapeMapHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function getDeletedStoreShelves() {
+  try {
+    const list = JSON.parse(localStorage.getItem(DELETED_SHELVES_KEY) || '[]');
+    return new Set(Array.isArray(list) ? list.map(s => String(s).trim().toUpperCase()) : []);
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function addDeletedStoreShelf(shelfCode) {
+  try {
+    const set = getDeletedStoreShelves();
+    set.add(String(shelfCode).trim().toUpperCase());
+    localStorage.setItem(DELETED_SHELVES_KEY, JSON.stringify(Array.from(set)));
+  } catch (_) {}
+}
+
+function removeDeletedStoreShelf(shelfCode) {
+  try {
+    const set = getDeletedStoreShelves();
+    set.delete(String(shelfCode).trim().toUpperCase());
+    localStorage.setItem(DELETED_SHELVES_KEY, JSON.stringify(Array.from(set)));
+  } catch (_) {}
 }
 
 function getCurrentMapUser() {
@@ -192,6 +218,10 @@ function calculateDefaultCoordinatesForShelf(wallCode, floorLevel) {
 function ensureShelfExistsForLocation(shelfCode, floorLevel = 1, locationLabel = '') {
   if (!shelfCode || shelfCode === 'PC-CENTRO') return null;
   const normalizedCode = String(shelfCode).trim().toUpperCase();
+  
+  // Guard: if this shelf was explicitly deleted, do NOT resurrect it automatically
+  if (getDeletedStoreShelves().has(normalizedCode)) return null;
+
   const existing = storeShelves.find(s => s.code.toUpperCase() === normalizedCode && s.floor_level === floorLevel);
   if (existing) return existing;
 
@@ -210,7 +240,7 @@ function ensureShelfExistsForLocation(shelfCode, floorLevel = 1, locationLabel =
     y: coords.y,
     width: coords.width,
     height: coords.height,
-    icon: coords.icon,
+    icon: coords.icon || '🗄️',
     is_anchor: false
   };
 
@@ -218,7 +248,7 @@ function ensureShelfExistsForLocation(shelfCode, floorLevel = 1, locationLabel =
   saveStoreLayout();
   logMapHistoryAction(
     'CREAR_ESTANTE',
-    'Módulo agregado automáticamente por ubicación',
+    'Módulo agregado por ubicación física',
     `Se creó el módulo ${normalizedCode} (${locationLabel || 'Asignado a producto'})`,
     normalizedCode,
     floorLevel
@@ -226,15 +256,17 @@ function ensureShelfExistsForLocation(shelfCode, floorLevel = 1, locationLabel =
   return newShelf;
 }
 
-function setStoreMapData(shelves = [], products = [], syncLabel = 'Inventario sincronizado') {
-  const localPhotos = getLocalShelfPhotos();
-  
-  // Cleanly integrate located products and create their shelves on the map
+function setStoreMapData(shelves = [], products = [], syncLabel = 'Inventario WMS sincronizado') {
   storeLocationProducts = Array.isArray(products) ? products : [];
+  
+  const deletedSet = getDeletedStoreShelves();
   storeLocationProducts.forEach(prod => {
     if (prod.shelf_code && prod.shelf_code !== 'PC-CENTRO') {
-      const fLevel = Number(prod.floor_level) || (String(prod.wms_code || '').startsWith('DP') ? 2 : 1);
-      ensureShelfExistsForLocation(prod.shelf_code, fLevel, prod.location_label || prod.location);
+      const codeUpper = String(prod.shelf_code).trim().toUpperCase();
+      if (!deletedSet.has(codeUpper)) {
+        const fLevel = Number(prod.floor_level) || (String(prod.wms_code || '').startsWith('DP') ? 2 : 1);
+        ensureShelfExistsForLocation(prod.shelf_code, fLevel, prod.location_label || prod.location);
+      }
     }
   });
 
@@ -350,24 +382,55 @@ function deleteStoreShelf(shelfCode) {
   const shelf = storeShelves.find(item => item.code === shelfCode);
   if (!shelf) return;
   if (shelf.is_anchor) {
-    if (window.showToast) window.showToast('⚠️ No se puede eliminar la PC Central (punto de ancla cardinal).');
+    if (window.showToast) window.showToast('⚠️ No se puede eliminar la Terminal Central (punto de ancla cardinal).');
     return;
   }
 
   const assignedProducts = getShelfProducts(shelfCode);
   const msg = assignedProducts.length
-    ? `⚠️ Este estante tiene ${assignedProducts.length} producto(s) asignado(s). ¿Estás seguro de eliminar el estante ${shelfCode}?`
+    ? `⚠️ Este estante tiene ${assignedProducts.length} producto(s) asignado(s). Al eliminarlo, quedarán desvinculados físicamente. ¿Eliminar definitivamente el estante ${shelfCode}?`
     : `¿Eliminar el estante ${shelfCode} del plano?`;
 
   if (confirm(msg)) {
+    // 1. Mark in deleted tombstone so it won't be resurrected
+    addDeletedStoreShelf(shelfCode);
+
+    // 2. Remove from active shelves
     storeShelves = storeShelves.filter(item => item.code !== shelfCode);
+
+    // 3. Unassign product locations in localStorage
+    try {
+      const locKey = 'boeweb_wms_product_locations';
+      const rawLocs = JSON.parse(localStorage.getItem(locKey) || '[]');
+      if (Array.isArray(rawLocs)) {
+        const updated = rawLocs.map(loc => {
+          if (String(loc.shelf_code || '').toUpperCase() === shelfCode.toUpperCase()) {
+            return { ...loc, shelf_code: null, wms_code: null, location: 'Sin ubicación', location_label: 'Sin ubicación' };
+          }
+          return loc;
+        });
+        localStorage.setItem(locKey, JSON.stringify(updated));
+      }
+    } catch (_) {}
+
+    // 4. Unassign in memory
+    storeLocationProducts.forEach(prod => {
+      if (String(prod.shelf_code || '').toUpperCase() === shelfCode.toUpperCase()) {
+        prod.shelf_code = null;
+        prod.wms_code = null;
+        prod.location = 'Sin ubicación';
+        prod.location_label = 'Sin ubicación';
+      }
+    });
+
     saveStoreLayout();
     logMapHistoryAction('ELIMINAR_ESTANTE', 'Módulo eliminado', `Se eliminó el estante ${shelfCode} de ${FLOOR_NAMES[shelf.floor_level]}`, shelfCode, shelf.floor_level);
+    
     if (selectedShelfCode === shelfCode) {
       const fallback = storeShelves.find(s => s.floor_level === shelf.floor_level && !s.is_anchor);
       selectedShelfCode = fallback ? fallback.code : 'PC-CENTRO';
     }
-    if (window.showToast) window.showToast(`🗑️ Estante ${shelfCode} eliminado.`);
+    if (window.showToast) window.showToast(`🗑️ Estante ${shelfCode} eliminado definitivamente.`);
     rerenderStoreMap();
   }
 }
@@ -382,6 +445,9 @@ function addNewStoreShelf(floorLevel, wallCode, shelfType, shelfNumber, customNa
     if (window.showToast) window.showToast(`⚠️ Ya existe un módulo con el código ${fullCode} en esta sala.`);
     return false;
   }
+
+  // If was previously deleted, remove from tombstone
+  removeDeletedStoreShelf(fullCode);
 
   const wallLabels = {
     'P1': 'Pared 1 (Frente / Norte)',
@@ -404,7 +470,7 @@ function addNewStoreShelf(floorLevel, wallCode, shelfType, shelfNumber, customNa
     y: coords.y,
     width: coords.width,
     height: coords.height,
-    icon: coords.icon,
+    icon: coords.icon || '🗄️',
     is_anchor: false
   };
 
@@ -420,12 +486,32 @@ function addNewStoreShelf(floorLevel, wallCode, shelfType, shelfNumber, customNa
 }
 
 function clearAllStoreShelves() {
-  if (confirm('¿Vaciar todos los estantes del plano y dejar únicamente la PC Central?')) {
+  if (confirm('¿Vaciar todos los estantes del plano y dejar únicamente la Terminal Central? Los productos quedarán desvinculados físicamente.')) {
+    storeShelves.forEach(s => {
+      if (!s.is_anchor) addDeletedStoreShelf(s.code);
+    });
+
+    try {
+      const locKey = 'boeweb_wms_product_locations';
+      const rawLocs = JSON.parse(localStorage.getItem(locKey) || '[]');
+      if (Array.isArray(rawLocs)) {
+        const updated = rawLocs.map(loc => ({ ...loc, shelf_code: null, wms_code: null, location: 'Sin ubicación', location_label: 'Sin ubicación' }));
+        localStorage.setItem(locKey, JSON.stringify(updated));
+      }
+    } catch (_) {}
+
+    storeLocationProducts.forEach(prod => {
+      prod.shelf_code = null;
+      prod.wms_code = null;
+      prod.location = 'Sin ubicación';
+      prod.location_label = 'Sin ubicación';
+    });
+
     storeShelves = structuredClone(DEFAULT_STORE_SHELVES);
     saveStoreLayout();
     selectedShelfCode = 'PC-CENTRO';
-    logMapHistoryAction('VACIAR_PLANO', 'Plano reiniciado', 'Se vaciaron todos los estantes. Solo quedó la PC Central como punto cardinal.');
-    if (window.showToast) window.showToast('🧹 Plano vaciado correctamente (solo PC Central).');
+    logMapHistoryAction('VACIAR_PLANO', 'Plano reiniciado', 'Se vaciaron todos los estantes. Solo quedó la Terminal Central.');
+    if (window.showToast) window.showToast('🧹 Plano vaciado correctamente (solo Terminal Central).');
     rerenderStoreMap();
   }
 }
@@ -513,23 +599,31 @@ function formatLocationVoiceText(loc) {
 function renderShelfBlocks() {
   const floorShelves = storeShelves.filter(item => item.floor_level === selectedFloorLevel);
   if (!floorShelves.length) {
-    return `<div class="gba-empty-room"><div><span style="font-size:2.5rem;">🌿</span><br><strong>SALA SIN ESTANTES</strong><br><small>Tocá '🛠️ EDITAR' para agregar módulos.</small></div></div>`;
+    return `
+      <div class="gba-empty-room">
+        <div>
+          <span style="font-size: 2.2rem; display: block; margin-bottom: 8px;">📐</span>
+          <strong>SALA SIN ESTANTES</strong><br>
+          <small style="color: rgba(246,243,232,0.65);">Hacé clic en '🛠️ EDITAR PLANO' para incorporar módulos de guardado.</small>
+        </div>
+      </div>`;
   }
   return floorShelves.map(shelf => {
-    // Si es la Computadora Central (Brújula)
+    // Si es la Terminal Central (Brújula)
     if (shelf.is_anchor) {
       return `
         <div class="gba-shelf-wrapper gba-anchor-pc-wrapper" style="left:${shelf.x}%;top:${shelf.y}%;width:${shelf.width}%;height:${shelf.height}%;">
-          <div class="gba-anchor-pc" title="Computadora Central: Punto de Referencia Cardinal">
+          <div class="gba-anchor-pc" title="Terminal Central: Punto de Referencia Cardinal de Planta">
+            <div class="gba-pc-radar-ring"></div>
             <div class="gba-pc-screen">💻</div>
-            <strong class="gba-pc-title">PC CENTRAL</strong>
-            <small class="gba-pc-sub">(BRÚJULA)</small>
+            <strong class="gba-pc-title">TERMINAL CENTRAL</strong>
+            <small class="gba-pc-sub">BRÚJULA WMS</small>
             
             <!-- Flechas Cardinales de Brújula -->
-            <span class="gba-compass-arrow gba-compass-north" title="Frente / Norte (Pared 1)">⬆️ Frente</span>
-            <span class="gba-compass-arrow gba-compass-south" title="Atrás / Sur (Pared 2)">⬇️ Atrás</span>
-            <span class="gba-compass-arrow gba-compass-east" title="Derecha / Este (Pared 3)">➡️ Derecha</span>
-            <span class="gba-compass-arrow gba-compass-west" title="Izquierda / Oeste (Pared 4)">⬅️ Izquierda</span>
+            <span class="gba-compass-arrow gba-compass-north" title="Pared 1 · Frente / Norte">▲ P1 · FRENTE</span>
+            <span class="gba-compass-arrow gba-compass-south" title="Pared 2 · Fondo / Sur">▼ P2 · FONDO</span>
+            <span class="gba-compass-arrow gba-compass-east" title="Pared 3 · Lateral Derecho / Este">▶ P3 · DERECHA</span>
+            <span class="gba-compass-arrow gba-compass-west" title="Pared 4 · Lateral Izquierdo / Oeste">◀ P4 · IZQUIERDA</span>
           </div>
         </div>`;
     }
@@ -537,14 +631,14 @@ function renderShelfBlocks() {
     const count = getShelfUnitCount(shelf.code);
     const selected = shelf.code === selectedShelfCode;
     
-    // HP Bar calculation
-    let hpColor = '#4caf50'; // Green (>10)
-    let hpPercent = Math.min(100, Math.max(8, (count / 25) * 100));
+    // Capacity indicator calculation
+    let capColor = '#2e7d32'; // Green (>10)
+    let capPercent = Math.min(100, Math.max(6, (count / 30) * 100));
     if (count === 0) {
-      hpColor = '#e53935';
-      hpPercent = 0;
+      capColor = '#d32f2f';
+      capPercent = 0;
     } else if (count < 10) {
-      hpColor = '#fbc02d';
+      capColor = '#f57c00';
     }
 
     return `
@@ -553,25 +647,27 @@ function renderShelfBlocks() {
           <button type="button" class="gba-shelf-delete-btn" onclick="deleteStoreShelf('${escapeMapHtml(shelf.code)}')" title="Eliminar estante ${escapeMapHtml(shelf.code)}">✕</button>
         ` : ''}
         <button type="button" class="gba-shelf-block ${selected ? 'selected' : ''}" data-zone="${escapeMapHtml(shelf.zone_code)}"
-          onclick="selectShelf('${escapeMapHtml(shelf.code)}')" aria-label="Estante ${escapeMapHtml(shelf.code)}, ${count} unidades">
+          onclick="selectShelf('${escapeMapHtml(shelf.code)}')" aria-label="Módulo ${escapeMapHtml(shelf.code)}, ${count} unidades">
           
           <div class="gba-shelf-header">
-            <span class="gba-shelf-icon">${shelf.icon || '📦'}</span>
+            <span class="gba-shelf-icon">${shelf.icon || '🗄️'}</span>
             <strong class="gba-shelf-code">${escapeMapHtml(shelf.code)}</strong>
           </div>
           
           <div class="gba-hp-track" title="${count} unidades">
-            <div class="gba-hp-fill" style="width: ${hpPercent}%; background: ${hpColor};"></div>
+            <div class="gba-hp-fill" style="width: ${capPercent}%; background: ${capColor};"></div>
           </div>
           
-          <span class="gba-shelf-count">${count} u.</span>
-          ${selected ? '<span class="gba-cursor-tag">🎯</span>' : ''}
+          <div class="gba-shelf-footer-info">
+            <span class="gba-shelf-count">${count} u.</span>
+            ${selected ? '<span class="gba-cursor-tag">📍 ACTIVO</span>' : ''}
+          </div>
         </button>
         ${isEditMode ? `<div class="gba-editor-arrows">
-          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',-3,0)" title="Mover Izquierda">◀</button>
-          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',3,0)" title="Mover Derecha">▶</button>
-          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',0,-3)" title="Mover Arriba">▲</button>
-          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',0,3)" title="Mover Abajo">▼</button>
+          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',-3,0)" title="Mover a la izquierda">◀</button>
+          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',3,0)" title="Mover a la derecha">▶</button>
+          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',0,-3)" title="Mover hacia arriba">▲</button>
+          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',0,3)" title="Mover hacia abajo">▼</button>
         </div>` : ''}
       </div>`;
   }).join('');
@@ -579,16 +675,19 @@ function renderShelfBlocks() {
 
 function renderProductRows(products) {
   if (!products.length) {
-    return `<div class="gba-bag-empty">
-      <span style="font-size: 1.5rem; display: block; margin-bottom: 6px;">🎒</span>
-      No hay objetos asignados en este estante/nivel.<br>
-      <small style="color: #ffd54f; display: block; margin-top: 6px;">Ubicá un producto o agregá stock con los botones de arriba.</small>
-    </div>`;
+    return `
+      <div class="gba-bag-empty">
+        <span style="font-size: 1.4rem; display: block; margin-bottom: 6px;">📦</span>
+        No hay productos asignados en este nivel del módulo.<br>
+        <small style="color: var(--color-accent-gold, #c2a246); display: block; margin-top: 6px;">Asigná una ubicación desde el asistente o ajustá el stock.</small>
+      </div>`;
   }
   return products.map(product => {
     const exactPosition = product.shelf_position ? ` · ${escapeMapHtml(product.shelf_position)}` : '';
     const stockNum = Number(product.stock) || 0;
     const stockBadgeClass = stockNum > 5 ? 'gba-badge-ok' : stockNum > 0 ? 'gba-badge-low' : 'gba-badge-zero';
+    const stockLabel = stockNum > 5 ? `${stockNum} u.` : stockNum > 0 ? `${stockNum} u. (Bajo)` : '0 u. (Agotado)';
+    
     return `
       <article class="gba-item-row" data-product-code="${escapeMapHtml(product.product_code || product.id)}">
         <div class="gba-item-thumb">
@@ -596,11 +695,11 @@ function renderProductRows(products) {
         </div>
         <div class="gba-item-info">
           <strong>${escapeMapHtml(product.name || 'Producto sin nombre')}</strong>
-          <small>${escapeMapHtml(product.product_code || product.id || 'SIN CÓD')} · <span class="gba-stock-pill ${stockBadgeClass}">${stockNum} u.</span>${exactPosition}</small>
+          <small>${escapeMapHtml(product.product_code || product.id || 'SIN CÓD')} · <span class="gba-stock-pill ${stockBadgeClass}">${stockLabel}</span>${exactPosition}</small>
         </div>
-        <div style="display: flex; gap: 4px;">
-          <button type="button" class="gba-qr-btn" onclick="openStockAdjustmentModal('${escapeMapHtml(product.product_code || product.id)}', 'add')" title="Ajustar Stock">📦</button>
-          <button type="button" class="gba-qr-btn" onclick="printProductQrByCode('${escapeMapHtml(product.product_code || product.id)}')" aria-label="Imprimir QR">QR</button>
+        <div style="display: flex; gap: 6px;">
+          <button type="button" class="gba-qr-btn" onclick="openStockAdjustmentModal('${escapeMapHtml(product.product_code || product.id)}', 'add')" title="Ajustar Stock Físico">📦 Ajustar</button>
+          <button type="button" class="gba-qr-btn" onclick="printProductQrByCode('${escapeMapHtml(product.product_code || product.id)}')" aria-label="Imprimir Etiqueta QR">QR</button>
         </div>
       </article>`;
   }).join('');
@@ -618,23 +717,30 @@ function renderSelectedShelfPanel() {
       <aside class="gba-inspector-side">
         <section class="gba-dialog-box">
           <div class="gba-dialog-banner">
-            <span class="gba-poke-ball">🔴</span>
-            <span class="gba-dialog-kicker">BRÚJULA CENTRAL</span>
-            <span class="gba-poke-leaf">🌿</span>
+            <span class="gba-dialog-kicker">TERMINAL CENTRAL DE PLANTA</span>
+            <span class="gba-status-dot"></span>
           </div>
-          <h3 class="gba-shelf-title">💻 COMPUTADORA CENTRAL</h3>
-          <p style="font-size: 0.82rem; color: #e8f5e9; line-height: 1.5; margin: 8px 0 12px 0;">
-            Este es el punto cardinal de referencia del local. Todas las orientaciones (Frente, Atrás, Derecha, Izquierda) se miden mirando desde esta PC.
+          <h3 class="gba-shelf-title">💻 TERMINAL DE CONTROL Y BRÚJULA</h3>
+          <p style="font-size: 0.84rem; color: rgba(246,243,232,0.8); line-height: 1.5; margin: 10px 0 14px 0;">
+            Este es el punto cardinal de referencia operativa. Todas las indicaciones de orientación se determinan situándose frente a esta terminal.
           </p>
-          <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.78rem; color: #a5d6a7;">
-            <div>⬆️ <strong>Pared 1:</strong> Frente / Norte</div>
-            <div>➡️ <strong>Pared 3:</strong> Lateral Derecho / Este</div>
-            <div>⬇️ <strong>Pared 2:</strong> Fondo / Sur</div>
-            <div>⬅️ <strong>Pared 4:</strong> Lateral Izquierdo / Oeste</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.8rem; color: #a5d6a7; margin-bottom: 14px;">
+            <div style="background: rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 8px; border-left: 3px solid #4caf50;">
+              ▲ <strong>Pared 1:</strong> Frente (Norte)
+            </div>
+            <div style="background: rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 8px; border-left: 3px solid #29b6f6;">
+              ▶ <strong>Pared 3:</strong> Lateral Derecho (Este)
+            </div>
+            <div style="background: rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 8px; border-left: 3px solid #fbc02d;">
+              ▼ <strong>Pared 2:</strong> Fondo / Ingreso (Sur)
+            </div>
+            <div style="background: rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 8px; border-left: 3px solid #ab47bc;">
+              ◀ <strong>Pared 4:</strong> Lateral Izquierdo (Oeste)
+            </div>
           </div>
           ${isEditMode ? `
             <div style="margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">
-              <button type="button" class="gba-action-btn-gold" onclick="openAddShelfModal()" style="width: 100%;">➕ NUEVO ESTANTE</button>
+              <button type="button" class="gba-action-btn-gold" onclick="openAddShelfModal()" style="width: 100%;">➕ NUEVO MÓDULO</button>
             </div>
           ` : ''}
         </section>
@@ -658,12 +764,11 @@ function renderSelectedShelfPanel() {
 
   return `
     <aside class="gba-inspector-side">
-      <!-- Retro GBA Dialog Window Box -->
+      <!-- Inspector Window Box -->
       <section class="gba-dialog-box" aria-labelledby="map-selected-shelf-title">
         <div class="gba-dialog-banner">
-          <span class="gba-poke-ball">🔴</span>
-          <span class="gba-dialog-kicker">INFORMACIÓN DEL ESTANTE</span>
-          <span class="gba-poke-leaf">🌿</span>
+          <span class="gba-dialog-kicker">INFORMACIÓN DEL MÓDULO</span>
+          <span class="gba-status-dot"></span>
         </div>
         <h3 id="map-selected-shelf-title" class="gba-shelf-title">${escapeMapHtml(shelf.code)} · ${escapeMapHtml(shelf.name)}</h3>
         <div class="gba-dialog-meta">
@@ -672,7 +777,7 @@ function renderSelectedShelfPanel() {
         </div>
 
         <div class="gba-photo-frame">
-          ${shelf.photo_url ? `<img src="${escapeMapHtml(shelf.photo_url)}" alt="Foto del estante ${escapeMapHtml(shelf.code)}">` : '<div class="gba-photo-empty"><span>📷 SIN FOTO DEL MUEBLE</span><small>Agregá una imagen de referencia.</small></div>'}
+          ${shelf.photo_url ? `<img src="${escapeMapHtml(shelf.photo_url)}" alt="Foto del estante ${escapeMapHtml(shelf.code)}">` : '<div class="gba-photo-empty"><span>📷 SIN FOTO DEL MUEBLE</span><small>Subí una foto para facilitar el reconocimiento visual.</small></div>'}
         </div>
 
         <div class="gba-photo-buttons">
@@ -685,8 +790,8 @@ function renderSelectedShelfPanel() {
 
         ${isEditMode ? `
           <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-            <button type="button" class="gba-action-btn-gold" onclick="openAddShelfModal()" style="flex:1;">➕ NUEVO ESTANTE</button>
-            <button type="button" class="gba-action-btn-green" onclick="deleteStoreShelf('${escapeMapHtml(shelf.code)}')" style="flex:1; background: #c62828;">🗑️ ELIMINAR</button>
+            <button type="button" class="gba-action-btn-gold" onclick="openAddShelfModal()" style="flex:1;">➕ NUEVO MÓDULO</button>
+            <button type="button" class="gba-action-btn-green" onclick="deleteStoreShelf('${escapeMapHtml(shelf.code)}')" style="flex:1; background: #c62828; border-color: #ef5350;">🗑️ ELIMINAR</button>
           </div>
         ` : ''}
 
@@ -696,11 +801,11 @@ function renderSelectedShelfPanel() {
         </div>
       </section>
 
-      <!-- Retro GBA Item Bag / Products Box -->
+      <!-- Products in Selected Level Box -->
       <section class="gba-bag-box" aria-labelledby="map-products-title">
         <div class="gba-bag-header">
-          <span class="gba-bag-icon">🎒</span>
-          <h3 id="map-products-title" class="gba-bag-title">OBJETOS EN ESTANTE ${escapeMapHtml(shelf.code)} · N${selectedInternalLevel}</h3>
+          <span class="gba-bag-icon">📦</span>
+          <h3 id="map-products-title" class="gba-bag-title">PRODUCTOS EN ${escapeMapHtml(shelf.code)} · N${selectedInternalLevel}</h3>
         </div>
         <div class="gba-bag-list">${renderProductRows(visibleProducts)}</div>
       </section>
@@ -711,7 +816,7 @@ function renderFloorTabs() {
   return Object.entries(FLOOR_NAMES).map(([floor, name]) => {
     const floorNum = Number(floor);
     const active = floorNum === selectedFloorLevel;
-    const label = floorNum === 1 ? '🏪 SALÓN TIENDA (PC AL CENTRO)' : '📦 DEPÓSITO GENERAL (PC AL CENTRO)';
+    const label = floorNum === 1 ? '🏪 SALÓN TIENDA' : '📦 DEPÓSITO GENERAL';
     return `<button type="button" class="gba-room-btn ${active ? 'active' : ''}" onclick="setFloorLevel(${floorNum})">${label}</button>`;
   }).join('');
 }
@@ -722,20 +827,20 @@ function renderMapHistoryHTML() {
     <div class="gba-history-container">
       <div class="gba-history-header">
         <div>
-          <h3 style="margin: 0; font-family: 'Press Start 2P', monospace; font-size: 0.8rem; color: #ffd54f;">
-            📜 HISTORIAL DE AUDITORÍA Y CAMBIOS DEL MAPA
+          <h3 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--color-accent-gold, #c2a246);">
+            📜 HISTORIAL DE AUDITORÍA Y CAMBIOS DEL PLANO
           </h3>
-          <small style="color: #a5d6a7; font-size: 0.76rem;">Registro cronológico de creaciones, modificaciones y ubicaciones físicas</small>
+          <small style="color: rgba(246,243,232,0.7); font-size: 0.8rem;">Registro cronológico de creaciones, modificaciones y asignaciones de inventario</small>
         </div>
         <div style="display: flex; gap: 8px;">
           <button type="button" class="gba-pad-btn" onclick="exportMapHistoryCSV()">📥 EXPORTAR CSV</button>
-          <button type="button" class="gba-pad-btn" onclick="clearMapHistory()" style="background: #b71c1c;">🗑️ LIMPIAR</button>
+          <button type="button" class="gba-pad-btn" onclick="clearMapHistory()" style="background: #b71c1c; border-color: #ef5350;">🗑️ LIMPIAR</button>
         </div>
       </div>
 
       ${!history.length ? `
-        <div style="text-align: center; padding: 30px; color: #81c784; font-family: 'Press Start 2P', monospace; font-size: 0.6rem;">
-          No hay cambios registrados en el mapa todavía.
+        <div style="text-align: center; padding: 30px; color: rgba(246,243,232,0.6); font-size: 0.85rem;">
+          No hay cambios registrados en el plano todavía.
         </div>
       ` : `
         <div style="overflow-x: auto;">
@@ -763,11 +868,11 @@ function renderMapHistoryHTML() {
                 });
                 return `
                   <tr>
-                    <td style="white-space: nowrap; font-family: monospace; font-size: 0.78rem;">${formattedDate}</td>
+                    <td style="white-space: nowrap; font-family: monospace; font-size: 0.82rem;">${formattedDate}</td>
                     <td><strong>${escapeMapHtml(item.user)}</strong></td>
                     <td><span class="gba-history-badge ${badgeClass}">${escapeMapHtml(item.action_label || item.action)}</span></td>
                     <td>${escapeMapHtml(item.details)}</td>
-                    <td><strong style="color: #ffd54f;">${escapeMapHtml(item.shelf_code || '-')}</strong></td>
+                    <td><strong style="color: var(--color-accent-gold, #c2a246);">${escapeMapHtml(item.shelf_code || '-')}</strong></td>
                     <td>${item.floor_level === 2 ? '📦 Depósito' : '🏪 Tienda'}</td>
                   </tr>
                 `;
@@ -784,33 +889,33 @@ function renderAddShelfModalHTML() {
   if (!isAddShelfModalOpen) return '';
   return `
     <div style="position: fixed; inset: 0; z-index: 99999999; background: rgba(0,0,0,0.85); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 16px;">
-      <div style="max-width: 480px; width: 100%; border-radius: 20px; border: 2px solid #c2a246; background: #152d24; color: #fff; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,0.8);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid rgba(194,162,70,0.3); padding-bottom: 10px;">
-          <h3 style="margin: 0; color: #ffd54f; font-size: 1.15rem; font-weight: 800;">➕ Agregar Nuevo Estante</h3>
-          <button type="button" onclick="closeAddShelfModal()" style="background: rgba(255,255,255,0.15); border: none; color: #fff; border-radius: 50%; width: 32px; height: 32px; cursor: pointer;">✕</button>
+      <div style="max-width: 480px; width: 100%; border-radius: 20px; border: 2px solid #c2a246; background: #152d24; color: #fff; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.85);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid rgba(194,162,70,0.3); padding-bottom: 12px;">
+          <h3 style="margin: 0; color: #c2a246; font-size: 1.15rem; font-weight: 800;">➕ Agregar Nuevo Módulo de Guardado</h3>
+          <button type="button" onclick="closeAddShelfModal()" style="background: rgba(255,255,255,0.15); border: none; color: #fff; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-weight: bold;">✕</button>
         </div>
         <form onsubmit="event.preventDefault(); addNewStoreShelf(document.getElementById('new-shelf-floor').value, document.getElementById('new-shelf-wall').value, document.getElementById('new-shelf-type').value, document.getElementById('new-shelf-num').value, document.getElementById('new-shelf-name').value);">
-          <div style="margin-bottom: 12px;">
-            <label style="display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 4px; color: #c2a246;">Sala / Planta</label>
-            <select id="new-shelf-floor" style="width: 100%; padding: 10px; border-radius: 8px; background: #0f2019; border: 1.5px solid #2e6b4d; color: #fff; font-weight: 700;">
+          <div style="margin-bottom: 14px;">
+            <label style="display: block; font-size: 0.84rem; font-weight: 700; margin-bottom: 6px; color: #c2a246;">Sala / Planta</label>
+            <select id="new-shelf-floor" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: #0f2019; border: 1.5px solid #2e6b4d; color: #fff; font-weight: 700; box-sizing: border-box;">
               <option value="1" ${selectedFloorLevel === 1 ? 'selected' : ''}>🏪 Salón Tienda</option>
               <option value="2" ${selectedFloorLevel === 2 ? 'selected' : ''}>📦 Depósito General</option>
             </select>
           </div>
-          <div style="margin-bottom: 12px;">
-            <label style="display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 4px; color: #c2a246;">Pared / Orientación</label>
-            <select id="new-shelf-wall" style="width: 100%; padding: 10px; border-radius: 8px; background: #0f2019; border: 1.5px solid #2e6b4d; color: #fff; font-weight: 700;">
-              <option value="P1">⬆️ Pared 1 (Frente / Norte)</option>
-              <option value="P2">⬇️ Pared 2 (Fondo / Sur)</option>
-              <option value="P3">➡️ Pared 3 (Derecha / Este)</option>
-              <option value="P4">⬅️ Pared 4 (Izquierda / Oeste)</option>
+          <div style="margin-bottom: 14px;">
+            <label style="display: block; font-size: 0.84rem; font-weight: 700; margin-bottom: 6px; color: #c2a246;">Pared / Orientación</label>
+            <select id="new-shelf-wall" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: #0f2019; border: 1.5px solid #2e6b4d; color: #fff; font-weight: 700; box-sizing: border-box;">
+              <option value="P1">▲ Pared 1 (Frente / Norte)</option>
+              <option value="P2">▼ Pared 2 (Fondo / Sur)</option>
+              <option value="P3">▶ Pared 3 (Lateral Derecho / Este)</option>
+              <option value="P4">◀ Pared 4 (Lateral Izquierdo / Oeste)</option>
               <option value="ISLA">📦 Isla / Pasillo Central</option>
             </select>
           </div>
-          <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 10px; margin-bottom: 12px;">
+          <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 10px; margin-bottom: 14px;">
             <div>
-              <label style="display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 4px; color: #c2a246;">Tipo de mueble</label>
-              <select id="new-shelf-type" style="width: 100%; padding: 10px; border-radius: 8px; background: #0f2019; border: 1.5px solid #2e6b4d; color: #fff; font-weight: 700;">
+              <label style="display: block; font-size: 0.84rem; font-weight: 700; margin-bottom: 6px; color: #c2a246;">Tipo de mueble</label>
+              <select id="new-shelf-type" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: #0f2019; border: 1.5px solid #2e6b4d; color: #fff; font-weight: 700; box-sizing: border-box;">
                 <option value="E">🪵 Estante de Pared (E)</option>
                 <option value="VIT">💎 Vitrina Vidriada (VIT)</option>
                 <option value="HEL">❄️ Heladera / Frío (HEL)</option>
@@ -819,16 +924,16 @@ function renderAddShelfModalHTML() {
               </select>
             </div>
             <div>
-              <label style="display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 4px; color: #c2a246;">Número</label>
-              <input type="number" id="new-shelf-num" min="1" max="20" value="1" required style="width: 100%; padding: 10px; border-radius: 8px; background: #0f2019; border: 1.5px solid #2e6b4d; color: #fff; font-weight: 800; text-align: center; box-sizing: border-box;">
+              <label style="display: block; font-size: 0.84rem; font-weight: 700; margin-bottom: 6px; color: #c2a246;">Número</label>
+              <input type="number" id="new-shelf-num" min="1" max="20" value="1" required style="width: 100%; padding: 10px 12px; border-radius: 8px; background: #0f2019; border: 1.5px solid #2e6b4d; color: #fff; font-weight: 800; text-align: center; box-sizing: border-box;">
             </div>
           </div>
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 4px; color: #c2a246;">Nombre / Etiqueta Descriptiva</label>
-            <input type="text" id="new-shelf-name" placeholder="Ej: Fertilizantes, Semillas, Sustratos..." style="width: 100%; padding: 10px; border-radius: 8px; background: #0f2019; border: 1.5px solid #2e6b4d; color: #fff; box-sizing: border-box;">
+          <div style="margin-bottom: 18px;">
+            <label style="display: block; font-size: 0.84rem; font-weight: 700; margin-bottom: 6px; color: #c2a246;">Etiqueta Descriptiva</label>
+            <input type="text" id="new-shelf-name" placeholder="Ej: Fertilizantes, Semillas, Sustratos..." style="width: 100%; padding: 10px 12px; border-radius: 8px; background: #0f2019; border: 1.5px solid #2e6b4d; color: #fff; box-sizing: border-box;">
           </div>
           <div style="display: flex; gap: 10px;">
-            <button type="button" onclick="closeAddShelfModal()" style="flex: 1; padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25); color: #fff; cursor: pointer;">Cancelar</button>
+            <button type="button" onclick="closeAddShelfModal()" style="flex: 1; padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25); color: #fff; font-weight: 600; cursor: pointer;">Cancelar</button>
             <button type="submit" style="flex: 1.5; padding: 12px; border-radius: 10px; background: #2e7d32; border: 1.5px solid #81c784; color: #fff; font-weight: 800; cursor: pointer;">➕ Crear Módulo</button>
           </div>
         </form>
@@ -849,20 +954,20 @@ function renderStoreMapHTML(activeZone = null, activeShelf = null, targetLevel =
   if (targetLevel) selectedInternalLevel = Number(targetLevel);
   const floorShelfCount = storeShelves.filter(item => item.floor_level === selectedFloorLevel && !item.is_anchor).length;
   const totalUnits = storeLocationProducts.reduce((sum, item) => sum + Math.max(0, Number(item.stock) || 0), 0);
-  const currentRoomName = FLOOR_NAMES[selectedFloorLevel] || 'SALÓN';
+  const currentRoomName = FLOOR_NAMES[selectedFloorLevel] || 'SALÓN TIENDA';
 
   return `
     <div class="gba-map-shell">
       
-      <!-- Top GBA Status Bar -->
+      <!-- Top Status Header -->
       <div class="gba-screen-topbar">
         <div class="gba-topbar-left">
           <span class="gba-led-light"></span>
-          <span class="gba-title-logo">🌿 BÔ GROW CLUB</span>
-          <span class="gba-version-tag">BRÚJULA CENTRAL</span>
+          <span class="gba-title-logo">BÔ GROW CLUB · CONTROL DE PLANTA WMS</span>
+          <span class="gba-version-tag">CAD VIRTUAL</span>
         </div>
         <div class="gba-topbar-right">
-          <span class="gba-battery-tag">🧭 PC = CENTRO</span>
+          <span class="gba-battery-tag">🧭 TERMINAL AL CENTRO</span>
           <span class="gba-sync-tag">${escapeMapHtml(storeMapSyncLabel)}</span>
         </div>
       </div>
@@ -872,20 +977,20 @@ function renderStoreMapHTML(activeZone = null, activeShelf = null, targetLevel =
         <div class="gba-room-tabs">
           ${renderFloorTabs()}
           <button type="button" class="gba-room-btn ${activeMapTab === 'interactive' ? 'active' : ''}" onclick="setMapTab('interactive')">
-            🎮 MAPA INTERACTIVO
+            🗺️ PLANO INTERACTIVO
           </button>
           <button type="button" class="gba-room-btn ${activeMapTab === 'illustration' ? 'active' : ''}" onclick="setMapTab('illustration')">
-            🖼️ PLANO ILUSTRADO
+            🖼️ INFOGRAFÍA OFICIAL
           </button>
           <button type="button" class="gba-room-btn ${activeMapTab === 'history' ? 'active' : ''}" onclick="setMapTab('history')">
-            📜 HISTORIAL DE CAMBIOS
+            📜 HISTORIAL DE AUDITORÍA
           </button>
         </div>
         <div class="gba-hardware-buttons">
-          <button type="button" class="gba-pad-btn ${isEditMode ? 'active' : ''}" onclick="toggleStoreLayoutEditMode()">${isEditMode ? '💾 GUARDAR' : '🛠️ EDITAR'}</button>
+          <button type="button" class="gba-pad-btn ${isEditMode ? 'active' : ''}" onclick="toggleStoreLayoutEditMode()">${isEditMode ? '💾 GUARDAR PLANO' : '🛠️ EDITAR PLANO'}</button>
           ${isEditMode ? `
-            <button type="button" class="gba-pad-btn" onclick="openAddShelfModal()" style="background: #2e7d32; color: #fff;">➕ NUEVO</button>
-            <button type="button" class="gba-pad-btn" onclick="clearAllStoreShelves()" style="background: #b71c1c; color: #fff;">🧹 VACIAR</button>
+            <button type="button" class="gba-pad-btn" onclick="openAddShelfModal()" style="background: #2e7d32; color: #fff; border-color: #81c784;">➕ NUEVO MÓDULO</button>
+            <button type="button" class="gba-pad-btn" onclick="clearAllStoreShelves()" style="background: #b71c1c; color: #fff; border-color: #ef5350;">🧹 VACIAR PLANO</button>
           ` : ''}
           <button type="button" class="gba-pad-btn ${currentViewMode === '2D' ? 'active' : ''}" onclick="setViewMode('2D')">2D</button>
           <button type="button" class="gba-pad-btn ${currentViewMode === '3D' ? 'active' : ''}" onclick="setViewMode('3D')">3D</button>
@@ -896,36 +1001,42 @@ function renderStoreMapHTML(activeZone = null, activeShelf = null, targetLevel =
 
       ${activeMapTab === 'history' ? renderMapHistoryHTML() : activeMapTab === 'illustration' ? `
         <!-- Vista Ilustrada / Infografía Oficial del Local -->
-        <div style="background: #0f2318; border: 2px solid #2e6b4d; border-radius: 16px; padding: 18px; margin: 12px 0; text-align: center;">
-          <h3 style="color: #a5d6a7; font-family: 'Press Start 2P', monospace; font-size: 0.8rem; margin: 0 0 12px 0;">
-            🧭 SISTEMA DE UBICACIÓN — PC AL CENTRO COMO BRÚJULA
+        <div style="background: #0f2318; border: 2px solid #2e6b4d; border-radius: 16px; padding: 20px; margin: 12px 0; text-align: center;">
+          <h3 style="color: var(--color-accent-gold, #c2a246); font-size: 1rem; font-weight: 800; margin: 0 0 14px 0;">
+            🧭 SISTEMA DE UBICACIÓN — TERMINAL AL CENTRO COMO BRÚJULA
           </h3>
-          <div style="max-width: 820px; margin: 0 auto; border: 3px solid #c2a246; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.5);">
+          <div style="max-width: 860px; margin: 0 auto; border: 2px solid #c2a246; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 32px rgba(0,0,0,0.6);">
             <img src="assets/store-shelf-map-gba.jpg" alt="Mapa Isométrico con PC Central y Estanterías Pared 1 a 4" style="width: 100%; height: auto; display: block;">
           </div>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 14px; text-align: left; font-size: 0.8rem; color: #e8f5e9;">
-            <div style="background: rgba(255,255,255,0.06); padding: 10px; border-radius: 10px; border-left: 3px solid #4caf50;">
-              <strong>⬆️ Frente (Norte):</strong> Pared 1 con vitrinas y estantes.
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 16px; text-align: left; font-size: 0.85rem; color: #e8f5e9;">
+            <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 10px; border-left: 4px solid #4caf50;">
+              <strong>▲ Frente (Norte):</strong> Pared 1 con vitrinas y estantes principales.
             </div>
-            <div style="background: rgba(255,255,255,0.06); padding: 10px; border-radius: 10px; border-left: 3px solid #fbc02d;">
-              <strong>➡️ Derecha (Este):</strong> Pared 3 con estantes laterales.
+            <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 10px; border-left: 4px solid #29b6f6;">
+              <strong>▶ Derecha (Este):</strong> Pared 3 con estanterías laterales.
             </div>
-            <div style="background: rgba(255,255,255,0.06); padding: 10px; border-radius: 10px; border-left: 3px solid #29b6f6;">
-              <strong>⬇️ Atrás (Sur):</strong> Pared 2 / Ingreso / Pallets.
+            <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 10px; border-left: 4px solid #fbc02d;">
+              <strong>▼ Fondo (Sur):</strong> Pared 2 / Zona de ingreso y pallets.
             </div>
-            <div style="background: rgba(255,255,255,0.06); padding: 10px; border-radius: 10px; border-left: 3px solid #ab47bc;">
-              <strong>⬅️ Izquierda (Oeste):</strong> Pared 4 con estantes laterales.
+            <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 10px; border-left: 4px solid #ab47bc;">
+              <strong>◀ Izquierda (Oeste):</strong> Pared 4 con estanterías laterales.
             </div>
           </div>
         </div>
       ` : `
-        <!-- Main Layout: Retro Canvas + Inspector -->
+        <!-- Main Layout: Modern Architectural Canvas + Inspector -->
         <div class="gba-main-grid">
           <div class="gba-screen-viewport">
             
             <div id="architectural-map-canvas" class="gba-pokemart-canvas" style="transform:${getCanvasTransform()}">
               
-              <!-- Room Background Floor Grid -->
+              <!-- Wall Perimeter Orientation Labels -->
+              <div class="gba-wall-banner gba-wall-north">PARED 1 · FRENTE (NORTE)</div>
+              <div class="gba-wall-banner gba-wall-south">PARED 2 · FONDO (SUR)</div>
+              <div class="gba-wall-banner gba-wall-east">PARED 3 · DERECHA (ESTE)</div>
+              <div class="gba-wall-banner gba-wall-west">PARED 4 · IZQUIERDA (OESTE)</div>
+
+              <!-- Architectural Grid Floor -->
               <div class="gba-floor-grid ${selectedFloorLevel === 2 ? 'gba-floor-warehouse' : 'gba-floor-wood'}"></div>
 
               <!-- Shelf & Compass Anchor Blocks -->
@@ -933,23 +1044,23 @@ function renderStoreMapHTML(activeZone = null, activeShelf = null, targetLevel =
             </div>
           </div>
 
-          <!-- Right Side: Retro Inspector & Bag -->
+          <!-- Right Side: Architectural Inspector & Item List -->
           ${renderSelectedShelfPanel()}
         </div>
       `}
 
-      <!-- Retro Bottom HUD -->
+      <!-- Bottom Status Bar -->
       <div class="gba-bottom-hud">
         <div class="gba-hud-stat">
-          <span>SALA ACTUAL:</span>
+          <span>SALA SELECCIONADA:</span>
           <strong>${escapeMapHtml(currentRoomName)}</strong>
         </div>
         <div class="gba-hud-stat">
-          <span>ESTANTES ACTIVOS:</span>
+          <span>MÓDULOS ACTIVOS:</span>
           <strong>${floorShelfCount} MÓDULOS</strong>
         </div>
         <div class="gba-hud-stat">
-          <span>TOTAL EN INVENTARIO:</span>
+          <span>INVENTARIO TOTAL:</span>
           <strong>${totalUnits} UNIDADES</strong>
         </div>
       </div>
