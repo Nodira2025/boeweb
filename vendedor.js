@@ -108,7 +108,10 @@ const supplierNames = {
   'astrogrow': 'AstroGrow',
   'santaplanta': 'Santa Planta',
   'rosse': 'Distribuidora Rosse',
-  'candyclub': 'Candy Club'
+  'candyclub': 'Candy Club',
+  'distripulpo': 'Distripulpo',
+  'cabrasrl': 'Cabra SRL',
+  'mundohidroponia': 'Mundo Hidroponía'
 };
 
 // --- DOM ELEMENTS ---

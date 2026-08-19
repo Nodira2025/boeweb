@@ -28,7 +28,10 @@ const supplierNames = {
   'astrogrow': 'AstroGrow',
   'santaplanta': 'Santa Planta',
   'rosse': 'Distribuidora Rosse',
-  'candyclub': 'Candy Club'
+  'candyclub': 'Candy Club',
+  'distripulpo': 'Distripulpo',
+  'cabrasrl': 'Cabra SRL',
+  'mundohidroponia': 'Mundo Hidroponía'
 };
 
 /**
@@ -346,6 +349,80 @@ async function scrapeDistribuidoraRosse(baseProducts) {
 }
 
 /**
+ * Scrape Distripulpo (WooCommerce)
+ */
+async function scrapeDistripulpo(baseProducts) {
+  console.log('\n======================================');
+  console.log('Scraping Distripulpo...');
+  console.log('======================================');
+
+  const supplierId = 'distripulpo';
+  let page = 1;
+  let hasMore = true;
+  const scrapedItems = [];
+
+  while (hasMore) {
+    const url = `https://distripulpo.ar/wp-json/wc/store/v1/products?per_page=100&page=${page}`;
+    console.log(`Fetching Distripulpo page ${page}...`);
+
+    try {
+      const response = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+
+      if (response.status === 400 || response.status === 404) {
+        hasMore = false;
+        break;
+      }
+
+      if (!response.ok) {
+        console.error(`Error fetching page ${page}: ${response.status} ${response.statusText}`);
+        break;
+      }
+
+      const products = await response.json();
+      if (!Array.isArray(products) || products.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      console.log(`Received ${products.length} products from page ${page}.`);
+
+      for (const item of products) {
+        const minorUnit = item.prices?.currency_minor_unit !== undefined ? item.prices.currency_minor_unit : 2;
+        const price = Number(item.prices?.price) / Math.pow(10, minorUnit);
+
+        let stock = null;
+        if (item.add_to_cart && item.add_to_cart.maximum !== undefined) {
+          stock = item.add_to_cart.maximum;
+        }
+
+        const scrapedItem = {
+          supplier_id: supplierId,
+          supplier_product_id: String(item.id),
+          name: item.name,
+          price: price || 0,
+          stock: stock,
+          available: item.is_in_stock !== undefined ? item.is_in_stock : true,
+          image: item.images && item.images.length > 0 ? item.images[0].src : null,
+          link: item.permalink,
+          rawCategories: item.categories
+        };
+
+        scrapedItems.push(scrapedItem);
+      }
+
+      page++;
+      await new Promise(resolve => setTimeout(resolve, 300));
+    } catch (err) {
+      console.error(`Unexpected error on page ${page}:`, err.message);
+      break;
+    }
+  }
+
+  console.log(`Scraped ${scrapedItems.length} products from Distripulpo.`);
+  return mapAndSave(scrapedItems, baseProducts);
+}
+
+/**
  * Fuzzy Match products, dynamically create new base products for unmapped ones, and save to Supabase
  */
 async function mapAndSave(scrapedItems, baseProducts) {
@@ -472,6 +549,14 @@ async function main() {
     } catch (err) {
       console.error('Distribuidora Rosse Scraper failed:', err.message);
       results.rosse = { error: err.message };
+    }
+
+    // 4. Scrape Distripulpo
+    try {
+      results.distripulpo = await scrapeDistripulpo(baseProducts);
+    } catch (err) {
+      console.error('Distripulpo Scraper failed:', err.message);
+      results.distripulpo = { error: err.message };
     }
 
     console.log('\n======================================');
