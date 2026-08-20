@@ -307,22 +307,27 @@
               </div>
             </div>
 
-            <!-- 6. Disponibilidad & Stock -->
+            <!-- 6. Disponibilidad & Origen de Catálogo -->
             <div class="facet-group">
               <h4 class="facet-title" onclick="toggleFacetAccordion(this)">
-                <span>Disponibilidad</span>
+                <span>Disponibilidad & Origen</span>
                 <span class="facet-arrow">▼</span>
               </h4>
               <div class="facet-content">
                 <div class="facet-checklist">
                   <label class="facet-check-item">
                     <input type="checkbox" id="check-stock-in" value="instock" onchange="applyFacetedFilters()">
-                    <span>En Stock</span>
+                    <span>🟢 En Stock · Tienda Física</span>
                     <span class="facet-count" id="count-stock-in">(0)</span>
                   </label>
                   <label class="facet-check-item">
+                    <input type="checkbox" id="check-stock-national" value="national" onchange="applyFacetedFilters()">
+                    <span>📦 Proveedores Nacionales (5 días)</span>
+                    <span class="facet-count" id="count-stock-national">(0)</span>
+                  </label>
+                  <label class="facet-check-item">
                     <input type="checkbox" id="check-stock-low" value="lowstock" onchange="applyFacetedFilters()">
-                    <span>Últimas Unidades</span>
+                    <span>⚠️ Últimas Unidades</span>
                     <span class="facet-count" id="count-stock-low">(0)</span>
                   </label>
                 </div>

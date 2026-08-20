@@ -676,11 +676,15 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    const inStockCount = products.filter(p => p.available && p.stock > 0).length;
+    const inStockCount = products.filter(p => (p.has_own_stock || (p.stock > 0 && p.availability !== 'A_PEDIDO' && p.availability !== 'LOCAL_2_DAYS'))).length;
+    const nationalCount = products.filter(p => (p.availability === 'A_PEDIDO' || p.badge_text?.includes('5 días') || p.badge_text?.includes('PEDIDO'))).length;
     const lowStockCount = products.filter(p => p.stock > 0 && p.stock <= 5).length;
 
     const countInStockEl = document.getElementById('count-stock-in');
     if (countInStockEl) countInStockEl.textContent = `(${inStockCount})`;
+
+    const countNationalEl = document.getElementById('count-stock-national');
+    if (countNationalEl) countNationalEl.textContent = `(${nationalCount})`;
 
     const countLowStockEl = document.getElementById('count-stock-low');
     if (countLowStockEl) countLowStockEl.textContent = `(${lowStockCount})`;
@@ -739,13 +743,20 @@ document.addEventListener('DOMContentLoaded', () => {
       filteredProducts = filteredProducts.filter(p => p.price <= maxInputVal);
     }
 
-    // 6. Filter by Stock Availability
+    // 6. Filter by Stock Availability / Origin
     const checkStockIn = document.getElementById('check-stock-in');
+    const checkStockNational = document.getElementById('check-stock-national');
     const checkStockLow = document.getElementById('check-stock-low');
 
-    if (checkStockIn && checkStockIn.checked) {
-      filteredProducts = filteredProducts.filter(p => p.available && p.stock > 0);
+    const inStockActive = checkStockIn && checkStockIn.checked;
+    const nationalActive = checkStockNational && checkStockNational.checked;
+
+    if (inStockActive && !nationalActive) {
+      filteredProducts = filteredProducts.filter(p => p.available && (p.has_own_stock || (p.stock > 0 && p.availability !== 'A_PEDIDO' && p.availability !== 'LOCAL_2_DAYS')));
+    } else if (nationalActive && !inStockActive) {
+      filteredProducts = filteredProducts.filter(p => p.availability === 'A_PEDIDO' || p.badge_text?.includes('5 días') || p.badge_text?.includes('PEDIDO'));
     }
+
     if (checkStockLow && checkStockLow.checked) {
       filteredProducts = filteredProducts.filter(p => p.stock > 0 && p.stock <= 5);
     }
@@ -820,16 +831,16 @@ document.addEventListener('DOMContentLoaded', () => {
       let stockTag = '';
       if (hasPhysicalStock) {
         if (stockNum <= 5) {
-          stockTag = `<span class="stock-tag">Últimos ${stockNum}</span>`;
+          stockTag = `<span class="stock-tag tag-in-stock">🟢 En Stock (${stockNum} en tienda)</span>`;
         } else {
-          stockTag = '<span class="stock-tag tag-in-stock">🟢 En Stock</span>';
+          stockTag = '<span class="stock-tag tag-in-stock">🟢 En Stock · Tienda Física</span>';
         }
       } else if (product.availability === 'LOCAL_2_DAYS' || product.badge_text?.includes('2 DÍAS')) {
-        stockTag = '<span class="stock-tag tag-local-store">📦 Llega en 2 días</span>';
+        stockTag = '<span class="stock-tag tag-local-store">🚚 Tienda Cercana · Demora 2 días</span>';
       } else if (product.availability === 'A_PEDIDO' || product.badge_text?.includes('5 días') || product.badge_text?.includes('PEDIDO')) {
-        stockTag = '<span class="stock-tag tag-on-demand">📦 Solo por pedido · 5 días</span>';
+        stockTag = '<span class="stock-tag tag-on-demand">📦 Demora 5 días hábiles</span>';
       } else {
-        stockTag = '<span class="stock-tag tag-out">Sin Stock</span>';
+        stockTag = '<span class="stock-tag tag-out">🔴 Sin Stock</span>';
       }
 
       // Fallback image if empty
@@ -842,6 +853,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (product.weight) {
         weightTag = `<span class="product-card-weight-badge">${escapeHtml(product.weight)}</span>`;
       }
+
+      const btnLabel = hasPhysicalStock 
+        ? 'Agregar' 
+        : (product.availability === 'LOCAL_2_DAYS' ? 'Pedir (2 días)' : (product.availability === 'A_PEDIDO' ? 'Pedir (5 días)' : 'Sin Stock'));
 
       card.innerHTML = `
         ${stockTag}
@@ -867,7 +882,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
               </svg>
-              <span class="add-to-cart-label">Agregar</span>
+              <span class="add-to-cart-label">${btnLabel}</span>
             </button>
           </div>
         </div>

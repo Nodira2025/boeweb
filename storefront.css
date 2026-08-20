@@ -69,13 +69,59 @@ textarea:focus-visible {
 
 .zen-bg-glow,
 .zen-leaves-container,
-.floating-wheel-btn,
 .mandala-decoration {
   display: none !important;
 }
 
+/* Floating Lotus Wheel trigger button */
+.floating-wheel-trigger,
 #floating-wheel-btn {
-  display: none !important;
+  position: fixed !important;
+  bottom: 28px !important;
+  right: 28px !important;
+  width: 62px !important;
+  height: 62px !important;
+  border-radius: 50% !important;
+  background: var(--bo-forest) !important;
+  color: var(--bo-gold) !important;
+  border: 2.5px solid var(--bo-gold) !important;
+  cursor: pointer !important;
+  z-index: 99 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 10px 30px rgba(21, 45, 36, 0.45), 0 0 18px rgba(194, 162, 70, 0.35) !important;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease !important;
+}
+
+.floating-wheel-trigger:hover,
+#floating-wheel-btn:hover {
+  transform: translateY(-4px) scale(1.08) !important;
+  background: #1f4235 !important;
+  box-shadow: 0 14px 36px rgba(21, 45, 36, 0.55), 0 0 24px rgba(194, 162, 70, 0.55) !important;
+}
+
+.floating-wheel-trigger svg,
+#floating-wheel-btn svg {
+  width: 32px !important;
+  height: 32px !important;
+  color: var(--bo-gold) !important;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+@media (max-width: 768px) {
+  .floating-wheel-trigger,
+  #floating-wheel-btn {
+    bottom: 84px !important;
+    right: 18px !important;
+    width: 54px !important;
+    height: 54px !important;
+  }
+  .floating-wheel-trigger svg,
+  #floating-wheel-btn svg {
+    width: 26px !important;
+    height: 26px !important;
+  }
 }
 
 .brand-utility-bar {
@@ -919,25 +965,43 @@ textarea:focus-visible {
 }
 
 .stock-tag {
-  top: 20px !important;
-  left: 20px !important;
+  top: 14px !important;
+  left: 14px !important;
   z-index: 2;
   min-height: 26px;
-  padding: 0 9px !important;
+  padding: 4px 10px !important;
   display: inline-flex;
   align-items: center;
-  border: 0 !important;
+  gap: 5px;
   border-radius: 999px !important;
-  background: var(--bo-gold) !important;
-  color: var(--bo-forest) !important;
-  font-size: 0.62rem !important;
+  font-size: 0.68rem !important;
   font-weight: 800 !important;
-  box-shadow: none !important;
+  letter-spacing: 0.02em !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18) !important;
+}
+
+.stock-tag.tag-in-stock {
+  background: #2E7D32 !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255,255,255,0.2) !important;
+}
+
+.stock-tag.tag-on-demand {
+  background: #C2A246 !important;
+  color: #0D1E17 !important;
+  border: 1px solid rgba(13,30,23,0.25) !important;
+}
+
+.stock-tag.tag-local-store {
+  background: #234E70 !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255,255,255,0.2) !important;
 }
 
 .stock-tag.tag-out {
-  background: var(--bo-earth) !important;
-  color: var(--bo-cream) !important;
+  background: #6B4E2E !important;
+  color: #F6F3E8 !important;
+  border: 1px solid rgba(255,255,255,0.15) !important;
 }
 
 .product-card-content {
