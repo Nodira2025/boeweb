@@ -1720,8 +1720,50 @@
         <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
       </header>
 
+      <!-- Selector de Modo de Venta Móvil (Asistente Guiado vs Modo Clásico) -->
+      <div id="pos-mode-switcher-nav" class="pos-mode-switcher-nav" role="tablist" aria-label="Modo de venta">
+        <button type="button" id="pos-mode-btn-assistant" class="pos-mode-btn active" onclick="switchPosWorkspaceMode('assistant')">
+          <span>🎙️ Asistente Guiado / Por Voz</span>
+        </button>
+        <button type="button" id="pos-mode-btn-classic" class="pos-mode-btn" onclick="switchPosWorkspaceMode('classic')">
+          <span>📋 Modo Mostrador Clásico</span>
+        </button>
+      </div>
+
+      <!-- ASISTENTE GUIADO DE VENTAS MÓVIL (MODO CONVERSACIONAL Y POR VOZ) -->
+      <section id="mobile-pos-assistant" class="mobile-task-assistant mobile-pos-assistant" aria-labelledby="mobile-pos-assistant-title">
+        <header class="mobile-task-assistant-header">
+          <div>
+            <span class="mobile-task-assistant-kicker">Asistente de ventas · BÔ POS</span>
+            <h3 id="mobile-pos-assistant-title">¿Qué deseás vender?</h3>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" id="mobile-pos-voice-assistant-btn" class="mobile-pos-voice-fab" onclick="toggleMobilePosVoiceAssistant()" title="Activar / Pausar asistente de voz interactivo" aria-label="Asistente de voz">
+              <span class="voice-fab-icon">🎙️</span>
+              <span class="voice-fab-pulse"></span>
+            </button>
+            <span id="mobile-pos-assistant-progress" class="mobile-task-assistant-progress">Paso 1 de 6</span>
+          </div>
+        </header>
+
+        <!-- Indicador de voz activa / texto hablado -->
+        <div id="mobile-pos-voice-feedback" class="mobile-pos-voice-feedback" hidden>
+          <span class="voice-feedback-icon">🔊</span>
+          <span id="mobile-pos-voice-text">Escuchando...</span>
+        </div>
+
+        <!-- Contenido dinámico del paso -->
+        <div id="mobile-pos-assistant-content" class="mobile-task-assistant-content" aria-live="polite"></div>
+
+        <!-- Barra de navegación del asistente -->
+        <nav class="mobile-task-assistant-nav mobile-pos-assistant-nav" id="mobile-pos-assistant-nav" aria-label="Controles del asistente">
+          <button type="button" id="mobile-pos-assistant-back" class="mobile-assistant-secondary" onclick="goBackMobilePosAssistant()">← Atrás</button>
+          <button type="button" id="mobile-pos-assistant-next" class="mobile-assistant-primary" onclick="continueMobilePosAssistant()">Continuar ➔</button>
+        </nav>
+      </section>
+
       <!-- Selector de pestañas móvil para POS (Catálogo vs Ticket) -->
-      <div id="pos-mobile-tabs-nav" class="pos-mobile-nav-switcher" role="tablist" aria-label="Vistas del mostrador POS">
+      <div id="pos-mobile-tabs-nav" class="pos-mobile-nav-switcher" role="tablist" aria-label="Vistas del mostrador POS" style="display: none;">
         <button type="button" id="pos-tab-btn-catalog" class="pos-mobile-nav-btn active" onclick="switchPosMobileView('catalog')" role="tab" aria-selected="true">
           <span>🔍 1. Catálogo & Escáner</span>
         </button>
@@ -1730,7 +1772,7 @@
         </button>
       </div>
 
-      <div id="pos-workspace-grid" class="pos-workspace-grid" data-mobile-view="catalog">
+      <div id="pos-workspace-grid" class="pos-workspace-grid" data-mobile-view="catalog" style="display: none;">
         <!-- Columna Izquierda: Búsqueda Unificada, Dictado y Selección de Productos -->
         <div id="pos-catalog-column" class="pos-workspace-column">
           <!-- Barra de Búsqueda Unificada -->
@@ -3564,7 +3606,8 @@
         <label for="map-search-input">Buscar producto o ubicación</label>
         <div>
           <span aria-hidden="true">⌕</span>
-          <input type="search" id="map-search-input" placeholder="Nombre, QR, código de barras o estante (ej: DP-D-P3-E3-N3-D)" onkeydown="if(event.key==='Enter') searchShelfOnMap()">
+          <input type="search" id="map-search-input" placeholder="Nombre, QR, código o dictá por voz..." onkeydown="if(event.key==='Enter') searchShelfOnMap()">
+          <button type="button" class="store-map-mic-btn" id="map-mic-btn" onclick="startVoiceSearchOnMap()" aria-label="Dictar búsqueda por voz" title="Dictar por voz">🎙️</button>
           <button type="button" onclick="searchShelfOnMap()">Ubicar</button>
         </div>
       </div>

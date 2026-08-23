@@ -1491,3 +1491,291 @@
   display: none !important;
 }
 
+/* ==========================================================================
+   MOBILE POS ASSISTANT & VOICE ENGINE STYLES
+   ========================================================================== */
+
+.pos-mode-switcher-nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  background: rgba(21, 45, 36, 0.06);
+  padding: 4px;
+  border-radius: 14px;
+  border: 1px solid var(--color-border-subtle, rgba(194, 162, 70, 0.2));
+}
+
+.pos-mode-btn {
+  flex: 1;
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted, #5c6f64);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.pos-mode-btn.active {
+  background: var(--color-card-bg, #ffffff);
+  color: var(--color-text-main, #152d24);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  font-weight: 800;
+}
+
+.mobile-pos-assistant {
+  margin-bottom: 24px;
+  border: 1.5px solid rgba(194, 162, 70, 0.45);
+  border-radius: 20px;
+  background: linear-gradient(145deg, #fffdf8, #f7f1e1);
+  padding: 18px;
+  box-shadow: 0 12px 30px rgba(21, 45, 36, 0.08);
+}
+
+.mobile-pos-voice-fab {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #152d24, #274f40);
+  border: 1.5px solid #c2a246;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  font-size: 1.15rem;
+}
+
+.mobile-pos-voice-fab:hover {
+  transform: scale(1.06);
+}
+
+.mobile-pos-voice-fab.listening {
+  background: linear-gradient(135deg, #c62828, #e53935);
+  border-color: #ffffff;
+}
+
+.mobile-pos-voice-fab.listening .voice-fab-pulse {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid #e53935;
+  animation: voicePulse 1.2s infinite ease-out;
+}
+
+@keyframes voicePulse {
+  0% { transform: scale(0.95); opacity: 1; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+.mobile-pos-voice-feedback {
+  margin: 10px 0 14px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(194, 162, 70, 0.15);
+  border: 1px solid rgba(194, 162, 70, 0.35);
+  color: #152d24;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: notifPop 0.2s ease-out;
+}
+
+/* Mode cards in Step 1 */
+.pos-assistant-mode-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.pos-assistant-mode-card {
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1.5px solid var(--color-border-subtle, rgba(21, 45, 36, 0.12));
+  background: var(--color-card-bg, #ffffff);
+  color: var(--color-text-main, #152d24);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.pos-assistant-mode-card:hover,
+.pos-assistant-mode-card:focus-visible {
+  border-color: var(--color-accent-gold, #c2a246);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(21, 45, 36, 0.08);
+}
+
+.pos-assistant-mode-card.featured {
+  border-color: rgba(126, 166, 66, 0.6);
+  background: linear-gradient(135deg, #ffffff 0%, #f4f8ee 100%);
+}
+
+.pos-mode-icon {
+  font-size: 1.8rem;
+  flex-shrink: 0;
+}
+
+.pos-mode-info strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--color-text-main, #152d24);
+}
+
+.pos-mode-info small {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--color-text-muted, #5c6f64);
+  margin-top: 2px;
+}
+
+/* Results in Step 2 */
+.pos-assistant-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-top: 12px;
+}
+
+.pos-assistant-result-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(21, 45, 36, 0.08);
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pos-assistant-result-item:hover {
+  border-color: var(--color-accent-gold, #c2a246);
+  background: #fffdf5;
+}
+
+.pos-assistant-result-item img {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(194, 162, 70, 0.3);
+}
+
+/* Payment choices in Step 5 */
+.pos-assistant-payment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.pos-assistant-payment-btn {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1.5px solid var(--color-border-subtle, rgba(21, 45, 36, 0.12));
+  background: #ffffff;
+  color: var(--color-text-main, #152d24);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pos-assistant-payment-btn:hover,
+.pos-assistant-payment-btn.active {
+  border-color: var(--color-accent-gold, #c2a246);
+  background: #152d24;
+  color: #f6f3e8;
+}
+
+.pos-assistant-payment-btn span.pay-icon {
+  font-size: 1.4rem;
+}
+
+/* WhatsApp Box in Step 6 */
+.pos-assistant-whatsapp-box {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(37, 211, 102, 0.08);
+  border: 1.5px solid rgba(37, 211, 102, 0.4);
+}
+
+.pos-whatsapp-btn {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 10px;
+  border-radius: 12px;
+  border: none;
+  background: #25d366;
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37, 211, 102, 0.35);
+}
+
+[data-theme="dark"] .pos-mode-switcher-nav {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .pos-mode-btn.active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f6f3e8;
+}
+
+[data-theme="dark"] .mobile-pos-assistant {
+  background: linear-gradient(145deg, #1c382e, #152d24);
+  border-color: rgba(194, 162, 70, 0.35);
+}
+
+[data-theme="dark"] .pos-assistant-mode-card,
+[data-theme="dark"] .pos-assistant-result-item,
+[data-theme="dark"] .pos-assistant-payment-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #f6f3e8;
+}
+
+[data-theme="dark"] .pos-assistant-mode-card.featured {
+  background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(126,166,66,0.15) 100%);
+}
+
+[data-theme="dark"] .pos-mode-info strong {
+  color: #f6f3e8;
+}
+
+[data-theme="dark"] .pos-mode-info small {
+  color: rgba(246, 243, 232, 0.65);
+}
+
