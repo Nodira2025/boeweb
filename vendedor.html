@@ -3597,17 +3597,25 @@
         <div>
           <span class="stock-entry-eyebrow">Inventario físico · Ubicación real</span>
           <h2 id="store-map-title">Mapa y ubicaciones del local</h2>
-          <p>Encontrá un producto por nombre, QR, código de barras o estante y mantené una foto actualizada de cada mueble.</p>
+          <p>Encontrá un producto por voz, nombre, QR o código y visualizá la foto del estante y su ubicación física.</p>
         </div>
-        <button type="button" class="store-map-add-product" onclick="switchVendorTab('fast-upload')">+ Ingresar producto</button>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" class="store-map-voice-assistant-btn" onclick="startVoiceLocationAssistantFlow()" aria-label="Abrir Asistente de Voz WMS">
+            🎙️ Asistente de Voz
+          </button>
+          <button type="button" class="store-map-add-product" onclick="switchVendorTab('fast-upload')">+ Ingresar producto</button>
+        </div>
       </header>
+
+      <!-- Interactive Voice Assistant Hub -->
+      <div id="voice-assistant-hub-container" style="display: none;" aria-live="polite"></div>
 
       <div class="store-map-searchbar" role="search">
         <label for="map-search-input">Buscar producto o ubicación</label>
         <div>
           <span aria-hidden="true">⌕</span>
           <input type="search" id="map-search-input" placeholder="Nombre, QR, código o dictá por voz..." onkeydown="if(event.key==='Enter') searchShelfOnMap()">
-          <button type="button" class="store-map-mic-btn" id="map-mic-btn" onclick="startVoiceSearchOnMap()" aria-label="Dictar búsqueda por voz" title="Dictar por voz">🎙️</button>
+          <button type="button" class="store-map-mic-btn" id="map-mic-btn" onclick="startVoiceLocationAssistantFlow()" aria-label="Dictar búsqueda por voz" title="Iniciar Asistente de Voz">🎙️</button>
           <button type="button" onclick="searchShelfOnMap()">Ubicar</button>
         </div>
       </div>

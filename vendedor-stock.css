@@ -2302,6 +2302,188 @@
   gap: 8px;
 }
 
+/* Voice Location Assistant Hub */
+.store-map-voice-assistant-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #c2a246 0%, #a38430 100%);
+  color: #152d24;
+  border: 1.5px solid #ffd54f;
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 0.88rem;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(194, 162, 70, 0.35);
+  transition: all 0.2s ease;
+  min-height: 44px;
+}
+
+.store-map-voice-assistant-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(194, 162, 70, 0.5);
+  filter: brightness(1.08);
+}
+
+.voice-assistant-hub {
+  background: linear-gradient(145deg, #152d24 0%, #1a382c 100%);
+  border: 2px solid #c2a246;
+  border-radius: 20px;
+  padding: 22px;
+  margin: 15px 0 22px 0;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
+  animation: fadeInAssistant 0.3s ease-out;
+}
+
+@keyframes fadeInAssistant {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.voice-assistant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(194, 162, 70, 0.25);
+  padding-bottom: 12px;
+}
+
+.voice-assistant-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.voice-assistant-badge {
+  background: rgba(194, 162, 70, 0.25);
+  color: #c2a246;
+  border: 1px solid #c2a246;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.voice-assistant-prompt-bubble {
+  background: rgba(0, 0, 0, 0.3);
+  border-left: 4px solid #c2a246;
+  border-radius: 0 14px 14px 0;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+
+.voice-assistant-prompt-bubble h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.22rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.voice-assistant-prompt-bubble p {
+  margin: 0;
+  font-size: 0.86rem;
+  color: #ffd54f;
+}
+
+.voice-wave-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 38px;
+  margin: 12px 0 16px 0;
+}
+
+.voice-wave-bar {
+  width: 4px;
+  height: 10px;
+  background: #c2a246;
+  border-radius: 4px;
+  animation: voice-wave-anim 1.2s ease-in-out infinite;
+}
+
+.voice-wave-bar:nth-child(2) { animation-delay: 0.15s; }
+.voice-wave-bar:nth-child(3) { animation-delay: 0.3s; }
+.voice-wave-bar:nth-child(4) { animation-delay: 0.45s; }
+.voice-wave-bar:nth-child(5) { animation-delay: 0.6s; }
+.voice-wave-bar:nth-child(6) { animation-delay: 0.75s; }
+
+@keyframes voice-wave-anim {
+  0%, 100% { height: 8px; opacity: 0.4; }
+  50% { height: 32px; opacity: 1; background: #81c784; }
+}
+
+.voice-match-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 14px 0;
+  padding-right: 4px;
+}
+
+.voice-match-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1.5px solid rgba(194, 162, 70, 0.3);
+  border-radius: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  width: 100%;
+  color: #ffffff;
+  min-height: 52px;
+}
+
+.voice-match-card:hover,
+.voice-match-card:focus-visible {
+  border-color: #ffd54f;
+  background: rgba(194, 162, 70, 0.2);
+  transform: translateX(4px);
+}
+
+.voice-shelf-photo-banner {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid #c2a246;
+  background: #0b1812;
+  margin-bottom: 18px;
+  position: relative;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+.voice-shelf-photo-banner img {
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  display: block;
+}
+
+.voice-shelf-photo-tag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(21, 45, 36, 0.9);
+  border: 1px solid #c2a246;
+  color: #ffd54f;
+  font-weight: 800;
+  font-size: 0.76rem;
+  padding: 4px 10px;
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+}
+
 /* Optimización móvil y formato 9:16 para celulares */
 @media (max-width: 768px) {
   .store-map-searchbar {

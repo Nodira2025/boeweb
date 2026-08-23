@@ -123,3 +123,22 @@ test('Mapa de Estanterías: PC Central como brújula en Tienda y Depósito con f
   assert.match(mapJs, /assets\/store-shelf-map-gba\.jpg/);
 });
 
+test('Asistente de Voz WMS: Pregunta inicial, selección de coincidencias, foto de estante y locución', () => {
+  const code = fs.readFileSync(path.join(process.cwd(), 'vendedor.js'), 'utf8');
+
+  // Funciones principales del Asistente de Voz
+  assert.match(code, /function startVoiceLocationAssistantFlow/);
+  assert.match(code, /function speakVoiceAssistantPhrase/);
+  assert.match(code, /function renderVoiceAssistantStep1/);
+  assert.match(code, /function handleVoiceAssistantSearchInput/);
+  assert.match(code, /function selectVoiceAssistantProduct/);
+  assert.match(code, /function renderVoiceAssistantStep3/);
+  assert.match(code, /function closeVoiceLocationAssistant/);
+
+  // Pregunta inicial y elementos visuales
+  assert.match(code, /¿Qué producto estás buscando\?/);
+  assert.match(code, /voice-shelf-photo-banner/);
+  assert.match(code, /window\.startVoiceLocationAssistantFlow/);
+  assert.match(code, /window\.selectVoiceAssistantProduct/);
+});
+

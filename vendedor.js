@@ -2552,53 +2552,388 @@ function assignProductToStoreShelf(productCodeOrId, floorLevel = 1, shelfCode = 
 }
 window.assignProductToStoreShelf = assignProductToStoreShelf;
 
-function startVoiceSearchOnMap() {
+let voiceAssistantActiveRecognition = null;
+
+function speakVoiceAssistantPhrase(text, onEndCallback = null) {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    if (onEndCallback) onEndCallback();
+    return;
+  }
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'es-AR';
+    utterance.rate = 1.02;
+    utterance.pitch = 1.0;
+    const voices = window.speechSynthesis.getVoices();
+    const esVoice = voices.find(v => v.lang && (v.lang === 'es-AR' || v.lang.startsWith('es-419') || v.lang === 'es-US' || v.lang.startsWith('es')));
+    if (esVoice) utterance.voice = esVoice;
+    if (onEndCallback) {
+      utterance.onend = onEndCallback;
+      utterance.onerror = onEndCallback;
+    }
+    window.speechSynthesis.speak(utterance);
+  } catch (err) {
+    console.warn('Voice speech error:', err);
+    if (onEndCallback) onEndCallback();
+  }
+}
+
+function startVoiceLocationAssistantFlow() {
+  const container = document.getElementById('voice-assistant-hub-container');
+  if (!container) return;
+  container.style.display = 'block';
+  container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // 1. Initial Prompt Audio & UI
+  renderVoiceAssistantStep1('', true);
+
+  // 2. Speak initial question: "¿Qué producto estás buscando?"
+  speakVoiceAssistantPhrase('¿Qué producto estás buscando?', () => {
+    // Start listening once question finishes
+    startVoiceAssistantListening();
+  });
+}
+
+function renderVoiceAssistantStep1(query = '', isListening = true) {
+  const container = document.getElementById('voice-assistant-hub-container');
+  if (!container) return;
+
+  const escapeFn = typeof escapeMapHtml === 'function' ? escapeMapHtml : (v => String(v || ''));
+
+  container.innerHTML = `
+    <div class="voice-assistant-hub" role="region" aria-label="Asistente de Voz WMS">
+      <div class="voice-assistant-header">
+        <div class="voice-assistant-title-group">
+          <span style="font-size: 1.4rem;">🎙️</span>
+          <div>
+            <strong style="font-size: 0.95rem; color: #ffffff; display: block;">Asistente de Voz WMS</strong>
+            <small style="color: #a5d6a7; font-size: 0.74rem;">Reconocimiento y guía presencial</small>
+          </div>
+        </div>
+        <button type="button" onclick="closeVoiceLocationAssistant()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25); color: #fff; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-weight: 800;" aria-label="Cerrar asistente">✕</button>
+      </div>
+
+      <div class="voice-assistant-prompt-bubble">
+        <h3>¿Qué producto estás buscando?</h3>
+        <p>${isListening ? '🎙️ Hablá ahora o escribí el nombre/código...' : 'Podés dictar de nuevo o seleccionar una coincidencia.'}</p>
+      </div>
+
+      ${isListening ? `
+        <div class="voice-wave-container" aria-hidden="true">
+          <div class="voice-wave-bar"></div>
+          <div class="voice-wave-bar"></div>
+          <div class="voice-wave-bar"></div>
+          <div class="voice-wave-bar"></div>
+          <div class="voice-wave-bar"></div>
+          <div class="voice-wave-bar"></div>
+        </div>
+      ` : ''}
+
+      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <input type="text" id="voice-assistant-input" class="b2b-form-input" value="${escapeFn(query)}" placeholder="Decí o escribí el producto..." oninput="handleVoiceAssistantSearchInput(this.value)" style="flex: 1; background: #0f2318; border: 1.5px solid #c2a246; color: #fff; padding: 12px 14px; border-radius: 12px; font-size: 0.95rem;" autofocus>
+        <button type="button" class="store-map-mic-btn ${isListening ? 'recording' : ''}" onclick="toggleVoiceAssistantListening()" style="width: 48px; height: 48px; border-radius: 12px;" title="${isListening ? 'Detener micrófono' : 'Iniciar micrófono'}">
+          ${isListening ? '🔴' : '🎙️'}
+        </button>
+      </div>
+
+      <div id="voice-assistant-matches-box"></div>
+    </div>
+  `;
+
+  if (query) {
+    handleVoiceAssistantSearchInput(query);
+  }
+}
+
+function startVoiceAssistantListening() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
     if (typeof showToast === 'function') showToast('⚠️ Tu navegador no soporta reconocimiento de voz nativo.');
     return;
   }
-  const recognition = new SpeechRecognition();
-  recognition.lang = 'es-AR';
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-
-  const micBtn = document.getElementById('map-mic-btn');
-  const input = document.getElementById('map-search-input');
-
-  if (micBtn) {
-    micBtn.classList.add('recording');
-    micBtn.innerHTML = '🔴';
-  }
-  if (typeof showToast === 'function') showToast('🎙️ Escuchando... Decí el nombre del producto o código.');
-
-  recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript;
-    if (input) {
-      input.value = transcript;
-    }
-    if (typeof showToast === 'function') showToast(`🗣️ Dictado: "${transcript}"`);
-    searchShelfOnMap();
-  };
-
-  recognition.onerror = (event) => {
-    console.warn('Speech recognition error:', event.error);
-    if (typeof showToast === 'function') showToast('⚠️ No se pudo reconocer la voz. Intentá de nuevo.');
-  };
-
-  recognition.onend = () => {
-    if (micBtn) {
-      micBtn.classList.remove('recording');
-      micBtn.innerHTML = '🎙️';
-    }
-  };
 
   try {
+    if (voiceAssistantActiveRecognition) {
+      voiceAssistantActiveRecognition.abort();
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'es-AR';
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 3;
+
+    recognition.onresult = (event) => {
+      let interim = '';
+      let final = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          final += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      const query = final || interim;
+      const inputEl = document.getElementById('voice-assistant-input');
+      if (inputEl && query) {
+        inputEl.value = query;
+        handleVoiceAssistantSearchInput(query);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.warn('Assistant speech recognition error:', event.error);
+    };
+
+    recognition.onend = () => {
+      voiceAssistantActiveRecognition = null;
+      const micBtn = document.querySelector('.voice-assistant-hub .store-map-mic-btn');
+      if (micBtn) {
+        micBtn.classList.remove('recording');
+        micBtn.innerHTML = '🎙️';
+      }
+    };
+
+    voiceAssistantActiveRecognition = recognition;
     recognition.start();
   } catch (err) {
-    console.warn('Recognition start error:', err);
+    console.warn('Could not start recognition:', err);
   }
 }
+
+function toggleVoiceAssistantListening() {
+  if (voiceAssistantActiveRecognition) {
+    voiceAssistantActiveRecognition.abort();
+    voiceAssistantActiveRecognition = null;
+    const inputEl = document.getElementById('voice-assistant-input');
+    renderVoiceAssistantStep1(inputEl ? inputEl.value : '', false);
+  } else {
+    renderVoiceAssistantStep1(document.getElementById('voice-assistant-input')?.value || '', true);
+    startVoiceAssistantListening();
+  }
+}
+
+function handleVoiceAssistantSearchInput(query) {
+  const box = document.getElementById('voice-assistant-matches-box');
+  if (!box) return;
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) {
+    box.innerHTML = '';
+    return;
+  }
+
+  const escapeFn = typeof escapeMapHtml === 'function' ? escapeMapHtml : (v => String(v || ''));
+  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
+  const localLocs = typeof readLocalProductLocations === 'function' ? readLocalProductLocations() : [];
+  const catalog = typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) ? internalCatalogProducts : [];
+  const allProds = [...catalog, ...storeLocs, ...localLocs, ...(baseProducts || [])];
+
+  const unique = new Map();
+  allProds.forEach(p => {
+    const id = String(p.product_code || p.id || p.name).trim();
+    if (!id || unique.has(id)) return;
+    const nameMatch = p.name && p.name.toLowerCase().includes(q);
+    const barcodeMatch = p.barcode && p.barcode.toLowerCase() === q;
+    const codeMatch = (p.product_code && p.product_code.toLowerCase().includes(q)) || (p.wms_code && p.wms_code.toLowerCase().includes(q));
+    const catMatch = p.category && p.category.toLowerCase().includes(q);
+    if (nameMatch || barcodeMatch || codeMatch || catMatch) {
+      unique.set(id, p);
+    }
+  });
+
+  const matches = Array.from(unique.values()).slice(0, 8);
+
+  if (!matches.length) {
+    box.innerHTML = `
+      <div style="padding: 16px; background: rgba(0,0,0,0.25); border-radius: 12px; text-align: center; color: rgba(246,243,232,0.7); font-size: 0.84rem;">
+        🔍 No se encontraron productos coincidentes con "<strong>${escapeFn(query)}</strong>".
+      </div>
+    `;
+    return;
+  }
+
+  box.innerHTML = `
+    <div style="margin-top: 10px;">
+      <small style="color: #ffd54f; font-weight: 700; display: block; margin-bottom: 8px;">
+        ✨ Seleccioná el producto deseado (${matches.length} coincidencia${matches.length > 1 ? 's' : ''}):
+      </small>
+      <div class="voice-match-list">
+        ${matches.map(p => {
+          const img = p.image || p.image_url || p.placement_photo_url;
+          const stock = Math.max(0, Number(p.stock ?? p.on_hand) || 0);
+          const hasLocation = Boolean(p.shelf_code && p.shelf_code !== 'Sin ubicación' && p.shelf_code !== 'SIN_ASIGNAR');
+          const pId = escapeFn(p.product_code || p.id || p.name);
+          return `
+            <button type="button" class="voice-match-card" onclick="selectVoiceAssistantProduct('${pId}')">
+              ${img ? `<img src="${escapeFn(img)}" alt="${escapeFn(p.name)}" style="width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: #fff; flex-shrink: 0;">` : `<div style="width: 44px; height: 44px; border-radius: 8px; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0;">📦</div>`}
+              <div style="flex: 1; min-width: 0;">
+                <strong style="display: block; font-size: 0.88rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeFn(p.name || pId)}</strong>
+                <div style="display: flex; gap: 6px; align-items: center; margin-top: 3px; font-size: 0.72rem;">
+                  <span style="color: ${stock > 0 ? '#81c784' : '#ef5350'}; font-weight: 700;">${stock > 0 ? `${stock} u.` : 'Sin stock'}</span>
+                  <span style="color: rgba(255,255,255,0.4);">•</span>
+                  <span style="color: ${hasLocation ? '#c2a246' : 'rgba(255,255,255,0.6)'}; font-weight: 600;">${hasLocation ? `📍 ${escapeFn(p.shelf_code)}` : '⚠️ Sin estante'}</span>
+                </div>
+              </div>
+              <span style="color: #ffd54f; font-size: 1.1rem;">➔</span>
+            </button>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function selectVoiceAssistantProduct(productIdOrCode) {
+  if (voiceAssistantActiveRecognition) {
+    voiceAssistantActiveRecognition.abort();
+    voiceAssistantActiveRecognition = null;
+  }
+
+  // 1. Find product
+  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
+  const localLocs = typeof readLocalProductLocations === 'function' ? readLocalProductLocations() : [];
+  const catalog = typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) ? internalCatalogProducts : [];
+  const allProds = [...catalog, ...storeLocs, ...localLocs, ...(baseProducts || [])];
+
+  const matched = allProds.find(p => String(p.product_code || p.id).toUpperCase() === String(productIdOrCode).toUpperCase() || String(p.name).toLowerCase() === String(productIdOrCode).toLowerCase());
+
+  // 2. Decode WMS location info
+  const info = decodeHumanWmsLocation(productIdOrCode, matched);
+  window.__lastDecodedWmsLocation = info;
+
+  // 3. Render Step 3 in Voice Hub
+  renderVoiceAssistantStep3(info);
+
+  // 4. Voice narration
+  if (window.speakLocationVoicePhrase) {
+    window.speakLocationVoicePhrase(info);
+  }
+
+  // 5. Update interactive map
+  if (info.isLocated) {
+    if (window.setFloorLevel) window.setFloorLevel(info.floorLevel);
+    if (window.selectShelf) window.selectShelf(info.layoutShelfCode || info.shelfCode, info.levelNum);
+    renderStoreMapUI(info.wallCode || info.zoneCode, info.layoutShelfCode || info.shelfCode, info.levelNum);
+  }
+}
+
+function renderVoiceAssistantStep3(info) {
+  const container = document.getElementById('voice-assistant-hub-container');
+  if (!container) return;
+
+  const escapeFn = typeof escapeMapHtml === 'function' ? escapeMapHtml : (v => String(v || ''));
+  const currentShelves = (typeof window !== 'undefined' && Array.isArray(window.storeShelves)) ? window.storeShelves.filter(s => !s.is_anchor) : [];
+  const title = info.productName ? `${escapeFn(info.productName)}` : `Módulo: ${escapeFn(info.layoutShelfCode)}`;
+
+  // Determine shelf photo or visual fallback
+  let shelfPhotoSrc = info.shelfPhoto;
+  let isRealShelfPhoto = Boolean(shelfPhotoSrc);
+  if (!shelfPhotoSrc) {
+    shelfPhotoSrc = 'assets/store-shelf-map-gba.jpg';
+  }
+
+  container.innerHTML = `
+    <div class="voice-assistant-hub" role="region" aria-label="Ubicación encontrada">
+      <div class="voice-assistant-header">
+        <div class="voice-assistant-title-group">
+          <span style="font-size: 1.4rem;">📍</span>
+          <div>
+            <strong style="font-size: 0.95rem; color: #ffffff; display: block;">Ubicación Física del Producto</strong>
+            <small style="color: #c2a246; font-size: 0.74rem;">${escapeFn(info.layoutShelfCode)} · ${escapeFn(info.areaLabel)}</small>
+          </div>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button type="button" onclick="startVoiceLocationAssistantFlow()" style="background: rgba(194,162,70,0.25); border: 1.5px solid #c2a246; color: #ffd54f; padding: 6px 12px; border-radius: 10px; font-weight: 800; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+            🎙️ Buscar otro
+          </button>
+          <button type="button" onclick="closeVoiceLocationAssistant()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25); color: #fff; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-weight: 800;" aria-label="Cerrar asistente">✕</button>
+        </div>
+      </div>
+
+      <!-- 1. FOTO PRINCIPAL DEL ESTANTE DONDE ESTÁ EL PRODUCTO -->
+      <div class="voice-shelf-photo-banner">
+        <span class="voice-shelf-photo-tag">
+          ${isRealShelfPhoto ? `📸 Foto Real: ${escapeFn(info.layoutShelfCode)}` : `🧭 Plano Ilustrado: ${escapeFn(info.wallLabel)}`}
+        </span>
+        <img src="${escapeFn(shelfPhotoSrc)}" alt="Foto del estante ${escapeFn(info.layoutShelfCode)}">
+      </div>
+
+      <!-- 2. DATOS DEL PRODUCTO Y UBICACIÓN FÍSICA DETALLADA -->
+      <div style="background: rgba(0,0,0,0.35); border-radius: 16px; padding: 18px; border: 1px solid rgba(194,162,70,0.3); margin-bottom: 16px;">
+        
+        <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px;">
+          ${info.productImage ? `
+            <img src="${escapeFn(info.productImage)}" alt="${title}" style="width: 52px; height: 52px; border-radius: 10px; border: 1.5px solid #c2a246; object-fit: cover; background: #fff; flex-shrink: 0;">
+          ` : `
+            <div style="width: 52px; height: 52px; border-radius: 10px; border: 1.5px solid #c2a246; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; flex-shrink: 0;">📦</div>
+          `}
+          <div style="flex: 1; min-width: 0;">
+            <h3 style="margin: 0 0 3px 0; font-size: 1.12rem; color: #ffffff; font-weight: 800;">${title}</h3>
+            <small style="color: rgba(246,243,232,0.7); font-size: 0.76rem; font-family: monospace;">SKU: ${escapeFn(info.productBarcode || info.productId || info.rawCode)}</small>
+          </div>
+          <button type="button" onclick="if(window.speakLocationVoicePhrase)window.speakLocationVoicePhrase(window.__lastDecodedWmsLocation||null)" style="padding: 8px 12px; border-radius: 10px; background: rgba(46,125,50,0.35); border: 1.5px solid #81c784; color: #81c784; font-size: 0.78rem; font-weight: 800; cursor: pointer; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;" title="Repetir locución">
+            🔊 Repetir
+          </button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; font-size: 0.88rem; line-height: 1.6;">
+          <div style="background: rgba(255,255,255,0.04); padding: 10px 12px; border-radius: 10px; border-left: 3px solid #c2a246;">
+            🏢 <strong>Lugar:</strong> <span style="color: #ffd54f;">${escapeFn(info.areaLabel)}</span>
+          </div>
+          <div style="background: rgba(255,255,255,0.04); padding: 10px 12px; border-radius: 10px; border-left: 3px solid #81c784;">
+            🧭 <strong>Pared & Brújula:</strong> <span style="color: #a5d6a7;">${escapeFn(info.wallLabel)}</span> (${escapeFn(info.compassText)})
+          </div>
+          <div style="background: rgba(255,255,255,0.04); padding: 10px 12px; border-radius: 10px; border-left: 3px solid #64b5f6;">
+            🪵 <strong>Tipo de Mueble:</strong> <span style="color: #ffffff;">${escapeFn(info.furnitureType)}</span> (${escapeFn(info.layoutShelfCode)})
+          </div>
+          <div style="background: rgba(255,255,255,0.04); padding: 10px 12px; border-radius: 10px; border-left: 3px solid #ba68c8;">
+            ↕️ <strong>Nivel / Altura:</strong> <span style="color: #ffd54f;">${escapeFn(info.levelLabel)}</span> (${escapeFn(info.levelDesc)})
+          </div>
+          <div style="background: rgba(255,255,255,0.04); padding: 10px 12px; border-radius: 10px; border-left: 3px solid #4db6ac;">
+            ↔️ <strong>Posición:</strong> <span style="color: #ffffff;">${escapeFn(info.sectorText)}</span>
+          </div>
+          <div style="background: rgba(255,255,255,0.04); padding: 10px 12px; border-radius: 10px; border-left: 3px solid ${info.stockCount > 0 ? '#81c784' : '#e53935'};">
+            📦 <strong>Stock disponible:</strong> <strong style="color: ${info.stockCount > 0 ? '#81c784' : '#ef5350'};">${info.stockCount} unidades</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTONES DE ACCIÓN -->
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button type="button" onclick="document.getElementById('architectural-map-canvas')?.scrollIntoView({ behavior: 'smooth', block: 'center' })" style="flex: 1.2; min-height: 48px; padding: 12px 18px; font-weight: 800; font-size: 0.92rem; background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: #fff; border: 1.5px solid #81c784; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          🗺️ Ver en el Plano 2D/3D
+        </button>
+        <button type="button" onclick="startVoiceLocationAssistantFlow()" style="flex: 1; min-height: 48px; padding: 12px 16px; font-weight: 800; font-size: 0.9rem; background: rgba(194,162,70,0.25); color: #ffd54f; border: 1.5px solid #c2a246; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          🎙️ Buscar otro producto
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function closeVoiceLocationAssistant() {
+  if (voiceAssistantActiveRecognition) {
+    voiceAssistantActiveRecognition.abort();
+    voiceAssistantActiveRecognition = null;
+  }
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+  const container = document.getElementById('voice-assistant-hub-container');
+  if (container) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+  }
+}
+
+function startVoiceSearchOnMap() {
+  startVoiceLocationAssistantFlow();
+}
+
+window.startVoiceLocationAssistantFlow = startVoiceLocationAssistantFlow;
+window.handleVoiceAssistantSearchInput = handleVoiceAssistantSearchInput;
+window.selectVoiceAssistantProduct = selectVoiceAssistantProduct;
+window.closeVoiceLocationAssistant = closeVoiceLocationAssistant;
+window.toggleVoiceAssistantListening = toggleVoiceAssistantListening;
 window.startVoiceSearchOnMap = startVoiceSearchOnMap;
 
 
