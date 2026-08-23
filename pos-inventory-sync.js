@@ -109,8 +109,8 @@ class PosInventorySyncEngine {
       const productId = item.product_id || item.id;
       const qty = Number(item.quantity || 1);
 
-      // Si es producto solo B2B, no exige stock propio
-      if (item.availability === 'A_PEDIDO') continue;
+      // Si es producto solo B2B o ítem exprés no mapeado, no exige stock previo propio
+      if (item.availability === 'A_PEDIDO' || item.availability === 'EXPRESS_UNMAPPED' || item.is_express) continue;
 
       const avail = this.getInventoryAvailability(tenantId, productId, locationsStore, balancesStore, reservationsStore, profilesStore);
       if (avail.available < qty) {
@@ -133,6 +133,7 @@ class PosInventorySyncEngine {
       discount: Number(saleDraft.discount || 0),
       total: Number(saleDraft.total || 0),
       payment_method: saleDraft.payment_method || 'EFECTIVO',
+      payment_breakdown: saleDraft.payment_breakdown || null,
       idempotency_key: key,
       created_at: new Date().toISOString()
     };
@@ -145,15 +146,23 @@ class PosInventorySyncEngine {
     for (const item of items) {
       const productId = item.product_id || item.id;
       const qty = Number(item.quantity || 1);
+      const isExpress = item.availability === 'EXPRESS_UNMAPPED' || !!item.is_express;
 
       // Prevenir Adulteración de Precios de Cliente (DevTools Price Tampering Protection)
       let authoritativePrice = Number(item.unit_price || item.price || 0);
       const catList = Array.isArray(productsStore) ? productsStore : [];
-      if (catList.length > 0) {
+      if (!isExpress && catList.length > 0) {
         const catProduct = catList.find(p => p.id === productId || p.product_code === productId);
         if (catProduct && catProduct.price !== undefined && Math.abs(Number(catProduct.price) - authoritativePrice) > 0.01) {
           authoritativePrice = Number(catProduct.price);
         }
+      }
+
+      let fulfillmentType = 'DIRECT';
+      if (item.availability === 'A_PEDIDO') {
+        fulfillmentType = 'B2B_BACKORDER';
+      } else if (isExpress) {
+        fulfillmentType = 'EXPRESS_UNMAPPED';
       }
 
       const saleItemRecord = {
@@ -165,13 +174,13 @@ class PosInventorySyncEngine {
         quantity: qty,
         unit_price: authoritativePrice,
         subtotal: qty * authoritativePrice,
-        fulfillment_type: item.availability === 'A_PEDIDO' ? 'B2B_BACKORDER' : 'DIRECT'
+        fulfillment_type: fulfillmentType
       };
       saleItemsStore.push(saleItemRecord);
       createdItems.push(saleItemRecord);
 
-      // Si es producto propio en stock, descontar de inventario y registrar ledger
-      if (item.availability !== 'A_PEDIDO') {
+      // Si es producto propio en stock (no B2B ni exprés), descontar de inventario y registrar ledger
+      if (item.availability !== 'A_PEDIDO' && !isExpress) {
         const avail = this.getInventoryAvailability(tenantId, productId, locationsStore, balancesStore, reservationsStore, profilesStore);
 
         if (avail.wms_enabled) {
@@ -238,26 +247,71 @@ class PosInventorySyncEngine {
       cashSessionsStore.push(openSession);
     }
 
-    const cashType = saleDraft.payment_method === 'EFECTIVO' ? 'venta_efectivo' : 'venta_transferencia';
-    const cashMovement = {
-      id: `cmov-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      session_id: openSession.id,
-      tenant_id: tenantId,
-      type: cashType,
-      amount: saleRecord.total,
-      payment_method: saleDraft.payment_method,
-      reference_type: 'SALE',
-      reference_id: saleId,
-      created_by: saleDraft.cashier_name_snapshot,
-      created_at: new Date().toISOString()
-    };
-    cashMovementsStore.push(cashMovement);
+    const recordedMovements = [];
+    if (saleDraft.payment_method === 'MIXTO' && saleDraft.payment_breakdown) {
+      const breakdown = saleDraft.payment_breakdown;
+      const cashAmt = Math.max(0, Number(breakdown.cash_amount ?? breakdown.cash ?? 0));
+      const secMethod = breakdown.secondary_method || breakdown.secondaryMethod || 'TRANSFERENCIA';
+      const secAmt = Math.max(0, Number(breakdown.secondary_amount ?? (saleRecord.total - cashAmt)));
+
+      if (cashAmt > 0) {
+        const cashMovement1 = {
+          id: `cmov-${Date.now()}-cash`,
+          session_id: openSession.id,
+          tenant_id: tenantId,
+          type: 'venta_efectivo',
+          amount: cashAmt,
+          payment_method: 'EFECTIVO',
+          reference_type: 'SALE',
+          reference_id: saleId,
+          created_by: saleDraft.cashier_name_snapshot,
+          created_at: new Date().toISOString()
+        };
+        cashMovementsStore.push(cashMovement1);
+        recordedMovements.push(cashMovement1);
+      }
+
+      if (secAmt > 0) {
+        const secCashType = secMethod === 'EFECTIVO' ? 'venta_efectivo' : (secMethod === 'TRANSFERENCIA' ? 'venta_transferencia' : `venta_${secMethod.toLowerCase()}`);
+        const cashMovement2 = {
+          id: `cmov-${Date.now()}-sec`,
+          session_id: openSession.id,
+          tenant_id: tenantId,
+          type: secCashType,
+          amount: secAmt,
+          payment_method: secMethod,
+          reference_type: 'SALE',
+          reference_id: saleId,
+          created_by: saleDraft.cashier_name_snapshot,
+          created_at: new Date().toISOString()
+        };
+        cashMovementsStore.push(cashMovement2);
+        recordedMovements.push(cashMovement2);
+      }
+    } else {
+      const cashType = saleDraft.payment_method === 'EFECTIVO' ? 'venta_efectivo' : 'venta_transferencia';
+      const cashMovement = {
+        id: `cmov-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        session_id: openSession.id,
+        tenant_id: tenantId,
+        type: cashType,
+        amount: saleRecord.total,
+        payment_method: saleDraft.payment_method,
+        reference_type: 'SALE',
+        reference_id: saleId,
+        created_by: saleDraft.cashier_name_snapshot,
+        created_at: new Date().toISOString()
+      };
+      cashMovementsStore.push(cashMovement);
+      recordedMovements.push(cashMovement);
+    }
 
     return {
       success: true,
       sale: saleRecord,
       items: createdItems,
-      cash_movement: cashMovement,
+      cash_movement: recordedMovements[0] || null,
+      cash_movements: recordedMovements,
       wms_allocations: wmsAllocations,
       ticket: {
         sale_id: saleId,
@@ -329,7 +383,7 @@ class PosInventorySyncEngine {
     const movements = cashMovementsStore.filter(m => m.tenant_id === tenantId && (sessionId ? m.session_id === sessionId : true));
 
     const salesCash = movements.filter(m => m.type === 'venta_efectivo').reduce((sum, m) => sum + Number(m.amount), 0);
-    const salesTransfer = movements.filter(m => m.type === 'venta_transferencia').reduce((sum, m) => sum + Number(m.amount), 0);
+    const salesTransfer = movements.filter(m => m.type !== 'venta_efectivo' && m.type !== 'ingreso_manual' && m.type !== 'gasto' && m.type !== 'devolucion').reduce((sum, m) => sum + Number(m.amount), 0);
     const manualIncome = movements.filter(m => m.type === 'ingreso_manual').reduce((sum, m) => sum + Number(m.amount), 0);
     const expenses = movements.filter(m => m.type === 'gasto').reduce((sum, m) => sum + Number(m.amount), 0);
     const refunds = movements.filter(m => m.type === 'devolucion').reduce((sum, m) => sum + Number(m.amount), 0);
@@ -342,6 +396,7 @@ class PosInventorySyncEngine {
       opening_amount: openingAmount,
       sales_cash: salesCash,
       sales_transfer: salesTransfer,
+      sales_digital: salesTransfer,
       manual_income: manualIncome,
       expenses: expenses,
       refunds: refunds,

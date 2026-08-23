@@ -49,6 +49,15 @@ class PosCartEngine {
     const qty = Number(product.quantity) || 1;
     const unitPrice = Number(product.price) || 0;
 
+    let defaultAvail = 'A_PEDIDO';
+    if (product.availability) {
+      defaultAvail = product.availability;
+    } else if (product.is_express) {
+      defaultAvail = 'EXPRESS_UNMAPPED';
+    } else if (product.own_stock > 0) {
+      defaultAvail = 'EN_STOCK';
+    }
+
     if (existingIndex >= 0) {
       this.items[existingIndex].quantity += qty;
     } else {
@@ -58,7 +67,8 @@ class PosCartEngine {
         name: product.name || 'Producto Sin Nombre',
         price: unitPrice,
         quantity: qty,
-        availability: product.availability || (product.own_stock > 0 ? 'EN_STOCK' : 'A_PEDIDO'),
+        availability: defaultAvail,
+        is_express: !!(product.is_express || defaultAvail === 'EXPRESS_UNMAPPED'),
         supplier_code: product.supplier_code || 'own',
         image_url: product.image_url || 'assets/logo.jpg'
       });
@@ -198,6 +208,10 @@ class PosCartEngine {
     return Math.max(0, subtotal + adjAmt);
   }
 
+  calculateTotal(discountPercent = null) {
+    return this.getTotal(discountPercent);
+  }
+
   createSaleDraft(options = {}) {
     const cashierUser = options.cashierUser || { id: 'anonymous', name: 'Cajero' };
     const salespersonUser = options.salespersonUser || { id: 'anonymous', name: 'Vendedor' };
@@ -222,7 +236,8 @@ class PosCartEngine {
         quantity: i.quantity,
         unit_price: i.price,
         subtotal: i.price * i.quantity,
-        availability: i.availability || 'EN_STOCK'
+        availability: i.availability || (i.is_express ? 'EXPRESS_UNMAPPED' : 'EN_STOCK'),
+        is_express: !!i.is_express
       })),
       subtotal,
       adjustment_type: adj.type || 'NONE',
@@ -233,6 +248,7 @@ class PosCartEngine {
       surcharge: this.getIncreaseAmount(),
       total,
       payment_method: options.paymentMethod || 'EFECTIVO',
+      payment_breakdown: options.paymentBreakdown || null,
       notes: options.notes || '',
       idempotency_key: `pos_draft_${Date.now()}_${total}`,
       created_at: dateNow.toISOString(),

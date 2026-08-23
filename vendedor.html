@@ -9,7 +9,7 @@
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
   
   <!-- Favicon -->
   <link rel="icon" type="image/jpeg" href="assets/logo.jpg">
@@ -1038,6 +1038,15 @@
       display: none !important;
     }
 
+    @media (min-width: 1100px) {
+      #vendedor-portal-app .b2b-header {
+        display: none !important;
+      }
+      #vendedor-portal-app {
+        padding-top: 24px !important;
+      }
+    }
+
     @media (max-width: 1099px) {
       .b2b-header-container .theme-toggle-btn {
         display: none !important;
@@ -1062,22 +1071,29 @@
         padding: 4px 7px !important;
       }
 
-      /* En celulares, la pantalla de inicio muestra ÚNICAMENTE el flujo de trabajo (1 al 13) */
-      .vendor-dashboard-home .vendor-home-hero,
-      .vendor-dashboard-home .vendor-home-kpis,
-      .vendor-dashboard-home #vendor-reports-title,
-      .vendor-dashboard-home .vendor-home-operational-grid {
-        display: none !important;
-      }
-
-      .vendor-dashboard-home #vendor-flow-title {
-        margin-top: 4px !important;
-        margin-bottom: 10px !important;
-      }
-
-      .vendor-dashboard-home .vendor-2col-grid {
-        grid-template-columns: 1fr !important;
+      .vendor-dashboard-home .vendor-home-kpis {
+        grid-template-columns: repeat(2, 1fr) !important;
         gap: 10px !important;
+      }
+
+      .vendor-dashboard-home .vendor-home-operational-grid {
+        grid-template-columns: 1fr !important;
+        gap: 14px !important;
+      }
+
+      .vendor-home-hero {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        padding: 20px !important;
+      }
+
+      .vendor-home-hero-actions {
+        width: 100% !important;
+        flex-direction: column !important;
+      }
+
+      .vendor-home-hero-actions button {
+        width: 100% !important;
       }
 
       .b2b-header {
@@ -1222,8 +1238,15 @@
         </div>
       </div>
 
-      <!-- Quick Session & Password Actions in Sidebar -->
-      <div class="vendor-sidebar-user-actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: -16px 0 18px;">
+      <!-- Quick Session, Theme & Notification Actions in Sidebar -->
+      <div class="vendor-sidebar-user-actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: -16px 0 16px;">
+        <button type="button" id="vendor-notifications-bell-btn-sidebar" class="vendor-sidebar-action-btn" onclick="toggleVendorNotificationPanel()" title="Alertas y Notificaciones del Local" style="position: relative;">
+          <span>🔔</span><span>Alertas</span>
+          <span id="vendor-sidebar-notifications-badge" class="vendor-nav-bell-badge" style="display: none; position: absolute; top: -5px; right: -5px; background: #e53935; color: white; border-radius: 999px; padding: 2px 6px; font-size: 0.65rem; font-weight: 800;">0</span>
+        </button>
+        <button type="button" class="theme-toggle-btn vendor-sidebar-action-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Oscuro">
+          <span>🌙</span><span>Tema</span>
+        </button>
         <button type="button" onclick="openVendorPasswordModal()" class="vendor-sidebar-action-btn" title="Cambiar mi contraseña">
           <span>🔑</span><span>Clave</span>
         </button>
@@ -1366,25 +1389,31 @@
     <!-- VENDOR HOME / CENTRO OPERATIVO -->
     <section id="vendor-dashboard-home" class="vendor-dashboard-home" aria-labelledby="vendor-welcome-title">
       
-      <!-- ================= NOTIFICACIONES & RESUMEN DEL TURNO ================= -->
+      <!-- ================= HERO CON AVATAR Y BIENVENIDA EMPÁTICA ================= -->
       <header class="vendor-home-hero">
-        <div class="vendor-home-copy">
-          <span class="vendor-home-eyebrow">Centro operativo · BÔ Grow Club</span>
-          <h2 id="vendor-welcome-title">Buenas tardes, vendedor</h2>
-          <p>Notificaciones y alertas activas del turno. Registrá, controlá y resolvé en el orden operativo del local.</p>
+        <div class="vendor-welcome-identity-group">
+          <div class="vendor-welcome-avatar-wrap">
+            <span class="vendor-welcome-avatar" id="vendor-welcome-avatar" aria-hidden="true">V</span>
+            <span class="vendor-welcome-avatar-status" title="Vendedor activo en turno"></span>
+          </div>
+          <div class="vendor-home-copy">
+            <span class="vendor-home-eyebrow">Centro operativo · BÔ Grow Club</span>
+            <h2 id="vendor-welcome-title">Buen día, vendedor</h2>
+            <p id="vendor-welcome-subtitle" class="vendor-welcome-subtitle">¡Espero que tengas un día lleno de ventas! 🌿🚀</p>
+          </div>
         </div>
         <div class="vendor-home-hero-actions">
           <button type="button" class="vendor-home-primary-action" onclick="switchVendorTab('pos')" style="background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: #ffffff; border: none; font-weight: 800; box-shadow: 0 4px 14px rgba(46,125,50,0.3);">
-            🏷️🛒 2. Vender producto
+            🏷️🛒 Vender en Mostrador
           </button>
           <button type="button" class="vendor-home-secondary-action" onclick="switchVendorTab('fast-upload')">
-            📥 1. Ingresar producto
+            📥 Ingresar producto
           </button>
         </div>
       </header>
 
-      <!-- Notificaciones / KPIs del Turno -->
-      <section class="vendor-home-kpis" aria-label="Notificaciones y resumen operativo del turno">
+      <!-- KPIs del Turno -->
+      <section class="vendor-home-kpis" aria-label="Resumen operativo del turno">
         <article class="vendor-home-kpi">
           <span class="vendor-home-kpi-icon" aria-hidden="true">↗</span>
           <div class="vendor-home-kpi-copy">
@@ -1419,29 +1448,86 @@
         </article>
       </section>
 
-      <!-- ================= FLUJO OPERATIVO DEL VENDEDOR (1 al 13) ================= -->
-      <div class="vendor-section-heading" id="vendor-flow-title" style="margin-top: 24px;">
+      <!-- ================= 1. VENTAS, CAJA Y CLIENTES ================= -->
+      <div class="vendor-section-heading" style="margin-top: 32px;">
         <div>
-          <span class="vendor-section-eyebrow">Flujo de trabajo</span>
-          <h3>Operaciones del vendedor</h3>
+          <span class="vendor-section-eyebrow">Operaciones de mostrador</span>
+          <h3>1. Ventas, Caja y Clientes</h3>
         </div>
-        <p>Herramientas ordenadas según el proceso diario de la tienda.</p>
+        <p>Herramientas directas para atender, cobrar y gestionar cuentas de clientes.</p>
       </div>
 
-      <div class="vendor-2col-grid">
-        
-        <!-- 1. Vender producto (POS) -->
+      <div class="vendor-launchpad-grid">
+        <!-- Vender producto (POS) -->
         <button type="button" class="vendor-flow-card vendor-flow-card-featured" id="vcard-pos" onclick="switchVendorTab('pos')">
           <div class="vendor-flow-top">
             <span class="vendor-flow-icon">🏷️🛒</span>
+            <span class="vendor-flow-num">1</span>
           </div>
           <div>
             <strong class="vendor-flow-title">Vender producto</strong>
-            <span class="vendor-flow-desc">Mostrador POS · Escáner de barra · Teclado · Voz</span>
+            <span class="vendor-flow-desc">Mostrador POS · Escáner láser · Teclado rápido · Voz</span>
           </div>
         </button>
 
-        <!-- 2. Ingresar producto -->
+        <!-- Caja & Arqueo Diario -->
+        <button type="button" class="vendor-flow-card" id="vcard-cash" onclick="switchVendorTab('cash')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-icon">💰💵</span>
+            <span class="vendor-flow-num">2</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Caja & Arqueo Diario</strong>
+            <span class="vendor-flow-desc">Apertura · Cobros · Gastos · Cierre de turno en vivo</span>
+          </div>
+        </button>
+
+        <!-- Ver pedidos web -->
+        <button type="button" class="vendor-flow-card" id="vcard-weborders" onclick="switchVendorTab('web-orders')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-icon">🛍️</span>
+            <span class="vendor-flow-badge" id="vendor-pending-web-orders-badge-action" hidden>0</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Ver pedidos web</strong>
+            <span class="vendor-flow-desc">Compras online · Picking, despacho y cobranza</span>
+          </div>
+        </button>
+
+        <!-- Gestionar Clientes -->
+        <button type="button" class="vendor-flow-card" id="vcard-portfolio" onclick="switchVendorTab('portfolio')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-icon">👥</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Gestionar Clientes</strong>
+            <span class="vendor-flow-desc">Clientes propios · Cuentas Corrientes · WhatsApp</span>
+          </div>
+        </button>
+
+        <!-- Buscar en catálogo tienda física -->
+        <button type="button" class="vendor-flow-card" id="vcard-internalcatalog" onclick="switchVendorTab('internal-catalog')">
+          <div class="vendor-flow-top">
+            <span class="vendor-flow-icon">▤</span>
+          </div>
+          <div>
+            <strong class="vendor-flow-title">Catálogo Tienda Física</strong>
+            <span class="vendor-flow-desc">Stock comercial disponible y precios del local</span>
+          </div>
+        </button>
+      </div>
+
+      <!-- ================= 2. INVENTARIO, DEPÓSITO Y WMS ================= -->
+      <div class="vendor-section-heading" style="margin-top: 36px;">
+        <div>
+          <span class="vendor-section-eyebrow">Control físico y depósito</span>
+          <h3>2. Inventario, Depósito y WMS</h3>
+        </div>
+        <p>Ingreso de mercadería, localización en estantes, vencimientos y control de calidad.</p>
+      </div>
+
+      <div class="vendor-launchpad-grid">
+        <!-- Ingresar producto -->
         <button type="button" class="vendor-flow-card" id="vcard-fastupload" onclick="switchVendorTab('fast-upload')">
           <div class="vendor-flow-top">
             <span class="vendor-flow-icon">📥</span>
@@ -1452,18 +1538,7 @@
           </div>
         </button>
 
-        <!-- 3. Caja & Arqueo Diario -->
-        <button type="button" class="vendor-flow-card" id="vcard-cash" onclick="switchVendorTab('cash')">
-          <div class="vendor-flow-top">
-            <span class="vendor-flow-icon">💰💵</span>
-          </div>
-          <div>
-            <strong class="vendor-flow-title">Caja & Arqueo Diario</strong>
-            <span class="vendor-flow-desc">Apertura · Ventas POS · Gastos · Cierre de caja en vivo</span>
-          </div>
-        </button>
-
-        <!-- 4. Ubicar producto -->
+        <!-- Ubicar producto -->
         <button type="button" class="vendor-flow-card" id="vcard-locationassistant" onclick="switchVendorTab('location-assistant')">
           <div class="vendor-flow-top">
             <span class="vendor-flow-icon">⌖</span>
@@ -1475,41 +1550,18 @@
           </div>
         </button>
 
-        <!-- 5. Buscar producto en local -->
+        <!-- Buscar producto en local / Mapa WMS -->
         <button type="button" class="vendor-flow-card" id="vcard-map" onclick="switchVendorTab('map')">
           <div class="vendor-flow-top">
             <span class="vendor-flow-icon">🗺️</span>
           </div>
           <div>
-            <strong class="vendor-flow-title">Buscar Producto en local</strong>
-            <span class="vendor-flow-desc">Mapa WMS · Tienda y Depósito (PC central)</span>
+            <strong class="vendor-flow-title">Buscar en local (Mapa)</strong>
+            <span class="vendor-flow-desc">Plano interactivo WMS · Tienda y Depósito</span>
           </div>
         </button>
 
-        <!-- 6. Buscar en catálogo tienda física -->
-        <button type="button" class="vendor-flow-card" id="vcard-internalcatalog" onclick="switchVendorTab('internal-catalog')">
-          <div class="vendor-flow-top">
-            <span class="vendor-flow-icon">🏷️</span>
-          </div>
-          <div>
-            <strong class="vendor-flow-title">Buscar en catálogo tienda física</strong>
-            <span class="vendor-flow-desc">Catálogo interno · Stock comercial del local</span>
-          </div>
-        </button>
-
-        <!-- 7. Ver pedidos web -->
-        <button type="button" class="vendor-flow-card" id="vcard-weborders" onclick="switchVendorTab('web-orders')">
-          <div class="vendor-flow-top">
-            <span class="vendor-flow-icon">🛍️</span>
-            <span class="vendor-flow-badge" id="vendor-pending-web-orders-badge-action" hidden>0</span>
-          </div>
-          <div>
-            <strong class="vendor-flow-title">Ver pedidos web</strong>
-            <span class="vendor-flow-desc">Compras online · Mediación, picking y cobro</span>
-          </div>
-        </button>
-
-        <!-- 8. Cola de Aprobación de Productos -->
+        <!-- Cola de Aprobación -->
         <button type="button" class="vendor-flow-card" id="vcard-draftsreview" onclick="switchVendorTab('drafts-review')">
           <div class="vendor-flow-top">
             <span class="vendor-flow-icon">👑📋</span>
@@ -1517,22 +1569,11 @@
           </div>
           <div>
             <strong class="vendor-flow-title">Cola de Aprobación</strong>
-            <span class="vendor-flow-desc">Borradores de productos · Revisar, autorizar y publicar</span>
+            <span class="vendor-flow-desc">Borradores de productos · Revisar y publicar</span>
           </div>
         </button>
 
-        <!-- 9. Gestionar Clientes (propios y cuenta corriente) -->
-        <button type="button" class="vendor-flow-card" id="vcard-portfolio" onclick="switchVendorTab('portfolio')">
-          <div class="vendor-flow-top">
-            <span class="vendor-flow-icon">👥</span>
-          </div>
-          <div>
-            <strong class="vendor-flow-title">Gestionar Clientes</strong>
-            <span class="vendor-flow-desc">Clientes propios · Cuentas Corrientes · WhatsApp</span>
-          </div>
-        </button>
-
-        <!-- 10. Productos a Vencer -->
+        <!-- Productos a Vencer -->
         <button type="button" class="vendor-flow-card" id="vcard-expirations" onclick="switchVendorTab('expirations')">
           <div class="vendor-flow-top">
             <span class="vendor-flow-icon">⏳</span>
@@ -1544,7 +1585,7 @@
           </div>
         </button>
 
-        <!-- 11. Productos Retirados -->
+        <!-- Productos Retirados -->
         <button type="button" class="vendor-flow-card" id="vcard-retired" onclick="switchVendorTab('retired-products')">
           <div class="vendor-flow-top">
             <span class="vendor-flow-icon">🗑️📉</span>
@@ -1554,19 +1595,30 @@
             <span class="vendor-flow-desc">Mermas · Roturas · Vencidos · Salidas con voz</span>
           </div>
         </button>
+      </div>
 
-        <!-- 12. Comprar productos (catálogo B2B) -->
+      <!-- ================= 3. REPOSICIÓN Y RED DE LOCALES ================= -->
+      <div class="vendor-section-heading" style="margin-top: 36px;">
+        <div>
+          <span class="vendor-section-eyebrow">Abastecimiento y red</span>
+          <h3>3. Reposición y Red de Locales</h3>
+        </div>
+        <p>Catálogo B2B mayorista y consulta de stock en sucursales cercanas.</p>
+      </div>
+
+      <div class="vendor-launchpad-grid vendor-launchpad-grid-3col">
+        <!-- Comprar productos (catálogo B2B) -->
         <button type="button" class="vendor-flow-card" id="vcard-catalog" onclick="switchVendorTab('catalog')">
           <div class="vendor-flow-top">
-            <span class="vendor-flow-icon">📦</span>
+            <span class="vendor-flow-icon">📦🛒</span>
           </div>
           <div>
-            <strong class="vendor-flow-title">Comprar productos</strong>
-            <span class="vendor-flow-desc">Catálogo B2B · Mayoristas y distribuidores</span>
+            <strong class="vendor-flow-title">Comprar productos (B2B)</strong>
+            <span class="vendor-flow-desc">Catálogo mayorista · Distribuidores y reposición</span>
           </div>
         </button>
 
-        <!-- 13. Tiendas Cerca -->
+        <!-- Tiendas Cerca -->
         <button type="button" class="vendor-flow-card" id="vcard-nearbystores" onclick="switchVendorTab('nearby-stores')">
           <div class="vendor-flow-top">
             <span class="vendor-flow-icon">🏪</span>
@@ -1576,8 +1628,19 @@
             <span class="vendor-flow-desc">Red de locales asociados · Stock en 48 hs</span>
           </div>
         </button>
+      </div>
 
-        <!-- 14. Promos TV -->
+      <!-- ================= 4. EXPERIENCIA Y PANTALLAS DEL LOCAL ================= -->
+      <div class="vendor-section-heading" style="margin-top: 36px;">
+        <div>
+          <span class="vendor-section-eyebrow">Pantallas satélite</span>
+          <h3>4. Experiencia y Pantallas del Local</h3>
+        </div>
+        <p>Cartelera digital para clientes, catálogo interactivo en tablet y cafetería de especialidad.</p>
+      </div>
+
+      <div class="vendor-launchpad-grid vendor-launchpad-grid-3col">
+        <!-- Promos TV -->
         <a href="tv.html" target="_blank" rel="noopener" class="vendor-flow-card">
           <div class="vendor-flow-top">
             <span class="vendor-flow-icon">📺</span>
@@ -1588,7 +1651,7 @@
           </div>
         </a>
 
-        <!-- 15. Tablet promos -->
+        <!-- Tablet promos -->
         <a href="tablet.html" target="_blank" rel="noopener" class="vendor-flow-card">
           <div class="vendor-flow-top">
             <span class="vendor-flow-icon">📱</span>
@@ -1599,7 +1662,7 @@
           </div>
         </a>
 
-        <!-- 16. BÔ Caffè Club -->
+        <!-- BÔ Caffè Club -->
         <a href="coffee.html" target="_blank" rel="noopener" class="vendor-flow-card">
           <div class="vendor-flow-top">
             <span class="vendor-flow-icon">☕</span>
@@ -1609,20 +1672,19 @@
             <span class="vendor-flow-desc">Cafetería de especialidad · Bar y menú</span>
           </div>
         </a>
-
       </div>
 
-      <!-- ================= REPORTES & CAJA DEL TURNO ================= -->
-      <div class="vendor-section-heading" id="vendor-reports-title" style="margin-top: 32px;">
+      <!-- ================= RESUMEN DE CAJA Y ARQUEO ================= -->
+      <div class="vendor-section-heading" id="vendor-reports-title" style="margin-top: 40px;">
         <div>
           <span class="vendor-section-eyebrow">Cierre & Control</span>
-          <h3>Reportes y Caja</h3>
+          <h3>Caja y Movimientos del Turno</h3>
         </div>
-        <p>Arqueo de turno, movimientos de dinero y reportes de gestión.</p>
+        <p>Arqueo en vivo, control de ingresos y egresos de efectivo.</p>
       </div>
 
       <div class="vendor-home-operational-grid">
-        <section class="vendor-home-panel vendor-home-cash-card" aria-labelledby="vendor-home-cash-title">
+        <section class="vendor-home-panel vendor-home-cash-card" aria-labelledby="vendor-home-cash-title" style="grid-column: 1 / -1;">
           <div class="vendor-home-panel-heading">
             <div>
               <span class="vendor-section-eyebrow">Caja del turno</span>
@@ -1643,29 +1705,6 @@
             <div class="vendor-home-empty-movements">La caja está lista para comenzar.</div>
           </div>
         </section>
-
-        <aside class="vendor-home-panel" aria-labelledby="vendor-quick-reports-title">
-          <div class="vendor-home-panel-heading">
-            <div>
-              <span class="vendor-section-eyebrow">Acceso rápido</span>
-              <h3 id="vendor-quick-reports-title">Reportes Rápidos</h3>
-            </div>
-          </div>
-          <div class="vendor-home-quick-actions">
-            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('cash')">
-              <span aria-hidden="true">💰</span><span><strong>Arqueo y Cierre de Caja</strong><small>Control de efectivo, tarjetas y QR</small></span><span aria-hidden="true">›</span>
-            </button>
-            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('portfolio')">
-              <span aria-hidden="true">💳</span><span><strong>Reporte de Cuentas Corrientes</strong><small>Saldos deudores y recibos de pago</small></span><span aria-hidden="true">›</span>
-            </button>
-            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('expirations')">
-              <span aria-hidden="true">⏳</span><span><strong>Reporte de Vencimientos</strong><small>Productos críticos y liquidaciones</small></span><span aria-hidden="true">›</span>
-            </button>
-            <button type="button" class="vendor-home-quick-action" onclick="switchVendorTab('location-assistant')">
-              <span aria-hidden="true">⌖</span><span><strong>Auditoría de Ubicación WMS</strong><small>Control de estanterías y posiciones</small></span><span aria-hidden="true">›</span>
-            </button>
-          </div>
-        </aside>
       </div>
 
     </section>
@@ -1714,6 +1753,41 @@
               <span id="pos-scanner-indicator" class="pos-scanner-badge">⚡ Lector láser listo</span>
               <span id="pos-voice-status" class="pos-voice-status"></span>
               <span id="pos-search-count-badge" style="color: var(--color-text-muted); font-weight: 700;">Catálogo interno</span>
+              <button type="button" class="btn btn-secondary" id="pos-express-item-btn" onclick="openPosExpressItemModal()" style="padding: 4px 12px; font-size: 0.8rem; font-weight: 700; border-radius: 8px; background: rgba(195,155,75,0.12); color: var(--color-accent-gold); border: 1px solid var(--color-accent-gold); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-left: auto;">
+                ⚡ + Ítem Exprés / Venta Libre
+              </button>
+            </div>
+
+            <!-- Modal de Ítem Libre / Venta Exprés -->
+            <div class="wms-modal-backdrop" id="pos-express-item-modal" style="display: none; align-items: center; justify-content: center; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 9999; padding: 16px;">
+              <div class="wms-modal-card" style="background: #fff; border-radius: 16px; width: 100%; max-width: 440px; padding: 24px; box-shadow: 0 12px 36px rgba(0,0,0,0.25); position: relative;">
+                <button type="button" class="wms-modal-close" onclick="closePosExpressItemModal()" style="position: absolute; right: 16px; top: 16px; background: none; border: none; font-size: 1.4rem; cursor: pointer;">✕</button>
+                <h3 style="margin: 0 0 6px 0; font-family: 'Playfair Display', serif; font-size: 1.25rem; color: var(--color-text-main);">⚡ Venta Exprés / Ítem Libre</h3>
+                <p style="margin: 0 0 16px 0; font-size: 0.82rem; color: var(--color-text-muted);">Ingresá productos fuera de catálogo o recién recibidos sin trabar la venta.</p>
+                
+                <form id="pos-express-item-form" onsubmit="handlePosExpressItemSubmit(event)">
+                  <div style="margin-bottom: 12px;">
+                    <label for="pos-express-name" style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Concepto / Producto:</label>
+                    <input type="text" id="pos-express-name" class="b2b-form-input" placeholder="Ej: Sustrato Klasmann 50L recién recibido" required style="width: 100%; font-size: 0.9rem;">
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+                    <div>
+                      <label for="pos-express-price" style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Precio Unitario ($):</label>
+                      <input type="number" id="pos-express-price" class="b2b-form-input" placeholder="0" min="0" step="any" required style="width: 100%; font-size: 0.95rem; font-weight: 800; text-align: right;">
+                    </div>
+                    <div>
+                      <label for="pos-express-qty" style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Cantidad:</label>
+                      <input type="number" id="pos-express-qty" class="b2b-form-input" value="1" min="1" step="1" required style="width: 100%; font-size: 0.95rem; font-weight: 800; text-align: center;">
+                    </div>
+                  </div>
+
+                  <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary" onclick="closePosExpressItemModal()" style="padding: 8px 16px; border-radius: 8px;">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" style="padding: 8px 18px; border-radius: 8px; font-weight: 700; background: var(--color-accent-gold); color: #1a1a1a; border: none; cursor: pointer;">🛒 Agregar al Ticket</button>
+                  </div>
+                </form>
+              </div>
             </div>
 
             <!-- Grilla de Coincidencias en Tiempo Real -->
@@ -1809,8 +1883,42 @@
                 <option value="DEBITO">💳 Tarjeta de Débito</option>
                 <option value="CREDITO">💳 Tarjeta de Crédito</option>
                 <option value="MERCADOPAGO">📱 MercadoPago QR</option>
+                <option value="MIXTO">🔀 Pago Mixto (Efectivo + Otro Medio)</option>
                 <option value="CUENTA_CORRIENTE">📋 Cuenta Corriente (Fiado / Crédito)</option>
               </select>
+
+              <!-- Desglose de Pago Mixto -->
+              <div id="pos-mixed-payment-container" style="display: none; background: rgba(46,125,50,0.06); border: 1.5px solid #81c784; border-radius: 12px; padding: 12px; margin-bottom: 10px;">
+                <div style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: #2e7d32; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                  <span>🔀 Desglose de Pago Mixto</span>
+                </div>
+                
+                <div style="margin-bottom: 8px;">
+                  <label for="pos-mixed-cash-amount" style="font-size: 0.75rem; font-weight: 700; color: var(--color-text-main); display: block; margin-bottom: 2px;">1. Monto en Efectivo ($):</label>
+                  <input type="number" id="pos-mixed-cash-amount" class="b2b-form-input" placeholder="0" min="0" step="any" style="font-size: 0.88rem; font-weight: 800; background: #fff;" oninput="handlePosMixedPaymentInputChange('cash')">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                  <div>
+                    <label for="pos-mixed-secondary-method" style="font-size: 0.75rem; font-weight: 700; color: var(--color-text-main); display: block; margin-bottom: 2px;">2. Segundo Medio:</label>
+                    <select id="pos-mixed-secondary-method" class="b2b-form-input" style="font-size: 0.82rem; font-weight: 700; background: #fff;" onchange="handlePosMixedSecondaryMethodChange()">
+                      <option value="TRANSFERENCIA">🏦 Transferencia</option>
+                      <option value="DEBITO">💳 Débito</option>
+                      <option value="CREDITO">💳 Crédito</option>
+                      <option value="MERCADOPAGO">📱 MercadoPago</option>
+                      <option value="CUENTA_CORRIENTE">📋 Cta Corriente</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="pos-mixed-secondary-amount" style="font-size: 0.75rem; font-weight: 700; color: var(--color-text-main); display: block; margin-bottom: 2px;">Monto Segundo Medio ($):</label>
+                    <input type="number" id="pos-mixed-secondary-amount" class="b2b-form-input" placeholder="0" min="0" step="any" style="font-size: 0.88rem; font-weight: 800; background: #fff;" oninput="handlePosMixedPaymentInputChange('secondary')">
+                  </div>
+                </div>
+
+                <div id="pos-mixed-validation-feedback" style="font-size: 0.76rem; font-weight: 700; padding: 4px 8px; border-radius: 6px; text-align: center; background: rgba(0,0,0,0.04); color: var(--color-text-muted);">
+                  Ingresá el monto en efectivo para calcular el resto
+                </div>
+              </div>
 
               <!-- Selector de Cliente con Cuenta Corriente -->
               <div id="pos-current-account-container" style="display: none; background: rgba(195,155,75,0.08); border: 1.5px solid var(--color-accent-gold); border-radius: 12px; padding: 12px; margin-bottom: 10px;">
@@ -2013,6 +2121,11 @@
               <span aria-hidden="true">✦</span> Analizar foto con IA
             </button>
             <div id="fastupload-ai-status" class="stock-ai-status" role="status" aria-live="polite" hidden></div>
+
+            <div class="stock-step-inline-nav">
+              <button type="button" class="mobile-assistant-secondary" onclick="goBackMobileProductAssistant()">← Cambiar método</button>
+              <button type="button" class="mobile-assistant-primary" onclick="continueMobileProductAssistant()">Continuar a datos ➔</button>
+            </div>
           </section>
 
           <section class="stock-entry-panel stock-entry-details-panel" aria-labelledby="stock-identity-title">
@@ -2088,6 +2201,11 @@
                 <input type="url" id="fastupload-official-url-input" class="b2b-form-input" placeholder="https://marca.com/producto">
                 <div id="fastupload-source-links" class="stock-source-links" aria-live="polite"></div>
               </div>
+            </div>
+
+            <div class="stock-step-inline-nav">
+              <button type="button" class="mobile-assistant-secondary" onclick="goBackMobileProductAssistant()">← Volver a foto/código</button>
+              <button type="button" class="mobile-assistant-primary" onclick="continueMobileProductAssistant()">Revisar ingreso ➔</button>
             </div>
           </section>
         </div>

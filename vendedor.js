@@ -1174,6 +1174,8 @@ function checkVendorAuth() {
     if (vendorCheckoutInput) vendorCheckoutInput.value = activeVendor;
     if (sidebarName) sidebarName.textContent = activeVendor;
     if (sidebarAvatar) sidebarAvatar.textContent = activeVendor.charAt(0).toUpperCase();
+    const welcomeAvatar = document.getElementById('vendor-welcome-avatar');
+    if (welcomeAvatar) welcomeAvatar.textContent = activeVendor.charAt(0).toUpperCase();
     const requestedProductCode = new URLSearchParams(window.location.search).get('product');
     if (requestedProductCode) {
       handleProductLocationDeepLink();
@@ -1662,6 +1664,7 @@ function updateVendorNotificationCenter() {
   const totalAlerts = pendingOrders + pendingDrafts + pendingExpirations + pendingWms;
 
   const bellBadge = document.getElementById('vendor-nav-notifications-badge');
+  const sidebarBellBadge = document.getElementById('vendor-sidebar-notifications-badge');
   const countBadge = document.getElementById('vendor-notif-total-count-badge');
   const listEl = document.getElementById('vendor-notif-items-list');
 
@@ -1671,6 +1674,15 @@ function updateVendorNotificationCenter() {
       bellBadge.style.display = 'block';
     } else {
       bellBadge.style.display = 'none';
+    }
+  }
+
+  if (sidebarBellBadge) {
+    if (totalAlerts > 0) {
+      sidebarBellBadge.textContent = totalAlerts > 99 ? '99+' : totalAlerts;
+      sidebarBellBadge.style.display = 'inline-flex';
+    } else {
+      sidebarBellBadge.style.display = 'none';
     }
   }
 
@@ -1752,6 +1764,17 @@ function toggleVendorNotificationPanel() {
 }
 window.toggleVendorNotificationPanel = toggleVendorNotificationPanel;
 
+// Close notifications dropdown on outside click
+document.addEventListener('click', (e) => {
+  const dropdown = document.getElementById('vendor-notifications-dropdown');
+  const bellBtn = document.getElementById('vendor-notifications-bell-btn');
+  const sidebarBellBtn = document.getElementById('vendor-notifications-bell-btn-sidebar');
+  if (!dropdown || dropdown.style.display !== 'block') return;
+  if (!dropdown.contains(e.target) && (!bellBtn || !bellBtn.contains(e.target)) && (!sidebarBellBtn || !sidebarBellBtn.contains(e.target))) {
+    dropdown.style.display = 'none';
+  }
+});
+
 function toggleVendorMobileOperationsMenu() {
   const sheet = document.getElementById('vendor-mobile-operations-sheet');
   if (!sheet) return;
@@ -1796,7 +1819,10 @@ function renderVendorHomeUI() {
     if (element) element.textContent = value;
   };
 
+  const welcomeAvatar = document.getElementById('vendor-welcome-avatar');
+  if (welcomeAvatar) welcomeAvatar.textContent = activeVendor.charAt(0).toUpperCase();
   setText('vendor-welcome-title', `${greeting}, ${activeVendor}`);
+  setText('vendor-welcome-subtitle', '¡Espero que tengas un día lleno de ventas! 🌿🚀');
   setText('vendor-kpi-income', formatCashCurrency(totals.recordedIncome));
   setText('vendor-kpi-expected-cash', formatCashCurrency(totals.expectedCash));
   setText('vendor-kpi-movement-count', `${totals.activeCount} ${totals.activeCount === 1 ? 'movimiento activo' : 'movimientos activos'}`);
@@ -3426,6 +3452,23 @@ function setMobileProductAssistantStep(step) {
   if (!MOBILE_PRODUCT_ASSISTANT_STEPS.includes(step)) return;
   mobileProductAssistantStep = step;
   renderMobileProductAssistant();
+  if (step === 'details') {
+    const detailsPanel = document.querySelector('.stock-entry-details-panel');
+    if (detailsPanel) {
+      detailsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.setTimeout(() => {
+        const nameInput = document.getElementById('fastupload-name-input');
+        const stockInput = document.getElementById('fastupload-stock-input');
+        if (nameInput && !nameInput.value.trim()) {
+          nameInput.focus();
+        } else if (stockInput) {
+          stockInput.focus();
+          stockInput.select();
+        }
+      }, 200);
+      return;
+    }
+  }
   document.getElementById('mobile-product-assistant')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -3456,7 +3499,7 @@ function getMobileProductIdentifyCopy() {
     camera: ['Sacá una foto clara del frente', 'La cámara se abrirá automáticamente.'],
     gallery: ['Elegí la foto del producto', 'Usá una imagen donde se lean marca y presentación.'],
     name: ['Buscá el producto por nombre', 'Después agregá una foto para confirmar el ingreso.'],
-    manual: ['Agregá una foto del producto', 'Luego completarás los datos manualmente.']
+    manual: ['Completá la información del producto', 'Podés ingresar los datos directamente o buscar en internet.']
   };
   return copyByMethod[mobileProductEntryMethod] || ['Identificá el producto', 'Podés usar foto, código o búsqueda por nombre.'];
 }
@@ -3504,14 +3547,14 @@ function renderMobileProductAssistant() {
   if (mobileProductAssistantStep === 'identify') {
     const [question, help] = getMobileProductIdentifyCopy();
     content.innerHTML = `<p class="assistant-question">${escapeStockHtml(question)}</p><p class="assistant-help">${escapeStockHtml(help)}</p>`;
-    if (nextButton) nextButton.textContent = 'Datos del producto';
+    if (nextButton) nextButton.textContent = 'Datos del producto ➔';
     return;
   }
   if (mobileProductAssistantStep === 'details') {
     content.innerHTML = fastUploadLookupResult?.found
       ? '<p class="assistant-question">Completá cantidad y precio</p><p class="assistant-help">Los demás datos ya fueron completados. Podés revisarlos si hace falta.</p>'
       : '<p class="assistant-question">Confirmá los datos, la cantidad y el precio</p><p class="assistant-help">Corregí cualquier dato antes de continuar.</p>';
-    if (nextButton) nextButton.textContent = 'Revisar ingreso';
+    if (nextButton) nextButton.textContent = 'Revisar ingreso ➔';
     return;
   }
   content.innerHTML = renderMobileProductAssistantReview();
@@ -3538,9 +3581,15 @@ function chooseMobileProductEntryMethod(method) {
 
 function continueMobileProductAssistant() {
   if (mobileProductAssistantStep === 'identify') {
-    if (!fastUploadSelectedFile && !fastUploadLookupResult?.found) {
-      showToast('Escaneá un código encontrado o agregá una foto para continuar.');
-      return;
+    const query = document.getElementById('fastupload-manual-query-input')?.value.trim();
+    const barcode = document.getElementById('fastupload-barcode-input')?.value.trim();
+    const nameInput = document.getElementById('fastupload-name-input');
+    const barcodeInput = document.getElementById('fastupload-barcode-input');
+    if (query && nameInput && !nameInput.value) {
+      nameInput.value = query;
+    }
+    if (barcode && barcodeInput && !barcodeInput.value) {
+      barcodeInput.value = barcode;
     }
     setMobileProductAssistantStep('details');
     return;
@@ -3550,8 +3599,24 @@ function continueMobileProductAssistant() {
     const category = document.getElementById('fastupload-category-input')?.value;
     const stock = Number.parseInt(document.getElementById('fastupload-stock-input')?.value || '', 10);
     const salePrice = Number(document.getElementById('fastupload-sale-price-input')?.value || 0);
-    if (!name || !category || !Number.isFinite(stock) || stock < 0 || !Number.isFinite(salePrice) || salePrice <= 0) {
-      showToast('Completá nombre, categoría, cantidad y precio de venta.');
+    if (!name) {
+      showToast('⚠️ Ingresá el nombre del producto.');
+      document.getElementById('fastupload-name-input')?.focus();
+      return;
+    }
+    if (!category) {
+      showToast('⚠️ Seleccioná la categoría del producto.');
+      document.getElementById('fastupload-category-input')?.focus();
+      return;
+    }
+    if (!Number.isFinite(stock) || stock < 0) {
+      showToast('⚠️ Indicá la cantidad de unidades recibidas.');
+      document.getElementById('fastupload-stock-input')?.focus();
+      return;
+    }
+    if (!Number.isFinite(salePrice) || salePrice <= 0) {
+      showToast('⚠️ Confirmá el precio de venta.');
+      document.getElementById('fastupload-sale-price-input')?.focus();
       return;
     }
     setMobileProductAssistantStep('review');
@@ -4304,7 +4369,12 @@ async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
     if (!result.found) {
       renderAiSourceLinks(result);
       status.dataset.state = 'error';
-      status.textContent = 'No encontramos una coincidencia confiable en growshops. Podés abrir Google Argentina desde las fuentes o completar los datos manualmente.';
+      status.innerHTML = `
+        <div style="margin-bottom: 8px;">No encontramos una coincidencia automática confiable. Podés abrir Google Argentina desde las fuentes o completar los datos manualmente.</div>
+        <button type="button" class="stock-inline-action-btn" onclick="continueMobileProductAssistant()" style="width: 100%; min-height: 42px; background: #c2a246; color: #152d24; border: none; font-weight: 800; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-size: 0.85rem;">
+          ✏️ Completar datos manualmente ahora ➔
+        </button>
+      `;
       if (barcode) setStockScannerState('error', 'Código leído, pero sin datos disponibles');
       return;
     }
@@ -4316,7 +4386,12 @@ async function lookupFastUploadProductWithoutAi(mode = 'barcode') {
       : (result.warnings.length ? '' : ' El precio puede completarse manualmente.');
     const warningCopy = result.warnings.length ? ` ${result.warnings.join(' ')}` : '';
     status.dataset.state = 'success';
-    status.textContent = `Datos encontrados en ${providers}.${marketCopy}${warningCopy} Ahora completá cantidad y precio.`;
+    status.innerHTML = `
+      <div style="margin-bottom: 8px;">Datos encontrados en ${providers}.${marketCopy}${warningCopy} Ahora completá cantidad y precio.</div>
+      <button type="button" class="stock-inline-action-btn" onclick="continueMobileProductAssistant()" style="width: 100%; min-height: 42px; background: #2e7d32; color: #ffffff; border: none; font-weight: 800; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-size: 0.85rem;">
+        ✓ Usar datos y continuar ➔
+      </button>
+    `;
     if (barcode) setStockScannerState('found', 'Producto encontrado · ficha completada');
     if (isMobileVendorAssistantView() && mobileProductAssistantStep === 'identify') {
       setMobileProductAssistantStep('details');
@@ -4434,7 +4509,12 @@ async function analyzeFastUploadPhoto() {
       ? ` Precio de referencia calculado con ${result.market.sample_size} publicaciones en ARS.`
       : ' No encontramos una muestra suficiente de precios; completalo manualmente.';
     status.dataset.state = 'success';
-    status.textContent = `Sugerencias completadas. Revisá los datos antes de enviar.${marketCopy}`;
+    status.innerHTML = `
+      <div style="margin-bottom: 8px;">Sugerencias completadas. Revisá los datos antes de enviar.${marketCopy}</div>
+      <button type="button" class="stock-inline-action-btn" onclick="continueMobileProductAssistant()" style="width: 100%; min-height: 42px; background: #2e7d32; color: #ffffff; border: none; font-weight: 800; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-size: 0.85rem;">
+        ✓ Continuar con estos datos ➔
+      </button>
+    `;
   } catch (error) {
     console.error('Error al analizar el producto:', error);
     status.dataset.state = 'error';
@@ -4454,36 +4534,32 @@ async function submitProductDraft(event) {
   const submitBtn = document.getElementById('fastupload-submit-btn');
 
   try {
-    if (!fastUploadSelectedFile && !fastUploadLookupResult?.found) {
-      showToast('⚠️ Escaneá un código encontrado o agregá una foto antes de enviar.');
+    const nameVal = document.getElementById('fastupload-name-input')?.value.trim();
+    const categoryVal = document.getElementById('fastupload-category-input')?.value;
+    const stockVal = Number.parseInt(document.getElementById('fastupload-stock-input')?.value || '', 10);
+    const salePriceVal = Number(document.getElementById('fastupload-sale-price-input')?.value || 0);
+
+    if (!nameVal || !categoryVal) {
+      showToast('⚠️ Completá el nombre y la categoría del producto.');
       return;
     }
-
-    const stockVal = Number.parseInt(document.getElementById('fastupload-stock-input').value, 10);
     if (!Number.isFinite(stockVal) || stockVal < 0) {
-      showToast('⚠️ El stock debe ser mayor o igual a 0.');
+      showToast('⚠️ La cantidad de unidades debe ser 0 o más.');
+      return;
+    }
+    if (!Number.isFinite(salePriceVal) || salePriceVal <= 0) {
+      showToast('⚠️ Completá el precio de venta del producto.');
+      document.getElementById('fastupload-sale-price-input')?.focus();
       return;
     }
 
-    const nameVal = document.getElementById('fastupload-name-input').value.trim();
-    const categoryVal = document.getElementById('fastupload-category-input').value;
     const shelfVal = document.getElementById('fastupload-shelf-input').value;
     const floorVal = shelfVal ? Number(document.getElementById('fastupload-floor-input').value || 1) : null;
     const shelfLevelVal = shelfVal ? Number(document.getElementById('fastupload-level-input').value || 2) : null;
     const locationVal = document.getElementById('fastupload-location-input').value.trim();
     const obsVal = document.getElementById('fastupload-obs-input').value.trim();
-    const salePriceVal = Number(document.getElementById('fastupload-sale-price-input').value || 0);
     const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'Vendedor Local';
 
-    if (!nameVal || !categoryVal) {
-      showToast('Completá el nombre y la categoría del producto.');
-      return;
-    }
-    if (!Number.isFinite(salePriceVal) || salePriceVal <= 0) {
-      showToast('Completá el precio de venta del producto.');
-      document.getElementById('fastupload-sale-price-input')?.focus();
-      return;
-    }
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.innerHTML = fastUploadSelectedFile ? '⏳ Comprimiendo y subiendo foto...' : '⏳ Guardando producto...';
@@ -9243,15 +9319,40 @@ async function submitPosSaleDraft() {
   const selectedSalespersonId = salespersonSelect?.value;
   const salespersonObj = users.find(u => (u.id || u.user_id) === selectedSalespersonId) || { id: selectedSalespersonId || 'usr-vendedor', name: salespersonSelect?.options[salespersonSelect.selectedIndex]?.text || 'Vendedor' };
 
+  const selectedPaymentMethod = paymentMethodSelect?.value || 'EFECTIVO';
+  let paymentBreakdown = null;
+
+  if (selectedPaymentMethod === 'MIXTO') {
+    const cashAmount = Number(document.getElementById('pos-mixed-cash-amount')?.value || 0);
+    const secMethod = document.getElementById('pos-mixed-secondary-method')?.value || 'TRANSFERENCIA';
+    const secAmount = Number(document.getElementById('pos-mixed-secondary-amount')?.value || 0);
+    const totalTicket = cart.calculateTotal();
+
+    if (Math.abs((cashAmount + secAmount) - totalTicket) > 0.01) {
+      alert(`⚠️ En Pago Mixto, la suma de Efectivo ($${cashAmount.toLocaleString('es-AR')}) y ${secMethod} ($${secAmount.toLocaleString('es-AR')}) debe ser igual al total del ticket ($${totalTicket.toLocaleString('es-AR')}).`);
+      return;
+    }
+
+    paymentBreakdown = {
+      cash_amount: cashAmount,
+      secondary_method: secMethod,
+      secondary_amount: secAmount
+    };
+  }
+
   const draft = cart.createSaleDraft({
     tenantId: cashierUser.tenantId || '11111111-1111-1111-1111-111111111111',
     cashierUser: { id: cashierUser.userId || cashierUser.id, name: cashierUser.userName },
     salespersonUser: { id: salespersonObj.id || salespersonObj.user_id, name: salespersonObj.name },
-    paymentMethod: paymentMethodSelect?.value || 'EFECTIVO',
+    paymentMethod: selectedPaymentMethod,
+    paymentBreakdown: paymentBreakdown,
     notes: notesInput?.value || ''
   });
 
-  if (draft.payment_method === 'CUENTA_CORRIENTE') {
+  const isDirectCc = draft.payment_method === 'CUENTA_CORRIENTE';
+  const isMixedCc = draft.payment_method === 'MIXTO' && draft.payment_breakdown?.secondary_method === 'CUENTA_CORRIENTE';
+
+  if (isDirectCc || isMixedCc) {
     const ccSelect = document.getElementById('pos-current-account-select');
     const ccId = ccSelect?.value;
     if (!ccId) {
@@ -9268,8 +9369,13 @@ async function submitPosSaleDraft() {
     if (dueDateInput?.value) {
       account.first_payment_due = dueDateInput.value;
     }
-    const saleConcept = `Venta Mostrador #${draft.draft_id} (${draft.items.map(i => `${i.quantity}x ${i.name}`).join(', ')})`;
-    account.current_balance = (account.current_balance || 0) + draft.total;
+
+    const ccDebitAmount = isMixedCc ? draft.payment_breakdown.secondary_amount : draft.total;
+    const saleConcept = isMixedCc
+      ? `Venta Mostrador #${draft.draft_id} (Pago Mixto: $${draft.payment_breakdown.cash_amount.toLocaleString('es-AR')} Efvo + $${ccDebitAmount.toLocaleString('es-AR')} Cta Cte)`
+      : `Venta Mostrador #${draft.draft_id} (${draft.items.map(i => `${i.quantity}x ${i.name}`).join(', ')})`;
+
+    account.current_balance = (account.current_balance || 0) + ccDebitAmount;
     if (!account.ledger) account.ledger = [];
 
     const recordedItems = draft.items.map(item => {
@@ -9293,7 +9399,7 @@ async function submitPosSaleDraft() {
       id: 'MOV-' + Date.now(),
       date: new Date().toISOString().slice(0, 10),
       concept: saleConcept,
-      amount: draft.total,
+      amount: ccDebitAmount,
       type: 'DEBIT',
       balance_after: account.current_balance,
       sale_draft_id: draft.draft_id,
@@ -9309,6 +9415,9 @@ async function submitPosSaleDraft() {
 
   const stockChanges = [];
   draft.items.forEach(soldItem => {
+    if (soldItem.is_express || soldItem.availability === 'EXPRESS_UNMAPPED') {
+      return;
+    }
     const code = String(soldItem.product_id || soldItem.id || soldItem.product_code || '');
     const barcode = String(soldItem.barcode || '');
     const name = String(soldItem.name || '').toLowerCase();
@@ -11419,15 +11528,158 @@ function sendCcWhatsAppReminder(ccId) {
   sendCcDetailedWhatsApp(ccId);
 }
 
+function openPosExpressItemModal() {
+  const modal = document.getElementById('pos-express-item-modal');
+  const nameInput = document.getElementById('pos-express-name');
+  const priceInput = document.getElementById('pos-express-price');
+  const qtyInput = document.getElementById('pos-express-qty');
+  if (nameInput) nameInput.value = '';
+  if (priceInput) priceInput.value = '';
+  if (qtyInput) qtyInput.value = '1';
+  if (modal) {
+    modal.style.display = 'flex';
+    if (nameInput) setTimeout(() => nameInput.focus(), 50);
+  }
+}
+
+function closePosExpressItemModal() {
+  const modal = document.getElementById('pos-express-item-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function handlePosExpressItemSubmit(e) {
+  if (e) e.preventDefault();
+  const nameInput = document.getElementById('pos-express-name');
+  const priceInput = document.getElementById('pos-express-price');
+  const qtyInput = document.getElementById('pos-express-qty');
+
+  const name = (nameInput?.value || '').trim();
+  const price = Number(priceInput?.value || 0);
+  const qty = Math.max(1, Number(qtyInput?.value || 1));
+
+  if (!name) {
+    alert('Ingresá una descripción o nombre para el ítem exprés.');
+    nameInput?.focus();
+    return;
+  }
+  if (price <= 0) {
+    alert('El precio unitario debe ser mayor a $0.');
+    priceInput?.focus();
+    return;
+  }
+
+  const cart = getPosCartEngine();
+  const expressId = `EXPRESS-${Date.now()}`;
+  cart.addItem({
+    id: expressId,
+    product_code: expressId,
+    name: name,
+    price: price,
+    quantity: qty,
+    availability: 'EXPRESS_UNMAPPED',
+    is_express: true,
+    image_url: 'assets/logo.jpg'
+  });
+
+  renderPosCartItems();
+  closePosExpressItemModal();
+  showToast(`⚡ Ítem libre '${name}' ($${price.toLocaleString('es-AR')}) agregado al ticket.`);
+}
+
 function handlePosPaymentMethodChange() {
   const methodSelect = document.getElementById('pos-payment-method-select');
   const ccContainer = document.getElementById('pos-current-account-container');
-  if (methodSelect && ccContainer) {
-    if (methodSelect.value === 'CUENTA_CORRIENTE') {
+  const mixedContainer = document.getElementById('pos-mixed-payment-container');
+  
+  if (!methodSelect) return;
+  const val = methodSelect.value;
+
+  if (mixedContainer) {
+    mixedContainer.style.display = val === 'MIXTO' ? 'block' : 'none';
+    if (val === 'MIXTO') {
+      const cart = getPosCartEngine();
+      const total = cart ? cart.calculateTotal() : 0;
+      const cashInput = document.getElementById('pos-mixed-cash-amount');
+      const secInput = document.getElementById('pos-mixed-secondary-amount');
+      if (cashInput && !cashInput.value) {
+        cashInput.value = '';
+      }
+      if (secInput && !secInput.value) {
+        secInput.value = total > 0 ? total : '';
+      }
+      handlePosMixedPaymentInputChange('init');
+    }
+  }
+
+  if (ccContainer) {
+    const isCcDirect = val === 'CUENTA_CORRIENTE';
+    const isCcMixed = val === 'MIXTO' && document.getElementById('pos-mixed-secondary-method')?.value === 'CUENTA_CORRIENTE';
+    if (isCcDirect || isCcMixed) {
       ccContainer.style.display = 'block';
       populatePosCurrentAccountDropdown();
     } else {
       ccContainer.style.display = 'none';
+    }
+  }
+}
+
+function handlePosMixedSecondaryMethodChange() {
+  const secSelect = document.getElementById('pos-mixed-secondary-method');
+  const ccContainer = document.getElementById('pos-current-account-container');
+  if (secSelect && ccContainer) {
+    if (secSelect.value === 'CUENTA_CORRIENTE') {
+      ccContainer.style.display = 'block';
+      populatePosCurrentAccountDropdown();
+    } else {
+      ccContainer.style.display = 'none';
+    }
+  }
+  handlePosMixedPaymentInputChange('change_method');
+}
+
+function handlePosMixedPaymentInputChange(source) {
+  const cart = getPosCartEngine();
+  const total = cart ? cart.calculateTotal() : 0;
+  const cashInput = document.getElementById('pos-mixed-cash-amount');
+  const secInput = document.getElementById('pos-mixed-secondary-amount');
+  const secSelect = document.getElementById('pos-mixed-secondary-method');
+  const feedback = document.getElementById('pos-mixed-validation-feedback');
+
+  let cash = Number(cashInput?.value || 0);
+  let sec = Number(secInput?.value || 0);
+
+  if (source === 'cash' && cashInput?.value !== '') {
+    sec = Math.max(0, total - cash);
+    if (secInput) secInput.value = sec > 0 ? sec : (cash >= total ? 0 : sec);
+  } else if (source === 'secondary' && secInput?.value !== '') {
+    cash = Math.max(0, total - sec);
+    if (cashInput) cashInput.value = cash > 0 ? cash : (sec >= total ? 0 : cash);
+  }
+
+  const sum = cash + sec;
+  const secName = secSelect?.options[secSelect.selectedIndex]?.text || 'Otro medio';
+
+  if (!feedback) return;
+
+  if (total <= 0) {
+    feedback.style.background = 'rgba(0,0,0,0.04)';
+    feedback.style.color = 'var(--color-text-muted)';
+    feedback.textContent = 'El ticket está vacío ($0)';
+    return;
+  }
+
+  if (Math.abs(sum - total) < 0.01) {
+    feedback.style.background = 'rgba(46,125,50,0.12)';
+    feedback.style.color = '#2e7d32';
+    feedback.textContent = `✅ Efectivo $${cash.toLocaleString('es-AR')} + ${secName} $${sec.toLocaleString('es-AR')} = $${total.toLocaleString('es-AR')}`;
+  } else {
+    feedback.style.background = 'rgba(211,47,47,0.1)';
+    feedback.style.color = '#d32f2f';
+    const diff = total - sum;
+    if (diff > 0) {
+      feedback.textContent = `⚠️ Faltan $${diff.toLocaleString('es-AR')} para completar el total de $${total.toLocaleString('es-AR')}`;
+    } else {
+      feedback.textContent = `⚠️ La suma supera el total por $${Math.abs(diff).toLocaleString('es-AR')}`;
     }
   }
 }
@@ -11925,6 +12177,11 @@ window.closeCcDetailsModal = closeCcDetailsModal;
 window.generateAndPrintCcPdf = generateAndPrintCcPdf;
 window.handlePosPaymentMethodChange = handlePosPaymentMethodChange;
 window.updatePosCurrentAccountInfo = updatePosCurrentAccountInfo;
+window.openPosExpressItemModal = openPosExpressItemModal;
+window.closePosExpressItemModal = closePosExpressItemModal;
+window.handlePosExpressItemSubmit = handlePosExpressItemSubmit;
+window.handlePosMixedSecondaryMethodChange = handlePosMixedSecondaryMethodChange;
+window.handlePosMixedPaymentInputChange = handlePosMixedPaymentInputChange;
 
 window.openUniversalCameraScanner = openUniversalCameraScanner;
 window.startUniversalCameraReader = startUniversalCameraReader;
