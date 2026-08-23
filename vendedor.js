@@ -8776,20 +8776,27 @@ async function initPosWorkspace() {
    ========================================================================== */
 
 let mobilePosAssistantState = {
-  step: 'mode', // 'mode' | 'search' | 'quantity' | 'cart-summary' | 'payment' | 'confirm'
+  step: 'mode', // 'mode' | 'search' | 'quantity' | 'cart-summary' | 'payment' | 'adjustment' | 'confirm'
   mode: 'stock', // 'stock' | 'nostock' | 'express'
   selectedProduct: null,
   expressData: { name: '', category: 'Otros', price: 0 },
   nostockData: { deliveryDate: '48_hs', customDate: '', isDeposit: false, depositAmount: 0 },
   quantity: 1,
   paymentMethod: 'EFECTIVO',
+  mixedCashAmount: 0,
+  mixedSecondaryMethod: 'TRANSFERENCIA',
+  mixedSecondaryAmount: 0,
+  customerAccountId: '',
+  customerAccountName: '',
+  adjustmentType: 'NONE', // 'NONE' | 'DISCOUNT_PERCENT' | 'DISCOUNT_FIXED' | 'INCREASE_PERCENT' | 'INCREASE_FIXED'
+  adjustmentValue: 0,
+  salespersonName: '',
   customerWhatsApp: '',
-  customerName: '',
   notes: '',
   voiceActive: false
 };
 
-const MOBILE_POS_ASSISTANT_STEPS = ['mode', 'search', 'quantity', 'cart-summary', 'payment', 'confirm'];
+const MOBILE_POS_ASSISTANT_STEPS = ['mode', 'search', 'quantity', 'cart-summary', 'payment', 'adjustment', 'confirm'];
 let posVoiceRecognitionInstance = null;
 
 function switchPosWorkspaceMode(mode) {
@@ -9059,6 +9066,7 @@ function renderMobilePosAssistant() {
     const cart = getPosCartEngine();
     const total = cart ? cart.getTotal() : 0;
     const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
+    const accounts = typeof getCurrentAccounts === 'function' ? getCurrentAccounts() : [];
 
     if (titleEl) titleEl.textContent = 'Medio de Pago';
     if (mobilePosAssistantState.voiceActive) {
@@ -9070,12 +9078,90 @@ function renderMobilePosAssistant() {
       { id: 'TRANSFERENCIA', label: 'Mercado Pago / Transf.', icon: '📱' },
       { id: 'DEBITO', label: 'Débito', icon: '💳' },
       { id: 'TARJETA', label: 'Crédito', icon: '💳' },
-      { id: 'CUENTA_CORRIENTE', label: 'Cuenta Corriente', icon: '👥' }
+      { id: 'CUENTA_CORRIENTE', label: 'Cuenta Corriente', icon: '👥' },
+      { id: 'MIXTO', label: 'Pago Mixto', icon: '🔀' }
     ];
+
+    let extraPaymentConfigHtml = '';
+
+    // Configuración para Cuenta Corriente
+    if (mobilePosAssistantState.paymentMethod === 'CUENTA_CORRIENTE') {
+      extraPaymentConfigHtml = `
+        <div style="margin-top: 14px; padding: 14px; border-radius: 14px; background: rgba(21, 45, 36, 0.04); border: 1.5px solid var(--color-border-subtle);">
+          <label style="display: block; font-size: 0.82rem; font-weight: 800; color: var(--color-text-main); margin-bottom: 6px;">
+            👥 Seleccionar Cliente con Cuenta Corriente *
+          </label>
+          <select id="mobile-pos-cc-select" class="b2b-form-input" onchange="handleMobilePosCcSelect(this.value)" style="margin-bottom: 8px;">
+            <option value="">-- Elegir cliente registrado --</option>
+            ${accounts.map(acc => `
+              <option value="${acc.id}" ${mobilePosAssistantState.customerAccountId === acc.id ? 'selected' : ''}>
+                ${escapeStockHtml(acc.customer_name)} (Saldo: $${(acc.current_balance || 0).toLocaleString('es-AR')})
+              </option>
+            `).join('')}
+          </select>
+          <input type="text" id="mobile-pos-cc-custom-name" class="b2b-form-input" placeholder="O escribir nombre del cliente..." value="${escapeStockHtml(mobilePosAssistantState.customerAccountName)}" oninput="mobilePosAssistantState.customerAccountName = this.value">
+        </div>
+      `;
+    }
+
+    // Configuración para Pago Mixto
+    if (mobilePosAssistantState.paymentMethod === 'MIXTO') {
+      if (!mobilePosAssistantState.mixedCashAmount) {
+        mobilePosAssistantState.mixedCashAmount = Math.round(total / 2);
+      }
+      mobilePosAssistantState.mixedSecondaryAmount = Math.max(0, total - mobilePosAssistantState.mixedCashAmount);
+
+      extraPaymentConfigHtml = `
+        <div style="margin-top: 14px; padding: 14px; border-radius: 14px; background: rgba(21, 45, 36, 0.04); border: 1.5px solid var(--color-accent-gold);">
+          <h4 style="margin: 0 0 10px 0; font-size: 0.9rem; color: var(--color-text-main);">🔀 Desglose de Pago Mixto</h4>
+          
+          <div style="display: grid; gap: 10px;">
+            <div>
+              <label style="display: block; font-size: 0.78rem; font-weight: 800; color: var(--color-text-main); margin-bottom: 4px;">
+                💵 1. Monto en Efectivo ($)
+              </label>
+              <input type="number" id="mobile-pos-mixed-cash-amount" class="b2b-form-input" value="${mobilePosAssistantState.mixedCashAmount}" step="100" min="0" max="${total}" oninput="updateMobilePosMixedCash(this.value)">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 8px;">
+              <div>
+                <label style="display: block; font-size: 0.78rem; font-weight: 800; color: var(--color-text-main); margin-bottom: 4px;">
+                  💳 2. Método Secundario
+                </label>
+                <select id="mobile-pos-mixed-sec-method" class="b2b-form-input" onchange="setMobilePosMixedSecondaryMethod(this.value)">
+                  <option value="TRANSFERENCIA" ${mobilePosAssistantState.mixedSecondaryMethod === 'TRANSFERENCIA' ? 'selected' : ''}>Transferencia</option>
+                  <option value="DEBITO" ${mobilePosAssistantState.mixedSecondaryMethod === 'DEBITO' ? 'selected' : ''}>Débito</option>
+                  <option value="TARJETA" ${mobilePosAssistantState.mixedSecondaryMethod === 'TARJETA' ? 'selected' : ''}>Crédito</option>
+                  <option value="CUENTA_CORRIENTE" ${mobilePosAssistantState.mixedSecondaryMethod === 'CUENTA_CORRIENTE' ? 'selected' : ''}>Cta Cte</option>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.78rem; font-weight: 800; color: var(--color-text-main); margin-bottom: 4px;">
+                  Monto Restante ($)
+                </label>
+                <input type="number" id="mobile-pos-mixed-sec-amount" class="b2b-form-input" value="${mobilePosAssistantState.mixedSecondaryAmount}" readonly style="background: rgba(0,0,0,0.04); font-weight: 800; color: var(--color-accent-gold);">
+              </div>
+            </div>
+
+            ${mobilePosAssistantState.mixedSecondaryMethod === 'CUENTA_CORRIENTE' ? `
+              <div>
+                <label style="display: block; font-size: 0.78rem; font-weight: 800; color: var(--color-text-main); margin-bottom: 4px;">
+                  Cliente para saldo en Cta Cte:
+                </label>
+                <select class="b2b-form-input" onchange="handleMobilePosCcSelect(this.value)">
+                  <option value="">-- Seleccionar cliente --</option>
+                  ${accounts.map(acc => `<option value="${acc.id}">${escapeStockHtml(acc.customer_name)}</option>`).join('')}
+                </select>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }
 
     container.innerHTML = `
       <div style="text-align: center; margin-bottom: 14px;">
-        <span style="font-size: 0.8rem; font-weight: 800; color: var(--color-text-muted); text-transform: uppercase;">Total a cobrar:</span>
+        <span style="font-size: 0.8rem; font-weight: 800; color: var(--color-text-muted); text-transform: uppercase;">Total ticket:</span>
         <div style="font-size: 1.8rem; font-weight: 900; color: var(--color-accent-gold);">$${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
       </div>
 
@@ -9089,12 +9175,105 @@ function renderMobilePosAssistant() {
         `).join('')}
       </div>
 
+      ${extraPaymentConfigHtml}
+
       <div style="margin-top: 14px; padding: 10px; border-radius: 12px; background: rgba(21, 45, 36, 0.04);">
-        <div style="font-size: 0.75rem; color: var(--color-text-muted);">Vendedor a cargo: <strong>${escapeStockHtml(activeVendor)}</strong></div>
+        <div style="font-size: 0.75rem; color: var(--color-text-muted);">Vendedor activo: <strong>${escapeStockHtml(mobilePosAssistantState.salespersonName || activeVendor)}</strong></div>
       </div>
 
-      <button type="button" class="mobile-assistant-primary" style="width: 100%; min-height: 48px; margin-top: 16px;" onclick="setMobilePosAssistantStep('confirm')">
-        Continuar a Confirmación ➔
+      <button type="button" class="mobile-assistant-primary" style="width: 100%; min-height: 48px; margin-top: 16px;" onclick="setMobilePosAssistantStep('adjustment')">
+        Continuar a Descuento o Recargo ➔
+      </button>
+    `;
+    return;
+  }
+
+  if (step === 'adjustment') {
+    const cart = getPosCartEngine();
+    const subtotal = cart ? cart.getSubtotal() : 0;
+    const currentTotal = cart ? cart.getTotal() : 0;
+
+    if (titleEl) titleEl.textContent = 'Ajuste de Precio (Descuento / Recargo)';
+    if (mobilePosAssistantState.voiceActive) {
+      speakPosAssistant('¿Deseás aplicar algún descuento o recargo al precio?');
+    }
+
+    const currentType = mobilePosAssistantState.adjustmentType || 'NONE';
+    const currentVal = mobilePosAssistantState.adjustmentValue || 0;
+
+    let adjustmentDiff = currentTotal - subtotal;
+
+    container.innerHTML = `
+      <div style="text-align: center; margin-bottom: 14px;">
+        <span style="font-size: 0.8rem; font-weight: 800; color: var(--color-text-muted); text-transform: uppercase;">Subtotal sin ajuste:</span>
+        <div style="font-size: 1.4rem; font-weight: 800; color: var(--color-text-main);">$${subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+        ${currentType !== 'NONE' && currentVal > 0 ? `
+          <div style="font-size: 0.85rem; font-weight: 800; color: ${adjustmentDiff >= 0 ? '#2e7d32' : '#c62828'}; margin-top: 4px;">
+            ${adjustmentDiff > 0 ? `+ Inflado / Recargo: +$${adjustmentDiff.toLocaleString('es-AR')}` : `- Descuento: -$${Math.abs(adjustmentDiff).toLocaleString('es-AR')}`}
+          </div>
+          <div style="font-size: 1.7rem; font-weight: 900; color: var(--color-accent-gold); margin-top: 2px;">
+            Total Final: $${currentTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+          </div>
+        ` : ''}
+      </div>
+
+      <p class="assistant-question">¿Deseás inflar o descontar el precio?</p>
+
+      <div style="display: grid; gap: 12px; margin-top: 10px;">
+        <!-- Opción 1: Sin ajuste -->
+        <button type="button" class="pos-assistant-payment-btn ${currentType === 'NONE' ? 'active' : ''}" style="justify-content: flex-start; padding: 12px 14px;" onclick="setMobilePosAdjustment('NONE', 0)">
+          <span style="font-size: 1.3rem; margin-right: 8px;">🟢</span>
+          <div style="text-align: left;">
+            <strong style="display: block; font-size: 0.88rem;">Precio Normal (Sin ajuste)</strong>
+            <small style="color: var(--color-text-muted); font-size: 0.74rem;">Mantener el total exacto de lista</small>
+          </div>
+        </button>
+
+        <!-- Opción 2: Descuento -->
+        <div style="padding: 12px; border-radius: 14px; background: rgba(46, 125, 50, 0.05); border: 1.5px solid ${currentType.startsWith('DISCOUNT') ? '#2e7d32' : 'var(--color-border-subtle)'};">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <strong style="font-size: 0.88rem; color: #2e7d32;">🏷️ Aplicar Descuento</strong>
+            <span style="font-size: 0.75rem; color: var(--color-text-muted);">% o $ fijo</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px;">
+            <button type="button" class="stock-entry-secondary-btn" onclick="setMobilePosAdjustment('DISCOUNT_PERCENT', 5)" style="font-size: 0.78rem; padding: 6px 2px;">-5%</button>
+            <button type="button" class="stock-entry-secondary-btn" onclick="setMobilePosAdjustment('DISCOUNT_PERCENT', 10)" style="font-size: 0.78rem; padding: 6px 2px;">-10%</button>
+            <button type="button" class="stock-entry-secondary-btn" onclick="setMobilePosAdjustment('DISCOUNT_PERCENT', 15)" style="font-size: 0.78rem; padding: 6px 2px;">-15%</button>
+            <button type="button" class="stock-entry-secondary-btn" onclick="setMobilePosAdjustment('DISCOUNT_PERCENT', 20)" style="font-size: 0.78rem; padding: 6px 2px;">-20%</button>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <select id="mobile-pos-disc-type" class="b2b-form-input" style="max-width: 90px;" onchange="setMobilePosAdjustment(this.value, document.getElementById('mobile-pos-disc-val')?.value || 0)">
+              <option value="DISCOUNT_PERCENT" ${currentType === 'DISCOUNT_PERCENT' ? 'selected' : ''}>%</option>
+              <option value="DISCOUNT_FIXED" ${currentType === 'DISCOUNT_FIXED' ? 'selected' : ''}>$</option>
+            </select>
+            <input type="number" id="mobile-pos-disc-val" class="b2b-form-input" placeholder="Valor personalizado" value="${currentType.startsWith('DISCOUNT') ? currentVal : ''}" oninput="setMobilePosAdjustment(document.getElementById('mobile-pos-disc-type')?.value, this.value)">
+          </div>
+        </div>
+
+        <!-- Opción 3: Inflar / Recargo -->
+        <div style="padding: 12px; border-radius: 14px; background: rgba(198, 40, 40, 0.05); border: 1.5px solid ${currentType.startsWith('INCREASE') ? '#c62828' : 'var(--color-border-subtle)'};">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <strong style="font-size: 0.88rem; color: #c62828;">📈 Inflar / Recargo al precio</strong>
+            <span style="font-size: 0.75rem; color: var(--color-text-muted);">% o $ fijo</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px;">
+            <button type="button" class="stock-entry-secondary-btn" onclick="setMobilePosAdjustment('INCREASE_PERCENT', 10)" style="font-size: 0.78rem; padding: 6px 2px;">+10%</button>
+            <button type="button" class="stock-entry-secondary-btn" onclick="setMobilePosAdjustment('INCREASE_PERCENT', 15)" style="font-size: 0.78rem; padding: 6px 2px;">+15%</button>
+            <button type="button" class="stock-entry-secondary-btn" onclick="setMobilePosAdjustment('INCREASE_PERCENT', 20)" style="font-size: 0.78rem; padding: 6px 2px;">+20%</button>
+            <button type="button" class="stock-entry-secondary-btn" onclick="setMobilePosAdjustment('INCREASE_PERCENT', 10)" style="font-size: 0.78rem; padding: 6px 2px;" title="Recargo estándar tarjeta">💳 Tarj 10%</button>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <select id="mobile-pos-inc-type" class="b2b-form-input" style="max-width: 90px;" onchange="setMobilePosAdjustment(this.value, document.getElementById('mobile-pos-inc-val')?.value || 0)">
+              <option value="INCREASE_PERCENT" ${currentType === 'INCREASE_PERCENT' ? 'selected' : ''}>%</option>
+              <option value="INCREASE_FIXED" ${currentType === 'INCREASE_FIXED' ? 'selected' : ''}>$</option>
+            </select>
+            <input type="number" id="mobile-pos-inc-val" class="b2b-form-input" placeholder="Valor personalizado" value="${currentType.startsWith('INCREASE') ? currentVal : ''}" oninput="setMobilePosAdjustment(document.getElementById('mobile-pos-inc-type')?.value, this.value)">
+          </div>
+        </div>
+      </div>
+
+      <button type="button" class="mobile-assistant-primary" style="width: 100%; min-height: 48px; margin-top: 18px;" onclick="setMobilePosAssistantStep('confirm')">
+        Continuar al Resumen Final ➔
       </button>
     `;
     return;
@@ -9103,32 +9282,75 @@ function renderMobilePosAssistant() {
   if (step === 'confirm') {
     const cart = getPosCartEngine();
     const total = cart ? cart.getTotal() : 0;
+    const subtotal = cart ? cart.getSubtotal() : 0;
     const items = cart ? cart.getItems() : [];
+    const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
+    const currentVendor = mobilePosAssistantState.salespersonName || activeVendor;
 
-    if (titleEl) titleEl.textContent = 'Confirmar Venta & WhatsApp';
+    if (titleEl) titleEl.textContent = 'Resumen Final & Confirmar';
     if (mobilePosAssistantState.voiceActive) {
       speakPosAssistant('Venta lista para confirmar.');
     }
 
+    const currentType = mobilePosAssistantState.adjustmentType || 'NONE';
+    const currentVal = mobilePosAssistantState.adjustmentValue || 0;
+
+    let paymentLabel = mobilePosAssistantState.paymentMethod;
+    if (mobilePosAssistantState.paymentMethod === 'CUENTA_CORRIENTE') {
+      paymentLabel = `Cuenta Corriente (${mobilePosAssistantState.customerAccountName || 'Cliente'})`;
+    } else if (mobilePosAssistantState.paymentMethod === 'MIXTO') {
+      paymentLabel = `Pago Mixto ($${mobilePosAssistantState.mixedCashAmount.toLocaleString('es-AR')} Efvo + $${mobilePosAssistantState.mixedSecondaryAmount.toLocaleString('es-AR')} ${mobilePosAssistantState.mixedSecondaryMethod})`;
+    }
+
+    const salespeople = [...new Set([currentVendor, activeVendor, 'Franco', 'Nodira', 'Vendedor 1', 'Vendedor 2'].filter(Boolean))];
+
     container.innerHTML = `
       <div style="padding: 14px; border-radius: 16px; background: var(--color-card-bg); border: 1.5px solid var(--color-accent-gold); margin-bottom: 16px;">
-        <span class="vendor-section-eyebrow">Resumen final</span>
-        <h4 style="margin: 4px 0 8px 0; font-size: 1.1rem; color: var(--color-text-main);">Venta de Mostrador</h4>
+        <span class="vendor-section-eyebrow">Resumen de Venta</span>
+        <h4 style="margin: 4px 0 8px 0; font-size: 1.1rem; color: var(--color-text-main);">Venta de Mostrador (${items.length} ítems)</h4>
+        
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 0.85rem;">
+          <span>Subtotal:</span>
+          <span>$${subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+        </div>
+
+        ${currentType !== 'NONE' && currentVal > 0 ? `
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 0.85rem; font-weight: 800; color: ${currentType.startsWith('INCREASE') ? '#c62828' : '#2e7d32'};">
+            <span>${currentType.startsWith('INCREASE') ? 'Recargo / Inflado:' : 'Descuento:'}</span>
+            <span>${currentType.endsWith('PERCENT') ? `${currentVal}%` : `$${currentVal.toLocaleString('es-AR')}`}</span>
+          </div>
+        ` : ''}
+
         <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.85rem;">
           <span>Medio de pago:</span>
-          <strong>${mobilePosAssistantState.paymentMethod}</strong>
+          <strong style="color: var(--color-accent-gold);">${escapeStockHtml(paymentLabel)}</strong>
         </div>
-        <div style="display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: 900; color: var(--color-accent-gold);">
-          <span>Total:</span>
+
+        <div style="display: flex; justify-content: space-between; font-size: 1.25rem; font-weight: 900; color: var(--color-accent-gold); border-top: 1px solid var(--color-border-subtle); padding-top: 6px; margin-top: 6px;">
+          <span>Total Final:</span>
           <span>$${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
         </div>
       </div>
 
+      <!-- Selector para cambiar de Vendedor -->
+      <div style="margin-bottom: 14px; padding: 12px; border-radius: 12px; background: rgba(21, 45, 36, 0.04); border: 1px solid var(--color-border-subtle);">
+        <label style="display: block; font-size: 0.78rem; font-weight: 800; color: var(--color-text-main); margin-bottom: 4px;">
+          🧑‍💼 Vendedor a cargo de la venta (Comisión):
+        </label>
+        <select id="mobile-pos-salesperson-select" class="b2b-form-input" onchange="mobilePosAssistantState.salespersonName = this.value">
+          ${salespeople.map(name => `
+            <option value="${escapeStockHtml(name)}" ${name === currentVendor ? 'selected' : ''}>
+              ${escapeStockHtml(name)}
+            </option>
+          `).join('')}
+        </select>
+      </div>
+
       <div class="pos-assistant-whatsapp-box">
         <label style="display: block; font-size: 0.82rem; font-weight: 800; color: #152d24; margin-bottom: 6px;">
-          📲 WhatsApp del Cliente (Opcional):
+          📲 WhatsApp del Cliente (Comprobante PDF):
         </label>
-        <input type="tel" id="mobile-pos-whatsapp-input" class="b2b-form-input" placeholder="Ej: 1123456789 (con código de área)" value="${escapeStockHtml(mobilePosAssistantState.customerWhatsApp)}" style="background: #ffffff;">
+        <input type="tel" id="mobile-pos-whatsapp-input" class="b2b-form-input" placeholder="Ej: 1123456789" value="${escapeStockHtml(mobilePosAssistantState.customerWhatsApp)}" style="background: #ffffff;" oninput="mobilePosAssistantState.customerWhatsApp = this.value">
         <button type="button" class="pos-whatsapp-btn" onclick="completeMobilePosSale(true)">
           <span>📲 Finalizar y Enviar Comprobante</span>
         </button>
@@ -9144,351 +9366,68 @@ function renderMobilePosAssistant() {
 }
 window.renderMobilePosAssistant = renderMobilePosAssistant;
 
-function parseExpressVoiceInput(rawText) {
-  if (!rawText) return null;
-  let text = rawText.toLowerCase().trim();
-
-  // 1. Detectar Cantidad
-  let qty = 1;
-  const wordQtyMap = {
-    'un': 1, 'uno': 1, 'una': 1, 'dos': 2, 'tres': 3, 'cuatro': 4,
-    'cinco': 5, 'seis': 6, 'siete': 7, 'ocho': 8, 'nueve': 9, 'diez': 10,
-    'once': 11, 'doce': 12, 'quince': 15, 'veinte': 20, 'veinticinco': 25,
-    'cincuenta': 50, 'cien': 100
-  };
-
-  const leadingQtyMatch = text.match(/^(\d+|\b(?:un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|doce|veinte)\b)\s+(.+)/i);
-  if (leadingQtyMatch) {
-    const rawQty = leadingQtyMatch[1].toLowerCase();
-    qty = wordQtyMap[rawQty] || parseInt(rawQty, 10) || 1;
-    text = leadingQtyMatch[2].trim();
-  }
-
-  // 2. Detectar Medio de Pago
-  let paymentMethod = null;
-  if (/\b(en\s+|con\s+)?(efectivo|cash|contado)\b/i.test(text)) {
-    paymentMethod = 'EFECTIVO';
-    text = text.replace(/\b(en\s+|con\s+)?(efectivo|cash|contado)\b/gi, '').trim();
-  } else if (/\b(en\s+|con\s+|por\s+)?(transferencia|mercado\s*pago|mp|transfe)\b/i.test(text)) {
-    paymentMethod = 'TRANSFERENCIA';
-    text = text.replace(/\b(en\s+|con\s+|por\s+)?(transferencia|mercado\s*pago|mp|transfe)\b/gi, '').trim();
-  } else if (/\b(en\s+|con\s+)?(débito|debito)\b/i.test(text)) {
-    paymentMethod = 'DEBITO';
-    text = text.replace(/\b(en\s+|con\s+)?(débito|debito)\b/gi, '').trim();
-  } else if (/\b(en\s+|con\s+)?(tarjeta|crédito|credito)\b/i.test(text)) {
-    paymentMethod = 'TARJETA';
-    text = text.replace(/\b(en\s+|con\s+)?(tarjeta|crédito|credito)\b/gi, '').trim();
-  } else if (/\b(en\s+|con\s+)?(cuenta\s*corriente|cta\s*cte|fiar|fiado)\b/i.test(text)) {
-    paymentMethod = 'CUENTA_CORRIENTE';
-    text = text.replace(/\b(en\s+|con\s+)?(cuenta\s*corriente|cta\s*cte|fiar|fiado)\b/gi, '').trim();
-  }
-
-  // 3. Detectar Precio Unitario (ej: 36000, 36 mil, 36.000, $36000, 36k, etc.)
-  let price = 0;
-  const milMatch = text.match(/(\d+(?:[.,]\d+)?)\s*mil(\s*(?:pesos|cada\s*uno|c\/u))?/i);
-  if (milMatch) {
-    price = parseFloat(milMatch[1].replace(',', '.')) * 1000;
-    text = text.replace(milMatch[0], '').trim();
-  } else {
-    const priceMatch = text.match(/(?:a\s+|\$\s*|por\s+)?(\d{1,3}(?:\.\d{3})*|\d+)(?:[.,](\d{2}))?\s*(?:pesos|cada\s*uno|c\/u)?/i);
-    if (priceMatch && parseInt(priceMatch[1].replace(/\./g, ''), 10) >= 100) {
-      price = parseInt(priceMatch[1].replace(/\./g, ''), 10);
-      text = text.replace(priceMatch[0], '').trim();
-    }
-  }
-
-  // 4. Nombre del producto limpio
-  let name = text
-    .replace(/\b(cada\s*uno|c\/u|pesos|a|por|de|unidades|unidad|u|precio|venta)\b/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (name) {
-    name = name.charAt(0).toUpperCase() + name.slice(1);
-  }
-
-  let category = 'Otros';
-  const lowerName = (name || '').toLowerCase();
-  if (lowerName.includes('sustrat') || lowerName.includes('tierra') || lowerName.includes('turba')) category = 'Sustratos';
-  else if (lowerName.includes('fertiliz') || lowerName.includes('nutri') || lowerName.includes('bio') || lowerName.includes('top crop') || lowerName.includes('bloom') || lowerName.includes('grow')) category = 'Fertilizantes';
-  else if (lowerName.includes('semill') || lowerName.includes('seed')) category = 'Semillas';
-  else if (lowerName.includes('indoor') || lowerName.includes('carpa') || lowerName.includes('luz') || lowerName.includes('panel') || lowerName.includes('led') || lowerName.includes('extractor')) category = 'Indoor';
-  else if (lowerName.includes('picador') || lowerName.includes('grinder') || lowerName.includes('papel') || lowerName.includes('sedas') || lowerName.includes('bong') || lowerName.includes('pipa')) category = 'Parafernalia';
-
-  return {
-    quantity: Math.max(1, qty),
-    name: name,
-    price: price,
-    category: category,
-    paymentMethod: paymentMethod
-  };
-}
-window.parseExpressVoiceInput = parseExpressVoiceInput;
-
-function renderMobilePosAssistantSearchResults(query) {
-  const container = document.getElementById('pos-assistant-results-container');
-  if (!container) return;
-
-  const clean = (query || '').toLowerCase().trim();
-
-  // MODO NOSTOCK / PREVENTA: ÚNICAMENTE B2B MAYORISTA Y TIENDAS CERCANAS
-  if (mobilePosAssistantState.mode === 'nostock') {
-    const b2bItems = (typeof baseProducts !== 'undefined' && Array.isArray(baseProducts))
-      ? baseProducts.map(p => ({
-          id: p.id,
-          product_code: p.product_code || `B2B-${p.id}`,
-          name: p.name,
-          brand: p.brand || '',
-          category: p.category || 'Mayorista',
-          price: Number(p.sale_price || p.price || 0),
-          image: p.image || p.image_url || 'assets/logo.jpg',
-          source_type: 'b2b',
-          source_label: '🏢 B2B Mayorista'
-        }))
-      : [];
-
-    let nearbyItems = [];
-    if (typeof getNearbyStores === 'function') {
-      const stores = getNearbyStores();
-      stores.forEach(s => {
-        (s.catalog || []).forEach(item => {
-          nearbyItems.push({
-            id: item.id || `loc_${item.product_code}`,
-            product_code: item.product_code,
-            name: item.name,
-            category: item.category || 'Tienda Asociada',
-            price: Number(item.public_price || item.price || 0),
-            image: 'assets/logo.jpg',
-            source_type: 'nearby',
-            source_label: `🏪 ${s.name || 'Tienda Cercana'} (48 hs)`
-          });
-        });
-      });
-    }
-
-    const externalProds = [...b2bItems, ...nearbyItems];
-    let filtered = externalProds;
-    if (clean) {
-      filtered = externalProds.filter(p => {
-        const text = [p.name, p.brand, p.category, p.product_code, p.source_label].filter(Boolean).join(' ').toLowerCase();
-        return text.includes(clean);
-      });
-    }
-
-    if (filtered.length === 0) {
-      container.innerHTML = `
-        <div style="text-align: center; padding: 20px 8px; color: var(--color-text-muted); font-size: 0.82rem;">
-          No encontramos coincidencias en B2B Mayorista ni en Tiendas Cercanas. Podés usar Venta Express para ingresarlo en el acto.
-        </div>
-      `;
-      return;
-    }
-
-    container.innerHTML = filtered.slice(0, 15).map((p, idx) => {
-      const priceVal = Number(p.price || 0);
-      return `
-        <div class="pos-assistant-result-item" onclick="selectMobilePosNoStockProduct('${escapeStockHtml(p.id)}', '${escapeStockHtml(p.source_type)}')">
-          <span style="min-width: 22px; height: 22px; border-radius: 50%; background: #1565c0; color: #ffffff; font-weight: 900; font-size: 0.72rem; display: grid; place-items: center; flex-shrink: 0;">${idx + 1}</span>
-          <img src="${p.image || 'assets/logo.jpg'}" alt="">
-          <div style="flex: 1; min-width: 0;">
-            <strong style="display: block; font-size: 0.86rem; color: var(--color-text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeStockHtml(p.name)}</strong>
-            <small style="color: #1565c0; font-weight: 800; font-size: 0.72rem;">${escapeStockHtml(p.source_label)}</small>
-          </div>
-          <div style="font-weight: 800; color: var(--color-accent-gold); font-size: 0.88rem;">
-            $${priceVal.toLocaleString('es-AR')}
-          </div>
-        </div>
-      `;
-    }).join('');
-    return;
-  }
-
-  // MODO STOCK INMEDIATO: Catálogo propio de la tienda física con stock > 0
-  const prods = (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts))
-    ? internalCatalogProducts
-    : JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
-
-  let filtered = prods.filter(p => Number(p.stock !== undefined ? p.stock : (p.own_stock || 0)) > 0);
-  if (clean) {
-    filtered = filtered.filter(p => {
-      const text = [p.name, p.brand, p.presentation, p.category, p.barcode, p.product_code].filter(Boolean).join(' ').toLowerCase();
-      return text.includes(clean);
-    });
-  }
-
-  if (filtered.length === 0) {
-    container.innerHTML = `
-      <div style="text-align: center; padding: 20px 8px; color: var(--color-text-muted); font-size: 0.82rem;">
-        No se encontraron productos coincidentes en stock. Podés dictar otro nombre o cambiar a Venta Express.
-      </div>
-    `;
-    return;
-  }
-
-  container.innerHTML = filtered.slice(0, 15).map((p, idx) => {
-    const stockVal = Number(p.stock !== undefined ? p.stock : (p.own_stock || 0));
-    const priceVal = Number(p.price || p.sale_price || 0);
-    return `
-      <div class="pos-assistant-result-item" onclick="selectMobilePosProduct('${escapeStockHtml(p.id || p.product_code)}')">
-        <span style="min-width: 22px; height: 22px; border-radius: 50%; background: var(--color-accent-gold, #c2a246); color: #152d24; font-weight: 900; font-size: 0.72rem; display: grid; place-items: center; flex-shrink: 0;">${idx + 1}</span>
-        <img src="${p.image || p.image_url || 'assets/logo.jpg'}" alt="">
-        <div style="flex: 1; min-width: 0;">
-          <strong style="display: block; font-size: 0.86rem; color: var(--color-text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeStockHtml(p.name)}</strong>
-          <small style="color: var(--color-text-muted); font-size: 0.72rem;">${escapeStockHtml(p.category || 'General')} · Stock: ${stockVal} u.</small>
-        </div>
-        <div style="font-weight: 800; color: var(--color-accent-gold); font-size: 0.88rem;">
-          $${priceVal.toLocaleString('es-AR')}
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-function handleMobilePosAssistantSearch(val) {
-  renderMobilePosAssistantSearchResults(val);
-}
-window.handleMobilePosAssistantSearch = handleMobilePosAssistantSearch;
-
-function selectMobilePosProduct(prodId) {
-  const prods = (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts))
-    ? internalCatalogProducts
-    : JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
-  const match = prods.find(p => String(p.id) === String(prodId) || String(p.product_code) === String(prodId));
-  if (!match) return;
-
-  mobilePosAssistantState.selectedProduct = match;
-  mobilePosAssistantState.quantity = 1;
-  setMobilePosAssistantStep('quantity');
-}
-window.selectMobilePosProduct = selectMobilePosProduct;
-
-function selectMobilePosNoStockProduct(prodId, sourceType) {
-  let match = null;
-  if (sourceType === 'b2b') {
-    const b2bList = (typeof baseProducts !== 'undefined' && Array.isArray(baseProducts)) ? baseProducts : [];
-    match = b2bList.find(p => String(p.id) === String(prodId) || p.product_code === prodId);
-    if (match) {
-      match = {
-        ...match,
-        price: Number(match.sale_price || match.price || 0),
-        is_nostock_b2b: true,
-        source_label: '🏢 B2B Mayorista'
-      };
-    }
-  } else {
-    const stores = typeof getNearbyStores === 'function' ? getNearbyStores() : [];
-    stores.forEach(s => {
-      (s.catalog || []).forEach(item => {
-        if (String(item.id) === String(prodId) || String(item.product_code) === String(prodId) || `loc_${item.product_code}` === String(prodId)) {
-          match = {
-            id: item.id || `loc_${item.product_code}`,
-            product_code: item.product_code,
-            name: item.name,
-            category: item.category || 'Tienda Asociada',
-            price: Number(item.public_price || item.price || 0),
-            image: 'assets/logo.jpg',
-            is_nostock_nearby: true,
-            source_label: `🏪 ${s.name || 'Tienda Cercana'} (48 hs)`
-          };
-        }
-      });
-    });
-  }
-
-  if (!match) return;
-
-  mobilePosAssistantState.selectedProduct = match;
-  mobilePosAssistantState.quantity = 1;
-  setMobilePosAssistantStep('quantity');
-}
-window.selectMobilePosNoStockProduct = selectMobilePosNoStockProduct;
-
-function confirmMobilePosExpressItem() {
-  const name = document.getElementById('pos-express-name')?.value.trim();
-  const cat = document.getElementById('pos-express-category')?.value || 'Otros';
-  const price = Number(document.getElementById('pos-express-price')?.value || 0);
-
-  if (!name) {
-    showToast('⚠️ Ingresá el nombre del producto.');
-    document.getElementById('pos-express-name')?.focus();
-    return;
-  }
-  if (!price || price <= 0) {
-    showToast('⚠️ Ingresá un precio válido.');
-    document.getElementById('pos-express-price')?.focus();
-    return;
-  }
-
-  mobilePosAssistantState.selectedProduct = {
-    id: `express_${Date.now()}`,
-    product_code: `EXP-${Date.now().toString().slice(-4)}`,
-    name: name,
-    category: cat,
-    price: price,
-    is_express: true,
-    image: 'assets/logo.jpg'
-  };
-  mobilePosAssistantState.quantity = 1;
-  setMobilePosAssistantStep('quantity');
-}
-window.confirmMobilePosExpressItem = confirmMobilePosExpressItem;
-
-function updateMobilePosQty(delta) {
-  const next = Math.max(1, mobilePosAssistantState.quantity + delta);
-  if (mobilePosAssistantState.mode === 'stock' && mobilePosAssistantState.selectedProduct) {
-    const max = Number(mobilePosAssistantState.selectedProduct.stock || 999);
-    if (next > max) {
-      showToast(`⚠️ Solo hay ${max} unidades disponibles.`);
-      return;
-    }
-  }
-  mobilePosAssistantState.quantity = next;
-  renderMobilePosAssistant();
-}
-window.updateMobilePosQty = updateMobilePosQty;
-
-function setMobilePosQtyValue(val) {
-  const num = Math.max(1, parseInt(val, 10) || 1);
-  mobilePosAssistantState.quantity = num;
-  renderMobilePosAssistant();
-}
-window.setMobilePosQtyValue = setMobilePosQtyValue;
-
-function setMobilePosDeliveryDays(days) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  const formatted = d.toISOString().slice(0, 10);
-  mobilePosAssistantState.nostockData.customDate = formatted;
-  const input = document.getElementById('pos-nostock-delivery-date');
-  if (input) input.value = formatted;
-}
-window.setMobilePosDeliveryDays = setMobilePosDeliveryDays;
-
-function confirmMobilePosItem() {
-  const prod = mobilePosAssistantState.selectedProduct;
-  if (!prod) return;
-
-  const cart = getPosCartEngine();
-  if (cart) {
-    cart.addItem({
-      ...prod,
-      quantity: mobilePosAssistantState.quantity
-    });
-    renderPosCartItems();
-    showToast(`✓ Agregado: ${mobilePosAssistantState.quantity}x ${prod.name}`);
-  }
-
-  setMobilePosAssistantStep('cart-summary');
-}
-window.confirmMobilePosItem = confirmMobilePosItem;
-
 function setMobilePosPaymentMethod(method) {
   mobilePosAssistantState.paymentMethod = method;
-  const paymentSelect = document.getElementById('pos-payment-method-select');
-  if (paymentSelect) paymentSelect.value = method;
+  const cart = getPosCartEngine();
+  const total = cart ? cart.getTotal() : 0;
+
+  if (method === 'MIXTO') {
+    if (!mobilePosAssistantState.mixedCashAmount) {
+      mobilePosAssistantState.mixedCashAmount = Math.round(total / 2);
+    }
+    mobilePosAssistantState.mixedSecondaryAmount = Math.max(0, total - mobilePosAssistantState.mixedCashAmount);
+  }
   renderMobilePosAssistant();
 }
 window.setMobilePosPaymentMethod = setMobilePosPaymentMethod;
+
+function updateMobilePosMixedCash(val) {
+  const cart = getPosCartEngine();
+  const total = cart ? cart.getTotal() : 0;
+  const cash = Math.max(0, Math.min(total, parseFloat(val) || 0));
+  mobilePosAssistantState.mixedCashAmount = cash;
+  mobilePosAssistantState.mixedSecondaryAmount = Math.max(0, total - cash);
+  const secInput = document.getElementById('mobile-pos-mixed-sec-amount');
+  if (secInput) secInput.value = mobilePosAssistantState.mixedSecondaryAmount;
+}
+window.updateMobilePosMixedCash = updateMobilePosMixedCash;
+
+function setMobilePosMixedSecondaryMethod(method) {
+  mobilePosAssistantState.mixedSecondaryMethod = method;
+  renderMobilePosAssistant();
+}
+window.setMobilePosMixedSecondaryMethod = setMobilePosMixedSecondaryMethod;
+
+function handleMobilePosCcSelect(accountId) {
+  mobilePosAssistantState.customerAccountId = accountId;
+  const accounts = typeof getCurrentAccounts === 'function' ? getCurrentAccounts() : [];
+  const found = accounts.find(a => a.id === accountId);
+  if (found) {
+    mobilePosAssistantState.customerAccountName = found.customer_name;
+    if (found.phone) {
+      mobilePosAssistantState.customerWhatsApp = found.phone;
+    }
+  }
+  renderMobilePosAssistant();
+}
+window.handleMobilePosCcSelect = handleMobilePosCcSelect;
+
+function setMobilePosAdjustment(type, value) {
+  mobilePosAssistantState.adjustmentType = type;
+  mobilePosAssistantState.adjustmentValue = Math.max(0, parseFloat(value) || 0);
+
+  const cart = getPosCartEngine();
+  if (cart) {
+    if (typeof cart.setAdjustment === 'function') {
+      cart.setAdjustment(type, mobilePosAssistantState.adjustmentValue);
+    } else {
+      cart.setDiscount(type, mobilePosAssistantState.adjustmentValue);
+    }
+    renderPosCartItems();
+  }
+  renderMobilePosAssistant();
+}
+window.setMobilePosAdjustment = setMobilePosAdjustment;
 
 async function completeMobilePosSale(sendWhatsApp = false) {
   const cart = getPosCartEngine();
@@ -9500,9 +9439,32 @@ async function completeMobilePosSale(sendWhatsApp = false) {
   const phoneInput = document.getElementById('mobile-pos-whatsapp-input');
   const phone = phoneInput?.value.trim() || mobilePosAssistantState.customerWhatsApp || '';
 
-  // Ejecuta el cierre de venta en el motor POS
+  // Sincronizar vendedor seleccionado
+  const salespersonSelect = document.getElementById('mobile-pos-salesperson-select');
+  const selectedSalesperson = salespersonSelect?.value || mobilePosAssistantState.salespersonName || sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
+
+  const globalSalespersonSelect = document.getElementById('pos-salesperson-select');
+  if (globalSalespersonSelect) globalSalespersonSelect.value = selectedSalesperson;
+
+  // Sincronizar medio de pago y configuraciones en el motor POS principal
   const paymentSelect = document.getElementById('pos-payment-method-select');
   if (paymentSelect) paymentSelect.value = mobilePosAssistantState.paymentMethod;
+
+  if (mobilePosAssistantState.paymentMethod === 'MIXTO') {
+    const cashInput = document.getElementById('pos-mixed-cash-amount');
+    const secMethodSelect = document.getElementById('pos-mixed-secondary-method');
+    const secAmountInput = document.getElementById('pos-mixed-secondary-amount');
+    if (cashInput) cashInput.value = mobilePosAssistantState.mixedCashAmount;
+    if (secMethodSelect) secMethodSelect.value = mobilePosAssistantState.mixedSecondaryMethod;
+    if (secAmountInput) secAmountInput.value = mobilePosAssistantState.mixedSecondaryAmount;
+  }
+
+  if (mobilePosAssistantState.paymentMethod === 'CUENTA_CORRIENTE') {
+    const ccSelect = document.getElementById('pos-current-account-select');
+    if (ccSelect && mobilePosAssistantState.customerAccountId) {
+      ccSelect.value = mobilePosAssistantState.customerAccountId;
+    }
+  }
 
   try {
     await submitPosSaleDraft();
@@ -9512,8 +9474,14 @@ async function completeMobilePosSale(sendWhatsApp = false) {
 
   if (sendWhatsApp && phone) {
     const cleanPhone = phone.replace(/[^\d]/g, '');
-    const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
-    const msg = `*BÔ GROW CLUB - COMPROBANTE DE VENTA*%0A%0A¡Hola! Gracias por tu compra.%0A🧑‍💼 Vendedor: ${encodeURIComponent(activeVendor)}%0A💳 Forma de Pago: ${encodeURIComponent(mobilePosAssistantState.paymentMethod)}%0A%0A🌿 *BÔ Grow Club · Cultivo y Café de Especialidad*`;
+    let paymentDesc = mobilePosAssistantState.paymentMethod;
+    if (mobilePosAssistantState.paymentMethod === 'MIXTO') {
+      paymentDesc = `Mixto ($${mobilePosAssistantState.mixedCashAmount.toLocaleString('es-AR')} Efectivo + $${mobilePosAssistantState.mixedSecondaryAmount.toLocaleString('es-AR')} ${mobilePosAssistantState.mixedSecondaryMethod})`;
+    } else if (mobilePosAssistantState.paymentMethod === 'CUENTA_CORRIENTE') {
+      paymentDesc = `Cuenta Corriente (${mobilePosAssistantState.customerAccountName || 'Cliente'})`;
+    }
+
+    const msg = `*BÔ GROW CLUB - COMPROBANTE DE VENTA*%0A%0A¡Hola! Gracias por tu compra.%0A🧑‍💼 Vendedor: ${encodeURIComponent(selectedSalesperson)}%0A💳 Forma de Pago: ${encodeURIComponent(paymentDesc)}%0A%0A🌿 *BÔ Grow Club · Cultivo y Café de Especialidad*`;
     window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
   }
 
@@ -9529,14 +9497,16 @@ function goBackMobilePosAssistant() {
   else if (step === 'quantity') setMobilePosAssistantStep('search');
   else if (step === 'cart-summary') setMobilePosAssistantStep('mode');
   else if (step === 'payment') setMobilePosAssistantStep('cart-summary');
-  else if (step === 'confirm') setMobilePosAssistantStep('payment');
+  else if (step === 'adjustment') setMobilePosAssistantStep('payment');
+  else if (step === 'confirm') setMobilePosAssistantStep('adjustment');
 }
 window.goBackMobilePosAssistant = goBackMobilePosAssistant;
 
 function continueMobilePosAssistant() {
   const step = mobilePosAssistantState.step;
   if (step === 'cart-summary') setMobilePosAssistantStep('payment');
-  else if (step === 'payment') setMobilePosAssistantStep('confirm');
+  else if (step === 'payment') setMobilePosAssistantStep('adjustment');
+  else if (step === 'adjustment') setMobilePosAssistantStep('confirm');
 }
 window.continueMobilePosAssistant = continueMobilePosAssistant;
 
@@ -9792,7 +9762,32 @@ function handlePosVoiceCommand(raw) {
     else if (text.includes('débito') || text.includes('debito')) setMobilePosPaymentMethod('DEBITO');
     else if (text.includes('tarjeta') || text.includes('crédito') || text.includes('credito')) setMobilePosPaymentMethod('TARJETA');
     else if (text.includes('cuenta corriente') || text.includes('fiar') || text.includes('corriente')) setMobilePosPaymentMethod('CUENTA_CORRIENTE');
-    else if (text.includes('continuar') || text.includes('siguiente') || text.includes('confirmar')) setMobilePosAssistantStep('confirm');
+    else if (text.includes('mixto') || text.includes('pago mixto') || text.includes('dividido') || text.includes('partido')) setMobilePosPaymentMethod('MIXTO');
+    else if (text.includes('continuar') || text.includes('siguiente') || text.includes('confirmar') || text.includes('descuento') || text.includes('ajuste')) setMobilePosAssistantStep('adjustment');
+    return;
+  }
+
+  if (step === 'adjustment') {
+    if (text.includes('sin ajuste') || text.includes('sin descuento') || text.includes('normal') || text.includes('ninguno') || text.includes('no')) {
+      setMobilePosAdjustment('NONE', 0);
+      setMobilePosAssistantStep('confirm');
+      return;
+    }
+    if (text.includes('descuento')) {
+      const match = text.match(/\d+/);
+      const val = match ? parseInt(match[0], 10) : 10;
+      setMobilePosAdjustment('DISCOUNT_PERCENT', val);
+      return;
+    }
+    if (text.includes('inflar') || text.includes('recargo') || text.includes('aumento')) {
+      const match = text.match(/\d+/);
+      const val = match ? parseInt(match[0], 10) : 10;
+      setMobilePosAdjustment('INCREASE_PERCENT', val);
+      return;
+    }
+    if (text.includes('continuar') || text.includes('siguiente') || text.includes('confirmar') || text.includes('listo')) {
+      setMobilePosAssistantStep('confirm');
+    }
     return;
   }
 
