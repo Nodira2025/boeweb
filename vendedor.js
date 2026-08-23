@@ -1991,11 +1991,33 @@ async function renderStoreMapUI(activeZone = null, activeShelf = null, targetLev
 }
 
 function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
+  const currentShelves = (typeof window !== 'undefined' && Array.isArray(window.storeShelves)) ? window.storeShelves : [];
+  const activeShelves = currentShelves.filter(s => !s.is_anchor);
   const raw = String(queryOrCode || (matchedProduct?.wms_code || matchedProduct?.location || matchedProduct?.shelf_code || '')).trim();
   const upper = raw.toUpperCase();
 
-  // 1. Check full WMS code pattern: DP-D-P3-E3-N3-D or TI-I-P4-E1-N1-C
+  // Match product from catalog, local locations, or store map
+  let matched = matchedProduct;
+  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
+  const localLocs = typeof readLocalProductLocations === 'function' ? readLocalProductLocations() : [];
+  const allProducts = [...(internalCatalogProducts || []), ...storeLocs, ...localLocs, ...(baseProducts || [])];
+
+  if (!matched && raw) {
+    // 1. Direct SKU, barcode, name or ID match
+    matched = allProducts.find(p => 
+      (p.barcode && p.barcode.toUpperCase() === upper) ||
+      (p.product_code && p.product_code.toUpperCase() === upper) ||
+      (p.id && String(p.id).toUpperCase() === upper) ||
+      (p.name && p.name.toUpperCase() === upper) ||
+      (p.name && p.name.toLowerCase().includes(raw.toLowerCase()))
+    );
+  }
+
+  // Determine if query is a direct full WMS code or shelf code
   const fullParts = upper.split('-');
+  const isExplicitWmsCode = fullParts.length >= 5 && (fullParts[0] === 'TI' || fullParts[0] === 'DP');
+
+  let rawShelf = '';
   let zoneCode = 'TI';
   let compassCode = 'F';
   let wallCode = 'P1';
@@ -2003,45 +2025,97 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
   let levelNum = 1;
   let sectorCode = 'C';
 
-  if (fullParts.length >= 6) {
-    zoneCode = fullParts[0];
-    compassCode = fullParts[1];
-    wallCode = fullParts[2];
-    shelfCode = fullParts[3];
-    levelNum = Number(fullParts[4].replace(/\D/g, '')) || 1;
-    sectorCode = fullParts[5];
+  if (isExplicitWmsCode) {
+    if (fullParts.length >= 6) {
+      zoneCode = fullParts[0];
+      compassCode = fullParts[1];
+      wallCode = fullParts[2];
+      shelfCode = fullParts[3];
+      levelNum = Number(fullParts[4].replace(/\D/g, '')) || 1;
+      sectorCode = fullParts[5];
+    } else {
+      zoneCode = fullParts[0];
+      compassCode = fullParts[1];
+      wallCode = fullParts[2];
+      shelfCode = fullParts[2];
+      levelNum = Number(fullParts[3].replace(/\D/g, '')) || 1;
+      sectorCode = fullParts[4];
+    }
+    rawShelf = shelfCode;
+  } else if (matched) {
+    // Check if matched product has an actual location
+    const pWms = String(matched.wms_code || '').toUpperCase();
+    const pWmsParts = pWms.split('-');
+    if (pWmsParts.length >= 5 && (pWmsParts[0] === 'TI' || pWmsParts[0] === 'DP')) {
+      if (pWmsParts.length >= 6) {
+        zoneCode = pWmsParts[0];
+        compassCode = pWmsParts[1];
+        wallCode = pWmsParts[2];
+        shelfCode = pWmsParts[3];
+        levelNum = Number(pWmsParts[4].replace(/\D/g, '')) || 1;
+        sectorCode = pWmsParts[5];
+      } else {
+        zoneCode = pWmsParts[0];
+        compassCode = pWmsParts[1];
+        wallCode = pWmsParts[2];
+        shelfCode = pWmsParts[2];
+        levelNum = Number(pWmsParts[3].replace(/\D/g, '')) || 1;
+        sectorCode = pWmsParts[4];
+      }
+      rawShelf = shelfCode;
+    } else if (matched.shelf_code && matched.shelf_code !== 'Sin ubicación' && matched.shelf_code !== 'SIN_ASIGNAR') {
+      rawShelf = String(matched.shelf_code).toUpperCase();
+      shelfCode = rawShelf;
+      const wallMatch = rawShelf.match(/P([1-4])/);
+      if (wallMatch) wallCode = `P${wallMatch[1]}`;
+      levelNum = Number(matched.shelf_level ?? matched.level) || 1;
+      sectorCode = matched.sector || 'C';
+      zoneCode = matched.floor_level === 2 ? 'DP' : 'TI';
+    }
   } else {
-    if (upper.includes('DP') || upper.includes('DEP')) zoneCode = 'DP';
-    else if (upper.includes('TI') || upper.includes('TIE')) zoneCode = 'TI';
-
-    const wallMatch = upper.match(/P([1-4])/);
-    if (wallMatch) wallCode = `P${wallMatch[1]}`;
-
-    const shelfMatch = upper.match(/(E[1-5]|HEL\d*|VIT\d*|PIS\d*|[A-E][-_]?[1-5])/);
-    if (shelfMatch) shelfCode = shelfMatch[1].replace('-', '');
-
-    const levelMatch = upper.match(/N([1-6])/) || upper.match(/NIVEL\s*([1-6])/);
-    if (levelMatch) levelNum = Number(levelMatch[1]);
-
-    if (upper.includes('IZQ') || upper.endsWith('-I')) sectorCode = 'I';
-    else if (upper.includes('DER') || upper.endsWith('-D')) sectorCode = 'D';
-    else if (upper.includes('CEN') || upper.endsWith('-C')) sectorCode = 'C';
+    // Check if user typed a shelf code directly (e.g. P3-HEL2, HEL2, P1-E1, etc.)
+    const matchedShelfDirect = activeShelves.find(s => {
+      const sCode = String(s.code).toUpperCase();
+      const sClean = sCode.replace(/[-_ ]/g, '');
+      const uClean = upper.replace(/[-_ ]/g, '');
+      return sCode === upper || sClean === uClean || sCode.endsWith(upper) || sClean.endsWith(uClean);
+    });
+    if (matchedShelfDirect) {
+      rawShelf = matchedShelfDirect.code;
+      shelfCode = matchedShelfDirect.code;
+      zoneCode = matchedShelfDirect.floor_level === 2 ? 'DP' : 'TI';
+      const wallMatch = shelfCode.match(/P([1-4])/);
+      if (wallMatch) wallCode = `P${wallMatch[1]}`;
+      compassCode = wallCode === 'P3' ? 'D' : wallCode === 'P4' ? 'I' : wallCode === 'P2' ? 'A' : 'F';
+    }
   }
 
-  // Area: Tienda vs Deposito
-  const floorLevel = (zoneCode === 'DP' || zoneCode === 'DEPÓSITO') ? 2 : 1;
+  // Physical shelf validation on current map
+  const physicalShelfMatch = rawShelf ? activeShelves.find(s => {
+    const sCode = String(s.code).toUpperCase();
+    const rUpper = String(rawShelf).toUpperCase();
+    const sClean = sCode.replace(/[-_ ]/g, '');
+    const rClean = rUpper.replace(/[-_ ]/g, '');
+    return sCode === rUpper || sClean === rClean || sCode.endsWith(rUpper) || sClean.endsWith(rClean);
+  }) : null;
+
+  const isLocated = Boolean(physicalShelfMatch);
+  const layoutShelfCode = physicalShelfMatch ? physicalShelfMatch.code : shelfCode;
+
+  // Area & floor
+  const floorLevel = physicalShelfMatch ? physicalShelfMatch.floor_level : ((zoneCode === 'DP' || zoneCode === 'DEPÓSITO') ? 2 : 1);
   const areaLabel = floorLevel === 2 ? 'el Depósito General' : 'la Tienda';
 
   // Wall text
   const wallMap = {
-    'P1': 'Pared etiqueta 1 (Pared frontal / Norte)',
-    'P2': 'Pared etiqueta 2 (Pared de fondo / Sur)',
-    'P3': 'Pared etiqueta 3 (es la pared lateral derecha)',
-    'P4': 'Pared etiqueta 4 (es la pared lateral izquierda)'
+    'P1': 'Pared 1 (Frente / Norte)',
+    'P2': 'Pared 2 (Fondo / Sur)',
+    'P3': 'Pared 3 (Lateral Derecho / Este)',
+    'P4': 'Pared 4 (Lateral Izquierdo / Oeste)'
   };
   const wallLabel = wallMap[wallCode] || `Pared ${wallCode}`;
 
-  // Compass explanation relative to central PC
+  // Compass text
   let compassText = 'al frente de la PC central (Norte)';
   if (compassCode === 'D' || wallCode === 'P3') {
     compassText = 'es la pared derecha respecto a la PC central';
@@ -2053,84 +2127,44 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
     compassText = 'es la pared frontal respecto a la PC central';
   }
 
-  // Furniture / Type text
+  // Furniture description
   let furnitureType = 'Estante de pared';
-  if (shelfCode.startsWith('HEL')) {
+  const cleanShelfUpper = String(layoutShelfCode).toUpperCase();
+  if (cleanShelfUpper.includes('HEL')) {
     furnitureType = 'Heladera / Equipo de frío';
-  } else if (shelfCode.startsWith('VIT')) {
+  } else if (cleanShelfUpper.includes('VIT')) {
     furnitureType = 'Vitrina / Mostrador vidriado';
-  } else if (shelfCode.startsWith('PIS')) {
+  } else if (cleanShelfUpper.includes('PIS')) {
     furnitureType = 'Pallet de piso (sustratos / bultos)';
-  } else if (shelfCode.startsWith('E')) {
-    const num = shelfCode.replace('E', '');
-    furnitureType = `Estante de pared (Estante ${num})`;
+  } else if (cleanShelfUpper.includes('E')) {
+    const num = cleanShelfUpper.replace(/\D/g, '') || '1';
+    furnitureType = `Góndola / Estante ${num}`;
   } else {
-    furnitureType = `Módulo de estantería ${shelfCode}`;
+    furnitureType = `Módulo ${layoutShelfCode}`;
   }
 
-  // Level description (N1 is bottom/floor)
+  // Level description
   const levelDescriptions = {
-    1: 'nivel piso / abajo',
-    2: 'nivel bajo',
-    3: 'nivel medio (a la altura de la vista y manos)',
-    4: 'nivel medio-alto',
-    5: 'nivel alto',
+    1: 'nivel 1 piso / abajo',
+    2: 'nivel 2 bajo',
+    3: 'nivel 3 medio (a la altura de la vista y manos)',
+    4: 'nivel 4 medio-alto',
+    5: 'nivel 5 alto',
     6: 'tope superior (arriba del todo)'
   };
   const levelLabel = `Nivel ${levelNum}`;
   const levelDesc = levelDescriptions[levelNum] || `Nivel ${levelNum}`;
 
-  // Sector horizontal description
+  // Sector description
   const sectorDescriptions = {
-    'I': 'en el sector izquierdo de la balda',
+    'I': 'en el sector izquierdo',
     'C': 'en el centro',
-    'D': 'en el sector derecho de la balda'
+    'D': 'en el sector derecho',
+    'U': 'sin sector específico'
   };
   const sectorText = sectorDescriptions[sectorCode] || 'en el centro';
 
-  // Physical shelf code on the floor layout (e.g. P3-E3 or E3)
-  const layoutShelfCode = `${wallCode}-${shelfCode}`.replace(/P\d-P/, 'P');
-
-  // Match product from internal catalog, local locations, or store map
-  let matched = matchedProduct;
-  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
-  const localLocs = typeof readLocalProductLocations === 'function' ? readLocalProductLocations() : [];
-  const allProducts = [...(internalCatalogProducts || []), ...storeLocs, ...localLocs, ...(baseProducts || [])];
-  
-  if (!matched) {
-    // 1. Direct WMS code, SKU, barcode, name or ID match
-    matched = allProducts.find(p => 
-      (p.wms_code && p.wms_code.toUpperCase() === upper) ||
-      (p.barcode && p.barcode.toUpperCase() === upper) ||
-      (p.product_code && p.product_code.toUpperCase() === upper) ||
-      (p.id && String(p.id).toUpperCase() === upper) ||
-      (p.name && p.name.toUpperCase() === upper) ||
-      (p.name && p.name.toLowerCase().includes(raw.toLowerCase()))
-    );
-  }
-
-  if (!matched) {
-    // 2. Matching by physical shelf code and level
-    matched = allProducts.find(p => {
-      const pShelf = String(p.shelf_code || '').toUpperCase().replace(/[-_ ]/g, '');
-      const tShelf1 = `${wallCode}${shelfCode}`.toUpperCase().replace(/[-_ ]/g, '');
-      const tShelf2 = `${shelfCode}`.toUpperCase().replace(/[-_ ]/g, '');
-      const shelfMatch = pShelf === tShelf1 || pShelf === tShelf2 || pShelf.includes(tShelf2);
-      const pLevel = Number(p.shelf_level ?? p.level) || 0;
-      const levelMatch = !pLevel || pLevel === levelNum;
-      return shelfMatch && levelMatch;
-    });
-  }
-
-  if (!matched) {
-    // 3. Fallback: match by shelf only
-    matched = allProducts.find(p => {
-      const pShelf = String(p.shelf_code || '').toUpperCase();
-      return pShelf.includes(shelfCode) || pShelf.includes(layoutShelfCode);
-    });
-  }
-
-  // Stock count & product properties
+  // Stock & product properties
   let stockCount = matched ? Math.max(0, Number(matched.stock ?? matched.on_hand) || 0) : null;
   let productName = matched?.name || null;
   let productBarcode = matched?.barcode || matched?.product_code || null;
@@ -2150,6 +2184,9 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
 
   return {
     rawCode: raw,
+    isLocated,
+    hasMatchedProduct: Boolean(matched),
+    shelfExists: Boolean(physicalShelfMatch),
     floorLevel,
     zoneCode,
     areaLabel,
@@ -2166,7 +2203,6 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
     sectorCode,
     sectorText,
     stockCount: stockCount !== null ? stockCount : 0,
-    hasMatchedProduct: !!matched,
     productName,
     productBarcode,
     productImage,
@@ -2184,94 +2220,209 @@ function renderStoreMapLocationCard(info) {
   if (!cardContainer) return;
 
   const escapeFn = typeof escapeMapHtml === 'function' ? escapeMapHtml : (v => String(v || ''));
-  const title = info.productName 
-    ? `${escapeFn(info.productName)}`
-    : `Ubicación: ${escapeFn(info.rawCode)}`;
+  const currentShelves = (typeof window !== 'undefined' && Array.isArray(window.storeShelves)) ? window.storeShelves.filter(s => !s.is_anchor) : [];
 
-  const isOutOfStock = info.hasMatchedProduct && info.stockCount === 0;
-  const stockBadgeHtml = info.hasMatchedProduct
-    ? (info.stockCount > 0
-        ? `<strong style="color: #81c784; font-size: 1.18rem; font-weight: 900;">${info.stockCount} unidades disponibles</strong>`
-        : `<span style="background: #c62828; color: #fff; padding: 4px 10px; border-radius: 8px; font-weight: 900; font-size: 0.95rem;">🔴 AGOTADO / SIN STOCK (0 u.)</span>`
-      )
-    : `<span style="color: #ffd54f; font-weight: 700;">0 u. (Espacio disponible para asignar)</span>`;
+  // STATE 1: Product or Code is LOCATED on an active shelf on the map
+  if (info.isLocated) {
+    const title = info.productName ? `${escapeFn(info.productName)}` : `Módulo: ${escapeFn(info.layoutShelfCode)}`;
+    const isOutOfStock = info.hasMatchedProduct && info.stockCount === 0;
+    const stockBadgeHtml = info.hasMatchedProduct
+      ? (info.stockCount > 0
+          ? `<strong style="color: #81c784; font-size: 1.18rem; font-weight: 900;">${info.stockCount} unidades disponibles</strong>`
+          : `<span style="background: #c62828; color: #fff; padding: 4px 10px; border-radius: 8px; font-weight: 900; font-size: 0.95rem;">🔴 AGOTADO / SIN STOCK (0 u.)</span>`
+        )
+      : `<span style="color: #ffd54f; font-weight: 700;">Espacio físico configurado en el plano</span>`;
 
-  cardContainer.innerHTML = `
-    <div class="location-found-card" style="background: linear-gradient(135deg, #152d24 0%, #1c3c30 100%); border: 2px solid #c2a246; border-radius: 20px; padding: 20px; color: #ffffff; box-shadow: 0 14px 40px rgba(0,0,0,0.4);">
-      
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; border-bottom: 1px solid rgba(194,162,70,0.3); padding-bottom: 12px;">
-        <div style="display: flex; gap: 12px; align-items: center; min-width: 0; flex: 1;">
-          ${info.productImage ? `
-            <img src="${escapeFn(info.productImage)}" alt="${title}" style="width: 58px; height: 58px; border-radius: 12px; border: 1.5px solid #c2a246; object-fit: cover; background: #fff; flex-shrink: 0;">
-          ` : `
-            <div style="width: 58px; height: 58px; border-radius: 12px; border: 1.5px solid #c2a246; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; flex-shrink: 0;">📦</div>
-          `}
-          <div style="min-width: 0; flex: 1;">
-            <span style="background: rgba(194,162,70,0.25); color: #c2a246; border: 1px solid #c2a246; padding: 2px 8px; border-radius: 8px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase;">
-              📍 Guía de Ubicación Física
-            </span>
-            <h3 style="margin: 4px 0 0 0; font-size: 1.15rem; color: #ffffff; font-weight: 800; line-height: 1.3; word-break: break-word;">
-              ${title}
-            </h3>
-            ${info.productBarcode ? `<small style="color: rgba(247,246,242,0.7); font-size: 0.78rem; font-family: monospace;">SKU / Código: ${escapeFn(info.productBarcode)}</small>` : `<small style="color: #ffd54f; font-size: 0.75rem;">Código WMS: ${escapeFn(info.rawCode)}</small>`}
+    cardContainer.innerHTML = `
+      <div class="location-found-card" style="background: linear-gradient(135deg, #152d24 0%, #1c3c30 100%); border: 2px solid #c2a246; border-radius: 20px; padding: 20px; color: #ffffff; box-shadow: 0 14px 40px rgba(0,0,0,0.4);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; border-bottom: 1px solid rgba(194,162,70,0.3); padding-bottom: 12px;">
+          <div style="display: flex; gap: 12px; align-items: center; min-width: 0; flex: 1;">
+            ${info.productImage ? `
+              <img src="${escapeFn(info.productImage)}" alt="${title}" style="width: 58px; height: 58px; border-radius: 12px; border: 1.5px solid #c2a246; object-fit: cover; background: #fff; flex-shrink: 0;">
+            ` : `
+              <div style="width: 58px; height: 58px; border-radius: 12px; border: 1.5px solid #c2a246; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; flex-shrink: 0;">📦</div>
+            `}
+            <div style="min-width: 0; flex: 1;">
+              <span style="background: rgba(194,162,70,0.25); color: #c2a246; border: 1px solid #c2a246; padding: 2px 8px; border-radius: 8px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase;">
+                📍 Ubicación Física Confirmada
+              </span>
+              <h3 style="margin: 4px 0 0 0; font-size: 1.15rem; color: #ffffff; font-weight: 800; line-height: 1.3; word-break: break-word;">
+                ${title}
+              </h3>
+              ${info.productBarcode ? `<small style="color: rgba(247,246,242,0.7); font-size: 0.78rem; font-family: monospace;">SKU / Código: ${escapeFn(info.productBarcode)}</small>` : `<small style="color: #ffd54f; font-size: 0.75rem;">Módulo: ${escapeFn(info.layoutShelfCode)}</small>`}
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button type="button" onclick="if(window.speakLocationVoicePhrase)window.speakLocationVoicePhrase(window.__lastDecodedWmsLocation||null)" style="padding: 7px 12px; border-radius: 10px; background: rgba(46,125,50,0.3); border: 1.5px solid #81c784; color: #81c784; font-size: 0.78rem; font-weight: 800; cursor: pointer; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;" title="Escuchar ubicación por voz">
+              🔊 Voz
+            </button>
+            ${info.productId ? `
+              <button type="button" onclick="openProductFullInfoModal('${escapeFn(info.productId)}')" style="padding: 7px 12px; border-radius: 10px; background: rgba(194,162,70,0.25); border: 1.5px solid #c2a246; color: #ffd54f; font-size: 0.78rem; font-weight: 800; cursor: pointer; white-space: nowrap; flex-shrink: 0; display: flex; align-items: center; gap: 4px;">
+                ℹ️ Info
+              </button>
+            ` : ''}
           </div>
         </div>
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <button type="button" onclick="if(window.speakLocationVoicePhrase)window.speakLocationVoicePhrase(window.__lastDecodedWmsLocation||null)" style="padding: 7px 12px; border-radius: 10px; background: rgba(46,125,50,0.3); border: 1.5px solid #81c784; color: #81c784; font-size: 0.78rem; font-weight: 800; cursor: pointer; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;" title="Escuchar ubicación por voz">
+
+        <div style="background: rgba(0,0,0,0.3); border-radius: 14px; padding: 16px; border: 1px solid rgba(255,255,255,0.12); margin-bottom: 18px; font-size: 0.95rem; line-height: 1.7;">
+          <div style="margin-bottom: 10px;">
+            🏢 <strong>Lugar:</strong> El producto se encuentra en <span style="color: #c2a246; font-weight: 800;">${escapeFn(info.areaLabel)}</span>.
+          </div>
+          <div style="margin-bottom: 10px;">
+            🧭 <strong>Pared y Orientación:</strong> <span style="color: #a5d6a7; font-weight: 700;">${escapeFn(info.wallLabel)}</span> (${escapeFn(info.compassText)}).
+          </div>
+          <div style="margin-bottom: 10px;">
+            🪵 <strong>Tipo de Mueble:</strong> <span style="color: #ffffff; font-weight: 700;">${escapeFn(info.furnitureType)}</span> (${escapeFn(info.layoutShelfCode)}).
+          </div>
+          <div style="margin-bottom: 10px;">
+            ↕️ <strong>Nivel / Altura:</strong> <span style="color: #ffd54f; font-weight: 800;">${escapeFn(info.levelLabel)}</span> (${escapeFn(info.levelDesc)}).
+          </div>
+          <div style="margin-bottom: 10px;">
+            ↔️ <strong>Posición:</strong> <span style="color: #ffffff; font-weight: 700;">${escapeFn(info.sectorText)}</span>.
+          </div>
+          <div>
+            📦 <strong>Unidades disponibles:</strong> ${stockBadgeHtml}.
+          </div>
+        </div>
+
+        ${info.shelfPhoto ? `
+          <div style="margin-bottom: 18px; text-align: center; background: rgba(0,0,0,0.25); padding: 12px; border-radius: 14px;">
+            <span style="display: block; font-size: 0.8rem; color: rgba(255,255,255,0.8); margin-bottom: 8px; font-weight: 600;">📸 Foto de la estantería:</span>
+            <img src="${escapeFn(info.shelfPhoto)}" alt="Foto del estante" style="max-height: 180px; width: auto; max-width: 100%; border-radius: 10px; border: 1.5px solid #c2a246; object-fit: cover;">
+          </div>
+        ` : ''}
+
+        ${info.hasMatchedProduct ? `
+          <div style="display: grid; grid-template-columns: ${isOutOfStock ? '1fr' : '1fr 1fr'}; gap: 10px; margin-bottom: 12px;">
+            <button type="button" onclick="openStockAdjustmentModal('${escapeFn(info.productId || info.productBarcode || info.productName || info.rawCode)}', 'add')" style="padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 0.92rem; background: ${isOutOfStock ? '#2e7d32' : 'rgba(76,175,80,0.25)'}; border: 1.5px solid #81c784; color: #ffffff; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              ${isOutOfStock ? '🔄 Reponer / Ingresar stock' : '➕ Agregar stock'}
+            </button>
+            ${!isOutOfStock ? `
+              <button type="button" onclick="openStockAdjustmentModal('${escapeFn(info.productId || info.productBarcode || info.productName || info.rawCode)}', 'remove')" style="padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; background: rgba(239,83,80,0.25); border: 1.5px solid #ef5350; color: #ef9a9a; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                ➖ Quitar stock
+              </button>
+            ` : ''}
+          </div>
+        ` : ''}
+
+        <div>
+          <button type="button" onclick="closeStoreMapLocationCard()" style="width: 100%; min-height: 52px; padding: 14px 20px; font-size: 1.05rem; font-weight: 900; background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: #ffffff; border: 2px solid #81c784; border-radius: 14px; cursor: pointer; box-shadow: 0 6px 20px rgba(46,125,50,0.45); display: flex; align-items: center; justify-content: center; gap: 10px;">
+            ✅ Encontrado
+          </button>
+        </div>
+      </div>
+    `;
+    cardContainer.style.display = 'block';
+    cardContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return;
+  }
+
+  // STATE 2: Product exists in catalog/stock but has NO location assigned in the active map
+  if (info.hasMatchedProduct) {
+    const title = `${escapeFn(info.productName)}`;
+    const shelfOptionsHtml = currentShelves.length
+      ? currentShelves.map(s => `<option value="${escapeFn(s.code)}" data-floor="${s.floor_level}">${s.floor_level === 2 ? '📦 Depósito' : '🌿 Tienda'} · Módulo ${escapeFn(s.code)} (${s.icon || '🗄️'})</option>`).join('')
+      : '<option value="">(No hay estantes creados en el plano)</option>';
+
+    cardContainer.innerHTML = `
+      <div class="location-found-card" style="background: linear-gradient(135deg, #221d15 0%, #332a1c 100%); border: 2px solid #f57c00; border-radius: 20px; padding: 20px; color: #ffffff; box-shadow: 0 14px 40px rgba(0,0,0,0.4);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; border-bottom: 1px solid rgba(245,124,0,0.3); padding-bottom: 12px;">
+          <div style="display: flex; gap: 12px; align-items: center; min-width: 0; flex: 1;">
+            ${info.productImage ? `
+              <img src="${escapeFn(info.productImage)}" alt="${title}" style="width: 58px; height: 58px; border-radius: 12px; border: 1.5px solid #f57c00; object-fit: cover; background: #fff; flex-shrink: 0;">
+            ` : `
+              <div style="width: 58px; height: 58px; border-radius: 12px; border: 1.5px solid #f57c00; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; flex-shrink: 0;">📦</div>
+            `}
+            <div style="min-width: 0; flex: 1;">
+              <span style="background: rgba(245,124,0,0.25); color: #ffb74d; border: 1px solid #f57c00; padding: 2px 8px; border-radius: 8px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase;">
+                ⚠️ Sin Ubicación en el Plano
+              </span>
+              <h3 style="margin: 4px 0 0 0; font-size: 1.15rem; color: #ffffff; font-weight: 800; line-height: 1.3; word-break: break-word;">
+                ${title}
+              </h3>
+              <small style="color: rgba(247,246,242,0.7); font-size: 0.78rem;">Stock: ${info.stockCount} u. · SKU: ${escapeFn(info.productBarcode || info.productId)}</small>
+            </div>
+          </div>
+          <button type="button" onclick="if(window.speakLocationVoicePhrase)window.speakLocationVoicePhrase(window.__lastDecodedWmsLocation||null)" style="padding: 7px 12px; border-radius: 10px; background: rgba(245,124,0,0.25); border: 1.5px solid #f57c00; color: #ffb74d; font-size: 0.78rem; font-weight: 800; cursor: pointer; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;">
             🔊 Voz
           </button>
-          ${info.productId ? `
-            <button type="button" onclick="openProductFullInfoModal('${escapeFn(info.productId)}')" style="padding: 7px 12px; border-radius: 10px; background: rgba(194,162,70,0.25); border: 1.5px solid #c2a246; color: #ffd54f; font-size: 0.78rem; font-weight: 800; cursor: pointer; white-space: nowrap; flex-shrink: 0; display: flex; align-items: center; gap: 4px;">
-              ℹ️ Info
+        </div>
+
+        <div style="background: rgba(0,0,0,0.3); border-radius: 14px; padding: 16px; border: 1px solid rgba(245,124,0,0.25); margin-bottom: 16px; font-size: 0.92rem; line-height: 1.6;">
+          <p style="margin: 0 0 8px 0; color: #ffb74d; font-weight: 800;">
+            📦 El producto está registrado en el inventario comercial (${info.stockCount} unidades), pero todavía no fue asignado a ningún módulo o estante de este local.
+          </p>
+          <p style="margin: 0; font-size: 0.84rem; color: rgba(246,243,232,0.85);">
+            Asignalo a uno de tus módulos activos para que aparezca resaltado en el plano y los vendedores puedan ubicarlo físicamente.
+          </p>
+        </div>
+
+        ${currentShelves.length ? `
+          <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 14px; margin-bottom: 16px;">
+            <strong style="display: block; font-size: 0.85rem; color: #c2a246; margin-bottom: 10px;">📍 Asignar ubicación rápida en el plano:</strong>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+              <div>
+                <label style="display: block; font-size: 0.72rem; color: rgba(255,255,255,0.7); margin-bottom: 3px;">Módulo del local</label>
+                <select id="quick-assign-shelf-select" style="width: 100%; padding: 8px 10px; border-radius: 8px; background: #152d24; border: 1px solid #c2a246; color: #fff; font-size: 0.82rem; font-weight: 700;">
+                  ${shelfOptionsHtml}
+                </select>
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.72rem; color: rgba(255,255,255,0.7); margin-bottom: 3px;">Nivel / Altura</label>
+                <select id="quick-assign-level-select" style="width: 100%; padding: 8px 10px; border-radius: 8px; background: #152d24; border: 1px solid #c2a246; color: #fff; font-size: 0.82rem; font-weight: 700;">
+                  <option value="1">Nivel 1 (Piso / Base)</option>
+                  <option value="2">Nivel 2 (Bajo)</option>
+                  <option value="3" selected>Nivel 3 (Medio / Ojos)</option>
+                  <option value="4">Nivel 4 (Medio Alto)</option>
+                  <option value="5">Nivel 5 (Alto)</option>
+                  <option value="6">Nivel 6 (Tope)</option>
+                </select>
+              </div>
+            </div>
+
+            <button type="button" onclick="const sEl = document.getElementById('quick-assign-shelf-select'); const lEl = document.getElementById('quick-assign-level-select'); const opt = sEl.options[sEl.selectedIndex]; assignProductToStoreShelf('${escapeFn(info.productId || info.productBarcode || info.productName)}', opt ? opt.dataset.floor : 1, sEl.value, lEl.value, 'C');" style="width: 100%; padding: 12px; border-radius: 10px; background: #c2a246; color: #152d24; font-weight: 900; border: none; cursor: pointer; font-size: 0.92rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              📍 Guardar y ubicar en el plano
             </button>
-          ` : ''}
-        </div>
-      </div>
+          </div>
+        ` : `
+          <div style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 12px; margin-bottom: 16px; font-size: 0.82rem; color: #ffd54f;">
+            💡 Primero hacé clic en '🛠️ EDITAR PLANO' -> '➕ NUEVO MÓDULO' para crear los estantes o heladeras de tu tienda.
+          </div>
+        `}
 
-      <div style="background: rgba(0,0,0,0.3); border-radius: 14px; padding: 16px; border: 1px solid rgba(255,255,255,0.12); margin-bottom: 18px; font-size: 0.95rem; line-height: 1.7;">
-        <div style="margin-bottom: 10px;">
-          🏢 <strong>Lugar:</strong> El producto se encuentra en <span style="color: #c2a246; font-weight: 800;">${escapeFn(info.areaLabel)}</span>.
-        </div>
-        <div style="margin-bottom: 10px;">
-          🧭 <strong>Pared y Orientación:</strong> <span style="color: #a5d6a7; font-weight: 700;">${escapeFn(info.wallLabel)}</span> (${escapeFn(info.compassText)}).
-        </div>
-        <div style="margin-bottom: 10px;">
-          🪵 <strong>Tipo de Mueble:</strong> <span style="color: #ffffff; font-weight: 700;">${escapeFn(info.furnitureType)}</span>.
-        </div>
-        <div style="margin-bottom: 10px;">
-          ↕️ <strong>Nivel / Altura:</strong> <span style="color: #ffd54f; font-weight: 800;">${escapeFn(info.levelLabel)}</span> (${escapeFn(info.levelDesc)}).
-        </div>
-        <div style="margin-bottom: 10px;">
-          ↔️ <strong>Posición:</strong> <span style="color: #ffffff; font-weight: 700;">${escapeFn(info.sectorText)}</span>.
-        </div>
         <div>
-          📦 <strong>Unidades disponibles:</strong> ${stockBadgeHtml}.
-        </div>
-      </div>
-
-      ${info.shelfPhoto ? `
-        <div style="margin-bottom: 18px; text-align: center; background: rgba(0,0,0,0.25); padding: 12px; border-radius: 14px;">
-          <span style="display: block; font-size: 0.8rem; color: rgba(255,255,255,0.8); margin-bottom: 8px; font-weight: 600;">📸 Foto de la estantería:</span>
-          <img src="${escapeFn(info.shelfPhoto)}" alt="Foto del estante" style="max-height: 180px; width: auto; max-width: 100%; border-radius: 10px; border: 1.5px solid #c2a246; object-fit: cover;">
-        </div>
-      ` : ''}
-
-      <div style="display: grid; grid-template-columns: ${isOutOfStock ? '1fr' : '1fr 1fr'}; gap: 10px; margin-bottom: 12px;">
-        <button type="button" onclick="openStockAdjustmentModal('${escapeFn(info.productId || info.productBarcode || info.productName || info.rawCode)}', 'add')" style="padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 0.92rem; background: ${isOutOfStock ? '#2e7d32' : 'rgba(76,175,80,0.25)'}; border: 1.5px solid #81c784; color: #ffffff; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-          ${isOutOfStock ? '🔄 Reponer / Ingresar stock' : '➕ Agregar stock'}
-        </button>
-        ${!isOutOfStock ? `
-          <button type="button" onclick="openStockAdjustmentModal('${escapeFn(info.productId || info.productBarcode || info.productName || info.rawCode)}', 'remove')" style="padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; background: rgba(239,83,80,0.25); border: 1.5px solid #ef5350; color: #ef9a9a; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-            ➖ Quitar stock
+          <button type="button" onclick="closeStoreMapLocationCard()" style="width: 100%; padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.25); cursor: pointer; font-weight: 700;">
+            Cerrar
           </button>
-        ` : ''}
+        </div>
       </div>
+    `;
+    cardContainer.style.display = 'block';
+    cardContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return;
+  }
 
-      <div>
-        <button type="button" onclick="closeStoreMapLocationCard()" style="width: 100%; min-height: 52px; padding: 14px 20px; font-size: 1.05rem; font-weight: 900; background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: #ffffff; border: 2px solid #81c784; border-radius: 14px; cursor: pointer; box-shadow: 0 6px 20px rgba(46,125,50,0.45); display: flex; align-items: center; justify-content: center; gap: 10px;">
-          ✅ Encontrado
-        </button>
+  // STATE 3: Nothing matched (neither product nor shelf)
+  cardContainer.innerHTML = `
+    <div class="location-found-card" style="background: linear-gradient(135deg, #2a1515 0%, #3d1c1c 100%); border: 2px solid #e53935; border-radius: 20px; padding: 20px; color: #ffffff; box-shadow: 0 14px 40px rgba(0,0,0,0.4);">
+      <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 12px;">
+        <span style="font-size: 2rem;">🔍</span>
+        <div>
+          <span style="background: rgba(229,57,53,0.25); color: #ef9a9a; border: 1px solid #e53935; padding: 2px 8px; border-radius: 8px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase;">
+            No Encontrado
+          </span>
+          <h3 style="margin: 4px 0 0 0; font-size: 1.1rem; color: #ffffff; font-weight: 800;">
+            No se encontró "${escapeFn(info.rawCode)}"
+          </h3>
+        </div>
       </div>
+      <p style="margin: 0 0 16px 0; font-size: 0.86rem; color: rgba(247,246,242,0.8); line-height: 1.5;">
+        El término ingresado no coincide con ningún producto del catálogo, código de barras ni módulo de guardado activo en el plano.
+      </p>
+      <button type="button" onclick="closeStoreMapLocationCard()" style="width: 100%; padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.25); cursor: pointer; font-weight: 800;">
+        Entendido
+      </button>
     </div>
   `;
   cardContainer.style.display = 'block';
@@ -2321,20 +2472,85 @@ function searchShelfOnMap() {
   // 3. Render persistent card
   renderStoreMapLocationCard(info);
 
-  // 4. Voice assistance speech output (User requirement)
+  // 4. Voice assistance speech output
   if (window.speakLocationVoicePhrase) {
     window.speakLocationVoicePhrase(info);
   }
 
-  // 5. Update the interactive 2D/3D map
-  if (window.setFloorLevel) {
-    window.setFloorLevel(info.floorLevel);
+  // 5. Update the interactive 2D/3D map ONLY if located on an active shelf
+  if (info.isLocated) {
+    if (window.setFloorLevel) {
+      window.setFloorLevel(info.floorLevel);
+    }
+    if (window.selectShelf) {
+      window.selectShelf(info.layoutShelfCode || info.shelfCode, info.levelNum);
+    }
+    renderStoreMapUI(info.wallCode || info.zoneCode, info.layoutShelfCode || info.shelfCode, info.levelNum);
   }
-  if (window.selectShelf) {
-    window.selectShelf(info.layoutShelfCode || info.shelfCode, info.levelNum);
-  }
-  renderStoreMapUI(info.wallCode || info.zoneCode, info.layoutShelfCode || info.shelfCode, info.levelNum);
 }
+
+function assignProductToStoreShelf(productCodeOrId, floorLevel = 1, shelfCode = '', levelNum = 1, sectorCode = 'C') {
+  if (!shelfCode) {
+    if (window.showToast) window.showToast('⚠️ Seleccioná un módulo válido.');
+    return;
+  }
+  const fLevel = Number(floorLevel) || 1;
+  const lNum = Number(levelNum) || 1;
+  const sCode = String(shelfCode).trim().toUpperCase();
+
+  const wallMatch = sCode.match(/P([1-4])/);
+  const wallCode = wallMatch ? `P${wallMatch[1]}` : 'P1';
+  const zonePrefix = fLevel === 2 ? 'DP' : 'TI';
+  const compassPrefix = wallCode === 'P3' ? 'D' : wallCode === 'P4' ? 'I' : wallCode === 'P2' ? 'A' : 'F';
+  const wmsCode = `${zonePrefix}-${compassPrefix}-${wallCode}-${sCode}-N${lNum}-${sectorCode}`;
+
+  const allProds = [...(typeof internalCatalogProducts !== 'undefined' ? internalCatalogProducts : []), ...(window.storeLocationProducts || [])];
+  const prod = allProds.find(p => String(p.product_code || p.id).toUpperCase() === String(productCodeOrId).toUpperCase() || String(p.name).toLowerCase() === String(productCodeOrId).toLowerCase());
+
+  const locationEntry = {
+    product_id: prod?.id || prod?.product_code || productCodeOrId,
+    product_code: prod?.product_code || prod?.id || productCodeOrId,
+    name: prod?.name || productCodeOrId,
+    image_url: prod?.image || prod?.image_url || '',
+    barcode: prod?.barcode || null,
+    floor_level: fLevel,
+    shelf_code: sCode,
+    shelf_level: lNum,
+    stock: Math.max(0, Number(prod?.stock ?? prod?.on_hand) || 0),
+    shelf_position: `Nivel ${lNum} (${sectorCode === 'I' ? 'Izq' : sectorCode === 'D' ? 'Der' : 'Centro'})`,
+    location_label: `📍 ${fLevel === 2 ? 'Depósito' : 'Tienda'} · ${sCode} · Nivel ${lNum}`,
+    wms_code: wmsCode
+  };
+
+  saveLocalProductLocation(locationEntry);
+
+  try {
+    const raw = JSON.parse(localStorage.getItem('boeweb_wms_product_locations') || '[]');
+    const filtered = raw.filter(r => String(r.product_code || r.id).toUpperCase() !== String(locationEntry.product_code).toUpperCase());
+    filtered.unshift(locationEntry);
+    localStorage.setItem('boeweb_wms_product_locations', JSON.stringify(filtered));
+  } catch (_) {}
+
+  if (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts)) {
+    const p = internalCatalogProducts.find(item => String(item.product_code || item.id).toUpperCase() === String(locationEntry.product_code).toUpperCase());
+    if (p) {
+      p.shelf_code = sCode;
+      p.shelf_level = lNum;
+      p.floor_level = fLevel;
+      p.wms_code = wmsCode;
+      p.location = locationEntry.location_label;
+      p.location_label = locationEntry.location_label;
+    }
+  }
+
+  if (window.showToast) window.showToast(`✅ ${locationEntry.name} asignado a ${sCode} · Nivel ${lNum}.`);
+  if (typeof loadStoreMapData === 'function') loadStoreMapData(true);
+  
+  const searchInput = document.getElementById('map-search-input');
+  if (searchInput) searchInput.value = locationEntry.name;
+  searchShelfOnMap();
+}
+window.assignProductToStoreShelf = assignProductToStoreShelf;
 
 function startVoiceSearchOnMap() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;

@@ -500,6 +500,8 @@ function clearAllStoreShelves() {
         const updated = rawLocs.map(loc => ({ ...loc, shelf_code: null, wms_code: null, location: 'Sin ubicación', location_label: 'Sin ubicación' }));
         localStorage.setItem(locKey, JSON.stringify(updated));
       }
+      const locKey2 = 'boeweb_product_locations_v1';
+      localStorage.removeItem(locKey2);
     } catch (_) {}
 
     storeLocationProducts.forEach(prod => {
@@ -509,7 +511,7 @@ function clearAllStoreShelves() {
       prod.location_label = 'Sin ubicación';
     });
 
-    storeShelves = structuredClone(DEFAULT_STORE_SHELVES);
+    storeShelves = DEFAULT_STORE_SHELVES.filter(s => s.is_anchor);
     saveStoreLayout();
     selectedShelfCode = 'PC-CENTRO';
     logMapHistoryAction('VACIAR_PLANO', 'Plano reiniciado', 'Se vaciaron todos los estantes. Solo quedó la Terminal Central.');
@@ -642,6 +644,14 @@ function formatLocationVoiceText(loc) {
 
 function generateDetailedVoicePhrase(info) {
   if (!info) return '';
+  if (info.isLocated === false) {
+    if (info.hasMatchedProduct) {
+      const prodName = info.productName ? `El producto ${info.productName}` : 'El ítem solicitado';
+      return `${prodName} está en el inventario con ${info.stockCount || 0} unidades, pero todavía no tiene una ubicación física asignada en el plano.`;
+    }
+    return 'No se encontró ningún producto o módulo de guardado con el término ingresado en el plano actual.';
+  }
+
   const prodName = info.productName ? `El producto ${info.productName}` : 'El ítem solicitado';
   const area = info.floorLevel === 2 ? 'el depósito' : 'la tienda';
   const wallMatch = String(info.wallCode || 'P1').match(/\d/);
