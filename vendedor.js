@@ -8863,7 +8863,7 @@ function renderMobilePosAssistant() {
   if (step === 'mode') {
     if (titleEl) titleEl.textContent = '¿Qué deseás vender?';
     if (mobilePosAssistantState.voiceActive) {
-      speakPosAssistant('¿Qué deseás vender? Podés elegir: en stock, sin stock, o venta express.');
+      speakPosAssistant('¿Qué deseás vender?');
     }
     container.innerHTML = `
       <p class="assistant-question">Elegí la modalidad de la venta:</p>
@@ -8899,7 +8899,7 @@ function renderMobilePosAssistant() {
     if (mobilePosAssistantState.mode === 'express') {
       if (titleEl) titleEl.textContent = '⚡ Venta Express (Carga rápida)';
       if (mobilePosAssistantState.voiceActive) {
-        speakPosAssistant('Ingresá el nombre y precio del producto express.');
+        speakPosAssistant('Ingresá nombre y precio express.');
       }
       container.innerHTML = `
         <p class="assistant-question">Completá los datos rápidos del producto:</p>
@@ -8937,10 +8937,10 @@ function renderMobilePosAssistant() {
       return;
     }
 
-    const modeLabel = mobilePosAssistantState.mode === 'nostock' ? '📦 Producto sin Stock / Preventa' : '🌿 Producto en Stock';
+    const modeLabel = mobilePosAssistantState.mode === 'nostock' ? '📦 Producto sin Stock' : '🌿 Producto en Stock';
     if (titleEl) titleEl.textContent = `Buscar: ${modeLabel}`;
     if (mobilePosAssistantState.voiceActive) {
-      speakPosAssistant('¿Qué producto buscamos? Podés decir el nombre o escanear el código.');
+      speakPosAssistant('¿Qué producto buscamos?');
     }
     container.innerHTML = `
       <p class="assistant-question">Buscá el producto por nombre o código:</p>
@@ -8965,7 +8965,7 @@ function renderMobilePosAssistant() {
 
     if (titleEl) titleEl.textContent = 'Indicar Cantidad';
     if (mobilePosAssistantState.voiceActive) {
-      speakPosAssistant(`¿Qué cantidad vas a vender de ${prod.name || 'este producto'}? Podés decir un número.`);
+      speakPosAssistant('¿Qué cantidad vas a vender?');
     }
 
     let noStockFieldsHtml = '';
@@ -9020,7 +9020,7 @@ function renderMobilePosAssistant() {
 
     if (titleEl) titleEl.textContent = 'Ticket de Venta';
     if (mobilePosAssistantState.voiceActive) {
-      speakPosAssistant(`Total acumulado $${total.toLocaleString('es-AR')}. ¿Deseás agregar otro producto o pasar a cobrar?`);
+      speakPosAssistant(`Total acumulado $${total.toLocaleString('es-AR')}. ¿Agregamos otro producto o pasamos a cobrar?`);
     }
 
     container.innerHTML = `
@@ -9062,7 +9062,7 @@ function renderMobilePosAssistant() {
 
     if (titleEl) titleEl.textContent = 'Medio de Pago';
     if (mobilePosAssistantState.voiceActive) {
-      speakPosAssistant(`Total a cobrar $${total.toLocaleString('es-AR')}. ¿Cómo abona el cliente? Podés decir: efectivo, transferencia, débito o tarjeta.`);
+      speakPosAssistant(`Total $${total.toLocaleString('es-AR')}. ¿Cómo abona el cliente?`);
     }
 
     const methods = [
@@ -9107,7 +9107,7 @@ function renderMobilePosAssistant() {
 
     if (titleEl) titleEl.textContent = 'Confirmar Venta & WhatsApp';
     if (mobilePosAssistantState.voiceActive) {
-      speakPosAssistant('Venta lista para confirmar. Podés ingresar el WhatsApp para enviar el comprobante o confirmar directamente.');
+      speakPosAssistant('Venta lista para confirmar.');
     }
 
     container.innerHTML = `
@@ -9348,15 +9348,40 @@ function continueMobilePosAssistant() {
 window.continueMobilePosAssistant = continueMobilePosAssistant;
 
 /* Voice Synthesis & Voice Command Recognition Engine */
+let isPosAssistantSpeaking = false;
+let posAssistantSpeakingTimer = null;
+
 function speakPosAssistant(text) {
   if (!('speechSynthesis' in window)) return;
   try {
     window.speechSynthesis.cancel();
+    if (posAssistantSpeakingTimer) clearTimeout(posAssistantSpeakingTimer);
+    isPosAssistantSpeaking = true;
+
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'es-AR';
-    utter.rate = 1.05;
+    utter.rate = 1.38; // Velocidad ágil y fluida (~1.4x - 1.5x)
+    utter.pitch = 0.94; // Tono más cálido/profundo para evitar efecto ardilla al acelerar
+
+    // Buscar la voz en español más natural disponible
+    const voices = window.speechSynthesis.getVoices();
+    const esVoice = voices.find(v => v.lang && (v.lang === 'es-AR' || v.lang.startsWith('es-419') || v.lang === 'es-US' || v.lang.startsWith('es')));
+    if (esVoice) utter.voice = esVoice;
+
+    utter.onend = () => {
+      posAssistantSpeakingTimer = setTimeout(() => {
+        isPosAssistantSpeaking = false;
+      }, 350);
+    };
+
+    utter.onerror = () => {
+      isPosAssistantSpeaking = false;
+    };
+
     window.speechSynthesis.speak(utter);
-  } catch (_) {}
+  } catch (_) {
+    isPosAssistantSpeaking = false;
+  }
 }
 
 function toggleMobilePosVoiceAssistant() {
@@ -9391,8 +9416,21 @@ function startMobilePosVoiceAssistant() {
     posVoiceRecognitionInstance.interimResults = false;
 
     posVoiceRecognitionInstance.onresult = (e) => {
+      // Evitar que el micrófono escuche la propia voz del asistente (anti-eco)
+      if (isPosAssistantSpeaking || (window.speechSynthesis && window.speechSynthesis.speaking)) {
+        return;
+      }
+
       const last = e.results[e.results.length - 1];
-      const transcript = last[0].transcript.trim();
+      const transcript = (last[0]?.transcript || '').trim();
+      if (!transcript) return;
+
+      // Filtrar frases que coincidan con los prompts del sistema
+      const lower = transcript.toLowerCase();
+      if (lower.includes('qué producto buscamos') || lower.includes('asistente de voz') || lower.includes('qué deseás vender')) {
+        return;
+      }
+
       if (textEl) textEl.textContent = `🗣️ "${transcript}"`;
       handlePosVoiceCommand(transcript);
     };
@@ -9408,7 +9446,7 @@ function startMobilePosVoiceAssistant() {
     };
 
     posVoiceRecognitionInstance.start();
-    speakPosAssistant('Asistente de voz activado. ¿Qué deseás vender?');
+    speakPosAssistant('¿Qué deseás vender?');
   } catch (err) {
     console.error('Error starting pos voice recognition:', err);
   }

@@ -698,8 +698,11 @@ function speakLocationVoicePhrase(infoOrText) {
 
     const utterance = new SpeechSynthesisUtterance(phrase);
     utterance.lang = 'es-AR';
-    utterance.rate = 0.98;
-    utterance.pitch = 1.0;
+    utterance.rate = 1.38;
+    utterance.pitch = 0.94;
+    const voices = window.speechSynthesis.getVoices();
+    const esVoice = voices.find(v => v.lang && (v.lang === 'es-AR' || v.lang.startsWith('es-419') || v.lang === 'es-US' || v.lang.startsWith('es')));
+    if (esVoice) utterance.voice = esVoice;
     window.speechSynthesis.speak(utterance);
   } catch (err) {
     console.warn('Voice synthesis error:', err);
