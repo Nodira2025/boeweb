@@ -8899,10 +8899,10 @@ function renderMobilePosAssistant() {
     if (mobilePosAssistantState.mode === 'express') {
       if (titleEl) titleEl.textContent = '⚡ Venta Express (Carga rápida)';
       if (mobilePosAssistantState.voiceActive) {
-        speakPosAssistant('Ingresá nombre y precio express.');
+        speakPosAssistant('¿Qué producto express deseás vender y cómo se cobrará?');
       }
       container.innerHTML = `
-        <p class="assistant-question">Completá los datos rápidos del producto:</p>
+        <p class="assistant-question">Dictá la venta en una frase (ej: "Dos sustratos a 36000 cada uno en efectivo"):</p>
         <div style="display: grid; gap: 12px; margin-top: 10px;">
           <div>
             <label style="display: block; font-size: 0.8rem; font-weight: 800; color: var(--color-text-main); margin-bottom: 4px;">Nombre del producto *</label>
@@ -9144,31 +9144,182 @@ function renderMobilePosAssistant() {
 }
 window.renderMobilePosAssistant = renderMobilePosAssistant;
 
+function parseExpressVoiceInput(rawText) {
+  if (!rawText) return null;
+  let text = rawText.toLowerCase().trim();
+
+  // 1. Detectar Cantidad
+  let qty = 1;
+  const wordQtyMap = {
+    'un': 1, 'uno': 1, 'una': 1, 'dos': 2, 'tres': 3, 'cuatro': 4,
+    'cinco': 5, 'seis': 6, 'siete': 7, 'ocho': 8, 'nueve': 9, 'diez': 10,
+    'once': 11, 'doce': 12, 'quince': 15, 'veinte': 20, 'veinticinco': 25,
+    'cincuenta': 50, 'cien': 100
+  };
+
+  const leadingQtyMatch = text.match(/^(\d+|\b(?:un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|doce|veinte)\b)\s+(.+)/i);
+  if (leadingQtyMatch) {
+    const rawQty = leadingQtyMatch[1].toLowerCase();
+    qty = wordQtyMap[rawQty] || parseInt(rawQty, 10) || 1;
+    text = leadingQtyMatch[2].trim();
+  }
+
+  // 2. Detectar Medio de Pago
+  let paymentMethod = null;
+  if (/\b(en\s+|con\s+)?(efectivo|cash|contado)\b/i.test(text)) {
+    paymentMethod = 'EFECTIVO';
+    text = text.replace(/\b(en\s+|con\s+)?(efectivo|cash|contado)\b/gi, '').trim();
+  } else if (/\b(en\s+|con\s+|por\s+)?(transferencia|mercado\s*pago|mp|transfe)\b/i.test(text)) {
+    paymentMethod = 'TRANSFERENCIA';
+    text = text.replace(/\b(en\s+|con\s+|por\s+)?(transferencia|mercado\s*pago|mp|transfe)\b/gi, '').trim();
+  } else if (/\b(en\s+|con\s+)?(débito|debito)\b/i.test(text)) {
+    paymentMethod = 'DEBITO';
+    text = text.replace(/\b(en\s+|con\s+)?(débito|debito)\b/gi, '').trim();
+  } else if (/\b(en\s+|con\s+)?(tarjeta|crédito|credito)\b/i.test(text)) {
+    paymentMethod = 'TARJETA';
+    text = text.replace(/\b(en\s+|con\s+)?(tarjeta|crédito|credito)\b/gi, '').trim();
+  } else if (/\b(en\s+|con\s+)?(cuenta\s*corriente|cta\s*cte|fiar|fiado)\b/i.test(text)) {
+    paymentMethod = 'CUENTA_CORRIENTE';
+    text = text.replace(/\b(en\s+|con\s+)?(cuenta\s*corriente|cta\s*cte|fiar|fiado)\b/gi, '').trim();
+  }
+
+  // 3. Detectar Precio Unitario (ej: 36000, 36 mil, 36.000, $36000, 36k, etc.)
+  let price = 0;
+  const milMatch = text.match(/(\d+(?:[.,]\d+)?)\s*mil(\s*(?:pesos|cada\s*uno|c\/u))?/i);
+  if (milMatch) {
+    price = parseFloat(milMatch[1].replace(',', '.')) * 1000;
+    text = text.replace(milMatch[0], '').trim();
+  } else {
+    const priceMatch = text.match(/(?:a\s+|\$\s*|por\s+)?(\d{1,3}(?:\.\d{3})*|\d+)(?:[.,](\d{2}))?\s*(?:pesos|cada\s*uno|c\/u)?/i);
+    if (priceMatch && parseInt(priceMatch[1].replace(/\./g, ''), 10) >= 100) {
+      price = parseInt(priceMatch[1].replace(/\./g, ''), 10);
+      text = text.replace(priceMatch[0], '').trim();
+    }
+  }
+
+  // 4. Nombre del producto limpio
+  let name = text
+    .replace(/\b(cada\s*uno|c\/u|pesos|a|por|de|unidades|unidad|u|precio|venta)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (name) {
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
+  let category = 'Otros';
+  const lowerName = (name || '').toLowerCase();
+  if (lowerName.includes('sustrat') || lowerName.includes('tierra') || lowerName.includes('turba')) category = 'Sustratos';
+  else if (lowerName.includes('fertiliz') || lowerName.includes('nutri') || lowerName.includes('bio') || lowerName.includes('top crop') || lowerName.includes('bloom') || lowerName.includes('grow')) category = 'Fertilizantes';
+  else if (lowerName.includes('semill') || lowerName.includes('seed')) category = 'Semillas';
+  else if (lowerName.includes('indoor') || lowerName.includes('carpa') || lowerName.includes('luz') || lowerName.includes('panel') || lowerName.includes('led') || lowerName.includes('extractor')) category = 'Indoor';
+  else if (lowerName.includes('picador') || lowerName.includes('grinder') || lowerName.includes('papel') || lowerName.includes('sedas') || lowerName.includes('bong') || lowerName.includes('pipa')) category = 'Parafernalia';
+
+  return {
+    quantity: Math.max(1, qty),
+    name: name,
+    price: price,
+    category: category,
+    paymentMethod: paymentMethod
+  };
+}
+window.parseExpressVoiceInput = parseExpressVoiceInput;
+
 function renderMobilePosAssistantSearchResults(query) {
   const container = document.getElementById('pos-assistant-results-container');
   if (!container) return;
 
   const clean = (query || '').toLowerCase().trim();
+
+  // MODO NOSTOCK / PREVENTA: ÚNICAMENTE B2B MAYORISTA Y TIENDAS CERCANAS
+  if (mobilePosAssistantState.mode === 'nostock') {
+    const b2bItems = (typeof baseProducts !== 'undefined' && Array.isArray(baseProducts))
+      ? baseProducts.map(p => ({
+          id: p.id,
+          product_code: p.product_code || `B2B-${p.id}`,
+          name: p.name,
+          brand: p.brand || '',
+          category: p.category || 'Mayorista',
+          price: Number(p.sale_price || p.price || 0),
+          image: p.image || p.image_url || 'assets/logo.jpg',
+          source_type: 'b2b',
+          source_label: '🏢 B2B Mayorista'
+        }))
+      : [];
+
+    let nearbyItems = [];
+    if (typeof getNearbyStores === 'function') {
+      const stores = getNearbyStores();
+      stores.forEach(s => {
+        (s.catalog || []).forEach(item => {
+          nearbyItems.push({
+            id: item.id || `loc_${item.product_code}`,
+            product_code: item.product_code,
+            name: item.name,
+            category: item.category || 'Tienda Asociada',
+            price: Number(item.public_price || item.price || 0),
+            image: 'assets/logo.jpg',
+            source_type: 'nearby',
+            source_label: `🏪 ${s.name || 'Tienda Cercana'} (48 hs)`
+          });
+        });
+      });
+    }
+
+    const externalProds = [...b2bItems, ...nearbyItems];
+    let filtered = externalProds;
+    if (clean) {
+      filtered = externalProds.filter(p => {
+        const text = [p.name, p.brand, p.category, p.product_code, p.source_label].filter(Boolean).join(' ').toLowerCase();
+        return text.includes(clean);
+      });
+    }
+
+    if (filtered.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 20px 8px; color: var(--color-text-muted); font-size: 0.82rem;">
+          No encontramos coincidencias en B2B Mayorista ni en Tiendas Cercanas. Podés usar Venta Express para ingresarlo en el acto.
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = filtered.slice(0, 15).map((p, idx) => {
+      const priceVal = Number(p.price || 0);
+      return `
+        <div class="pos-assistant-result-item" onclick="selectMobilePosNoStockProduct('${escapeStockHtml(p.id)}', '${escapeStockHtml(p.source_type)}')">
+          <span style="min-width: 22px; height: 22px; border-radius: 50%; background: #1565c0; color: #ffffff; font-weight: 900; font-size: 0.72rem; display: grid; place-items: center; flex-shrink: 0;">${idx + 1}</span>
+          <img src="${p.image || 'assets/logo.jpg'}" alt="">
+          <div style="flex: 1; min-width: 0;">
+            <strong style="display: block; font-size: 0.86rem; color: var(--color-text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeStockHtml(p.name)}</strong>
+            <small style="color: #1565c0; font-weight: 800; font-size: 0.72rem;">${escapeStockHtml(p.source_label)}</small>
+          </div>
+          <div style="font-weight: 800; color: var(--color-accent-gold); font-size: 0.88rem;">
+            $${priceVal.toLocaleString('es-AR')}
+          </div>
+        </div>
+      `;
+    }).join('');
+    return;
+  }
+
+  // MODO STOCK INMEDIATO: Catálogo propio de la tienda física con stock > 0
   const prods = (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts))
     ? internalCatalogProducts
     : JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
 
-  let filtered = prods;
+  let filtered = prods.filter(p => Number(p.stock !== undefined ? p.stock : (p.own_stock || 0)) > 0);
   if (clean) {
-    filtered = prods.filter(p => {
+    filtered = filtered.filter(p => {
       const text = [p.name, p.brand, p.presentation, p.category, p.barcode, p.product_code].filter(Boolean).join(' ').toLowerCase();
       return text.includes(clean);
     });
   }
 
-  if (mobilePosAssistantState.mode === 'stock') {
-    filtered = filtered.filter(p => Number(p.stock !== undefined ? p.stock : (p.own_stock || 0)) > 0);
-  }
-
   if (filtered.length === 0) {
     container.innerHTML = `
       <div style="text-align: center; padding: 20px 8px; color: var(--color-text-muted); font-size: 0.82rem;">
-        No se encontraron productos coincidentes. Podés dictar otro nombre o cambiar a Venta Express.
+        No se encontraron productos coincidentes en stock. Podés dictar otro nombre o cambiar a Venta Express.
       </div>
     `;
     return;
@@ -9210,6 +9361,47 @@ function selectMobilePosProduct(prodId) {
   setMobilePosAssistantStep('quantity');
 }
 window.selectMobilePosProduct = selectMobilePosProduct;
+
+function selectMobilePosNoStockProduct(prodId, sourceType) {
+  let match = null;
+  if (sourceType === 'b2b') {
+    const b2bList = (typeof baseProducts !== 'undefined' && Array.isArray(baseProducts)) ? baseProducts : [];
+    match = b2bList.find(p => String(p.id) === String(prodId) || p.product_code === prodId);
+    if (match) {
+      match = {
+        ...match,
+        price: Number(match.sale_price || match.price || 0),
+        is_nostock_b2b: true,
+        source_label: '🏢 B2B Mayorista'
+      };
+    }
+  } else {
+    const stores = typeof getNearbyStores === 'function' ? getNearbyStores() : [];
+    stores.forEach(s => {
+      (s.catalog || []).forEach(item => {
+        if (String(item.id) === String(prodId) || String(item.product_code) === String(prodId) || `loc_${item.product_code}` === String(prodId)) {
+          match = {
+            id: item.id || `loc_${item.product_code}`,
+            product_code: item.product_code,
+            name: item.name,
+            category: item.category || 'Tienda Asociada',
+            price: Number(item.public_price || item.price || 0),
+            image: 'assets/logo.jpg',
+            is_nostock_nearby: true,
+            source_label: `🏪 ${s.name || 'Tienda Cercana'} (48 hs)`
+          };
+        }
+      });
+    });
+  }
+
+  if (!match) return;
+
+  mobilePosAssistantState.selectedProduct = match;
+  mobilePosAssistantState.quantity = 1;
+  setMobilePosAssistantStep('quantity');
+}
+window.selectMobilePosNoStockProduct = selectMobilePosNoStockProduct;
 
 function confirmMobilePosExpressItem() {
   const name = document.getElementById('pos-express-name')?.value.trim();
@@ -9495,7 +9687,50 @@ function handlePosVoiceCommand(raw) {
   }
 
   if (step === 'search') {
-    // Si ya hay productos mostrándose y el usuario elige por voz ("el primero", "uno", "opción 1", etc.)
+    // 1. MODO EXPRESS: Procesar frase completa de venta con NLP (ej: "dos sustratos 36000 cada uno en efectivo")
+    if (mobilePosAssistantState.mode === 'express') {
+      const parsed = parseExpressVoiceInput(text);
+      if (parsed && parsed.name && parsed.price > 0) {
+        mobilePosAssistantState.expressData = {
+          name: parsed.name,
+          category: parsed.category,
+          price: parsed.price
+        };
+        mobilePosAssistantState.quantity = parsed.quantity;
+        mobilePosAssistantState.selectedProduct = {
+          id: `express_${Date.now()}`,
+          product_code: `EXP-${Date.now().toString().slice(-4)}`,
+          name: parsed.name,
+          category: parsed.category,
+          price: parsed.price,
+          is_express: true,
+          image: 'assets/logo.jpg'
+        };
+
+        const cart = getPosCartEngine();
+        if (cart) {
+          cart.addItem({
+            ...mobilePosAssistantState.selectedProduct,
+            quantity: parsed.quantity
+          });
+          renderPosCartItems();
+        }
+
+        if (parsed.paymentMethod) {
+          mobilePosAssistantState.paymentMethod = parsed.paymentMethod;
+          const paymentSelect = document.getElementById('pos-payment-method-select');
+          if (paymentSelect) paymentSelect.value = parsed.paymentMethod;
+          setMobilePosAssistantStep('confirm');
+          speakPosAssistant(`Se ingresará venta por ${parsed.quantity} ${parsed.name} a $${parsed.price.toLocaleString('es-AR')} cada uno en ${parsed.paymentMethod.toLowerCase()}. Venta lista para confirmar.`);
+        } else {
+          setMobilePosAssistantStep('payment');
+          speakPosAssistant(`Se ingresará venta por ${parsed.quantity} ${parsed.name} a $${parsed.price.toLocaleString('es-AR')} cada uno. ¿Cómo abona el cliente?`);
+        }
+        return;
+      }
+    }
+
+    // 2. MODO STOCK / NOSTOCK: Selección numérica si ya hay productos mostrándose
     const visibleItems = document.querySelectorAll('.pos-assistant-result-item');
     if (visibleItems.length > 0) {
       if (text === 'uno' || text === 'primero' || text === 'el primero' || text === 'opción 1' || text === 'opcion 1' || text === '1') {
