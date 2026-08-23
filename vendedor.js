@@ -9174,11 +9174,12 @@ function renderMobilePosAssistantSearchResults(query) {
     return;
   }
 
-  container.innerHTML = filtered.slice(0, 20).map(p => {
+  container.innerHTML = filtered.slice(0, 15).map((p, idx) => {
     const stockVal = Number(p.stock !== undefined ? p.stock : (p.own_stock || 0));
     const priceVal = Number(p.price || p.sale_price || 0);
     return `
       <div class="pos-assistant-result-item" onclick="selectMobilePosProduct('${escapeStockHtml(p.id || p.product_code)}')">
+        <span style="min-width: 22px; height: 22px; border-radius: 50%; background: var(--color-accent-gold, #c2a246); color: #152d24; font-weight: 900; font-size: 0.72rem; display: grid; place-items: center; flex-shrink: 0;">${idx + 1}</span>
         <img src="${p.image || p.image_url || 'assets/logo.jpg'}" alt="">
         <div style="flex: 1; min-width: 0;">
           <strong style="display: block; font-size: 0.86rem; color: var(--color-text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeStockHtml(p.name)}</strong>
@@ -9324,7 +9325,7 @@ async function completeMobilePosSale(sendWhatsApp = false) {
     window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
   }
 
-  speakPosAssistant('¡Venta confirmada con éxito! Muchas gracias.');
+  speakPosAssistant('¡Venta confirmada con éxito!');
   showToast('🎉 ¡Venta registrada y completada con éxito!');
   startMobilePosAssistant();
 }
@@ -9358,12 +9359,16 @@ function speakPosAssistant(text) {
     if (posAssistantSpeakingTimer) clearTimeout(posAssistantSpeakingTimer);
     isPosAssistantSpeaking = true;
 
+    // Pausar micrófono mientras habla para bloqueo total de eco
+    if (posVoiceRecognitionInstance) {
+      try { posVoiceRecognitionInstance.stop(); } catch (_) {}
+    }
+
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'es-AR';
-    utter.rate = 1.38; // Velocidad ágil y fluida (~1.4x - 1.5x)
-    utter.pitch = 0.94; // Tono más cálido/profundo para evitar efecto ardilla al acelerar
+    utter.rate = 1.38;
+    utter.pitch = 0.94;
 
-    // Buscar la voz en español más natural disponible
     const voices = window.speechSynthesis.getVoices();
     const esVoice = voices.find(v => v.lang && (v.lang === 'es-AR' || v.lang.startsWith('es-419') || v.lang === 'es-US' || v.lang.startsWith('es')));
     if (esVoice) utter.voice = esVoice;
@@ -9371,11 +9376,17 @@ function speakPosAssistant(text) {
     utter.onend = () => {
       posAssistantSpeakingTimer = setTimeout(() => {
         isPosAssistantSpeaking = false;
-      }, 350);
+        if (mobilePosAssistantState.voiceActive && posVoiceRecognitionInstance) {
+          try { posVoiceRecognitionInstance.start(); } catch (_) {}
+        }
+      }, 250);
     };
 
     utter.onerror = () => {
       isPosAssistantSpeaking = false;
+      if (mobilePosAssistantState.voiceActive && posVoiceRecognitionInstance) {
+        try { posVoiceRecognitionInstance.start(); } catch (_) {}
+      }
     };
 
     window.speechSynthesis.speak(utter);
@@ -9416,7 +9427,6 @@ function startMobilePosVoiceAssistant() {
     posVoiceRecognitionInstance.interimResults = false;
 
     posVoiceRecognitionInstance.onresult = (e) => {
-      // Evitar que el micrófono escuche la propia voz del asistente (anti-eco)
       if (isPosAssistantSpeaking || (window.speechSynthesis && window.speechSynthesis.speaking)) {
         return;
       }
@@ -9425,7 +9435,6 @@ function startMobilePosVoiceAssistant() {
       const transcript = (last[0]?.transcript || '').trim();
       if (!transcript) return;
 
-      // Filtrar frases que coincidan con los prompts del sistema
       const lower = transcript.toLowerCase();
       if (lower.includes('qué producto buscamos') || lower.includes('asistente de voz') || lower.includes('qué deseás vender')) {
         return;
@@ -9440,7 +9449,7 @@ function startMobilePosVoiceAssistant() {
     };
 
     posVoiceRecognitionInstance.onend = () => {
-      if (mobilePosAssistantState.voiceActive && posVoiceRecognitionInstance) {
+      if (mobilePosAssistantState.voiceActive && !isPosAssistantSpeaking && posVoiceRecognitionInstance) {
         try { posVoiceRecognitionInstance.start(); } catch (_) {}
       }
     };
@@ -9486,14 +9495,31 @@ function handlePosVoiceCommand(raw) {
   }
 
   if (step === 'search') {
+    // Si ya hay productos mostrándose y el usuario elige por voz ("el primero", "uno", "opción 1", etc.)
+    const visibleItems = document.querySelectorAll('.pos-assistant-result-item');
+    if (visibleItems.length > 0) {
+      if (text === 'uno' || text === 'primero' || text === 'el primero' || text === 'opción 1' || text === 'opcion 1' || text === '1') {
+        visibleItems[0]?.click();
+        return;
+      }
+      if (text === 'dos' || text === 'segundo' || text === 'el segundo' || text === 'opción 2' || text === 'opcion 2' || text === '2') {
+        if (visibleItems[1]) { visibleItems[1].click(); return; }
+      }
+      if (text === 'tres' || text === 'tercero' || text === 'el tercero' || text === 'opción 3' || text === 'opcion 3' || text === '3') {
+        if (visibleItems[2]) { visibleItems[2].click(); return; }
+      }
+      if (text === 'cuatro' || text === 'cuarto' || text === 'el cuarto' || text === 'opción 4' || text === 'opcion 4' || text === '4') {
+        if (visibleItems[3]) { visibleItems[3].click(); return; }
+      }
+    }
+
+    const cleanQuery = text.replace(/^(buscar|buscá|quiero|poner|producto)\s+/i, '').trim();
+    if (!cleanQuery) return;
+
     const input = document.getElementById('pos-assistant-search-input');
     if (input) {
-      input.value = text;
-      handleMobilePosAssistantSearch(text);
-      const first = document.querySelector('.pos-assistant-result-item');
-      if (first) {
-        speakPosAssistant(`Encontré coincidencias para ${text}. Podés tocar el producto.`);
-      }
+      input.value = cleanQuery;
+      handleMobilePosAssistantSearch(cleanQuery);
     }
     return;
   }
