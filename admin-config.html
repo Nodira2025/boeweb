@@ -241,22 +241,57 @@
       </div>
 
       <!-- Brand Identity & Business Vertical Config Card -->
-      <div class="admin-card">
+      <div class="admin-card" style="border: 2px solid var(--color-accent-gold); box-shadow: 0 16px 45px rgba(0,0,0,0.5);">
         <div class="admin-card-title">
-          <svg style="width: 24px; height: 24px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-          <span>Perfil de Empresa, Marca & Rubro Comercial</span>
+          <svg style="width: 28px; height: 28px; color: var(--color-accent-gold);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          <span style="font-size: 1.5rem; font-weight: 800;">🎨 Estudio de Marca & Personalización White-Label</span>
         </div>
-        <p class="admin-card-subtitle">
-          Configurá la identidad visual de tu negocio, cargá el logo oficial, definí los colores corporativos y seleccioná el rubro comercial (Growshop, Ferretería, Repuestos, Indumentaria) para adaptar automáticamente los campos y la IA.
+        <p class="admin-card-subtitle" style="font-size: 0.92rem; line-height: 1.5;">
+          Personalizá el 100% de la identidad visual de tu tienda y del sistema. Los cambios de nombre, logo, eslogan, paleta de colores y rubro se aplicarán automáticamente a la tienda web, catálogo móvil, tickets y portal de gestión.
         </p>
 
+        <!-- 1-Click Color Presets -->
+        <div style="margin-bottom: 24px; background: rgba(15, 30, 24, 0.6); padding: 18px; border-radius: 14px; border: 1px solid rgba(195, 155, 75, 0.25);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <label class="admin-label" style="margin: 0; font-size: 0.92rem;">✨ Paletas Predefinidas Populares (1 Clic):</label>
+            <small style="color: #ffd54f; font-weight: 600;">Elegí un estilo o personalizá abajo</small>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 8px;">
+            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#152D24', '#C2A246', 'growshop', 'BÔ Grow Club', 'Espacio Zen para Cultivo Premium')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #C2A246; background: #152D24; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <span style="width: 12px; height: 12px; border-radius: 50%; background: #C2A246;"></span>
+              🌿 Growshop Zen
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#0D47A1', '#FF6D00', 'ferreteria', 'Ferretería Industrial', 'Herramientas y Materiales de Primera')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #FF6D00; background: #0D47A1; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <span style="width: 12px; height: 12px; border-radius: 50%; background: #FF6D00;"></span>
+              🛠️ Ferretería Pro
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#B71C1C', '#FFD600', 'repuestos', 'Mecánica & Autopartes', 'Repuestos Originales y Accesorios')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #FFD600; background: #B71C1C; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <span style="width: 12px; height: 12px; border-radius: 50%; background: #FFD600;"></span>
+              🚗 Autopartes
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#1A1A1A', '#E0A96D', 'indumentaria', 'Atelier Moda & Estilo', 'Colección Exclusiva y Tendencia Urbana')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #E0A96D; background: #1A1A1A; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <span style="width: 12px; height: 12px; border-radius: 50%; background: #E0A96D;"></span>
+              👗 Moda Urbana
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#00695C', '#FFAB00', 'growshop', 'Pet Shop & Veterinaria', 'Todo para el Cuidado de tu Mascota')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #FFAB00; background: #00695C; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <span style="width: 12px; height: 12px; border-radius: 50%; background: #FFAB00;"></span>
+              🐾 Pet Shop
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#3E2723', '#D7CCC8', 'growshop', 'Café & Roastery', 'Especialidad y Tostado Artesanal')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #D7CCC8; background: #3E2723; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <span style="width: 12px; height: 12px; border-radius: 50%; background: #D7CCC8;"></span>
+              ☕ Café Gourmet
+            </button>
+          </div>
+        </div>
+
+        <!-- Basic Business Identity -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 20px;">
           <div>
             <label class="admin-label" for="brand-name-input">Nombre Comercial / Marca *</label>
             <input type="text" id="brand-name-input" class="admin-input" placeholder="Ej: BÔ Grow Club" oninput="updateBrandLivePreview()">
           </div>
           <div>
-            <label class="admin-label" for="brand-slogan-input">Eslogan del Negocio</label>
+            <label class="admin-label" for="brand-slogan-input">Eslogan o Frase de Marca</label>
             <input type="text" id="brand-slogan-input" class="admin-input" placeholder="Ej: Espacio Zen para Cultivo Premium" oninput="updateBrandLivePreview()">
           </div>
         </div>
@@ -278,14 +313,14 @@
         <!-- Corporate Colors Picker -->
         <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-bottom: 20px;">
           <div style="background: rgba(15, 30, 24, 0.5); padding: 16px; border-radius: 12px; border: 1px solid rgba(195, 155, 75, 0.15);">
-            <label class="admin-label" for="brand-primary-color">Color Primario (Fondo & Encabezados)</label>
+            <label class="admin-label" for="brand-primary-color">Color Primario (Fondo & Estructura)</label>
             <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
               <input type="color" id="brand-primary-color" value="#152D24" style="width: 48px; height: 42px; border: 1px solid rgba(195, 155, 75, 0.4); border-radius: 8px; cursor: pointer; background: transparent;" oninput="updateBrandColorInputs('primary')">
               <input type="text" id="brand-primary-color-hex" class="admin-input" value="#152D24" style="text-transform: uppercase;" maxlength="7" oninput="updateBrandColorPickers('primary')">
             </div>
           </div>
           <div style="background: rgba(15, 30, 24, 0.5); padding: 16px; border-radius: 12px; border: 1px solid rgba(195, 155, 75, 0.15);">
-            <label class="admin-label" for="brand-accent-color">Color Acento (Botones & Destacados)</label>
+            <label class="admin-label" for="brand-accent-color">Color Acento (Botones & Llamadas a Acción)</label>
             <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
               <input type="color" id="brand-accent-color" value="#C2A246" style="width: 48px; height: 42px; border: 1px solid rgba(195, 155, 75, 0.4); border-radius: 8px; cursor: pointer; background: transparent;" oninput="updateBrandColorInputs('accent')">
               <input type="text" id="brand-accent-color-hex" class="admin-input" value="#C2A246" style="text-transform: uppercase;" maxlength="7" oninput="updateBrandColorPickers('accent')">
@@ -297,10 +332,29 @@
         <div style="margin-bottom: 20px; background: rgba(15, 30, 24, 0.5); padding: 16px; border-radius: 12px; border: 1px solid rgba(195, 155, 75, 0.15);">
           <label class="admin-label" for="brand-logo-file">📁 Logo de Marca Oficial (Archivo PNG / JPG / SVG)</label>
           <div style="display: flex; gap: 16px; align-items: center; margin-top: 8px; flex-wrap: wrap;">
-            <div id="brand-logo-preview-box" style="width: 64px; height: 64px; border-radius: 12px; border: 1.5px solid var(--color-accent-gold); background: #152d24; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">
+            <div id="brand-logo-preview-box" style="width: 68px; height: 68px; border-radius: 14px; border: 2px solid var(--color-accent-gold); background: #152d24; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
               <img id="brand-logo-preview-img" src="assets/logo.jpg" alt="Logo preview" style="width: 100%; height: 100%; object-fit: contain;">
             </div>
             <input type="file" id="brand-logo-file" accept="image/*" class="admin-input" style="flex: 1; min-width: 220px; padding: 10px;" onchange="handleBrandLogoFileSelect(event)">
+          </div>
+        </div>
+
+        <!-- Commercial Contact Details -->
+        <div style="margin-bottom: 20px; background: rgba(15, 30, 24, 0.5); padding: 16px; border-radius: 12px; border: 1px solid rgba(195, 155, 75, 0.15);">
+          <label class="admin-label" style="font-size: 0.92rem; margin-bottom: 10px;">📞 Datos de Contacto y Ventas en la Web</label>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+            <div>
+              <span style="font-size: 0.78rem; color: rgba(247,246,242,0.7); display: block; margin-bottom: 4px;">WhatsApp de Pedidos (con código país):</span>
+              <input type="text" id="brand-whatsapp-input" class="admin-input" placeholder="Ej: +5493816123456" oninput="updateBrandLivePreview()">
+            </div>
+            <div>
+              <span style="font-size: 0.78rem; color: rgba(247,246,242,0.7); display: block; margin-bottom: 4px;">Instagram o Red Social:</span>
+              <input type="text" id="brand-instagram-input" class="admin-input" placeholder="Ej: @tunegocio_oficial" oninput="updateBrandLivePreview()">
+            </div>
+            <div>
+              <span style="font-size: 0.78rem; color: rgba(247,246,242,0.7); display: block; margin-bottom: 4px;">Dirección / Localidad:</span>
+              <input type="text" id="brand-address-input" class="admin-input" placeholder="Ej: Av. Principal 1234, Tucumán" oninput="updateBrandLivePreview()">
+            </div>
           </div>
         </div>
 
@@ -323,20 +377,43 @@
           </div>
         </div>
 
-        <!-- Live Preview Box -->
-        <div style="margin-top: 20px; border-radius: 16px; padding: 18px; border: 1.5px solid var(--color-accent-gold); background: #0c1813;" id="brand-preview-canvas">
-          <span style="font-size: 0.74rem; font-weight: 800; color: #ffd54f; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 10px;">👁️ Vista Previa en Tiempo Real:</span>
-          <div id="preview-header-bar" style="background: #152D24; padding: 12px 18px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.15);">
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <img id="preview-logo-thumb" src="assets/logo.jpg" alt="Logo" style="width: 34px; height: 34px; border-radius: 8px; object-fit: contain;">
+        <!-- Live Storefront Mockup Preview Box -->
+        <div style="margin-top: 20px; border-radius: 18px; padding: 20px; border: 2px solid var(--color-accent-gold); background: #0c1813;" id="brand-preview-canvas">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span style="font-size: 0.78rem; font-weight: 800; color: #ffd54f; text-transform: uppercase; letter-spacing: 0.5px;">👁️ Vista Previa en Vivo de la Tienda Web:</span>
+            <span style="font-size: 0.72rem; background: rgba(194,162,70,0.25); color: #ffd54f; padding: 2px 8px; border-radius: 6px; font-weight: 700;">100% Personalizado</span>
+          </div>
+          
+          <!-- Mockup Header -->
+          <div id="preview-header-bar" style="background: #152D24; padding: 14px 20px; border-radius: 14px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.15); margin-bottom: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <img id="preview-logo-thumb" src="assets/logo.jpg" alt="Logo" style="width: 40px; height: 40px; border-radius: 8px; object-fit: contain; background: #fff; padding: 2px;">
               <div>
-                <strong id="preview-brand-name" style="color: #fff; font-size: 1rem; display: block; font-family: var(--font-display);">BÔ Grow Club</strong>
-                <small id="preview-brand-slogan" style="color: rgba(247,246,242,0.7); font-size: 0.72rem;">Espacio Zen para Cultivo Premium</small>
+                <strong id="preview-brand-name" style="color: #fff; font-size: 1.1rem; display: block; font-family: var(--font-display);">BÔ Grow Club</strong>
+                <small id="preview-brand-slogan" style="color: rgba(247,246,242,0.7); font-size: 0.74rem;">Espacio Zen para Cultivo Premium</small>
               </div>
             </div>
             <div style="display: flex; gap: 8px; align-items: center;">
-              <span id="preview-term-product-badge" style="background: rgba(255,255,255,0.1); color: #fff; padding: 3px 8px; border-radius: 6px; font-size: 0.72rem;">Producto Botánico</span>
-              <button type="button" id="preview-sample-btn" style="background: #C2A246; color: #152D24; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 800; font-size: 0.78rem;">Comprar</button>
+              <span id="preview-term-product-badge" style="background: rgba(255,255,255,0.12); color: #fff; padding: 4px 10px; border-radius: 8px; font-size: 0.74rem; font-weight: 700;">Producto Botánico</span>
+              <button type="button" id="preview-sample-btn" style="background: #C2A246; color: #152D24; border: none; padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 0.82rem; cursor: pointer;">Comprar</button>
+            </div>
+          </div>
+
+          <!-- Mockup Product Card & WhatsApp bar -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; display: flex; gap: 10px; align-items: center;">
+              <div style="width: 44px; height: 44px; border-radius: 8px; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">📦</div>
+              <div>
+                <strong id="preview-sample-product-title" style="color: #fff; font-size: 0.84rem; display: block;">Ítem Destacado #1</strong>
+                <span id="preview-sample-price" style="color: #81c784; font-weight: 800; font-size: 0.8rem;">$12.500</span>
+              </div>
+            </div>
+            <div id="preview-contact-box" style="background: rgba(46,125,50,0.15); border: 1px solid #81c784; border-radius: 12px; padding: 12px; display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <small style="color: #a5d6a7; font-size: 0.72rem; display: block; font-weight: 700;">ATENCIÓN DIRECTA</small>
+                <span id="preview-whatsapp-text" style="color: #fff; font-size: 0.82rem; font-weight: 800;">💬 WhatsApp Activo</span>
+              </div>
+              <span style="font-size: 1.2rem;">➔</span>
             </div>
           </div>
         </div>

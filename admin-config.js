@@ -72,6 +72,9 @@ async function loadBrandConfig() {
   const bTermProduct = brand?.terminology?.product || 'Producto Botánico';
   const bTermVendor = brand?.terminology?.vendor || 'Asesor de Cultivo';
   const bTermWarehouse = brand?.terminology?.warehouse || 'Depósito Principal';
+  const bWhatsapp = brand?.whatsapp_phone || '+5493816123456';
+  const bInstagram = brand?.instagram_url || '@bogrowclub';
+  const bAddress = brand?.address || 'Estudio de Cultivo Privado, Tucumán';
 
   // Set values to DOM
   const nameEl = document.getElementById('brand-name-input');
@@ -102,10 +105,49 @@ async function loadBrandConfig() {
   const termWhEl = document.getElementById('brand-term-warehouse');
   if (termWhEl) termWhEl.value = bTermWarehouse;
 
+  const waEl = document.getElementById('brand-whatsapp-input');
+  if (waEl) waEl.value = bWhatsapp;
+
+  const igEl = document.getElementById('brand-instagram-input');
+  if (igEl) igEl.value = bInstagram;
+
+  const addrEl = document.getElementById('brand-address-input');
+  if (addrEl) addrEl.value = bAddress;
+
   const logoImgEl = document.getElementById('brand-logo-preview-img');
   if (logoImgEl) logoImgEl.src = bLogo;
 
   currentBrandLogoDataUrl = bLogo;
+
+  updateBrandLivePreview();
+}
+
+function applyBrandColorPreset(primaryColor, accentColor, verticalCode, sampleName = '', sampleSlogan = '') {
+  const primColorEl = document.getElementById('brand-primary-color');
+  const primHexEl = document.getElementById('brand-primary-color-hex');
+  if (primColorEl) primColorEl.value = primaryColor;
+  if (primHexEl) primHexEl.value = primaryColor;
+
+  const accColorEl = document.getElementById('brand-accent-color');
+  const accHexEl = document.getElementById('brand-accent-color-hex');
+  if (accColorEl) accColorEl.value = accentColor;
+  if (accHexEl) accHexEl.value = accentColor;
+
+  const verticalEl = document.getElementById('brand-vertical-select');
+  if (verticalEl && verticalCode) {
+    verticalEl.value = verticalCode;
+    handleBrandVerticalChange(verticalCode);
+  }
+
+  if (sampleName) {
+    const nameEl = document.getElementById('brand-name-input');
+    if (nameEl && (!nameEl.value || nameEl.value === 'BÔ Grow Club')) nameEl.value = sampleName;
+  }
+
+  if (sampleSlogan) {
+    const sloganEl = document.getElementById('brand-slogan-input');
+    if (sloganEl && (!sloganEl.value || sloganEl.value === 'Espacio Zen para Cultivo Premium')) sloganEl.value = sampleSlogan;
+  }
 
   updateBrandLivePreview();
 }
@@ -181,6 +223,7 @@ function updateBrandLivePreview() {
   const primaryColor = document.getElementById('brand-primary-color')?.value || '#152D24';
   const accentColor = document.getElementById('brand-accent-color')?.value || '#C2A246';
   const termProduct = document.getElementById('brand-term-product')?.value.trim() || 'Producto Botánico';
+  const whatsapp = document.getElementById('brand-whatsapp-input')?.value.trim() || '+5493816123456';
 
   const previewBar = document.getElementById('preview-header-bar');
   const previewName = document.getElementById('preview-brand-name');
@@ -188,6 +231,7 @@ function updateBrandLivePreview() {
   const previewBtn = document.getElementById('preview-sample-btn');
   const previewBadge = document.getElementById('preview-term-product-badge');
   const previewThumb = document.getElementById('preview-logo-thumb');
+  const previewWhatsappText = document.getElementById('preview-whatsapp-text');
 
   if (previewBar) previewBar.style.background = primaryColor;
   if (previewName) previewName.textContent = name;
@@ -199,6 +243,9 @@ function updateBrandLivePreview() {
   }
   if (previewThumb && currentBrandLogoDataUrl) {
     previewThumb.src = currentBrandLogoDataUrl;
+  }
+  if (previewWhatsappText) {
+    previewWhatsappText.textContent = `💬 WhatsApp: ${whatsapp}`;
   }
 }
 
@@ -236,6 +283,9 @@ async function saveAdminConfig() {
     accent_color: document.getElementById('brand-accent-color')?.value || '#C2A246',
     logo_url: currentBrandLogoDataUrl || 'assets/logo.jpg',
     favicon_url: 'assets/favicon.ico',
+    whatsapp_phone: document.getElementById('brand-whatsapp-input')?.value.trim() || '',
+    instagram_url: document.getElementById('brand-instagram-input')?.value.trim() || '',
+    address: document.getElementById('brand-address-input')?.value.trim() || '',
     terminology: {
       product: document.getElementById('brand-term-product')?.value.trim() || 'Producto',
       vendor: document.getElementById('brand-term-vendor')?.value.trim() || 'Vendedor',
@@ -249,6 +299,11 @@ async function saveAdminConfig() {
 
   if (typeof TENANT_PROFILES_CACHE !== 'undefined') {
     TENANT_PROFILES_CACHE['11111111-1111-1111-1111-111111111111'] = brandProfile;
+  }
+
+  // Apply immediately to current document
+  if (typeof window.applyBrandIdentity === 'function') {
+    window.applyBrandIdentity();
   }
 
   // Sync to Supabase if available
@@ -331,5 +386,7 @@ window.updateBrandColorInputs = updateBrandColorInputs;
 window.updateBrandColorPickers = updateBrandColorPickers;
 window.handleBrandVerticalChange = handleBrandVerticalChange;
 window.handleBrandLogoFileSelect = handleBrandLogoFileSelect;
+window.applyBrandColorPreset = applyBrandColorPreset;
+
 
 
