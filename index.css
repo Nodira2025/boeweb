@@ -562,7 +562,7 @@ button, input, select, textarea {
   padding: 90px 24px;
   position: relative;
   overflow: hidden;
-  background: radial-gradient(circle at 80% 20%, #3E5F1F 0%, #1e310d 100%);
+  background: radial-gradient(circle at 80% 20%, var(--color-primary) 0%, var(--color-neutral-dark, #152d24) 100%);
   border-bottom: 3px solid var(--color-accent-gold);
   color: #F6F3E8;
 }
@@ -5217,13 +5217,13 @@ textarea.form-control {
 .nav-header-btn.nav-cart-btn {
   background: linear-gradient(135deg, #C2A246 0%, #a68532 100%);
   border: 1.5px solid var(--color-accent-gold);
-  color: #2B4214;                             /* Verde Oscuro sobre Fondo Dorado - Alto Contraste */
+  color: var(--color-primary);                             /* Color de marca dinámico */
   font-weight: 800;
   box-shadow: 0 4px 14px rgba(194, 162, 70, 0.4);
 }
 
 .nav-header-btn.nav-cart-btn:hover {
-  background: linear-gradient(135deg, #7EA642 0%, #3E5F1F 100%);
+  background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-primary) 100%);
   color: #FFFFFF;
   transform: translateY(-2px);
   box-shadow: 0 6px 18px rgba(126, 166, 66, 0.45);
@@ -5232,7 +5232,7 @@ textarea.form-control {
 .nav-header-btn.nav-cart-btn .cart-icon {
   width: 17px;
   height: 17px;
-  color: #2B4214;
+  color: var(--color-primary);
 }
 
 .nav-header-btn.nav-cart-btn:hover .cart-icon {
@@ -5240,14 +5240,14 @@ textarea.form-control {
 }
 
 .nav-header-btn.nav-cart-btn .cart-badge {
-  background: #2B4214;
+  background: var(--color-primary);
   color: #F6F3E8;
   border: 1px solid var(--color-accent-gold);
 }
 
 /* --- DYNAMIC FACETED FILTER SYSTEM STYLES (STRICT BRAND MANUAL V3.0) --- */
 .catalog-sidebar .sidebar-block {
-  background: linear-gradient(165deg, #2B4214 0%, #1e310d 100%);
+  background: linear-gradient(165deg, var(--color-primary) 0%, var(--color-neutral-dark, #152d24) 100%);
   border: 2px solid var(--color-accent-gold);
   border-radius: 20px;
   padding: 22px 16px;
@@ -5268,14 +5268,14 @@ textarea.form-control {
 }
 
 .catalog-search-area #search-input {
-  color: #2B4214;
+  color: var(--color-text-main);
   font-family: var(--font-sans);
   font-size: 0.9rem;
   font-weight: 700;
 }
 
 .catalog-search-area #search-input::placeholder {
-  color: #6B4E2E;
+  color: var(--color-text-muted);
   font-weight: 500;
 }
 
@@ -5334,7 +5334,7 @@ textarea.form-control {
 }
 
 .facet-title {
-  background: linear-gradient(90deg, #6B4E2E 0%, #3E5F1F 100%);
+  background: linear-gradient(90deg, var(--color-earth-brown) 0%, var(--color-primary) 100%);
   color: #F6F3E8;
   padding: 13px 16px;
   font-size: 0.95rem;
@@ -5415,7 +5415,7 @@ textarea.form-control {
 }
 
 .category-btn.active {
-  background: linear-gradient(135deg, #7EA642 0%, #3E5F1F 100%);
+  background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-primary) 100%);
   border: 2px solid var(--color-accent-gold);
   color: #FFFFFF;
   font-weight: 800;
@@ -5424,7 +5424,7 @@ textarea.form-control {
 
 .category-btn.active .facet-count {
   background: #F6F3E8;
-  color: #3E5F1F;
+  color: var(--color-primary);
 }
 
 /* Custom Scrollbar for Brand Checklist */
@@ -5649,7 +5649,7 @@ textarea.form-control {
     width: 52px !important;
     height: 52px !important;
     border-radius: 50%;                 /* Botón circular flotante (FAB) */
-    background: linear-gradient(135deg, #3E5F1F 0%, #1e310d 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-neutral-dark, #152d24) 100%);
     border: 2px solid var(--color-accent-gold);
     color: #F6F3E8;
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5), 0 0 20px rgba(194, 162, 70, 0.4);
@@ -5660,7 +5660,7 @@ textarea.form-control {
 
   .mobile-filter-trigger-btn:hover,
   .mobile-filter-trigger-btn:active {
-    background: linear-gradient(135deg, #7EA642 0%, #3E5F1F 100%);
+    background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-primary) 100%);
     transform: scale(1.08);
     box-shadow: 0 10px 30px rgba(126, 166, 66, 0.5);
   }
@@ -5670,7 +5670,7 @@ textarea.form-control {
     top: -4px;
     right: -4px;
     background: var(--color-accent-gold);
-    color: #2B4214;
+    color: var(--color-primary);
     border-radius: 50%;
     width: 22px;
     height: 22px;
@@ -5679,7 +5679,7 @@ textarea.form-control {
     justify-content: center;
     font-size: 0.75rem;
     font-weight: 900;
-    border: 1.5px solid #2B4214;
+    border: 1.5px solid var(--color-primary);
     margin-left: 0;
   }
 }
