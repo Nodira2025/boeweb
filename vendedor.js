@@ -9906,7 +9906,7 @@ function renderMobilePosAssistant() {
               </option>
             `).join('')}
           </select>
-          <input type="text" id="mobile-pos-cc-custom-name" class="b2b-form-input" placeholder="O escribir nombre del cliente..." value="${escapeStockHtml(mobilePosAssistantState.customerAccountName)}" oninput="mobilePosAssistantState.customerAccountName = this.value">
+          <input type="text" id="mobile-pos-cc-custom-name" class="b2b-form-input" placeholder="O escribir nombre del cliente..." value="${escapeStockHtml(mobilePosAssistantState.customerAccountName)}" oninput="handleMobilePosCcCustomName(this.value)">
         </div>
       `;
     }
@@ -9957,7 +9957,7 @@ function renderMobilePosAssistant() {
                 </label>
                 <select class="b2b-form-input" onchange="handleMobilePosCcSelect(this.value)">
                   <option value="">-- Seleccionar cliente --</option>
-                  ${accounts.map(acc => `<option value="${acc.id}">${escapeStockHtml(acc.customer_name)}</option>`).join('')}
+                  ${accounts.map(acc => `<option value="${acc.id}" ${mobilePosAssistantState.customerAccountId === acc.id ? 'selected' : ''}>${escapeStockHtml(acc.customer_name)}</option>`).join('')}
                 </select>
               </div>
             ` : ''}
@@ -10184,6 +10184,20 @@ function setMobilePosPaymentMethod(method) {
     }
     mobilePosAssistantState.mixedSecondaryAmount = Math.max(0, total - mobilePosAssistantState.mixedCashAmount);
   }
+
+  if (method === 'CUENTA_CORRIENTE') {
+    const accounts = typeof getCurrentAccounts === 'function' ? getCurrentAccounts() : [];
+    if (!mobilePosAssistantState.customerAccountId && accounts.length > 0) {
+      mobilePosAssistantState.customerAccountId = accounts[0].id;
+      mobilePosAssistantState.customerAccountName = accounts[0].customer_name;
+      if (accounts[0].phone) mobilePosAssistantState.customerWhatsApp = accounts[0].phone;
+    }
+  }
+
+  if (typeof populatePosCurrentAccountDropdown === 'function') {
+    populatePosCurrentAccountDropdown();
+  }
+
   renderMobilePosAssistant();
 }
 window.setMobilePosPaymentMethod = setMobilePosPaymentMethod;
@@ -10214,10 +10228,24 @@ function handleMobilePosCcSelect(accountId) {
     if (found.phone) {
       mobilePosAssistantState.customerWhatsApp = found.phone;
     }
+  } else {
+    mobilePosAssistantState.customerAccountName = '';
   }
-  renderMobilePosAssistant();
+  const customInput = document.getElementById('mobile-pos-cc-custom-name');
+  if (customInput) customInput.value = mobilePosAssistantState.customerAccountName;
 }
 window.handleMobilePosCcSelect = handleMobilePosCcSelect;
+
+function handleMobilePosCcCustomName(name) {
+  mobilePosAssistantState.customerAccountName = name;
+  const accounts = typeof getCurrentAccounts === 'function' ? getCurrentAccounts() : [];
+  const found = accounts.find(a => a.customer_name && a.customer_name.toLowerCase() === (name || '').trim().toLowerCase());
+  if (found) {
+    mobilePosAssistantState.customerAccountId = found.id;
+    if (found.phone) mobilePosAssistantState.customerWhatsApp = found.phone;
+  }
+}
+window.handleMobilePosCcCustomName = handleMobilePosCcCustomName;
 
 function setMobilePosAdjustment(type, value) {
   mobilePosAssistantState.adjustmentType = type;
@@ -10266,18 +10294,28 @@ async function completeMobilePosSale(sendWhatsApp = false) {
     if (secAmountInput) secAmountInput.value = mobilePosAssistantState.mixedSecondaryAmount;
   }
 
-  if (mobilePosAssistantState.paymentMethod === 'CUENTA_CORRIENTE') {
+  if (typeof populatePosCurrentAccountDropdown === 'function') {
+    populatePosCurrentAccountDropdown();
+  }
+
+  if (mobilePosAssistantState.paymentMethod === 'CUENTA_CORRIENTE' || (mobilePosAssistantState.paymentMethod === 'MIXTO' && mobilePosAssistantState.mixedSecondaryMethod === 'CUENTA_CORRIENTE')) {
     const ccSelect = document.getElementById('pos-current-account-select');
     if (ccSelect && mobilePosAssistantState.customerAccountId) {
       ccSelect.value = mobilePosAssistantState.customerAccountId;
     }
   }
 
+  let saleSucceeded = false;
   try {
-    await submitPosSaleDraft();
+    const res = await submitPosSaleDraft();
+    if (res !== false) {
+      saleSucceeded = true;
+    }
   } catch (error) {
     console.error('Error al registrar venta POS:', error);
   }
+
+  if (!saleSucceeded) return;
 
   if (sendWhatsApp && phone) {
     const cleanPhone = phone.replace(/[^\d]/g, '');
@@ -11286,16 +11324,48 @@ async function submitPosSaleDraft() {
 
   if (isDirectCc || isMixedCc) {
     const ccSelect = document.getElementById('pos-current-account-select');
-    const ccId = ccSelect?.value;
-    if (!ccId) {
-      alert('⚠️ Debés seleccionar un cliente de la lista de Cuenta Corriente para confirmar la venta fiada.');
-      return;
+    let ccId = ccSelect?.value || (typeof mobilePosAssistantState !== 'undefined' ? mobilePosAssistantState.customerAccountId : '');
+    let accounts = typeof getCurrentAccounts === 'function' ? getCurrentAccounts() : [];
+    let account = accounts.find(a => a.id === ccId);
+
+    // Si aún no se encontró la cuenta por ID, buscar o crear a partir del nombre ingresado
+    const customName = typeof mobilePosAssistantState !== 'undefined' ? (mobilePosAssistantState.customerAccountName || '').trim() : '';
+    if (!account && customName) {
+      account = accounts.find(a => a.customer_name && a.customer_name.toLowerCase() === customName.toLowerCase());
+      if (!account) {
+        account = {
+          id: `CC-${Date.now().toString().slice(-4)}`,
+          customer_name: customName,
+          dni: '',
+          phone: mobilePosAssistantState.customerWhatsApp || '',
+          credit_limit: 300000,
+          current_balance: 0,
+          first_payment_due: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+          ledger: []
+        };
+        accounts.push(account);
+        localStorage.setItem('boeweb_current_accounts', JSON.stringify(accounts));
+      }
+      ccId = account.id;
+      if (typeof mobilePosAssistantState !== 'undefined') {
+        mobilePosAssistantState.customerAccountId = account.id;
+        mobilePosAssistantState.customerAccountName = account.customer_name;
+      }
     }
-    const accounts = typeof getCurrentAccounts === 'function' ? getCurrentAccounts() : [];
-    const account = accounts.find(a => a.id === ccId);
+
+    // Si todavía no hay cuenta pero existen cuentas registradas, tomar la primera
+    if (!account && accounts.length > 0) {
+      account = accounts[0];
+      ccId = account.id;
+      if (typeof mobilePosAssistantState !== 'undefined') {
+        mobilePosAssistantState.customerAccountId = account.id;
+        mobilePosAssistantState.customerAccountName = account.customer_name;
+      }
+    }
+
     if (!account) {
-      alert('⚠️ La cuenta corriente seleccionada no existe.');
-      return;
+      alert('⚠️ Debés seleccionar o ingresar un cliente para confirmar la venta en Cuenta Corriente.');
+      return false;
     }
     const dueDateInput = document.getElementById('pos-cc-due-date');
     if (dueDateInput?.value) {
