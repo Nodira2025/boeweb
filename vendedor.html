@@ -9,7 +9,7 @@
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   
   <!-- Favicon -->
   <link rel="icon" type="image/jpeg" href="assets/logo.jpg">
@@ -2860,7 +2860,7 @@
         <div style="background: rgba(0,0,0,0.04); border: 2px dashed var(--vendor-gold); border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 16px;">
           <div style="font-size: 3rem; margin-bottom: 8px;">📷</div>
           <p style="font-size: 0.85rem; margin-bottom: 14px;">Escanear código de barras o QR de módulo con la cámara</p>
-          <button type="button" class="wms-btn wms-btn-primary" style="width: 100%; margin-bottom: 14px; background: #2e7d32; font-weight: 800;" onclick="closeWmsModal('wms-qr-modal'); openUniversalCameraScanner('wms');">
+          <button type="button" class="wms-btn wms-btn-primary" style="width: 100%; margin-bottom: 14px; background: var(--vendor-forest); font-weight: 800;" onclick="closeWmsModal('wms-qr-modal'); openUniversalCameraScanner('wms');">
             ⚡ ACTIVAR CÁMARA EN VIVO
           </button>
           <label style="display: block; margin-bottom: 8px; font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest);">O seleccionar módulo demo:</label>
@@ -3904,7 +3904,7 @@
       </p>
 
       <!-- Viewport de Video / Escáner -->
-      <div style="position: relative; width: 100%; aspect-ratio: 4/3; max-height: 290px; background: #000; border-radius: 16px; overflow: hidden; border: 2px solid #7ea642; margin-bottom: 14px;">
+      <div style="position: relative; width: 100%; aspect-ratio: 4/3; max-height: 290px; background: #000; border-radius: 16px; overflow: hidden; border: 2px solid var(--vendor-gold); margin-bottom: 14px;">
         <div id="universal-camera-reader-viewport" style="width: 100%; height: 100%;"></div>
         
         <!-- Láser y marco visor -->
@@ -3913,7 +3913,7 @@
       </div>
 
       <!-- Estado / Feedback -->
-      <div id="camera-scanner-feedback" style="padding: 10px 14px; border-radius: 12px; background: rgba(0,0,0,0.35); font-size: 0.85rem; font-weight: 700; color: #81c784; margin-bottom: 14px; border: 1px solid rgba(126,166,66,0.3);">
+      <div id="camera-scanner-feedback" style="padding: 10px 14px; border-radius: 12px; background: rgba(0,0,0,0.35); font-size: 0.85rem; font-weight: 700; color: var(--color-success, #81c784); margin-bottom: 14px; border: 1px solid var(--color-border-accent, rgba(126,166,66,0.3));">
         <span>⚡ Buscando código de barras o QR…</span>
       </div>
 
@@ -3922,7 +3922,7 @@
 
       <!-- Controles de Cámara -->
       <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
-        <button type="button" onclick="triggerNativeMobileCamera()" style="background: #2e7d32; color: #ffffff; border: 1.5px solid #81c784; padding: 10px 16px; border-radius: 12px; font-size: 0.88rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(46,125,50,0.4);">
+        <button type="button" onclick="triggerNativeMobileCamera()" style="background: var(--vendor-forest); color: #ffffff; border: 1.5px solid var(--vendor-gold); padding: 10px 16px; border-radius: 12px; font-size: 0.88rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.4);">
           📸 Sacar foto al código
         </button>
         <button type="button" id="camera-switch-btn" onclick="switchUniversalCamera()" style="background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.25); padding: 8px 14px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; cursor: pointer;">
@@ -3937,7 +3937,7 @@
 
   <!-- Modal Cambiar Contraseña de Vendedor -->
   <div id="modal-vendor-change-password" style="display: none; position: fixed !important; inset: 0 !important; z-index: 99999999 !important; background: rgba(0,0,0,0.85) !important; backdrop-filter: blur(6px) !important; -webkit-backdrop-filter: blur(6px) !important; align-items: center !important; justify-content: center !important; padding: 16px !important; box-sizing: border-box !important;">
-    <div style="max-width: 420px; width: 100%; border-radius: 22px; border: 2px solid var(--color-accent-gold, #c2a246); background: #152d24; color: #ffffff; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.8); margin: auto; position: relative;">
+    <div style="max-width: 420px; width: 100%; border-radius: 22px; border: 2px solid var(--color-accent-gold, #c2a246); background: var(--vendor-forest); color: #ffffff; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.8); margin: auto; position: relative;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 1.4rem;" aria-hidden="true">🔑</span>

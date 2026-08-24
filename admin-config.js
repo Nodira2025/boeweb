@@ -68,6 +68,10 @@ async function loadBrandConfig() {
   const bVertical = brand?.vertical_code || 'growshop';
   const bPrimary = brand?.primary_color || '#152D24';
   const bAccent = brand?.accent_color || '#C2A246';
+  const bTextColor = brand?.text_color || '#152D24';
+  const bActionColor = brand?.action_color || '#2E7D32';
+  const bFontFamily = brand?.font_family || "'Outfit', sans-serif";
+  const bFontHeadings = brand?.font_headings || "'Playfair Display', serif";
   const bLogo = brand?.logo_url || 'assets/logo.jpg';
   const bTermProduct = brand?.terminology?.product || 'Producto Botánico';
   const bTermVendor = brand?.terminology?.vendor || 'Asesor de Cultivo';
@@ -86,6 +90,12 @@ async function loadBrandConfig() {
   const verticalEl = document.getElementById('brand-vertical-select');
   if (verticalEl) verticalEl.value = bVertical;
 
+  const fontFamEl = document.getElementById('brand-font-family');
+  if (fontFamEl) fontFamEl.value = bFontFamily;
+
+  const fontHeadEl = document.getElementById('brand-font-headings');
+  if (fontHeadEl) fontHeadEl.value = bFontHeadings;
+
   const primColorEl = document.getElementById('brand-primary-color');
   const primHexEl = document.getElementById('brand-primary-color-hex');
   if (primColorEl) primColorEl.value = bPrimary;
@@ -95,6 +105,16 @@ async function loadBrandConfig() {
   const accHexEl = document.getElementById('brand-accent-color-hex');
   if (accColorEl) accColorEl.value = bAccent;
   if (accHexEl) accHexEl.value = bAccent;
+
+  const textColEl = document.getElementById('brand-text-color');
+  const textHexEl = document.getElementById('brand-text-color-hex');
+  if (textColEl) textColEl.value = bTextColor;
+  if (textHexEl) textHexEl.value = bTextColor;
+
+  const actColEl = document.getElementById('brand-action-color');
+  const actHexEl = document.getElementById('brand-action-color-hex');
+  if (actColEl) actColEl.value = bActionColor;
+  if (actHexEl) actHexEl.value = bActionColor;
 
   const termProdEl = document.getElementById('brand-term-product');
   if (termProdEl) termProdEl.value = bTermProduct;
@@ -122,7 +142,7 @@ async function loadBrandConfig() {
   updateBrandLivePreview();
 }
 
-function applyBrandColorPreset(primaryColor, accentColor, verticalCode, sampleName = '', sampleSlogan = '') {
+function applyBrandColorPreset(primaryColor, accentColor, verticalCode, sampleName = '', sampleSlogan = '', textColor = '#152D24', actionColor = '#2E7D32', fontFamily = "'Outfit', sans-serif", fontHeadings = "'Playfair Display', serif") {
   const primColorEl = document.getElementById('brand-primary-color');
   const primHexEl = document.getElementById('brand-primary-color-hex');
   if (primColorEl) primColorEl.value = primaryColor;
@@ -132,6 +152,22 @@ function applyBrandColorPreset(primaryColor, accentColor, verticalCode, sampleNa
   const accHexEl = document.getElementById('brand-accent-color-hex');
   if (accColorEl) accColorEl.value = accentColor;
   if (accHexEl) accHexEl.value = accentColor;
+
+  const textColEl = document.getElementById('brand-text-color');
+  const textHexEl = document.getElementById('brand-text-color-hex');
+  if (textColEl) textColEl.value = textColor;
+  if (textHexEl) textHexEl.value = textColor;
+
+  const actColEl = document.getElementById('brand-action-color');
+  const actHexEl = document.getElementById('brand-action-color-hex');
+  if (actColEl) actColEl.value = actionColor;
+  if (actHexEl) actHexEl.value = actionColor;
+
+  const fontFamEl = document.getElementById('brand-font-family');
+  if (fontFamEl && fontFamily) fontFamEl.value = fontFamily;
+
+  const fontHeadEl = document.getElementById('brand-font-headings');
+  if (fontHeadEl && fontHeadings) fontHeadEl.value = fontHeadings;
 
   const verticalEl = document.getElementById('brand-vertical-select');
   if (verticalEl && verticalCode) {
@@ -153,28 +189,32 @@ function applyBrandColorPreset(primaryColor, accentColor, verticalCode, sampleNa
 }
 
 function updateBrandColorInputs(type) {
-  if (type === 'primary') {
-    const picker = document.getElementById('brand-primary-color');
-    const hex = document.getElementById('brand-primary-color-hex');
-    if (picker && hex) hex.value = picker.value.toUpperCase();
-  } else {
-    const picker = document.getElementById('brand-accent-color');
-    const hex = document.getElementById('brand-accent-color-hex');
+  const map = {
+    primary: ['brand-primary-color', 'brand-primary-color-hex'],
+    accent: ['brand-accent-color', 'brand-accent-color-hex'],
+    text: ['brand-text-color', 'brand-text-color-hex'],
+    action: ['brand-action-color', 'brand-action-color-hex']
+  };
+  const ids = map[type];
+  if (ids) {
+    const picker = document.getElementById(ids[0]);
+    const hex = document.getElementById(ids[1]);
     if (picker && hex) hex.value = picker.value.toUpperCase();
   }
   updateBrandLivePreview();
 }
 
 function updateBrandColorPickers(type) {
-  if (type === 'primary') {
-    const picker = document.getElementById('brand-primary-color');
-    const hex = document.getElementById('brand-primary-color-hex');
-    if (picker && hex && /^#[0-9A-F]{6}$/i.test(hex.value.trim())) {
-      picker.value = hex.value.trim();
-    }
-  } else {
-    const picker = document.getElementById('brand-accent-color');
-    const hex = document.getElementById('brand-accent-color-hex');
+  const map = {
+    primary: ['brand-primary-color', 'brand-primary-color-hex'],
+    accent: ['brand-accent-color', 'brand-accent-color-hex'],
+    text: ['brand-text-color', 'brand-text-color-hex'],
+    action: ['brand-action-color', 'brand-action-color-hex']
+  };
+  const ids = map[type];
+  if (ids) {
+    const picker = document.getElementById(ids[0]);
+    const hex = document.getElementById(ids[1]);
     if (picker && hex && /^#[0-9A-F]{6}$/i.test(hex.value.trim())) {
       picker.value = hex.value.trim();
     }
@@ -222,9 +262,14 @@ function updateBrandLivePreview() {
   const slogan = document.getElementById('brand-slogan-input')?.value.trim() || 'Espacio Zen para Cultivo Premium';
   const primaryColor = document.getElementById('brand-primary-color')?.value || '#152D24';
   const accentColor = document.getElementById('brand-accent-color')?.value || '#C2A246';
+  const textColor = document.getElementById('brand-text-color')?.value || '#152D24';
+  const actionColor = document.getElementById('brand-action-color')?.value || '#2E7D32';
+  const fontFamily = document.getElementById('brand-font-family')?.value || "'Outfit', sans-serif";
+  const fontHeadings = document.getElementById('brand-font-headings')?.value || "'Playfair Display', serif";
   const termProduct = document.getElementById('brand-term-product')?.value.trim() || 'Producto Botánico';
   const whatsapp = document.getElementById('brand-whatsapp-input')?.value.trim() || '+5493816123456';
 
+  const previewCanvas = document.getElementById('brand-preview-canvas');
   const previewBar = document.getElementById('preview-header-bar');
   const previewName = document.getElementById('preview-brand-name');
   const previewSlogan = document.getElementById('preview-brand-slogan');
@@ -232,14 +277,28 @@ function updateBrandLivePreview() {
   const previewBadge = document.getElementById('preview-term-product-badge');
   const previewThumb = document.getElementById('preview-logo-thumb');
   const previewWhatsappText = document.getElementById('preview-whatsapp-text');
+  const previewContactBox = document.getElementById('preview-contact-box');
+  const previewSamplePrice = document.getElementById('preview-sample-price');
 
+  if (previewCanvas) {
+    previewCanvas.style.fontFamily = fontFamily;
+  }
   if (previewBar) previewBar.style.background = primaryColor;
-  if (previewName) previewName.textContent = name;
+  if (previewName) {
+    previewName.textContent = name;
+    previewName.style.fontFamily = fontHeadings;
+  }
   if (previewSlogan) previewSlogan.textContent = slogan;
   if (previewBadge) previewBadge.textContent = termProduct;
   if (previewBtn) {
     previewBtn.style.background = accentColor;
-    previewBtn.style.color = primaryColor;
+    previewBtn.style.color = textColor;
+  }
+  if (previewSamplePrice) {
+    previewSamplePrice.style.color = actionColor;
+  }
+  if (previewContactBox) {
+    previewContactBox.style.borderColor = actionColor;
   }
   if (previewThumb && currentBrandLogoDataUrl) {
     previewThumb.src = currentBrandLogoDataUrl;
@@ -279,8 +338,12 @@ async function saveAdminConfig() {
     brand_name: document.getElementById('brand-name-input')?.value.trim() || 'BÔ Grow Club',
     slogan: document.getElementById('brand-slogan-input')?.value.trim() || '',
     vertical_code: document.getElementById('brand-vertical-select')?.value || 'growshop',
+    font_family: document.getElementById('brand-font-family')?.value || "'Outfit', sans-serif",
+    font_headings: document.getElementById('brand-font-headings')?.value || "'Playfair Display', serif",
     primary_color: document.getElementById('brand-primary-color')?.value || '#152D24',
     accent_color: document.getElementById('brand-accent-color')?.value || '#C2A246',
+    text_color: document.getElementById('brand-text-color')?.value || '#152D24',
+    action_color: document.getElementById('brand-action-color')?.value || '#2E7D32',
     logo_url: currentBrandLogoDataUrl || 'assets/logo.jpg',
     favicon_url: 'assets/favicon.ico',
     whatsapp_phone: document.getElementById('brand-whatsapp-input')?.value.trim() || '',

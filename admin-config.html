@@ -9,14 +9,14 @@
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   
   <!-- Supabase JS SDK CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="index.css?v=2.5">
-  <script src="theme.js"></script>
+  <link rel="stylesheet" href="index.css?v=white_label_v2">
+  <script src="theme.js?v=white_label_v2"></script>
   
   <style>
     body {
@@ -257,27 +257,27 @@
             <small style="color: #ffd54f; font-weight: 600;">Elegí un estilo o personalizá abajo</small>
           </div>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 8px;">
-            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#152D24', '#C2A246', 'growshop', 'BÔ Grow Club', 'Espacio Zen para Cultivo Premium')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #C2A246; background: #152D24; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#152D24', '#C2A246', 'growshop', 'BÔ Grow Club', 'Espacio Zen para Cultivo Premium', '#152D24', '#2E7D32', '\'Outfit\', sans-serif', '\'Playfair Display\', serif')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #C2A246; background: #152D24; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
               <span style="width: 12px; height: 12px; border-radius: 50%; background: #C2A246;"></span>
               🌿 Growshop Zen
             </button>
-            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#0D47A1', '#FF6D00', 'ferreteria', 'Ferretería Industrial', 'Herramientas y Materiales de Primera')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #FF6D00; background: #0D47A1; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#0D47A1', '#FF6D00', 'ferreteria', 'Ferretería Industrial', 'Herramientas y Materiales de Primera', '#0F172A', '#0D47A1', '\'Plus Jakarta Sans\', sans-serif', '\'Montserrat\', sans-serif')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #FF6D00; background: #0D47A1; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
               <span style="width: 12px; height: 12px; border-radius: 50%; background: #FF6D00;"></span>
               🛠️ Ferretería Pro
             </button>
-            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#B71C1C', '#FFD600', 'repuestos', 'Mecánica & Autopartes', 'Repuestos Originales y Accesorios')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #FFD600; background: #B71C1C; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#B71C1C', '#FFD600', 'repuestos', 'Mecánica & Autopartes', 'Repuestos Originales y Accesorios', '#111827', '#B71C1C', '\'Inter\', sans-serif', '\'Montserrat\', sans-serif')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #FFD600; background: #B71C1C; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
               <span style="width: 12px; height: 12px; border-radius: 50%; background: #FFD600;"></span>
               🚗 Autopartes
             </button>
-            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#1A1A1A', '#E0A96D', 'indumentaria', 'Atelier Moda & Estilo', 'Colección Exclusiva y Tendencia Urbana')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #E0A96D; background: #1A1A1A; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#1A1A1A', '#E0A96D', 'indumentaria', 'Atelier Moda & Estilo', 'Colección Exclusiva y Tendencia Urbana', '#18181B', '#E0A96D', '\'Outfit\', sans-serif', '\'Playfair Display\', serif')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #E0A96D; background: #1A1A1A; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
               <span style="width: 12px; height: 12px; border-radius: 50%; background: #E0A96D;"></span>
               👗 Moda Urbana
             </button>
-            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#00695C', '#FFAB00', 'growshop', 'Pet Shop & Veterinaria', 'Todo para el Cuidado de tu Mascota')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #FFAB00; background: #00695C; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#00695C', '#FFAB00', 'growshop', 'Pet Shop & Veterinaria', 'Todo para el Cuidado de tu Mascota', '#0F172A', '#00695C', '\'Poppins\', sans-serif', '\'Poppins\', sans-serif')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #FFAB00; background: #00695C; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
               <span style="width: 12px; height: 12px; border-radius: 50%; background: #FFAB00;"></span>
               🐾 Pet Shop
             </button>
-            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#3E2723', '#D7CCC8', 'growshop', 'Café & Roastery', 'Especialidad y Tostado Artesanal')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #D7CCC8; background: #3E2723; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            <button type="button" class="btn btn-secondary" onclick="applyBrandColorPreset('#3E2723', '#D7CCC8', 'growshop', 'Café & Roastery', 'Especialidad y Tostado Artesanal', '#271C19', '#8D6E63', '\'Outfit\', sans-serif', '\'Playfair Display\', serif')" style="padding: 8px; font-size: 0.76rem; font-weight: 700; border-color: #D7CCC8; background: #3E2723; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px;">
               <span style="width: 12px; height: 12px; border-radius: 50%; background: #D7CCC8;"></span>
               ☕ Café Gourmet
             </button>
@@ -310,20 +310,60 @@
           </small>
         </div>
 
-        <!-- Corporate Colors Picker -->
-        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-bottom: 20px;">
+        <!-- Typography & Fonts Selection -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 20px; background: rgba(15, 30, 24, 0.5); padding: 16px; border-radius: 12px; border: 1px solid rgba(195, 155, 75, 0.15);">
+          <div>
+            <label class="admin-label" for="brand-font-family" style="font-size: 0.9rem; margin-bottom: 6px;">✍️ Tipografía Principal (Textos y Botones)</label>
+            <select id="brand-font-family" class="admin-input" style="cursor: pointer; font-weight: 700;" onchange="updateBrandLivePreview()">
+              <option value="'Outfit', sans-serif">Outfit (Moderna & Clean)</option>
+              <option value="'Montserrat', sans-serif">Montserrat (Geométrica & Robusta)</option>
+              <option value="'Plus Jakarta Sans', sans-serif">Plus Jakarta Sans (Tech & Moderna)</option>
+              <option value="'Inter', sans-serif">Inter (Minimalista & Legible)</option>
+              <option value="'Poppins', sans-serif">Poppins (Amigable & Retail)</option>
+              <option value="'Roboto', sans-serif">Roboto (Clásica & Versátil)</option>
+            </select>
+          </div>
+          <div>
+            <label class="admin-label" for="brand-font-headings" style="font-size: 0.9rem; margin-bottom: 6px;">👑 Tipografía de Títulos y Encabezados</label>
+            <select id="brand-font-headings" class="admin-input" style="cursor: pointer; font-weight: 700;" onchange="updateBrandLivePreview()">
+              <option value="'Playfair Display', serif">Playfair Display (Editorial & Clásica)</option>
+              <option value="'Cinzel', serif">Cinzel (Exclusiva & Boutique)</option>
+              <option value="'Outfit', sans-serif">Outfit (Moderna & Sin Serif)</option>
+              <option value="'Montserrat', sans-serif">Montserrat (Fuerte & Contraste)</option>
+              <option value="'Plus Jakarta Sans', sans-serif">Plus Jakarta Sans (Tech Premium)</option>
+              <option value="'Poppins', sans-serif">Poppins (Dinámica)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Corporate Colors & Palette -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
           <div style="background: rgba(15, 30, 24, 0.5); padding: 16px; border-radius: 12px; border: 1px solid rgba(195, 155, 75, 0.15);">
-            <label class="admin-label" for="brand-primary-color">Color Primario (Fondo & Estructura)</label>
+            <label class="admin-label" for="brand-primary-color">Color Primario (Fondo & Marca)</label>
             <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
               <input type="color" id="brand-primary-color" value="#152D24" style="width: 48px; height: 42px; border: 1px solid rgba(195, 155, 75, 0.4); border-radius: 8px; cursor: pointer; background: transparent;" oninput="updateBrandColorInputs('primary')">
               <input type="text" id="brand-primary-color-hex" class="admin-input" value="#152D24" style="text-transform: uppercase;" maxlength="7" oninput="updateBrandColorPickers('primary')">
             </div>
           </div>
           <div style="background: rgba(15, 30, 24, 0.5); padding: 16px; border-radius: 12px; border: 1px solid rgba(195, 155, 75, 0.15);">
-            <label class="admin-label" for="brand-accent-color">Color Acento (Botones & Llamadas a Acción)</label>
+            <label class="admin-label" for="brand-accent-color">Color Acento (Dorado/Destacado)</label>
             <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
               <input type="color" id="brand-accent-color" value="#C2A246" style="width: 48px; height: 42px; border: 1px solid rgba(195, 155, 75, 0.4); border-radius: 8px; cursor: pointer; background: transparent;" oninput="updateBrandColorInputs('accent')">
               <input type="text" id="brand-accent-color-hex" class="admin-input" value="#C2A246" style="text-transform: uppercase;" maxlength="7" oninput="updateBrandColorPickers('accent')">
+            </div>
+          </div>
+          <div style="background: rgba(15, 30, 24, 0.5); padding: 16px; border-radius: 12px; border: 1px solid rgba(195, 155, 75, 0.15);">
+            <label class="admin-label" for="brand-text-color">Color de Tipografía (Textos/Títulos)</label>
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
+              <input type="color" id="brand-text-color" value="#152D24" style="width: 48px; height: 42px; border: 1px solid rgba(195, 155, 75, 0.4); border-radius: 8px; cursor: pointer; background: transparent;" oninput="updateBrandColorInputs('text')">
+              <input type="text" id="brand-text-color-hex" class="admin-input" value="#152D24" style="text-transform: uppercase;" maxlength="7" oninput="updateBrandColorPickers('text')">
+            </div>
+          </div>
+          <div style="background: rgba(15, 30, 24, 0.5); padding: 16px; border-radius: 12px; border: 1px solid rgba(195, 155, 75, 0.15);">
+            <label class="admin-label" for="brand-action-color">Botones de Acción / Cámara / Scanner</label>
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
+              <input type="color" id="brand-action-color" value="#2E7D32" style="width: 48px; height: 42px; border: 1px solid rgba(195, 155, 75, 0.4); border-radius: 8px; cursor: pointer; background: transparent;" oninput="updateBrandColorInputs('action')">
+              <input type="text" id="brand-action-color-hex" class="admin-input" value="#2E7D32" style="text-transform: uppercase;" maxlength="7" oninput="updateBrandColorPickers('action')">
             </div>
           </div>
         </div>

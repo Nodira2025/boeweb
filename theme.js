@@ -51,6 +51,28 @@
       root.style.setProperty('--tv-accent-gold', brand.accent_color);
       root.style.setProperty('--shadow-gold', `0 0 14px ${brand.accent_color}66`);
     }
+    if (brand.text_color) {
+      root.style.setProperty('--color-text-main', brand.text_color);
+      root.style.setProperty('--vendor-ink', brand.text_color);
+      root.style.setProperty('--cash-ink', brand.text_color);
+      root.style.setProperty('--color-neutral-dark', brand.text_color);
+    }
+    if (brand.action_color) {
+      root.style.setProperty('--color-success', brand.action_color);
+      root.style.setProperty('--vendor-leaf', brand.action_color);
+    }
+
+    // 1.1 Inyectar tipografías configuradas
+    if (brand.font_family) {
+      root.style.setProperty('--font-sans', brand.font_family);
+      if (document.body) {
+        document.body.style.fontFamily = brand.font_family;
+      }
+    }
+    if (brand.font_headings) {
+      root.style.setProperty('--font-serif', brand.font_headings);
+      root.style.setProperty('--font-display', brand.font_headings);
+    }
 
     // 2. Actualizar textos de marca en todos los portales y dispositivos
     if (brand.brand_name) {
