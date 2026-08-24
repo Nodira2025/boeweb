@@ -42,6 +42,22 @@ const TENANT_PROFILES_CACHE = {
 
 class TenantThemeManager {
   getProfile(tenantId) {
+    if (!tenantId || tenantId === '11111111-1111-1111-1111-111111111111') {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          const custom = localStorage.getItem('boeweb_tenant_profile_published');
+          if (custom) {
+            const parsed = JSON.parse(custom);
+            if (parsed && (parsed.brand_name || parsed.primary_color)) {
+              return {
+                ...TENANT_PROFILES_CACHE['11111111-1111-1111-1111-111111111111'],
+                ...parsed
+              };
+            }
+          }
+        }
+      } catch (_) {}
+    }
     return TENANT_PROFILES_CACHE[tenantId] || TENANT_PROFILES_CACHE['11111111-1111-1111-1111-111111111111'];
   }
 

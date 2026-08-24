@@ -141,12 +141,12 @@ function applyBrandColorPreset(primaryColor, accentColor, verticalCode, sampleNa
 
   if (sampleName) {
     const nameEl = document.getElementById('brand-name-input');
-    if (nameEl && (!nameEl.value || nameEl.value === 'BÔ Grow Club')) nameEl.value = sampleName;
+    if (nameEl) nameEl.value = sampleName;
   }
 
   if (sampleSlogan) {
     const sloganEl = document.getElementById('brand-slogan-input');
-    if (sloganEl && (!sloganEl.value || sloganEl.value === 'Espacio Zen para Cultivo Premium')) sloganEl.value = sampleSlogan;
+    if (sloganEl) sloganEl.value = sampleSlogan;
   }
 
   updateBrandLivePreview();
@@ -301,10 +301,19 @@ async function saveAdminConfig() {
     TENANT_PROFILES_CACHE['11111111-1111-1111-1111-111111111111'] = brandProfile;
   }
 
-  // Apply immediately to current document
+  if (typeof TenantTheme !== 'undefined' && typeof TenantTheme.applyTenantTheme === 'function') {
+    TenantTheme.applyTenantTheme('11111111-1111-1111-1111-111111111111');
+  }
+
+  // Apply immediately to current document and notify other components
   if (typeof window.applyBrandIdentity === 'function') {
     window.applyBrandIdentity();
   }
+
+  window.dispatchEvent(new CustomEvent('boeweb_brand_updated', { detail: brandProfile }));
+  try {
+    window.dispatchEvent(new Event('storage'));
+  } catch (_) {}
 
   // Sync to Supabase if available
   if (supabaseClient) {

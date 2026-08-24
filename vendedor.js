@@ -2722,10 +2722,7 @@ function handleVoiceAssistantSearchInput(query) {
   }
 
   const escapeFn = typeof escapeMapHtml === 'function' ? escapeMapHtml : (v => String(v || ''));
-  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
-  const localLocs = typeof readLocalProductLocations === 'function' ? readLocalProductLocations() : [];
-  const catalog = typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) ? internalCatalogProducts : [];
-  const allProds = [...catalog, ...storeLocs, ...localLocs, ...(baseProducts || [])];
+  const allProds = typeof getAllSearchableProducts === 'function' ? getAllSearchableProducts() : [];
 
   const unique = new Map();
   allProds.forEach(p => {
@@ -2789,11 +2786,7 @@ function selectVoiceAssistantProduct(productIdOrCode) {
   }
 
   // 1. Find product
-  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
-  const localLocs = typeof readLocalProductLocations === 'function' ? readLocalProductLocations() : [];
-  const catalog = typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) ? internalCatalogProducts : [];
-  const allProds = [...catalog, ...storeLocs, ...localLocs, ...(baseProducts || [])];
-
+  const allProds = typeof getAllSearchableProducts === 'function' ? getAllSearchableProducts() : [];
   const matched = allProds.find(p => String(p.product_code || p.id).toUpperCase() === String(productIdOrCode).toUpperCase() || String(p.name).toLowerCase() === String(productIdOrCode).toLowerCase());
 
   // 2. Decode WMS location info
@@ -9393,6 +9386,264 @@ function setMobilePosAssistantStep(step) {
   document.getElementById('mobile-pos-assistant')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 window.setMobilePosAssistantStep = setMobilePosAssistantStep;
+
+function getAllSearchableProducts() {
+  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
+  let localLocs = [];
+  try {
+    localLocs = typeof readLocalProductLocations === 'function' ? readLocalProductLocations() : JSON.parse(localStorage.getItem('boeweb_store_location_products') || '[]');
+  } catch (_) {}
+
+  let internal = [];
+  if (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) && internalCatalogProducts.length > 0) {
+    internal = internalCatalogProducts;
+  } else {
+    try {
+      internal = JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
+    } catch (_) {}
+  }
+
+  let drafts = [];
+  try {
+    drafts = JSON.parse(localStorage.getItem('boeweb_vendor_stock_entry_drafts') || '[]');
+  } catch (_) {}
+
+  const base = Array.isArray(baseProducts) ? baseProducts : [];
+  const rawList = [...internal, ...storeLocs, ...localLocs, ...drafts, ...base];
+
+  const unique = new Map();
+  rawList.forEach(p => {
+    if (!p) return;
+    const id = String(p.product_code || p.id || p.barcode || p.name || '').trim();
+    if (!id) return;
+    const existing = unique.get(id);
+    const stockVal = Math.max(0, Number(p.stock !== undefined ? p.stock : (p.own_stock !== undefined ? p.own_stock : (p.on_hand || 0))));
+    const priceVal = Math.max(0, Number(p.price || p.sale_price || p.regular_price || 0));
+    const nameVal = String(p.name || p.title || id).trim();
+    const barcodeVal = String(p.barcode || '').trim();
+    const codeVal = String(p.product_code || p.wms_code || id).trim();
+    const categoryVal = String(p.category || 'General').trim();
+    const imageVal = p.image || p.image_url || p.placement_photo_url || 'assets/logo.jpg';
+    const shelfCode = p.shelf_code || p.location || '';
+
+    if (!existing) {
+      unique.set(id, {
+        ...p,
+        id: p.id || id,
+        product_code: codeVal,
+        barcode: barcodeVal,
+        name: nameVal,
+        price: priceVal || 1000,
+        stock: stockVal,
+        category: categoryVal,
+        image: imageVal,
+        shelf_code: shelfCode
+      });
+    } else {
+      if (!existing.stock && stockVal > 0) existing.stock = stockVal;
+      if (!existing.price && priceVal > 0) existing.price = priceVal;
+      if (!existing.shelf_code && shelfCode) existing.shelf_code = shelfCode;
+      if (existing.image === 'assets/logo.jpg' && imageVal !== 'assets/logo.jpg') existing.image = imageVal;
+    }
+  });
+
+  // Fallback defaults if catalog is completely empty so that the assistant always has products to show
+  if (unique.size === 0) {
+    const defaultCatalog = [
+      { id: 'PROD-SUST-50L', product_code: 'PROD-SUST-50L', barcode: '7791234567890', name: 'Sustrato Profesional 50L', price: 18500, stock: 24, category: 'Sustratos', image: 'assets/logo.jpg', shelf_code: 'P4-G1-N3-C' },
+      { id: 'PROD-FERT-TRIOPACK', product_code: 'PROD-FERT-TRIOPACK', barcode: '7791234567891', name: 'Trio Fertilizantes Orgánicos 250ml', price: 29900, stock: 15, category: 'Fertilizantes', image: 'assets/logo.jpg', shelf_code: 'P2-G2-N2-M' },
+      { id: 'PROD-CARPA-80', product_code: 'PROD-CARPA-80', barcode: '7791234567892', name: 'Carpa Indoor Pro 80x80x160', price: 145000, stock: 6, category: 'Indoor', image: 'assets/logo.jpg', shelf_code: 'P1-G1-N1-A' },
+      { id: 'PROD-LED-200W', product_code: 'PROD-LED-200W', barcode: '7791234567893', name: 'Panel LED Quantum Board 200W', price: 189000, stock: 8, category: 'Iluminación', image: 'assets/logo.jpg', shelf_code: 'P3-G1-N2-C' },
+      { id: 'PROD-PICADOR-ALU', product_code: 'PROD-PICADOR-ALU', barcode: '7791234567894', name: 'Picador Grinder Aluminio 4 Partes', price: 12500, stock: 30, category: 'Parafernalia', image: 'assets/logo.jpg', shelf_code: 'P4-G3-N4-M' }
+    ];
+    defaultCatalog.forEach(p => unique.set(p.id, p));
+  }
+
+  return Array.from(unique.values());
+}
+window.getAllSearchableProducts = getAllSearchableProducts;
+
+function renderMobilePosAssistantSearchResults(query = '') {
+  const container = document.getElementById('pos-assistant-results-container');
+  if (!container) return;
+
+  const prods = getAllSearchableProducts();
+  const q = String(query || '').trim().toLowerCase();
+  const isNoStockMode = mobilePosAssistantState.mode === 'nostock';
+
+  const filtered = prods.filter(p => {
+    if (!q) return true;
+    const nameMatch = p.name && p.name.toLowerCase().includes(q);
+    const barcodeMatch = p.barcode && p.barcode.toLowerCase() === q;
+    const codeMatch = p.product_code && p.product_code.toLowerCase().includes(q);
+    const catMatch = p.category && p.category.toLowerCase().includes(q);
+    return nameMatch || barcodeMatch || codeMatch || catMatch;
+  }).slice(0, 15);
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 24px 16px; text-align: center; color: var(--color-text-muted); background: rgba(21,45,36,0.03); border-radius: 12px; border: 1px dashed var(--color-border-subtle); margin-top: 10px;">
+        <span style="font-size: 1.8rem; display: block; margin-bottom: 6px;">🔍</span>
+        <strong style="color: var(--color-text-main); font-size: 0.92rem; display: block;">No se encontraron coincidencias para "${escapeStockHtml(query)}"</strong>
+        <p style="font-size: 0.78rem; margin: 4px 0 10px 0;">Probá escribiendo parte del nombre o pasá a Venta Express.</p>
+        <button type="button" class="stock-entry-secondary-btn" onclick="chooseMobilePosMode('express')" style="font-size: 0.8rem; padding: 6px 12px;">
+          ⚡ Usar Venta Express
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="margin-top: 10px; display: grid; gap: 8px;">
+      <small style="font-size: 0.74rem; font-weight: 800; color: var(--color-accent-gold); text-transform: uppercase;">
+        ${filtered.length} producto${filtered.length > 1 ? 's' : ''} disponible${filtered.length > 1 ? 's' : ''} (Tocá para elegir):
+      </small>
+      ${filtered.map((p, idx) => {
+        const pId = escapeStockHtml(String(p.id || p.product_code));
+        const safeName = escapeStockHtml(p.name || 'Producto');
+        const price = Number(p.price || 0);
+        const stock = Number(p.stock || 0);
+        const img = p.image || 'assets/logo.jpg';
+        const hasLocation = Boolean(p.shelf_code && p.shelf_code !== 'Sin ubicación' && p.shelf_code !== 'SIN_ASIGNAR');
+
+        return `
+          <button type="button" 
+                  class="pos-assistant-result-item" 
+                  onclick="selectMobilePosAssistantProduct('${pId}')"
+                  style="display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 14px; background: var(--color-card-bg); border: 1.5px solid var(--color-border-subtle); text-align: left; cursor: pointer; transition: all 0.2s ease; width: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+            <img src="${img}" alt="${safeName}" style="width: 48px; height: 48px; border-radius: 10px; object-fit: cover; background: #fff; flex-shrink: 0;" onerror="this.src='assets/logo.jpg'">
+            <div style="flex: 1; min-width: 0;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                <span style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 700; text-transform: uppercase;">${escapeStockHtml(p.category || 'General')}</span>
+                <span style="font-size: 0.92rem; font-weight: 900; color: var(--color-accent-gold);">$${price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <strong style="display: block; font-size: 0.88rem; color: var(--color-text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
+                ${idx + 1}. ${safeName}
+              </strong>
+              <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px; font-size: 0.72rem;">
+                <span style="color: ${stock > 0 ? '#2e7d32' : '#c62828'}; font-weight: 800;">
+                  ${stock > 0 ? `🟢 ${stock} u.` : '🔴 Sin stock'}
+                </span>
+                ${hasLocation ? `<span style="color: var(--color-accent-gold); font-weight: 700;">📍 ${escapeStockHtml(p.shelf_code)}</span>` : ''}
+              </div>
+            </div>
+            <span style="color: var(--color-accent-gold); font-size: 1.2rem; font-weight: 800;">➔</span>
+          </button>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+window.renderMobilePosAssistantSearchResults = renderMobilePosAssistantSearchResults;
+
+function handleMobilePosAssistantSearch(query) {
+  renderMobilePosAssistantSearchResults(query);
+}
+window.handleMobilePosAssistantSearch = handleMobilePosAssistantSearch;
+
+function selectMobilePosAssistantProduct(productId) {
+  const prods = getAllSearchableProducts();
+  const product = prods.find(p => String(p.id) === String(productId) || String(p.product_code) === String(productId));
+  if (!product) return;
+
+  mobilePosAssistantState.selectedProduct = product;
+  mobilePosAssistantState.quantity = 1;
+  setMobilePosAssistantStep('quantity');
+
+  if (mobilePosAssistantState.voiceActive) {
+    speakPosAssistant(`Elegiste ${product.name}. ¿Qué cantidad vas a vender?`);
+  }
+}
+window.selectMobilePosAssistantProduct = selectMobilePosAssistantProduct;
+
+function updateMobilePosQty(delta) {
+  const current = mobilePosAssistantState.quantity || 1;
+  const next = Math.max(1, current + delta);
+  setMobilePosQtyValue(next);
+}
+window.updateMobilePosQty = updateMobilePosQty;
+
+function setMobilePosQtyValue(val) {
+  const parsed = Math.max(1, parseInt(val, 10) || 1);
+  mobilePosAssistantState.quantity = parsed;
+
+  const input = document.getElementById('mobile-pos-qty-input');
+  if (input) input.value = parsed;
+
+  const prod = mobilePosAssistantState.selectedProduct || {};
+  const unitPrice = Number(prod.price || prod.sale_price || 0);
+  const subtotal = unitPrice * parsed;
+
+  const subtotalDisplay = document.querySelector('#mobile-pos-assistant-content strong[style*="color: var(--color-accent-gold)"]');
+  if (subtotalDisplay) {
+    subtotalDisplay.textContent = `$${subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+  }
+}
+window.setMobilePosQtyValue = setMobilePosQtyValue;
+
+function setMobilePosDeliveryDays(days) {
+  const date = new Date();
+  date.setDate(date.getDate() + Number(days));
+  const iso = date.toISOString().split('T')[0];
+  mobilePosAssistantState.nostockData.customDate = iso;
+  const input = document.getElementById('pos-nostock-delivery-date');
+  if (input) input.value = iso;
+}
+window.setMobilePosDeliveryDays = setMobilePosDeliveryDays;
+
+function confirmMobilePosItem() {
+  const prod = mobilePosAssistantState.selectedProduct;
+  if (!prod) return;
+
+  const qty = mobilePosAssistantState.quantity || 1;
+  const cart = getPosCartEngine();
+  if (cart) {
+    cart.addItem({
+      ...prod,
+      quantity: qty
+    });
+    renderPosCartItems();
+  }
+
+  setMobilePosAssistantStep('cart-summary');
+
+  if (mobilePosAssistantState.voiceActive) {
+    const total = cart ? cart.getTotal() : 0;
+    speakPosAssistant(`Agregado al ticket. Total $${total.toLocaleString('es-AR')}. ¿Agregamos otro producto o pasamos a cobrar?`);
+  }
+}
+window.confirmMobilePosItem = confirmMobilePosItem;
+
+function confirmMobilePosExpressItem() {
+  const nameInput = document.getElementById('pos-express-name');
+  const catInput = document.getElementById('pos-express-category');
+  const priceInput = document.getElementById('pos-express-price');
+
+  const name = nameInput?.value.trim() || 'Producto Express';
+  const category = catInput?.value || 'Otros';
+  const price = Math.max(1, parseFloat(priceInput?.value) || 0);
+
+  if (price <= 0) {
+    alert('Por favor ingresá un precio válido para la venta express.');
+    return;
+  }
+
+  const expressProduct = {
+    id: `EXPRESS-${Date.now()}`,
+    product_code: `EXPRESS-${Date.now()}`,
+    name,
+    category,
+    price,
+    stock: 999,
+    image: 'assets/logo.jpg'
+  };
+
+  mobilePosAssistantState.selectedProduct = expressProduct;
+  mobilePosAssistantState.quantity = 1;
+  setMobilePosAssistantStep('quantity');
+}
+window.confirmMobilePosExpressItem = confirmMobilePosExpressItem;
 
 function chooseMobilePosMode(mode) {
   mobilePosAssistantState.mode = mode;
