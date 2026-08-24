@@ -1259,7 +1259,7 @@
         <button type="button" class="vendor-side-nav-item active" data-vendor-tab="home" onclick="switchVendorTab('home')">
           <span class="vendor-side-nav-icon" aria-hidden="true">⌂</span><span>Inicio</span>
         </button>
-        <button type="button" class="vendor-side-nav-item vendor-side-nav-featured" data-vendor-tab="pos" onclick="switchVendorTab('pos')" style="color: #2e7d32; font-weight: 800;">
+        <button type="button" class="vendor-side-nav-item vendor-side-nav-featured" data-vendor-tab="pos" onclick="switchVendorTab('pos')" style="color: var(--vendor-forest); font-weight: 800;">
           <span class="vendor-side-nav-icon" aria-hidden="true">🏷️</span><span>Vender producto</span>
         </button>
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="catalog" onclick="switchVendorTab('catalog')">
@@ -1308,7 +1308,6 @@
 
       <div class="vendor-sidebar-tools" aria-label="Herramientas y seguridad">
         <a href="tv.html" class="vendor-sidebar-tool-link" target="_blank" rel="noopener">TV</a>
-        <a href="coffee.html" class="vendor-sidebar-tool-link" target="_blank" rel="noopener">Coffee</a>
         <button type="button" class="vendor-sidebar-tool-link" onclick="openAdminAuditInvestigationModal()" style="border: 1px solid rgba(194,162,70,0.35); background: rgba(194,162,70,0.08); color: var(--vendor-gold-soft); cursor: pointer; font: inherit; font-size: 0.62rem; font-weight: 700;" title="Historial e Investigación de Seguridad (Admin)">🛡️ Auditoría</button>
       </div>
       <p class="vendor-sidebar-version">BÔ · Centro operativo</p>
@@ -1318,9 +1317,9 @@
       <div class="b2b-header-container">
         <div class="b2b-logo-area">
           <a href="index.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
-            <img src="assets/logo.jpg" alt="BÔ Grow Club" class="b2b-logo-img" style="width: 38px; height: 38px; border-radius: 8px; object-fit: cover;">
+            <img src="assets/logo.jpg" alt="Logo" class="b2b-logo-img" style="width: 38px; height: 38px; border-radius: 8px; object-fit: cover;">
             <div class="b2b-logo-text">
-              <h1 style="font-size: 1.1rem; margin: 0; color: var(--color-text-main); font-weight: 800; line-height: 1.1;">BÔ Grow Club</h1>
+              <h1 style="font-size: 1.1rem; margin: 0; color: var(--color-text-main); font-weight: 800; line-height: 1.1;" class="saas-brand-name-display">BÔ Grow Club</h1>
               <p style="font-size: 0.68rem; margin: 0; color: var(--color-accent-gold); font-weight: 700; text-transform: uppercase;">Portal Vendedores</p>
             </div>
           </a>
@@ -1376,7 +1375,7 @@
             </button>
           </div>
 
-          <button type="button" onclick="switchVendorTab('pos')" class="vendor-header-sell-action" style="background: #2e7d32; color: #ffffff; border: 1.5px solid #1b5e20; border-radius: 10px; font-weight: 800; font-size: 0.82rem; padding: 6px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(46,125,50,0.25);">
+          <button type="button" onclick="switchVendorTab('pos')" class="vendor-header-sell-action" style="background: var(--vendor-forest); color: #ffffff; border: 1.5px solid var(--vendor-gold); border-radius: 10px; font-weight: 800; font-size: 0.82rem; padding: 6px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.25);">
             <span>🏷️</span><span>Vender</span>
           </button>
         </div>
@@ -1394,13 +1393,13 @@
             <span class="vendor-welcome-avatar-status" title="Vendedor activo en turno"></span>
           </div>
           <div class="vendor-home-copy">
-            <span class="vendor-home-eyebrow">Centro operativo · BÔ Grow Club</span>
+            <span class="vendor-home-eyebrow">Centro operativo · <span class="saas-brand-name-display">BÔ Grow Club</span></span>
             <h2 id="vendor-welcome-title">Buen día, vendedor</h2>
-            <p id="vendor-welcome-subtitle" class="vendor-welcome-subtitle">¡Espero que tengas un día lleno de ventas! 🌿🚀</p>
+            <p id="vendor-welcome-subtitle" class="vendor-welcome-subtitle">¡Espero que tengas un día lleno de ventas! 🚀</p>
           </div>
         </div>
         <div class="vendor-home-hero-actions">
-          <button type="button" class="vendor-home-primary-action" onclick="switchVendorTab('pos')" style="background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: #ffffff; border: none; font-weight: 800; box-shadow: 0 4px 14px rgba(46,125,50,0.3);">
+          <button type="button" class="vendor-home-primary-action" onclick="switchVendorTab('pos')" style="background: linear-gradient(135deg, var(--vendor-forest) 0%, var(--vendor-forest-soft, var(--color-primary)) 100%); color: #ffffff; border: none; font-weight: 800; box-shadow: 0 4px 14px rgba(0,0,0,0.3);">
             🏷️🛒 Vender en Mostrador
           </button>
           <button type="button" class="vendor-home-secondary-action" onclick="switchVendorTab('fast-upload')">
@@ -1656,17 +1655,6 @@
           <div>
             <strong class="vendor-flow-title">Tablet promos</strong>
             <span class="vendor-flow-desc">Modo Kiosco · Catálogo interactivo en local</span>
-          </div>
-        </a>
-
-        <!-- BÔ Caffè Club -->
-        <a href="coffee.html" target="_blank" rel="noopener" class="vendor-flow-card">
-          <div class="vendor-flow-top">
-            <span class="vendor-flow-icon">☕</span>
-          </div>
-          <div>
-            <strong class="vendor-flow-title">BÔ Caffè Club</strong>
-            <span class="vendor-flow-desc">Cafetería de especialidad · Bar y menú</span>
           </div>
         </a>
       </div>

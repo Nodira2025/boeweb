@@ -14,15 +14,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="index.css?v=2.7">
-  <script src="theme.js"></script>
+  <link rel="stylesheet" href="index.css?v=white_label_v2">
+  <script src="theme.js?v=white_label_v2"></script>
   
   <style>
     :root {
       --tv-bg-dark: #060d09;
       --tv-card-bg: rgba(15, 30, 24, 0.92);
-      --tv-accent-gold: #c39b4b;
-      --tv-accent-green: #66bb6a;
+      --tv-accent-gold: var(--color-accent-gold, #c39b4b);
+      --tv-accent-green: var(--color-primary, #66bb6a);
     }
 
     * {
@@ -49,7 +49,7 @@
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: radial-gradient(circle at 50% 30%, rgba(21, 45, 36, 0.6) 0%, rgba(6, 13, 9, 0.98) 75%);
+      background: radial-gradient(circle at 50% 30%, var(--vendor-forest-soft, rgba(21, 45, 36, 0.6)) 0%, rgba(6, 13, 9, 0.98) 75%);
       z-index: 0;
       pointer-events: none;
     }
@@ -66,7 +66,7 @@
 
     /* TV Header Bar */
     .tv-header {
-      background: linear-gradient(135deg, rgba(21, 45, 36, 0.98), rgba(15, 30, 24, 0.99));
+      background: linear-gradient(135deg, var(--vendor-forest, rgba(21, 45, 36, 0.98)), var(--vendor-forest-soft, rgba(15, 30, 24, 0.99)));
       border-bottom: 2px solid var(--tv-accent-gold);
       padding: 16px 32px;
       display: flex;

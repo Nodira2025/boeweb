@@ -14,8 +14,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="index.css?v=2.7">
-  <script src="theme.js"></script>
+  <link rel="stylesheet" href="index.css?v=white_label_v2">
+  <script src="theme.js?v=white_label_v2"></script>
   
   <style>
     html, body {
@@ -41,7 +41,7 @@
       height: 100vh;
       max-height: 840px;
       aspect-ratio: 9 / 16;
-      background: linear-gradient(180deg, #0f1e18 0%, #09120e 100%);
+      background: linear-gradient(180deg, var(--vendor-forest, #0f1e18) 0%, #09120e 100%);
       border: 2px solid var(--color-accent-gold);
       border-radius: 24px;
       box-shadow: 0 0 50px rgba(0,0,0,0.9), 0 0 30px rgba(195,155,75,0.25);
@@ -64,7 +64,7 @@
     }
 
     .tablet-header {
-      background: linear-gradient(135deg, rgba(21,45,36,0.95), rgba(15,30,24,0.98));
+      background: linear-gradient(135deg, var(--vendor-forest, rgba(21,45,36,0.95)), var(--vendor-forest-soft, rgba(15,30,24,0.98)));
       border-bottom: 2px solid var(--color-accent-gold);
       padding: 14px 18px;
       display: flex;

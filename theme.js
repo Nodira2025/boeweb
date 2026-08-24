@@ -29,25 +29,44 @@
 
     const root = document.documentElement;
 
-    // 1. Inyectar variables de color de marca
+    // 1. Inyectar variables de color de marca (degradados y tonos derivados)
     if (brand.primary_color) {
       root.style.setProperty('--color-primary', brand.primary_color);
       root.style.setProperty('--color-brand-primary', brand.primary_color);
       root.style.setProperty('--vendor-forest', brand.primary_color);
+      root.style.setProperty('--vendor-forest-soft', `${brand.primary_color}ee`);
+      root.style.setProperty('--vendor-leaf', brand.accent_color || `${brand.primary_color}bb`);
       root.style.setProperty('--color-border-accent', brand.primary_color);
       root.style.setProperty('--color-primary-light', `${brand.primary_color}dd`);
+      root.style.setProperty('--cash-forest', brand.primary_color);
+      root.style.setProperty('--cash-ink', brand.primary_color);
+      root.style.setProperty('--tv-accent-green', brand.primary_color);
     }
     if (brand.accent_color) {
       root.style.setProperty('--color-accent-gold', brand.accent_color);
       root.style.setProperty('--color-brand-accent', brand.accent_color);
       root.style.setProperty('--vendor-gold', brand.accent_color);
+      root.style.setProperty('--vendor-gold-soft', `${brand.accent_color}cc`);
+      root.style.setProperty('--cash-gold', brand.accent_color);
+      root.style.setProperty('--tv-accent-gold', brand.accent_color);
       root.style.setProperty('--shadow-gold', `0 0 14px ${brand.accent_color}66`);
     }
 
-    // 2. Actualizar textos de marca
+    // 2. Actualizar textos de marca en todos los portales y dispositivos
     if (brand.brand_name) {
-      // Header brand title
-      document.querySelectorAll('.brand-title, .saas-brand-name-display, #header-brand-name').forEach(el => {
+      // Header brand title & logos
+      document.querySelectorAll('.brand-title, .saas-brand-name-display, #header-brand-name, .b2b-logo-text h1, #saas-active-tenant-name, .tablet-header h2, .tv-header h1').forEach(el => {
+        el.textContent = brand.brand_name;
+      });
+
+      // Vendor eyebrows and sidebar versions
+      document.querySelectorAll('.vendor-home-eyebrow').forEach(el => {
+        el.textContent = `Centro operativo · ${brand.brand_name}`;
+      });
+      document.querySelectorAll('.vendor-sidebar-version').forEach(el => {
+        el.textContent = `${brand.brand_name} · Centro operativo`;
+      });
+      document.querySelectorAll('.vendor-login-brand').forEach(el => {
         el.textContent = brand.brand_name;
       });
 
@@ -97,7 +116,7 @@
 
     // 3. Actualizar logos de marca
     if (brand.logo_url) {
-      document.querySelectorAll('img.brand-logo, img.main-brand-logo, #brand-logo-img, .footer-logo-img, .hero-service-brand img').forEach(el => {
+      document.querySelectorAll('img.brand-logo, img.main-brand-logo, #brand-logo-img, .footer-logo-img, .hero-service-brand img, .b2b-logo-img, .tablet-logo img, .tv-header img').forEach(el => {
         el.src = brand.logo_url;
         if (brand.brand_name) el.alt = brand.brand_name;
       });
@@ -155,6 +174,11 @@
         el.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(brand.address)}`;
       });
     }
+
+    // 7. Ocultar enlaces o módulos de BÔ Coffee si existen en el DOM
+    document.querySelectorAll('a[href*="coffee.html"], .vendor-flow-card[href*="coffee"], [data-feature="coffee"]').forEach(el => {
+      el.style.display = 'none';
+    });
   }
 
   function applyTheme(theme) {
