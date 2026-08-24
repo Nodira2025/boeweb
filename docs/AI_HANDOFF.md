@@ -248,7 +248,7 @@ node --test tests/operational-wms-frontend-v2.test.mjs tests/wms-security-v2.tes
 git diff --check
 ```
 
-Último resultado conocido: `289` pruebas, `289` aprobadas. El 24-08-2026
+Último resultado conocido: `292` pruebas, `292` aprobadas. El 24-08-2026
 también se verificó contra Supabase real: migraciones `000..011`, tenant activo,
 configuración publicada schema v2, ubicación default, caja activa y lectura
 pública del catálogo, todo correcto.

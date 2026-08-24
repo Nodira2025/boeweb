@@ -425,6 +425,16 @@ test('storefront, vendedor y admin cargan AppConfig y no operan la tabla legacy 
   assert.match(hero, /escapeHeroHtml/);
 });
 
+test('el portal vendedor enlaza el panel de configuración sólo para roles administrativos', () => {
+  const html = fs.readFileSync(path.resolve('vendedor.html'), 'utf8');
+  const source = fs.readFileSync(path.resolve('vendedor.js'), 'utf8');
+
+  assert.match(html, /href=["']admin-config\.html["'][^>]*data-admin-config-link[^>]*hidden/i);
+  assert.match(source, /querySelectorAll\s*\(\s*['"]\[data-admin-config-link\]['"]\s*\)/);
+  assert.match(source, /\[['"]ADMIN['"],\s*['"]SUPERADMIN['"]\]\.includes\(String\(authContext\.role/);
+  assert.match(source, /link\.hidden\s*=\s*!canManageConfiguration/);
+});
+
 function assertOrderedSource(source, expressions) {
   let cursor = -1;
   for (const expression of expressions) {

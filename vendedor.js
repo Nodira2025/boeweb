@@ -1118,6 +1118,7 @@ function checkVendorAuth() {
   const vendorCheckoutInput = document.getElementById('b2b-vendedor-name');
   const sidebarName = document.getElementById('vendor-sidebar-name');
   const sidebarAvatar = document.getElementById('vendor-sidebar-avatar');
+  const adminConfigLinks = document.querySelectorAll('[data-admin-config-link]');
 
   if (authContext.isVerified && activeVendor) {
     if (loginScreen) loginScreen.style.display = 'none';
@@ -1131,6 +1132,8 @@ function checkVendorAuth() {
     if (vendorCheckoutInput) vendorCheckoutInput.value = activeVendor;
     if (sidebarName) sidebarName.textContent = activeVendor;
     if (sidebarAvatar) sidebarAvatar.textContent = activeVendor.charAt(0).toUpperCase();
+    const canManageConfiguration = ['ADMIN', 'SUPERADMIN'].includes(String(authContext.role || '').toUpperCase());
+    adminConfigLinks.forEach(link => { link.hidden = !canManageConfiguration; });
     const welcomeAvatar = document.getElementById('vendor-welcome-avatar');
     if (welcomeAvatar) welcomeAvatar.textContent = activeVendor.charAt(0).toUpperCase();
     const requestedProductCode = new URLSearchParams(window.location.search).get('product');
@@ -1140,6 +1143,7 @@ function checkVendorAuth() {
       switchVendorTab('home');
     }
   } else {
+    adminConfigLinks.forEach(link => { link.hidden = true; });
     if (loginScreen) loginScreen.style.display = 'flex';
     if (portalApp) portalApp.style.display = 'none';
   }

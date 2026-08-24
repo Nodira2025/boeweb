@@ -6,9 +6,12 @@ const JSON_HEADERS = Object.freeze({
 });
 
 export function jsonResponse(status, payload, extraHeaders = {}) {
-  return new Response(JSON.stringify(payload), {
+  const bodyless = status === 204 || status === 205 || status === 304;
+  const headers = { ...JSON_HEADERS, ...extraHeaders };
+  if (bodyless) delete headers['Content-Type'];
+  return new Response(bodyless ? null : JSON.stringify(payload), {
     status,
-    headers: { ...JSON_HEADERS, ...extraHeaders }
+    headers
   });
 }
 
