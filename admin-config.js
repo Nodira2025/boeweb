@@ -15,6 +15,20 @@ let adminTenantContext = null;
 let appConfigRepository = null;
 let appConfigDirtyTrackingReady = false;
 const DEFAULT_ADMIN_TENANT_ID = '11111111-1111-1111-1111-111111111111';
+const ADMIN_CONFIG_PAGES = Object.freeze({
+  marca: {
+    title: 'Marca e identidad',
+    description: 'Personalizá la apariencia, los textos y la identidad comercial.'
+  },
+  operacion: {
+    title: 'Catálogo y reglas',
+    description: 'Definí la exposición del catálogo y los límites operativos de la tienda.'
+  },
+  pagos: {
+    title: 'Pagos y cobros',
+    description: 'Administrá únicamente los datos públicos de cada medio de pago.'
+  }
+});
 
 const DEFAULT_HERO_SLIDES = [
   {
@@ -883,7 +897,12 @@ function initializeAppConfigDirtyTracking() {
 function updateAppConfigStatus(message, isError = false) {
   const stage = document.getElementById('app-config-stage-status');
   const detail = document.getElementById('app-config-message');
+  const pageState = document.getElementById('admin-page-save-state');
   if (stage) stage.textContent = message;
+  if (pageState) {
+    pageState.textContent = message;
+    pageState.dataset.state = isError ? 'error' : 'normal';
+  }
   if (detail) {
     detail.textContent = message;
     detail.style.color = isError ? '#F6F3E8' : '#C2A246';
@@ -891,10 +910,54 @@ function updateAppConfigStatus(message, isError = false) {
 }
 
 function focusBrandConfig(controlId) {
+  focusAdminConfigControl(controlId, 'marca');
+}
+
+function focusAdminConfigControl(controlId, pageName) {
+  navigateAdminConfigPage(pageName, { scroll: false });
   const control = document.getElementById(controlId);
   if (!control) return;
   control.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  control.focus({ preventScroll: true });
+  if (typeof control.focus === 'function') control.focus({ preventScroll: true });
+}
+
+function getRequestedAdminConfigPage() {
+  const requested = String(window.location.hash || '').replace(/^#/, '').trim().toLowerCase();
+  return Object.hasOwn(ADMIN_CONFIG_PAGES, requested) ? requested : 'marca';
+}
+
+function navigateAdminConfigPage(pageName, options = {}) {
+  const page = Object.hasOwn(ADMIN_CONFIG_PAGES, pageName) ? pageName : 'marca';
+  const metadata = ADMIN_CONFIG_PAGES[page];
+  document.querySelectorAll('[data-admin-page]').forEach(section => {
+    section.hidden = section.dataset.adminPage !== page;
+  });
+  document.querySelectorAll('[data-admin-page-target]').forEach(button => {
+    const current = button.dataset.adminPageTarget === page;
+    if (current) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
+  const title = document.getElementById('admin-page-title');
+  const description = document.getElementById('admin-page-description');
+  if (title) title.textContent = metadata.title;
+  if (description) description.textContent = metadata.description;
+
+  const nextHash = `#${page}`;
+  if (window.location.hash !== nextHash) {
+    const method = options.replace ? 'replaceState' : 'pushState';
+    window.history[method](null, '', nextHash);
+  }
+  if (options.scroll !== false) {
+    document.querySelector('.admin-page-header')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function initializeAdminConfigPages() {
+  document.querySelectorAll('[data-admin-page-target]').forEach(button => {
+    button.addEventListener('click', () => navigateAdminConfigPage(button.dataset.adminPageTarget));
+  });
+  window.addEventListener('hashchange', () => navigateAdminConfigPage(getRequestedAdminConfigPage(), { replace: true }));
+  navigateAdminConfigPage(getRequestedAdminConfigPage(), { replace: true, scroll: false });
 }
 
 function ensureAdministrativeContext() {
@@ -957,6 +1020,8 @@ window.saveAdminConfig = saveAdminConfig;
 window.saveFutureAppConfigDraft = saveFutureAppConfigDraft;
 window.publishFutureAppConfig = publishFutureAppConfig;
 window.focusBrandConfig = focusBrandConfig;
+window.focusAdminConfigControl = focusAdminConfigControl;
+window.navigateAdminConfigPage = navigateAdminConfigPage;
 window.updateBrandLivePreview = updateBrandLivePreview;
 window.updateBrandColorInputs = updateBrandColorInputs;
 window.updateBrandColorPickers = updateBrandColorPickers;
@@ -965,6 +1030,7 @@ window.handleBrandLogoFileSelect = handleBrandLogoFileSelect;
 window.applyBrandColorPreset = applyBrandColorPreset;
 
 document.addEventListener('DOMContentLoaded', () => {
+  initializeAdminConfigPages();
   authorizeAdminSession().catch(error => setAdminAuthStatus(error.message || 'No se pudo verificar la sesión.', true));
 });
 

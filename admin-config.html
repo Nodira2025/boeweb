@@ -16,7 +16,7 @@
   
   <!-- Stylesheet -->
   <link rel="stylesheet" href="index.css?v=white_label_v2">
-  <link rel="stylesheet" href="app-config.css?v=config_v1">
+  <link rel="stylesheet" href="app-config.css?v=config_v2">
   <script src="theme.js?v=white_label_v2"></script>
   
   <style>
@@ -28,7 +28,7 @@
     }
 
     .admin-container {
-      max-width: 900px;
+      max-width: 1120px;
       margin: 40px auto;
       padding: 0 24px;
     }
@@ -189,9 +189,29 @@
     </header>
 
     <div class="admin-container">
+      <section class="admin-page-header" aria-labelledby="admin-page-title">
+        <div>
+          <span class="app-config-eyebrow">Administración de la tienda</span>
+          <h1 id="admin-page-title">Marca e identidad</h1>
+          <p id="admin-page-description">Personalizá la apariencia, los textos y la identidad comercial.</p>
+        </div>
+        <span class="admin-page-save-state" id="admin-page-save-state">Configuración publicada</span>
+      </section>
+
+      <nav class="admin-page-nav" aria-label="Páginas del centro de configuración">
+        <button type="button" class="admin-page-nav-item" data-admin-page-target="marca" aria-current="page">
+          <span aria-hidden="true">✦</span><span>Marca</span>
+        </button>
+        <button type="button" class="admin-page-nav-item" data-admin-page-target="operacion">
+          <span aria-hidden="true">▦</span><span>Catálogo y reglas</span>
+        </button>
+        <button type="button" class="admin-page-nav-item" data-admin-page-target="pagos">
+          <span aria-hidden="true">$</span><span>Pagos</span>
+        </button>
+      </nav>
       
       <!-- Mercado Pago public configuration. Private credentials belong to server environment variables. -->
-      <div class="admin-card">
+      <div class="admin-card" data-admin-page="pagos" hidden>
         <div class="admin-card-title">
           <svg style="width: 24px; height: 24px;" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
           <span>Mercado Pago (integración segura)</span>
@@ -219,7 +239,7 @@
       </div>
 
       <!-- Brand Identity & Business Vertical Config Card -->
-      <div class="admin-card" style="border: 2px solid var(--color-accent-gold); box-shadow: 0 16px 45px rgba(0,0,0,0.5);">
+      <div class="admin-card" data-admin-page="marca" style="border: 2px solid var(--color-accent-gold); box-shadow: 0 16px 45px rgba(0,0,0,0.5);">
         <div class="admin-card-title">
           <svg style="width: 28px; height: 28px; color: var(--color-accent-gold);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           <span style="font-size: 1.5rem; font-weight: 800;">🎨 Estudio de Marca & Personalización White-Label</span>
@@ -484,21 +504,21 @@
       </div>
 
       <!-- Versioned, tenant-scoped configuration foundation -->
-      <section class="admin-card app-config-shell" id="future-config" aria-labelledby="future-config-title">
+      <section class="admin-card app-config-shell" id="future-config" data-admin-page="operacion" hidden aria-labelledby="future-config-title">
         <div class="app-config-hero">
           <div>
             <span class="app-config-eyebrow">Configuración versionada por empresa</span>
-            <h2 class="app-config-title" id="future-config-title">Marca, catálogo y reglas operativas</h2>
+            <h2 class="app-config-title" id="future-config-title">Catálogo y reglas operativas</h2>
             <p class="app-config-copy">Prepará cambios como borrador y publicalos cuando estén listos. El caché del navegador se separa por empresa y nunca funciona como autoridad de permisos.</p>
           </div>
           <span class="app-config-status" id="app-config-stage-status" role="status" aria-live="polite">Sin cambios</span>
         </div>
 
         <nav class="app-config-nav" aria-label="Áreas de configuración">
-          <a href="#app-config-visuals">Visuales</a>
-          <a href="#app-config-texts">Textos</a>
-          <a href="#app-config-catalog">Catálogo</a>
-          <a href="#app-config-rules">Reglas</a>
+          <button type="button" onclick="focusBrandConfig('brand-logo-file')">Visuales</button>
+          <button type="button" onclick="focusBrandConfig('brand-name-input')">Textos</button>
+          <button type="button" onclick="focusAdminConfigControl('app-config-catalog', 'operacion')">Catálogo</button>
+          <button type="button" onclick="focusAdminConfigControl('app-config-rules', 'operacion')">Reglas</button>
         </nav>
 
         <div class="app-config-grid">
@@ -610,7 +630,7 @@
       </section>
 
       <!-- Bank Transfer Config Card -->
-      <div class="admin-card">
+      <div class="admin-card" data-admin-page="pagos" hidden>
         <div class="admin-card-title">
           <svg style="width: 24px; height: 24px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"/></svg>
           <span>Datos para Transferencia Bancaria</span>
@@ -668,6 +688,6 @@
   <script src="tenant-theme.js"></script>
   <script src="saas-auth.js?v=auth_v1"></script>
   <script src="app-config.js?v=config_v2"></script>
-  <script src="admin-config.js?v=3.0"></script>
+  <script src="admin-config.js?v=3.1"></script>
 </body>
 </html>

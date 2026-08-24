@@ -435,6 +435,22 @@ test('el portal vendedor enlaza el panel de configuración sólo para roles admi
   assert.match(source, /link\.hidden\s*=\s*!canManageConfiguration/);
 });
 
+test('el panel admin navega por páginas internas sin recargar ni perder el borrador', () => {
+  const html = fs.readFileSync(path.resolve('admin-config.html'), 'utf8');
+  const source = fs.readFileSync(path.resolve('admin-config.js'), 'utf8');
+
+  for (const page of ['marca', 'operacion', 'pagos']) {
+    assert.match(html, new RegExp(`data-admin-page-target=["']${page}["']`, 'i'));
+    assert.match(html, new RegExp(`data-admin-page=["']${page}["']`, 'i'));
+  }
+  assert.match(source, /const\s+ADMIN_CONFIG_PAGES\s*=\s*Object\.freeze\s*\(/);
+  assert.match(source, /function\s+navigateAdminConfigPage\s*\(/);
+  assert.match(source, /window\.history\[method\]\s*\(null,\s*['"]{2},\s*nextHash\)/);
+  assert.match(source, /window\.addEventListener\s*\(\s*['"]hashchange['"]/);
+  assert.doesNotMatch(source, /window\.location\.(?:assign|replace)\s*\(/);
+  assert.doesNotMatch(html, /href=["']#app-config-(?:visuals|texts|catalog|rules)["']/i);
+});
+
 function assertOrderedSource(source, expressions) {
   let cursor = -1;
   for (const expression of expressions) {
