@@ -1779,3 +1779,148 @@
   color: rgba(246, 243, 232, 0.65);
 }
 
+/* --- CASH ASSISTANT SPECIFIC STYLES --- */
+.cash-category-pill-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.cash-category-chip {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--color-border-subtle, rgba(21, 45, 36, 0.12));
+  background: var(--color-card-bg, #ffffff);
+  color: var(--color-text-main, #152d24);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.cash-category-chip:hover,
+.cash-category-chip:focus-visible {
+  border-color: var(--color-accent-gold, #c2a246);
+  transform: translateY(-1px);
+}
+
+.cash-category-chip.active {
+  background: var(--color-accent-gold, #c2a246);
+  color: #152d24;
+  border-color: var(--color-accent-gold, #c2a246);
+  font-weight: 800;
+  box-shadow: 0 3px 8px rgba(194, 162, 70, 0.35);
+}
+
+.cash-bills-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.cash-bill-stepper-card {
+  padding: 10px 8px;
+  border-radius: 12px;
+  background: var(--color-card-bg, #ffffff);
+  border: 1px solid var(--color-border-subtle, rgba(21, 45, 36, 0.12));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+}
+
+.cash-bill-stepper-card .denom {
+  font-size: 0.82rem;
+  font-weight: 900;
+  color: var(--color-text-main, #152d24);
+}
+
+.cash-bill-stepper-card .stepper-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cash-bill-stepper-card .stepper-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-subtle, rgba(21, 45, 36, 0.2));
+  background: rgba(21, 45, 36, 0.05);
+  color: var(--color-text-main, #152d24);
+  font-weight: 800;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.cash-bill-stepper-card .stepper-input {
+  width: 44px;
+  height: 28px;
+  text-align: center;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-subtle, rgba(21, 45, 36, 0.2));
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.cash-difference-alert {
+  padding: 12px 14px;
+  border-radius: 14px;
+  margin: 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.cash-difference-alert.ok {
+  background: rgba(46, 125, 50, 0.1);
+  border: 1.5px solid #2e7d32;
+  color: #2e7d32;
+}
+
+.cash-difference-alert.warning {
+  background: rgba(230, 81, 0, 0.1);
+  border: 1.5px solid #e65100;
+  color: #e65100;
+}
+
+.cash-difference-alert.danger {
+  background: rgba(198, 40, 40, 0.1);
+  border: 1.5px solid #c62828;
+  color: #c62828;
+}
+
+[data-theme="dark"] .cash-category-chip,
+[data-theme="dark"] .cash-bill-stepper-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f6f3e8;
+}
+
+[data-theme="dark"] .cash-bill-stepper-card .denom {
+  color: #f6f3e8;
+}
+
+[data-theme="dark"] .cash-bill-stepper-card .stepper-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f6f3e8;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .cash-bill-stepper-card .stepper-input {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f6f3e8;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+

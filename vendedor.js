@@ -1441,6 +1441,11 @@ function switchVendorTab(tab) {
       vcardCash.style.borderColor = '#ffb74d';
       vcardCash.style.transform = 'scale(1.02)';
     }
+    if (window.innerWidth <= 991) {
+      switchCashWorkspaceMode('assistant');
+    } else {
+      switchCashWorkspaceMode('classic');
+    }
     renderCashSectionUI();
   } else if (tab === 'map' || tab === 'estanteria') {
     if (mapSection) {
