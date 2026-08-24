@@ -533,8 +533,8 @@
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  background: #152d24;
-  color: #c2a246;
+  background: var(--vendor-forest);
+  color: var(--vendor-gold);
   font-size: 0.8rem;
   font-weight: 800;
   border: 1px solid rgba(194, 162, 70, 0.4);
@@ -560,7 +560,7 @@
   display: block;
   font-size: 0.95rem;
   font-weight: 800;
-  color: #152d24;
+  color: var(--vendor-ink);
   margin-bottom: 4px;
   line-height: 1.25;
 }
@@ -574,8 +574,8 @@
 }
 
 .vendor-flow-card-featured {
-  background: linear-gradient(135deg, #152d24 0%, #1c3c30 100%) !important;
-  border: 2px solid #c2a246 !important;
+  background: linear-gradient(135deg, var(--vendor-forest) 0%, var(--vendor-forest-soft) 100%) !important;
+  border: 2px solid var(--vendor-gold) !important;
   box-shadow: 0 8px 24px rgba(21, 45, 36, 0.25) !important;
 }
 
@@ -588,8 +588,8 @@
 }
 
 .vendor-flow-card-featured .vendor-flow-num {
-  background: #c2a246;
-  color: #152d24;
+  background: var(--vendor-gold);
+  color: var(--vendor-forest);
   border-color: #ffffff;
 }
 

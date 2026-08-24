@@ -15,7 +15,7 @@
   background:
     radial-gradient(circle at 5% 8%, rgba(194, 162, 70, 0.2), transparent 26rem),
     linear-gradient(145deg, #ede4cd 0%, #f6f3e8 48%, #e9dfc4 100%);
-  color: #152d24;
+  color: var(--vendor-forest);
 }
 
 .vendor-login-screen::before {
@@ -59,7 +59,7 @@
   display: inline-flex;
   align-items: center;
   gap: 13px;
-  color: #152d24;
+  color: var(--vendor-forest);
   text-decoration: none;
 }
 
@@ -108,7 +108,7 @@
 .vendor-login-heading h1 {
   max-width: 520px;
   margin: 10px 0 13px;
-  color: #152d24;
+  color: var(--vendor-forest);
   font-family: "Playfair Display", "Cinzel", serif;
   font-size: clamp(2.65rem, 4.1vw, 4.45rem);
   font-weight: 750;
@@ -133,7 +133,7 @@
 .vendor-login-field label {
   margin-bottom: 7px;
   display: block;
-  color: #152d24;
+  color: var(--vendor-forest);
   font-size: 0.71rem;
   font-weight: 820;
   letter-spacing: 0.025em;
@@ -165,7 +165,7 @@
   border-radius: 13px;
   outline: none;
   background: #fffdf6;
-  color: #152d24;
+  color: var(--vendor-forest);
   font: inherit;
   font-size: 0.84rem;
   font-weight: 620;
@@ -200,7 +200,7 @@
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: #3e5f1f;
+  color: var(--color-primary);
   font: inherit;
   font-size: 0.7rem;
   font-weight: 820;
@@ -238,7 +238,7 @@
   place-items: center;
   border: 1px solid rgba(194, 162, 70, 0.68);
   border-radius: 50%;
-  background: #152d24;
+  background: var(--vendor-forest);
   color: #f6f3e8;
   font-family: "Playfair Display", serif;
   font-size: 1rem;
@@ -251,7 +251,7 @@
 }
 
 .vendor-login-profile strong {
-  color: #152d24;
+  color: var(--vendor-forest);
   font-size: 0.77rem;
 }
 
@@ -275,7 +275,7 @@
 }
 
 .vendor-login-message[data-state="info"] {
-  border-left-color: #c2a246;
+  border-left-color: var(--vendor-gold);
   background: rgba(194, 162, 70, 0.1);
   color: #6b4e2e;
 }
@@ -288,9 +288,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border: 1px solid #152d24;
+  border: 1px solid var(--vendor-forest);
   border-radius: 13px;
-  background: #152d24;
+  background: var(--vendor-forest);
   color: #f6f3e8;
   font: inherit;
   font-size: 0.78rem;
@@ -348,7 +348,7 @@
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  background: #152d24;
+  background: var(--vendor-forest);
 }
 
 .vendor-login-visual > img {
