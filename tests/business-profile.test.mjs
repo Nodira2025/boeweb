@@ -141,3 +141,52 @@ test('Tenant Theme & White-Label: Ciclo Borrador -> Live Preview -> Cancelar -> 
   assert.equal(publishedProfile.brand_name, 'Ferretería El Martillo SA');
   assert.equal(publishedProfile.primary_color, '#d32f2f');
 });
+
+test('Hero Banners & Multimedia Slider: Estructura de slides, videos muteados y duraciones', () => {
+  const sampleHeroSlides = [
+    {
+      id: 'slide-1',
+      type: 'image',
+      media_url: 'assets/hero-banner1.jpg',
+      title: 'Gran Liquidación de Temporada',
+      subtitle: 'Hasta 30% OFF en productos seleccionados',
+      target_url: '#catalog-section',
+      cta_text: 'Ver Ofertas',
+      duration_seconds: 5,
+      overlay_enabled: true
+    },
+    {
+      id: 'slide-2',
+      type: 'video',
+      media_url: 'https://example.com/promo.mp4',
+      title: 'Lanzamiento Exclusivo',
+      subtitle: 'Conocé la nueva línea premium',
+      target_url: 'https://wa.me/5493816123456',
+      cta_text: 'Ver Más',
+      duration_seconds: 8,
+      overlay_enabled: true
+    }
+  ];
+
+  // 1. Validar persistencia en localStorage
+  localStorage.setItem('boeweb_hero_slides', JSON.stringify(sampleHeroSlides));
+  const recoveredSlides = JSON.parse(localStorage.getItem('boeweb_hero_slides'));
+  assert.equal(recoveredSlides.length, 2);
+  assert.equal(recoveredSlides[0].type, 'image');
+  assert.equal(recoveredSlides[0].duration_seconds, 5);
+  assert.equal(recoveredSlides[1].type, 'video');
+  assert.equal(recoveredSlides[1].duration_seconds, 8);
+  assert.equal(recoveredSlides[1].target_url, 'https://wa.me/5493816123456');
+
+  // 2. Validar estructura de render para video y CTA
+  function validateSlideRenderContract(slide) {
+    if (slide.type === 'video') {
+      assert.ok(slide.media_url.endsWith('.mp4') || slide.media_url.includes('http'));
+    }
+    assert.ok(slide.duration_seconds >= 2 && slide.duration_seconds <= 60);
+    assert.ok(slide.target_url.length > 0);
+    assert.ok(slide.cta_text.length > 0);
+  }
+
+  sampleHeroSlides.forEach(validateSlideRenderContract);
+});

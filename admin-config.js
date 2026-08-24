@@ -10,6 +10,33 @@ if (window.supabase) {
 // Config State
 let currentPasscode = localStorage.getItem('boeweb_admin_passcode') || 'boeweb2026';
 let currentBrandLogoDataUrl = null;
+let heroSlidesState = [];
+let heroSliderActive = true;
+
+const DEFAULT_HERO_SLIDES = [
+  {
+    id: 'slide-default-1',
+    type: 'image',
+    media_url: 'assets/hero-banner1.jpg',
+    title: 'Cultivo Premium & Equilibrio',
+    subtitle: 'Asesoramiento experto, catálogo seleccionado y entrega rápida',
+    target_url: '#catalog-section',
+    cta_text: 'Ver Catálogo',
+    duration_seconds: 5,
+    overlay_enabled: true
+  },
+  {
+    id: 'slide-default-2',
+    type: 'video',
+    media_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    title: 'Lanzamientos de Temporada',
+    subtitle: 'Conocé las últimas novedades y promociones exclusivas',
+    target_url: '#catalog-section',
+    cta_text: 'Ver Novedades',
+    duration_seconds: 8,
+    overlay_enabled: true
+  }
+];
 
 function checkAdminPasscode() {
   const inputPass = document.getElementById('admin-passcode-input').value.trim();
@@ -139,6 +166,25 @@ async function loadBrandConfig() {
 
   currentBrandLogoDataUrl = bLogo;
 
+  // Load hero slides & state
+  try {
+    const savedSlides = localStorage.getItem('boeweb_hero_slides');
+    if (savedSlides) {
+      heroSlidesState = JSON.parse(savedSlides);
+    } else if (brand?.hero_slides && Array.isArray(brand.hero_slides)) {
+      heroSlidesState = brand.hero_slides;
+    } else {
+      heroSlidesState = [...DEFAULT_HERO_SLIDES];
+    }
+  } catch (_) {
+    heroSlidesState = [...DEFAULT_HERO_SLIDES];
+  }
+
+  heroSliderActive = brand?.hero_slider_active !== false;
+  const toggleSlider = document.getElementById('hero-slider-active-toggle');
+  if (toggleSlider) toggleSlider.checked = heroSliderActive;
+
+  renderHeroSlidesManager();
   updateBrandLivePreview();
 }
 
@@ -257,6 +303,153 @@ function handleBrandLogoFileSelect(event) {
   reader.readAsDataURL(file);
 }
 
+function toggleHeroSliderActive(checked) {
+  heroSliderActive = checked;
+  updateBrandLivePreview();
+}
+
+function addHeroSlide(type = 'image') {
+  const isVideo = type === 'video';
+  const newSlide = {
+    id: 'slide-' + Date.now(),
+    type: type,
+    media_url: isVideo ? 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4' : 'assets/hero-banner1.jpg',
+    title: isVideo ? 'Nuevo Video Promocional' : 'Nuevo Banner de Ofertas',
+    subtitle: 'Texto descriptivo o promoción destacada',
+    target_url: '#catalog-section',
+    cta_text: 'Ver',
+    duration_seconds: isVideo ? 8 : 5,
+    overlay_enabled: true
+  };
+  heroSlidesState.push(newSlide);
+  renderHeroSlidesManager();
+  updateBrandLivePreview();
+}
+
+function removeHeroSlide(index) {
+  if (index >= 0 && index < heroSlidesState.length) {
+    heroSlidesState.splice(index, 1);
+    renderHeroSlidesManager();
+    updateBrandLivePreview();
+  }
+}
+
+function moveHeroSlide(index, direction) {
+  const targetIndex = index + direction;
+  if (targetIndex < 0 || targetIndex >= heroSlidesState.length) return;
+  const temp = heroSlidesState[index];
+  heroSlidesState[index] = heroSlidesState[targetIndex];
+  heroSlidesState[targetIndex] = temp;
+  renderHeroSlidesManager();
+  updateBrandLivePreview();
+}
+
+function updateHeroSlide(index, field, value) {
+  if (heroSlidesState[index]) {
+    heroSlidesState[index][field] = value;
+    updateBrandLivePreview();
+  }
+}
+
+function handleHeroSlideFileUpload(index, event) {
+  const file = event.target.files?.[0];
+  if (!file || !heroSlidesState[index]) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    heroSlidesState[index].media_url = e.target.result;
+    renderHeroSlidesManager();
+    updateBrandLivePreview();
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderHeroSlidesManager() {
+  const container = document.getElementById('hero-slides-container');
+  if (!container) return;
+
+  if (heroSlidesState.length === 0) {
+    container.innerHTML = `
+      <div style="background: rgba(0,0,0,0.25); border: 2px dashed rgba(195,155,75,0.4); border-radius: 12px; padding: 20px; text-align: center; color: rgba(247,246,242,0.7);">
+        <p style="margin: 0 0 8px 0; font-size: 0.9rem;">No hay banners configurados aún.</p>
+        <small>Hacé clic en los botones de abajo para agregar imágenes o videos al carrusel.</small>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = heroSlidesState.map((slide, idx) => {
+    const isVideo = slide.type === 'video';
+    return `
+      <div class="hero-slide-editor-card" style="background: rgba(15, 30, 24, 0.85); border: 1.5px solid rgba(195, 155, 75, 0.3); border-radius: 12px; padding: 16px; position: relative;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(195, 155, 75, 0.2); padding-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="background: ${isVideo ? '#0288D1' : '#E65100'}; color: #fff; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 800;">
+              ${isVideo ? '🎬 VIDEO' : '🖼️ IMAGEN'}
+            </span>
+            <strong style="color: #ffd54f; font-size: 0.88rem;">Slide #${idx + 1}</strong>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" class="btn btn-secondary" onclick="moveHeroSlide(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} style="padding: 4px 8px; font-size: 0.75rem; border-color: rgba(195, 155, 75, 0.4);" title="Mover arriba">⬆️</button>
+            <button type="button" class="btn btn-secondary" onclick="moveHeroSlide(${idx}, 1)" ${idx === heroSlidesState.length - 1 ? 'disabled' : ''} style="padding: 4px 8px; font-size: 0.75rem; border-color: rgba(195, 155, 75, 0.4);" title="Mover abajo">⬇️</button>
+            <button type="button" class="btn btn-secondary" onclick="removeHeroSlide(${idx})" style="padding: 4px 8px; font-size: 0.75rem; border-color: #d32f2f; color: #ff5252;" title="Eliminar slide">🗑️</button>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
+          <!-- Tipo y Archivo / URL -->
+          <div>
+            <label class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Tipo de Contenido:</label>
+            <select class="admin-input" style="font-weight: 700; margin-bottom: 10px;" onchange="updateHeroSlide(${idx}, 'type', this.value); renderHeroSlidesManager();">
+              <option value="image" ${slide.type === 'image' ? 'selected' : ''}>🖼️ Imagen (PNG / JPG / WebP)</option>
+              <option value="video" ${slide.type === 'video' ? 'selected' : ''}>🎬 Video (MP4 / WebM / Link directo)</option>
+            </select>
+
+            <label class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">URL o Archivo Multimedia:</label>
+            <input type="text" class="admin-input" value="${slide.media_url || ''}" placeholder="${isVideo ? 'Ej: https://.../video.mp4' : 'Ej: assets/hero-banner1.jpg o URL web'}" oninput="updateHeroSlide(${idx}, 'media_url', this.value)" style="margin-bottom: 8px;">
+            
+            ${!isVideo ? `
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="file" accept="image/*" class="admin-input" style="padding: 6px; font-size: 0.75rem;" onchange="handleHeroSlideFileUpload(${idx}, event)">
+              </div>
+            ` : `
+              <small style="color: rgba(247,246,242,0.6); font-size: 0.72rem; display: block; line-height: 1.3;">
+                💡 Los videos se reproducen en bucle y <strong>muteados por defecto</strong> para optimizar la experiencia en celular y web.
+              </small>
+            `}
+          </div>
+
+          <!-- Textos y CTA -->
+          <div>
+            <label class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Título del Banner (Opcional):</label>
+            <input type="text" class="admin-input" value="${slide.title || ''}" placeholder="Ej: Gran Oferta de Temporada" oninput="updateHeroSlide(${idx}, 'title', this.value)" style="margin-bottom: 8px;">
+
+            <label class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Subtítulo / Bajada:</label>
+            <input type="text" class="admin-input" value="${slide.subtitle || ''}" placeholder="Ej: Hasta 30% OFF en productos seleccionados" oninput="updateHeroSlide(${idx}, 'subtitle', this.value)">
+          </div>
+
+          <!-- Redirección y Tiempo -->
+          <div>
+            <label class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Enlace de Destino al Tocar / Clic:</label>
+            <input type="text" class="admin-input" value="${slide.target_url || ''}" placeholder="Ej: #catalog-section, link de WhatsApp o web" oninput="updateHeroSlide(${idx}, 'target_url', this.value)" style="margin-bottom: 8px;">
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <div>
+                <label class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Texto del Botón:</label>
+                <input type="text" class="admin-input" value="${slide.cta_text || 'Ver'}" placeholder="Ej: Ver" oninput="updateHeroSlide(${idx}, 'cta_text', this.value)">
+              </div>
+              <div>
+                <label class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Tiempo en Foco (seg):</label>
+                <input type="number" min="2" max="60" class="admin-input" value="${slide.duration_seconds || 5}" oninput="updateHeroSlide(${idx}, 'duration_seconds', parseInt(this.value) || 5)">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 function updateBrandLivePreview() {
   const name = document.getElementById('brand-name-input')?.value.trim() || 'BÔ Grow Club';
   const slogan = document.getElementById('brand-slogan-input')?.value.trim() || 'Espacio Zen para Cultivo Premium';
@@ -306,6 +499,42 @@ function updateBrandLivePreview() {
   if (previewWhatsappText) {
     previewWhatsappText.textContent = `💬 WhatsApp: ${whatsapp}`;
   }
+
+  // Update Hero Banner preview
+  const bannerBox = document.getElementById('preview-hero-banner-box');
+  const bannerImg = document.getElementById('preview-hero-banner-img');
+  const bannerVideo = document.getElementById('preview-hero-banner-video');
+  const bannerTitle = document.getElementById('preview-hero-banner-title');
+  const bannerSubtitle = document.getElementById('preview-hero-banner-subtitle');
+  const bannerCta = document.getElementById('preview-hero-banner-cta');
+
+  if (bannerBox) {
+    if (!heroSliderActive || heroSlidesState.length === 0) {
+      bannerBox.style.display = 'none';
+    } else {
+      bannerBox.style.display = 'flex';
+      const firstSlide = heroSlidesState[0];
+      if (firstSlide) {
+        if (bannerTitle) bannerTitle.textContent = firstSlide.title || name;
+        if (bannerSubtitle) bannerSubtitle.textContent = firstSlide.subtitle || slogan;
+        if (bannerCta) bannerCta.textContent = firstSlide.cta_text || 'Ver';
+
+        if (firstSlide.type === 'video') {
+          if (bannerImg) bannerImg.style.display = 'none';
+          if (bannerVideo) {
+            bannerVideo.style.display = 'block';
+            bannerVideo.src = firstSlide.media_url || '';
+          }
+        } else {
+          if (bannerVideo) bannerVideo.style.display = 'none';
+          if (bannerImg) {
+            bannerImg.style.display = 'block';
+            bannerImg.src = firstSlide.media_url || 'assets/hero-banner1.jpg';
+          }
+        }
+      }
+    }
+  }
 }
 
 async function saveAdminConfig() {
@@ -346,6 +575,8 @@ async function saveAdminConfig() {
     action_color: document.getElementById('brand-action-color')?.value || '#2E7D32',
     logo_url: currentBrandLogoDataUrl || 'assets/logo.jpg',
     favicon_url: 'assets/favicon.ico',
+    hero_slider_active: heroSliderActive,
+    hero_slides: heroSlidesState,
     whatsapp_phone: document.getElementById('brand-whatsapp-input')?.value.trim() || '',
     instagram_url: document.getElementById('brand-instagram-input')?.value.trim() || '',
     address: document.getElementById('brand-address-input')?.value.trim() || '',
@@ -357,6 +588,7 @@ async function saveAdminConfig() {
     published_at: new Date().toISOString()
   };
 
+  localStorage.setItem('boeweb_hero_slides', JSON.stringify(heroSlidesState));
   localStorage.setItem('boeweb_tenant_profile_published', JSON.stringify(brandProfile));
   localStorage.setItem('boeweb_tenant_profile_draft', JSON.stringify(brandProfile));
 

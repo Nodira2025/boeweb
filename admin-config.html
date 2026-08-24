@@ -417,6 +417,39 @@
           </div>
         </div>
 
+        <!-- Hero & Promotional Banners Section -->
+        <div style="margin-bottom: 24px; background: rgba(15, 30, 24, 0.6); padding: 20px; border-radius: 14px; border: 1px solid rgba(195, 155, 75, 0.3);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <label class="admin-label" style="margin: 0; font-size: 1rem; color: #ffd54f;">🖼️ Gestor de Banners y Video Hero (Web & Móvil)</label>
+              <small style="color: rgba(247,246,242,0.7); display: block; margin-top: 4px;">
+                Personalizá la portada de la tienda con imágenes o videos promocionales (muteados por defecto), tiempo de rotación, navegación táctil y botones con enlace a ofertas o WhatsApp.
+              </small>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <label style="font-size: 0.85rem; color: #F6F3E8; display: flex; align-items: center; gap: 8px; cursor: pointer; background: rgba(0,0,0,0.3); padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(195, 155, 75, 0.3);">
+                <input type="checkbox" id="hero-slider-active-toggle" onchange="toggleHeroSliderActive(this.checked)" style="transform: scale(1.2); cursor: pointer;" checked>
+                <strong>Activar Carrusel Multimedia</strong>
+              </label>
+            </div>
+          </div>
+
+          <!-- Slide Items List Container -->
+          <div id="hero-slides-container" style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px;">
+            <!-- Rendered dynamically by admin-config.js -->
+          </div>
+
+          <!-- Add Slide Buttons -->
+          <div style="margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-secondary" onclick="addHeroSlide('image')" style="font-size: 0.85rem; font-weight: 700; border-color: var(--color-accent-gold); color: #fff; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+              ➕ Agregar Banner Imagen
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="addHeroSlide('video')" style="font-size: 0.85rem; font-weight: 700; border-color: var(--color-accent-gold); color: #fff; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+              🎬 Agregar Banner Video
+            </button>
+          </div>
+        </div>
+
         <!-- Live Storefront Mockup Preview Box -->
         <div style="margin-top: 20px; border-radius: 18px; padding: 20px; border: 2px solid var(--color-accent-gold); background: #0c1813;" id="brand-preview-canvas">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -436,6 +469,19 @@
             <div style="display: flex; gap: 8px; align-items: center;">
               <span id="preview-term-product-badge" style="background: rgba(255,255,255,0.12); color: #fff; padding: 4px 10px; border-radius: 8px; font-size: 0.74rem; font-weight: 700;">Producto Botánico</span>
               <button type="button" id="preview-sample-btn" style="background: #C2A246; color: #152D24; border: none; padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 0.82rem; cursor: pointer;">Comprar</button>
+            </div>
+          </div>
+
+          <!-- Mockup Hero Banner Preview -->
+          <div id="preview-hero-banner-box" style="position: relative; border-radius: 12px; overflow: hidden; height: 110px; margin-bottom: 14px; background: #152D24; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.15);">
+            <img id="preview-hero-banner-img" src="" alt="Hero preview" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+            <video id="preview-hero-banner-video" src="" muted loop playsinline autoplay style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+            <div id="preview-hero-banner-overlay" style="position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.2) 100%); display: flex; flex-direction: column; justify-content: center; padding: 16px;">
+              <span id="preview-hero-banner-title" style="color: #ffd54f; font-weight: 800; font-size: 0.95rem; font-family: var(--font-display);">Gran Liquidación de Temporada</span>
+              <span id="preview-hero-banner-subtitle" style="color: #ffffff; font-size: 0.76rem;">Hasta 30% OFF en productos seleccionados</span>
+              <div style="margin-top: 6px;">
+                <span id="preview-hero-banner-cta" style="background: var(--color-accent-gold, #C2A246); color: #152d24; padding: 3px 10px; border-radius: 6px; font-weight: 800; font-size: 0.72rem; display: inline-block;">Ver</span>
+              </div>
             </div>
           </div>
 

@@ -201,6 +201,11 @@
     document.querySelectorAll('a[href*="coffee.html"], .vendor-flow-card[href*="coffee"], [data-feature="coffee"]').forEach(el => {
       el.style.display = 'none';
     });
+
+    // 8. Inicializar o actualizar Hero Slider si está presente
+    if (typeof window.initHeroSlider === 'function') {
+      window.initHeroSlider();
+    }
   }
 
   function applyTheme(theme) {
