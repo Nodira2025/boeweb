@@ -7,11 +7,14 @@ if (window.supabase) {
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
-// Config State
-let currentPasscode = localStorage.getItem('boeweb_admin_passcode') || 'boeweb2026';
+// Config state. Authorization is always derived from Supabase Auth + tenant membership.
 let currentBrandLogoDataUrl = null;
 let heroSlidesState = [];
 let heroSliderActive = true;
+let adminTenantContext = null;
+let appConfigRepository = null;
+let appConfigDirtyTrackingReady = false;
+const DEFAULT_ADMIN_TENANT_ID = '11111111-1111-1111-1111-111111111111';
 
 const DEFAULT_HERO_SLIDES = [
   {
@@ -38,55 +41,171 @@ const DEFAULT_HERO_SLIDES = [
   }
 ];
 
-function checkAdminPasscode() {
-  const inputPass = document.getElementById('admin-passcode-input').value.trim();
-  const errorMsg = document.getElementById('admin-login-error');
+function setAdminAuthStatus(message, isError = false) {
+  const status = document.getElementById('admin-auth-status');
+  if (!status) return;
+  status.textContent = message;
+  status.style.color = isError ? '#F6F3E8' : '#C2A246';
+}
 
-  if (inputPass === currentPasscode) {
+function getAdminTenantId() {
+  return adminTenantContext?.tenantId || window.AppConfig?.resolveTenantId?.() || DEFAULT_ADMIN_TENANT_ID;
+}
+
+function getLegacyPaymentStorageKeys() {
+  const keys = [`boeweb:payment-config:${getAdminTenantId()}`];
+  if (getAdminTenantId() === DEFAULT_ADMIN_TENANT_ID) keys.push('boeweb_payment_config');
+  return keys;
+}
+
+function readLegacyPaymentConfig() {
+  for (const key of getLegacyPaymentStorageKeys()) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      const sanitized = window.AppConfig?.sanitizeClientConfig(parsed) || {};
+      if (JSON.stringify(parsed) !== JSON.stringify(sanitized)) localStorage.removeItem(key);
+      return sanitized;
+    } catch (error) {
+      localStorage.removeItem(key);
+      console.warn('Se descartó una configuración local heredada inválida.', error);
+    }
+  }
+  return {};
+}
+
+function clearLegacyPaymentConfig() {
+  getLegacyPaymentStorageKeys().forEach(key => {
+    try {
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.warn('No se pudo retirar una configuración local heredada.', error);
+    }
+  });
+}
+
+async function authorizeAdminSession() {
+  const checkButton = document.getElementById('admin-session-check');
+  if (checkButton) checkButton.disabled = true;
+  setAdminAuthStatus('Verificando identidad y membresía…');
+  try {
+    localStorage.removeItem('boeweb_admin_passcode');
+  } catch (error) {
+    console.warn('No se pudo limpiar la clave local heredada.', error);
+  }
+
+  try {
+    if (!supabaseClient || !window.SaasAuth?.hydrateFromSupabase) {
+      throw new Error('El servicio de autenticación no está disponible.');
+    }
+
+    const hydrated = await window.SaasAuth.hydrateFromSupabase(supabaseClient);
+    const context = window.SaasAuth.getTenantContext();
+    const hasAdminRole = hydrated && context.isVerified && ['ADMIN', 'SUPERADMIN'].includes(context.role);
+    if (!hasAdminRole) {
+      throw new Error('Necesitás una sesión verificada con rol ADMIN o SUPERADMIN.');
+    }
+
+    adminTenantContext = context;
+    appConfigRepository = window.AppConfig?.createRepository({
+      tenantId: context.tenantId,
+      supabaseClient,
+      requireRemoteWrites: true
+    }) || null;
+
+    document.getElementById('admin-login-modal').hidden = true;
     document.getElementById('admin-login-modal').style.display = 'none';
     document.getElementById('admin-dashboard-content').style.display = 'block';
-    loadAdminConfig();
-    loadBrandConfig();
-  } else {
-    errorMsg.style.display = 'block';
+    await Promise.all([loadAdminConfig(), loadBrandConfig()]);
+  } catch (error) {
+    adminTenantContext = null;
+    const gate = document.getElementById('admin-login-modal');
+    const dashboard = document.getElementById('admin-dashboard-content');
+    if (gate) {
+      gate.hidden = false;
+      gate.style.display = 'grid';
+    }
+    if (dashboard) dashboard.style.display = 'none';
+    setAdminAuthStatus(error.message || 'No se pudo verificar la sesión.', true);
+  } finally {
+    if (checkButton) checkButton.disabled = false;
+  }
+}
+
+async function handleAdminSessionLogin(event) {
+  event.preventDefault();
+  const emailInput = document.getElementById('admin-session-email');
+  const passwordInput = document.getElementById('admin-session-password');
+  const submitButton = document.getElementById('admin-session-login');
+  if (!emailInput || !passwordInput || !event.currentTarget.reportValidity()) return;
+
+  if (submitButton) submitButton.disabled = true;
+  setAdminAuthStatus('Iniciando sesión segura…');
+  try {
+    if (!supabaseClient || !window.SaasAuth?.signInWithSupabase) {
+      throw new Error('El servicio de autenticación no está disponible.');
+    }
+    const result = await window.SaasAuth.signInWithSupabase(
+      supabaseClient,
+      emailInput.value.trim(),
+      passwordInput.value
+    );
+    if (!result.success) throw new Error(result.error || 'No se pudo iniciar sesión.');
+    passwordInput.value = '';
+    await authorizeAdminSession();
+  } catch (error) {
+    passwordInput.value = '';
+    setAdminAuthStatus(error.message || 'No se pudo iniciar sesión.', true);
+  } finally {
+    if (submitButton) submitButton.disabled = false;
   }
 }
 
 async function loadAdminConfig() {
-  let config = JSON.parse(localStorage.getItem('boeweb_payment_config')) || {};
-
-  // Try fetching config from Supabase store_config if available
-  if (supabaseClient) {
-    try {
-      const { data, error } = await supabaseClient.from('store_config').select('*').eq('id', 'main_config').single();
-      if (!error && data) {
-        config = data.config_json || config;
+  let payments = window.AppConfig?.DEFAULT_CONFIG.payments;
+  try {
+    if (!appConfigRepository || !window.AppConfig) throw new Error('AppConfig no está disponible.');
+    const publishedConfig = await appConfigRepository.loadPublished();
+    payments = publishedConfig.payments;
+    if (publishedConfig.revision === 0) {
+      const legacy = readLegacyPaymentConfig();
+      if (Object.keys(legacy).length) {
+        payments = window.AppConfig.normalizeConfig(legacy, { tenantId: getAdminTenantId() }).payments;
       }
-    } catch (e) {
-      console.warn('Using local config fallback:', e);
     }
+  } catch (error) {
+    console.warn('No se pudo cargar la configuración pública de pagos; se usan valores seguros.', error);
   }
 
   // Populate UI inputs
-  document.getElementById('mp-active-toggle').checked = config.mpActive !== false;
-  document.getElementById('mp-access-token').value = config.mpAccessToken || '';
-  document.getElementById('mp-public-key').value = config.mpPublicKey || '';
-
-  document.getElementById('bank-active-toggle').checked = config.bankActive !== false;
-  document.getElementById('bank-name').value = config.bankName || 'Banco Galicia';
-  document.getElementById('bank-holder').value = config.bankHolder || 'BO GROWCLUB S.A.';
-  document.getElementById('bank-cbu').value = config.bankCbu || '0000003100012345678901';
-  document.getElementById('bank-alias').value = config.bankAlias || 'BO.GROWCLUB.MP';
+  document.getElementById('mp-active-toggle').checked = payments.mercadoPago.enabled;
+  document.getElementById('mp-public-key').value = payments.mercadoPago.publicKey;
+  document.getElementById('bank-active-toggle').checked = payments.bankTransfer.enabled;
+  document.getElementById('bank-name').value = payments.bankTransfer.bankName;
+  document.getElementById('bank-holder').value = payments.bankTransfer.accountHolder;
+  document.getElementById('bank-cbu').value = payments.bankTransfer.cbu;
+  document.getElementById('bank-alias').value = payments.bankTransfer.alias;
 }
 
 async function loadBrandConfig() {
   let brand = null;
+  let managedConfig = null;
   try {
     brand = JSON.parse(localStorage.getItem('boeweb_tenant_profile_published') || 'null');
   } catch (_) {}
 
   if (!brand && typeof TENANT_PROFILES_CACHE !== 'undefined') {
-    brand = TENANT_PROFILES_CACHE['11111111-1111-1111-1111-111111111111'];
+    brand = TENANT_PROFILES_CACHE[getAdminTenantId()];
+  }
+
+  if (appConfigRepository) {
+    try {
+      managedConfig = await appConfigRepository.loadPublished();
+      if (managedConfig.revision > 0) brand = appConfigToLegacyBrand(managedConfig);
+    } catch (error) {
+      console.warn('No se pudo cargar la configuración versionada; se mantiene el perfil compatible.', error);
+    }
   }
 
   // Fallback defaults
@@ -169,7 +288,9 @@ async function loadBrandConfig() {
   // Load hero slides & state
   try {
     const savedSlides = localStorage.getItem('boeweb_hero_slides');
-    if (savedSlides) {
+    if (managedConfig?.revision > 0 && brand?.hero_slides && Array.isArray(brand.hero_slides)) {
+      heroSlidesState = brand.hero_slides;
+    } else if (savedSlides) {
       heroSlidesState = JSON.parse(savedSlides);
     } else if (brand?.hero_slides && Array.isArray(brand.hero_slides)) {
       heroSlidesState = brand.hero_slides;
@@ -180,12 +301,15 @@ async function loadBrandConfig() {
     heroSlidesState = [...DEFAULT_HERO_SLIDES];
   }
 
-  heroSliderActive = brand?.hero_slider_active !== false;
+  heroSliderActive = managedConfig?.revision > 0
+    ? managedConfig.brand.hero.enabled
+    : brand?.hero_slider_active !== false;
   const toggleSlider = document.getElementById('hero-slider-active-toggle');
   if (toggleSlider) toggleSlider.checked = heroSliderActive;
 
   renderHeroSlidesManager();
   updateBrandLivePreview();
+  loadFutureAppConfigControls(managedConfig || window.AppConfig?.normalizeConfig(brand || {}, { tenantId: getAdminTenantId() }));
 }
 
 function applyBrandColorPreset(primaryColor, accentColor, verticalCode, sampleName = '', sampleSlogan = '', textColor = '#152D24', actionColor = '#2E7D32', fontFamily = "'Outfit', sans-serif", fontHeadings = "'Playfair Display', serif") {
@@ -291,6 +415,12 @@ function handleBrandVerticalChange(verticalCode) {
 function handleBrandLogoFileSelect(event) {
   const file = event.target.files?.[0];
   if (!file) return;
+  const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
+  if (!allowedTypes.has(file.type) || file.size > 2_000_000) {
+    event.target.value = '';
+    updateAppConfigStatus('El logo debe ser PNG, JPG o WebP y pesar como máximo 2 MB.', true);
+    return;
+  }
 
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -299,7 +429,9 @@ function handleBrandLogoFileSelect(event) {
     const thumbImg = document.getElementById('preview-logo-thumb');
     if (previewImg) previewImg.src = currentBrandLogoDataUrl;
     if (thumbImg) thumbImg.src = currentBrandLogoDataUrl;
+    updateAppConfigStatus('Cambios sin guardar');
   };
+  reader.onerror = () => updateAppConfigStatus('No se pudo leer el archivo de logo.', true);
   reader.readAsDataURL(file);
 }
 
@@ -537,33 +669,49 @@ function updateBrandLivePreview() {
   }
 }
 
-async function saveAdminConfig() {
-  const newPasscode = document.getElementById('admin-new-passcode').value.trim();
-  if (newPasscode !== '') {
-    currentPasscode = newPasscode;
-    localStorage.setItem('boeweb_admin_passcode', newPasscode);
-  }
-
-  // 1. Payment Gateway Configuration
-  const paymentConfig = {
-    mpActive: document.getElementById('mp-active-toggle').checked,
-    mpAccessToken: document.getElementById('mp-access-token').value.trim(),
-    mpPublicKey: document.getElementById('mp-public-key').value.trim(),
-
-    bankActive: document.getElementById('bank-active-toggle').checked,
-    bankName: document.getElementById('bank-name').value.trim(),
-    bankHolder: document.getElementById('bank-holder').value.trim(),
-    bankCbu: document.getElementById('bank-cbu').value.trim(),
-    bankAlias: document.getElementById('bank-alias').value.trim(),
-
-    updatedAt: new Date().toISOString()
+function appConfigToLegacyBrand(config) {
+  const normalized = window.AppConfig.normalizeConfig(config, { tenantId: getAdminTenantId() });
+  const visuals = normalized.brand.visuals;
+  const texts = normalized.brand.texts;
+  const hero = normalized.brand.hero;
+  return {
+    tenant_id: normalized.tenantId,
+    brand_name: texts.name,
+    slogan: texts.slogan,
+    primary_color: visuals.primaryColor,
+    accent_color: visuals.accentColor,
+    text_color: visuals.textColor,
+    action_color: visuals.actionColor,
+    font_family: visuals.fontFamily,
+    font_headings: visuals.headingFont,
+    logo_url: visuals.logoUrl,
+    favicon_url: visuals.faviconUrl,
+    whatsapp_phone: texts.whatsapp,
+    instagram_url: texts.instagram,
+    address: texts.address,
+    hero_slider_active: hero.enabled,
+    hero_slides: hero.slides.map(slide => ({
+      id: slide.id,
+      type: slide.type,
+      media_url: slide.mediaUrl,
+      title: slide.title,
+      subtitle: slide.subtitle,
+      target_url: slide.targetUrl,
+      cta_text: slide.ctaText,
+      duration_seconds: slide.durationSeconds,
+      overlay_enabled: slide.overlayEnabled
+    })),
+    terminology: {
+      product: texts.productTerm,
+      vendor: texts.vendorTerm,
+      warehouse: texts.warehouseTerm
+    }
   };
+}
 
-  localStorage.setItem('boeweb_payment_config', JSON.stringify(paymentConfig));
-
-  // 2. Brand Identity & Business Profile Configuration
-  const brandProfile = {
-    tenant_id: '11111111-1111-1111-1111-111111111111',
+function collectLegacyBrandProfile() {
+  return {
+    tenant_id: getAdminTenantId(),
     brand_name: document.getElementById('brand-name-input')?.value.trim() || 'BÔ Grow Club',
     slogan: document.getElementById('brand-slogan-input')?.value.trim() || '',
     vertical_code: document.getElementById('brand-vertical-select')?.value || 'growshop',
@@ -574,7 +722,7 @@ async function saveAdminConfig() {
     text_color: document.getElementById('brand-text-color')?.value || '#152D24',
     action_color: document.getElementById('brand-action-color')?.value || '#2E7D32',
     logo_url: currentBrandLogoDataUrl || 'assets/logo.jpg',
-    favicon_url: 'assets/favicon.ico',
+    favicon_url: 'assets/logo.jpg',
     hero_slider_active: heroSliderActive,
     hero_slides: heroSlidesState,
     whatsapp_phone: document.getElementById('brand-whatsapp-input')?.value.trim() || '',
@@ -587,110 +735,238 @@ async function saveAdminConfig() {
     },
     published_at: new Date().toISOString()
   };
+}
 
-  localStorage.setItem('boeweb_hero_slides', JSON.stringify(heroSlidesState));
-  localStorage.setItem('boeweb_tenant_profile_published', JSON.stringify(brandProfile));
-  localStorage.setItem('boeweb_tenant_profile_draft', JSON.stringify(brandProfile));
-
-  if (typeof TENANT_PROFILES_CACHE !== 'undefined') {
-    TENANT_PROFILES_CACHE['11111111-1111-1111-1111-111111111111'] = brandProfile;
-  }
-
-  if (typeof TenantTheme !== 'undefined' && typeof TenantTheme.applyTenantTheme === 'function') {
-    TenantTheme.applyTenantTheme('11111111-1111-1111-1111-111111111111');
-  }
-
-  // Apply immediately to current document and notify other components
-  if (typeof window.applyBrandIdentity === 'function') {
-    window.applyBrandIdentity();
-  }
-
-  window.dispatchEvent(new CustomEvent('boeweb_brand_updated', { detail: brandProfile }));
-  try {
-    window.dispatchEvent(new Event('storage'));
-  } catch (_) {}
-
-  // Sync to Supabase if available
-  if (supabaseClient) {
-    try {
-      await supabaseClient.from('store_config').upsert({
-        id: 'main_config',
-        config_json: paymentConfig,
-        updated_at: new Date().toISOString()
-      });
-    } catch (e) {
-      console.warn('Could not sync to Supabase store_config table:', e);
-    }
-
-    try {
-      await supabaseClient.from('tenant_profiles').upsert({
-        tenant_id: brandProfile.tenant_id,
-        brand_name: brandProfile.brand_name,
+function collectFutureAppConfig(brandProfile = collectLegacyBrandProfile()) {
+  return window.AppConfig.normalizeConfig({
+    tenantId: getAdminTenantId(),
+    brand: {
+      visuals: {
+        logoUrl: brandProfile.logo_url,
+        faviconUrl: brandProfile.favicon_url,
+        primaryColor: brandProfile.primary_color,
+        accentColor: brandProfile.accent_color,
+        textColor: brandProfile.text_color,
+        actionColor: brandProfile.action_color,
+        fontFamily: brandProfile.font_family,
+        headingFont: brandProfile.font_headings
+      },
+      texts: {
+        name: brandProfile.brand_name,
         slogan: brandProfile.slogan,
-        vertical_code: brandProfile.vertical_code,
-        primary_color: brandProfile.primary_color,
-        accent_color: brandProfile.accent_color,
-        logo_url: brandProfile.logo_url,
-        terminology: brandProfile.terminology,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'tenant_id' });
-    } catch (e) {
-      console.warn('Could not sync to Supabase tenant_profiles table:', e);
+        productTerm: brandProfile.terminology.product,
+        vendorTerm: brandProfile.terminology.vendor,
+        warehouseTerm: brandProfile.terminology.warehouse,
+        whatsapp: brandProfile.whatsapp_phone,
+        instagram: brandProfile.instagram_url,
+        address: brandProfile.address
+      },
+      hero: {
+        enabled: heroSliderActive,
+        slides: heroSlidesState.map(slide => ({
+          id: slide.id,
+          type: slide.type,
+          mediaUrl: slide.media_url,
+          title: slide.title,
+          subtitle: slide.subtitle,
+          targetUrl: slide.target_url,
+          ctaText: slide.cta_text,
+          durationSeconds: slide.duration_seconds,
+          overlayEnabled: slide.overlay_enabled !== false
+        }))
+      }
+    },
+    payments: {
+      mercadoPago: {
+        enabled: document.getElementById('mp-active-toggle')?.checked,
+        publicKey: document.getElementById('mp-public-key')?.value.trim()
+      },
+      bankTransfer: {
+        enabled: document.getElementById('bank-active-toggle')?.checked,
+        bankName: document.getElementById('bank-name')?.value.trim(),
+        accountHolder: document.getElementById('bank-holder')?.value.trim(),
+        cbu: document.getElementById('bank-cbu')?.value.trim(),
+        alias: document.getElementById('bank-alias')?.value.trim()
+      }
+    },
+    catalog: {
+      source: document.getElementById('app-catalog-source')?.value,
+      visibility: document.getElementById('app-catalog-visibility')?.value,
+      showOutOfStock: document.getElementById('app-catalog-show-out')?.checked,
+      allowBackorders: document.getElementById('app-catalog-backorders')?.checked,
+      currency: document.getElementById('app-catalog-currency')?.value.trim().toUpperCase(),
+      lowStockThreshold: document.getElementById('app-catalog-low-stock')?.value
+    },
+    rules: {
+      sales: {
+        allowVendorAdjustments: document.getElementById('app-rule-vendor-adjustments')?.checked,
+        maxDiscountPercent: document.getElementById('app-rule-max-discount')?.value,
+        maxDiscountFixed: document.getElementById('app-rule-max-discount-fixed')?.value,
+        requireCustomerForCredit: document.getElementById('app-rule-credit-customer')?.checked
+      },
+      inventory: {
+        allowNegativeStock: false,
+        requireLocationOnReceive: true
+      },
+      cash: {
+        requireOpenShift: true,
+        supervisorApprovalForDifference: true,
+        differenceTolerance: document.getElementById('app-rule-cash-tolerance')?.value
+      },
+      currentAccount: {
+        enabled: true,
+        requireCreditLimit: true,
+        blockOverdue: true
+      }
     }
-  }
+  }, { tenantId: getAdminTenantId() });
+}
 
-  const saveMsg = document.getElementById('admin-save-msg');
-  if (saveMsg) {
-    saveMsg.style.display = 'block';
-    setTimeout(() => { saveMsg.style.display = 'none'; }, 3500);
+function setControlValue(id, value, property = 'value') {
+  const control = document.getElementById(id);
+  if (control) control[property] = value;
+}
+
+function loadFutureAppConfigControls(config) {
+  if (!config || !window.AppConfig) return;
+  const normalized = window.AppConfig.normalizeConfig(config, { tenantId: getAdminTenantId() });
+  setControlValue('app-catalog-source', normalized.catalog.source);
+  setControlValue('app-catalog-visibility', normalized.catalog.visibility);
+  setControlValue('app-catalog-currency', normalized.catalog.currency);
+  setControlValue('app-catalog-low-stock', normalized.catalog.lowStockThreshold);
+  setControlValue('app-catalog-show-out', normalized.catalog.showOutOfStock, 'checked');
+  setControlValue('app-catalog-backorders', normalized.catalog.allowBackorders, 'checked');
+  setControlValue('app-rule-vendor-adjustments', normalized.rules.sales.allowVendorAdjustments, 'checked');
+  setControlValue('app-rule-max-discount', normalized.rules.sales.maxDiscountPercent);
+  setControlValue('app-rule-max-discount-fixed', normalized.rules.sales.maxDiscountFixed);
+  setControlValue('app-rule-credit-customer', normalized.rules.sales.requireCustomerForCredit, 'checked');
+  setControlValue('app-rule-negative-stock', normalized.rules.inventory.allowNegativeStock, 'checked');
+  setControlValue('app-rule-require-location', normalized.rules.inventory.requireLocationOnReceive, 'checked');
+  setControlValue('app-rule-open-shift', normalized.rules.cash.requireOpenShift, 'checked');
+  setControlValue('app-rule-supervisor-difference', normalized.rules.cash.supervisorApprovalForDifference, 'checked');
+  setControlValue('app-rule-cash-tolerance', normalized.rules.cash.differenceTolerance);
+  setControlValue('app-rule-credit-limit', normalized.rules.currentAccount.requireCreditLimit, 'checked');
+  setControlValue('app-rule-block-overdue', normalized.rules.currentAccount.blockOverdue, 'checked');
+  updateAppConfigStatus(normalized.status === 'published' ? `Publicado · revisión ${normalized.revision}` : `Borrador · revisión ${normalized.revision}`);
+  window.AppConfig.applyCssVariables(normalized);
+  initializeAppConfigDirtyTracking();
+}
+
+function initializeAppConfigDirtyTracking() {
+  if (appConfigDirtyTrackingReady) return;
+  const selectors = [
+    '#future-config input',
+    '#future-config select',
+    '#brand-name-input',
+    '#brand-slogan-input',
+    '#brand-vertical-select',
+    '#brand-font-family',
+    '#brand-font-headings',
+    '#brand-primary-color',
+    '#brand-accent-color',
+    '#brand-text-color',
+    '#brand-action-color',
+    '#brand-whatsapp-input',
+    '#brand-instagram-input',
+    '#brand-address-input',
+    '#brand-term-product',
+    '#brand-term-vendor',
+    '#brand-term-warehouse'
+  ];
+  document.querySelectorAll(selectors.join(',')).forEach(control => {
+    control.addEventListener('input', () => updateAppConfigStatus('Cambios sin guardar'));
+    control.addEventListener('change', () => updateAppConfigStatus('Cambios sin guardar'));
+  });
+  appConfigDirtyTrackingReady = true;
+}
+
+function updateAppConfigStatus(message, isError = false) {
+  const stage = document.getElementById('app-config-stage-status');
+  const detail = document.getElementById('app-config-message');
+  if (stage) stage.textContent = message;
+  if (detail) {
+    detail.textContent = message;
+    detail.style.color = isError ? '#F6F3E8' : '#C2A246';
   }
 }
 
-async function testCurrentMpToken() {
-  const tokenInput = document.getElementById('mp-access-token');
-  const statusEl = document.getElementById('mp-test-status');
-  if (!tokenInput || !statusEl) return;
+function focusBrandConfig(controlId) {
+  const control = document.getElementById(controlId);
+  if (!control) return;
+  control.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  control.focus({ preventScroll: true });
+}
 
-  const token = tokenInput.value.trim();
-  if (!token) {
-    statusEl.style.display = 'block';
-    statusEl.style.color = '#ff6b6b';
-    statusEl.textContent = '⚠️ Por favor pegá el Access Token antes de probar.';
-    return;
+function ensureAdministrativeContext() {
+  const context = window.SaasAuth?.getTenantContext?.();
+  if (!adminTenantContext || !context?.isVerified || !['ADMIN', 'SUPERADMIN'].includes(context.role)) {
+    throw new Error('La sesión administrativa dejó de ser válida. Volvé a verificarla.');
   }
+}
 
-  statusEl.style.display = 'block';
-  statusEl.style.color = 'var(--color-accent-gold)';
-  statusEl.textContent = '⏳ Conectando con Mercado Pago...';
-
-  if (typeof window.testMercadoPagoCredentials !== 'function') {
-    statusEl.style.color = '#ff6b6b';
-    statusEl.textContent = '⚠️ Módulo de checkout no cargado.';
-    return;
+async function saveFutureAppConfigDraft() {
+  try {
+    ensureAdministrativeContext();
+    if (!appConfigRepository) throw new Error('El repositorio de configuración no está disponible.');
+    updateAppConfigStatus('Guardando borrador…');
+    const result = await appConfigRepository.saveDraft(collectFutureAppConfig());
+    loadFutureAppConfigControls(result.config);
+    updateAppConfigStatus(`Borrador sincronizado · revisión ${result.config.revision}`);
+  } catch (error) {
+    updateAppConfigStatus(error.message || 'No se pudo guardar el borrador.', true);
   }
+}
 
-  const res = await window.testMercadoPagoCredentials(token);
-  if (res.ok) {
-    statusEl.style.color = '#25D366';
-    statusEl.textContent = '✅ ¡Conexión exitosa! El Access Token es válido y está listo para recibir pagos.';
-  } else {
-    statusEl.style.color = '#ff6b6b';
-    statusEl.textContent = `❌ Error en Mercado Pago: ${res.error || 'Token inválido o no autorizado'}`;
+async function publishFutureAppConfig() {
+  await saveAdminConfig();
+}
+
+async function saveAdminConfig() {
+  try {
+    ensureAdministrativeContext();
+    if (!appConfigRepository) throw new Error('El repositorio de configuración no está disponible.');
+    updateAppConfigStatus('Publicando configuración…');
+
+    const brandProfile = collectLegacyBrandProfile();
+    const draftResult = await appConfigRepository.saveDraft(collectFutureAppConfig(brandProfile));
+    const publishResult = await appConfigRepository.publish(draftResult.config);
+    const publishedConfig = publishResult.config;
+    clearLegacyPaymentConfig();
+    window.AppConfig.applyCssVariables(publishedConfig);
+    window.dispatchEvent(new CustomEvent('boeweb_brand_updated', { detail: publishedConfig }));
+
+    loadFutureAppConfigControls(publishedConfig);
+    updateAppConfigStatus(`Configuración publicada y sincronizada · revisión ${publishedConfig.revision}`);
+
+    const saveMsg = document.getElementById('admin-save-msg');
+    if (saveMsg) {
+      saveMsg.style.display = 'block';
+      setTimeout(() => { saveMsg.style.display = 'none'; }, 3500);
+    }
+  } catch (error) {
+    updateAppConfigStatus(error.message || 'No se pudo publicar la configuración.', true);
   }
 }
 
 // Global Exposure
-window.checkAdminPasscode = checkAdminPasscode;
+window.authorizeAdminSession = authorizeAdminSession;
+window.handleAdminSessionLogin = handleAdminSessionLogin;
 window.loadAdminConfig = loadAdminConfig;
 window.loadBrandConfig = loadBrandConfig;
 window.saveAdminConfig = saveAdminConfig;
-window.testCurrentMpToken = testCurrentMpToken;
+window.saveFutureAppConfigDraft = saveFutureAppConfigDraft;
+window.publishFutureAppConfig = publishFutureAppConfig;
+window.focusBrandConfig = focusBrandConfig;
 window.updateBrandLivePreview = updateBrandLivePreview;
 window.updateBrandColorInputs = updateBrandColorInputs;
 window.updateBrandColorPickers = updateBrandColorPickers;
 window.handleBrandVerticalChange = handleBrandVerticalChange;
 window.handleBrandLogoFileSelect = handleBrandLogoFileSelect;
 window.applyBrandColorPreset = applyBrandColorPreset;
+
+document.addEventListener('DOMContentLoaded', () => {
+  authorizeAdminSession().catch(error => setAdminAuthStatus(error.message || 'No se pudo verificar la sesión.', true));
+});
 
 
 

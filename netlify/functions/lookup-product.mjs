@@ -1,3 +1,6 @@
+import { createClient } from '@supabase/supabase-js';
+import { authenticateBearer, requireServerConfig } from './_shared/http-auth.mjs';
+
 const OPEN_PRODUCTS_URL = 'https://world.openfoodfacts.org/api/v3/product';
 const UPCITEMDB_LOOKUP_URL = 'https://api.upcitemdb.com/prod/trial/lookup';
 const GOOGLE_CUSTOM_SEARCH_URL = 'https://customsearch.googleapis.com/customsearch/v1';
@@ -9,6 +12,14 @@ const REQUEST_WINDOW_MS = 60_000;
 const REQUEST_LIMIT_PER_WINDOW = 20;
 const EXTERNAL_TIMEOUT_MS = 12_000;
 const requestBuckets = new Map();
+
+export const config = {
+  rateLimit: {
+    windowLimit: 20,
+    windowSize: 60,
+    aggregateBy: ['domain', 'ip']
+  }
+};
 
 const COUNTRY_CONFIGS = {
   AR: { code: 'AR', name: 'Argentina', mlSite: 'MLA', currency: 'ARS', domainSuffix: '.ar', mlDomain: 'mercadolibre.com.ar', lang: 'es-AR' },
@@ -116,10 +127,33 @@ function jsonResponse(status, payload) {
 }
 
 function isAllowedOrigin(request) {
-  const configuredOrigin = process.env.PRODUCT_ANALYSIS_ALLOWED_ORIGIN;
-  if (!configuredOrigin) return true;
+  const configuredOrigin = process.env.PRODUCT_ANALYSIS_ALLOWED_ORIGIN || process.env.PUBLIC_SITE_URL;
   const origin = request.headers.get('origin');
-  return !origin || origin === configuredOrigin;
+  if (!origin) return true;
+  if (configuredOrigin && origin.replace(/\/$/, '') === configuredOrigin.replace(/\/$/, '')) return true;
+  return /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(origin);
+}
+
+async function authenticateLookupUser(request) {
+  const { supabaseUrl, serviceRoleKey } = requireServerConfig();
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+  const user = await authenticateBearer(supabaseAdmin, request.headers);
+  const { data: membership, error } = await supabaseAdmin
+    .from('tenant_users')
+    .select('tenant_id,user_id,role,active')
+    .eq('user_id', user.id)
+    .eq('active', true)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!membership) {
+    const authError = new Error('El usuario no pertenece a una empresa activa.');
+    authError.statusCode = 403;
+    throw authError;
+  }
+  return membership;
 }
 
 function isRateLimited(request, context) {
@@ -1019,12 +1053,14 @@ export default async function handler(request, context) {
   }
 
   try {
+    const membership = await authenticateLookupUser(request);
     const body = await request.json();
     const rawBarcode = cleanText(body.barcode, 24);
     const barcode = normalizeBarcode(rawBarcode);
     const query = cleanText(body.query, 160);
     const countryCode = cleanText(body.country || 'AR', 10);
-    const verticalCode = cleanText(body.vertical || 'growshop', 50);
+    const tenantContext = resolveServerTenantVerticalContext(membership.tenant_id, body.vertical);
+    const verticalCode = tenantContext.code;
 
     if (rawBarcode && !barcode) {
       return jsonResponse(400, { message: 'El código debe contener entre 6 y 18 números.' });
@@ -1114,6 +1150,10 @@ export default async function handler(request, context) {
     });
   } catch (error) {
     console.error('Error al buscar producto sin IA:', error.message);
-    return jsonResponse(502, { message: 'No se pudo consultar las fuentes externas. Podés continuar manualmente.' });
+    const status = Number(error.statusCode || error.status || 502);
+    const message = status === 401 || status === 403
+      ? error.message
+      : 'No se pudo consultar las fuentes externas. Podés continuar manualmente.';
+    return jsonResponse(status, { message });
   }
 }

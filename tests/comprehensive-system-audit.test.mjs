@@ -20,7 +20,7 @@ test('1. Netlify Functions: manage-tenant-user v2 & v1 exports & role security',
   const unauthRes = await mod.default(unauthReq, {});
   assert.equal(unauthRes.status, 401);
 
-  // Test v2 Request: Role elevation denial (ADMIN trying to elevate to SUPERADMIN)
+  // El contexto enviado por el body no autentica ni autoriza a nadie.
   const elevateReq = new Request('http://localhost/.netlify/functions/manage-tenant-user', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -33,9 +33,9 @@ test('1. Netlify Functions: manage-tenant-user v2 & v1 exports & role security',
     })
   });
   const elevateRes = await mod.default(elevateReq, {});
-  assert.equal(elevateRes.status, 403);
+  assert.equal(elevateRes.status, 401);
 
-  // Test v2 Request: Cross-tenant isolation denial
+  // Tampoco se puede simular una pertenencia a otro tenant desde DevTools.
   const crossReq = new Request('http://localhost/.netlify/functions/manage-tenant-user', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -48,23 +48,21 @@ test('1. Netlify Functions: manage-tenant-user v2 & v1 exports & role security',
     })
   });
   const crossRes = await mod.default(crossReq, {});
-  assert.equal(crossRes.status, 403);
+  assert.equal(crossRes.status, 401);
 });
 
-test('2. Netlify Functions: health-check-cron v2 & v1 execution', async () => {
+test('2. Netlify Functions: health-check-cron falla cerrado sin secreto ni backend configurado', async () => {
   const mod = await import('../netlify/functions/health-check-cron.mjs');
   assert.equal(typeof mod.default, 'function', 'Export default debe existir para Netlify Functions v2');
   assert.equal(typeof mod.handler, 'function', 'Export handler debe existir para retrocompatibilidad v1');
 
-  const req = new Request('http://localhost/.netlify/functions/health-check-cron', { method: 'POST' });
-  const res = await mod.default(req, {});
-  assert.equal(res.status, 200);
+  const manual = await mod.handler({ httpMethod: 'POST', headers: {} });
+  assert.equal(manual.statusCode, 401);
 
+  const res = await mod.default();
+  assert.equal(res.status, 503);
   const data = await res.json();
-  assert.equal(data.status, 'SUCCESS');
-  assert.ok(data.scheduled_at);
-  assert.ok(data.tenants_checked >= 2);
-  assert.ok(Array.isArray(data.summaries));
+  assert.equal(data.status, 'CHECK_FAILED');
 });
 
 test('3. Dr. BÔ Diagnosis Engine Catalog Integration', async () => {
@@ -115,10 +113,10 @@ test('5. Public Catalog and POS Cart Engine Consistency', async () => {
 
   const cart = new PosCartEngine('POS');
   cart.clear();
-  cart.addItem(unified[0]);
-  cart.addItem(unified[1]);
+  assert.equal(cart.addItem(unified[0]), true);
+  assert.equal(cart.addItem(unified[1]), false, 'POS no debe vender stock perteneciente a un proveedor');
 
-  assert.equal(cart.getItemCount(), 2);
-  assert.equal(cart.getSubtotal(), 4500 + 6200);
-  assert.equal(cart.getTotal(10), (4500 + 6200) * 0.9);
+  assert.equal(cart.getItemCount(), 1);
+  assert.equal(cart.getSubtotal(), 4500);
+  assert.equal(cart.getTotal(10), 4500 * 0.9);
 });

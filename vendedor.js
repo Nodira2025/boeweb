@@ -7,50 +7,6 @@ let supabaseClient;
 // --- STATE MANAGEMENT ---
 let baseProducts = []; // Stores products rendered in the grid
 let cart = JSON.parse(localStorage.getItem('boeweb_b2b_cart')) || [];
-// --- PRODUCTION RESET / CLEANUP UTILITY ---
-function purgeProductionTestData(silent = true) {
-  try {
-    // 1. Limpiar ventas POS de prueba, recibos y carritos
-    localStorage.removeItem('boeweb_pos_sale_drafts');
-    localStorage.removeItem('boeweb_last_pos_sale_receipt');
-    localStorage.removeItem('boeweb_sales_history');
-    localStorage.removeItem('boeweb_pos_cart');
-
-    // 2. Limpiar pedidos web y mediaciones
-    localStorage.removeItem('boeweb_web_orders');
-    localStorage.removeItem('boeweb_order_history');
-    localStorage.removeItem('boeweb_last_mp_order');
-
-    // 3. Limpiar borradores de ingresos de productos
-    localStorage.removeItem('boeweb_local_product_drafts');
-    localStorage.removeItem('boeweb_pending_product_drafts');
-    localStorage.removeItem('boeweb_product_drafts');
-
-    // 4. Limpiar asignaciones temporales de ubicaciones y mermas
-    localStorage.removeItem('boeweb_wms_product_locations');
-    localStorage.removeItem('boeweb_retired_products');
-    localStorage.removeItem('boeweb_inventory_audits');
-
-    // 5. Reiniciar caja a estado 0 inicial (sin movimientos)
-    const todayKey = (new Date()).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }).split('/').reverse().join('-');
-    localStorage.removeItem(`boeweb_cash_${todayKey}`);
-    localStorage.removeItem('boeweb_cash_legacy');
-
-    // Marcar como limpio para producción
-    localStorage.setItem('boeweb_production_clean_v1', 'true');
-
-    if (!silent && window.showToast) {
-      window.showToast('✨ Datos de prueba eliminados. ¡Local listo para operar en producción!');
-    }
-  } catch (err) {
-    console.warn('Error purging test data:', err);
-  }
-}
-window.purgeProductionTestData = purgeProductionTestData;
-
-if (localStorage.getItem('boeweb_production_clean_v1') !== 'true') {
-  purgeProductionTestData(true);
-}
 
 // Clear legacy carts once to prevent price mismatch with the new 30% discount system
 if (localStorage.getItem('boeweb_b2b_cart_version') !== '1.1') {
@@ -96,6 +52,10 @@ let posScanPendingProduct = null;
 let currentExpirationsFilter = 'all';
 let activeNearbyStoreFilter = 'all';
 let currentSelectedCcId = null;
+let canonicalCurrentAccounts = [];
+let canonicalCashView = null;
+let canonicalAdminAuditLogs = [];
+let canonicalAdminAuditLoadedAt = 0;
 
 // Retired products & stock adjustment state (hoisted)
 let retiredProductsFilterReason = 'all';
@@ -150,9 +110,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     if (window.supabase && typeof window.supabase.createClient === 'function') {
       supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+      window.supabaseClient = supabaseClient;
       if (window.SaasAuth?.hydrateFromSupabase) {
         try {
           await window.SaasAuth.hydrateFromSupabase(supabaseClient);
+          checkVendorAuth();
         } catch (authErr) {
           console.warn('SaasAuth optional hydration notice:', authErr);
         }
@@ -1095,16 +1057,8 @@ function formatPrice(value) {
 
 // --- VENDOR AUTHENTICATION & AI SALES ENGINE ---
 
-const AUTHORIZED_VENDEDORES = [
-  { name: 'Franco (Admin)', pass: 'admin123', altPass: 'admin', refCode: 'admin123', phone: '5493510000000', role: 'Administrador General & Auditoría', avatar: 'assets/logo.jpg', isAdmin: true },
-  { name: 'Raul', pass: 'raul123', refCode: 'raul123', phone: '5493510001111', role: 'Especialista en Sustratos & Nutrición Orgánica', avatar: 'assets/logo.jpg', isAdmin: true },
-  { name: 'Nacho Mina', pass: 'nacho mina123', altPass: 'nachomina123', refCode: 'nachomina123', phone: '5493510002222', role: 'Asesor Técnico en Cultivo Indoor & Iluminación LED', avatar: 'assets/logo.jpg' },
-  { name: 'Alexis', pass: 'alexis123', refCode: 'alexis123', phone: '5493510003333', role: 'Especialista en Riego Automático & Hidroponía', avatar: 'assets/logo.jpg' },
-  { name: 'Gino', pass: 'gino123', refCode: 'gino123', phone: '5493510004444', role: 'Asesor en Extracciones & Parafernalia Premium', avatar: 'assets/logo.jpg' },
-  { name: 'Rodrigo', pass: 'rodrigo123', refCode: 'rodrigo123', phone: '5493510005555', role: 'Especialista en Control de Plagas & Fitopatología', avatar: 'assets/logo.jpg' },
-  { name: 'Felipe', pass: 'felipe123', refCode: 'felipe123', phone: '5493510006666', role: 'Asesor de Membresías & Trámites REPROCANN', avatar: 'assets/logo.jpg' },
-  { name: 'Mariano', pass: 'mariano123', refCode: 'mariano123', phone: '5493510007777', role: 'Especialista en Semillas & Genética Cannabis', avatar: 'assets/logo.jpg' }
-];
+// La nómina y los roles provienen exclusivamente de Supabase Auth + tenant_users.
+const AUTHORIZED_VENDEDORES = Object.freeze([]);
 
 window.AUTHORIZED_VENDEDORES = AUTHORIZED_VENDEDORES;
 
@@ -1154,7 +1108,10 @@ function toggleVendorPasswordVisibility() {
 }
 
 function checkVendorAuth() {
-  const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name');
+  const authContext = typeof SaasAuth !== 'undefined'
+    ? SaasAuth.getTenantContext()
+    : { isVerified: false };
+  const activeVendor = authContext.isVerified ? authContext.userName : '';
   const loginScreen = document.getElementById('vendedor-login-screen');
   const portalApp = document.getElementById('vendedor-portal-app');
   const vendorNameHeader = document.getElementById('active-vendor-display-name');
@@ -1162,14 +1119,14 @@ function checkVendorAuth() {
   const sidebarName = document.getElementById('vendor-sidebar-name');
   const sidebarAvatar = document.getElementById('vendor-sidebar-avatar');
 
-  if (activeVendor) {
+  if (authContext.isVerified && activeVendor) {
     if (loginScreen) loginScreen.style.display = 'none';
     if (portalApp) portalApp.style.display = 'block';
     const activeVendorNameText = document.getElementById('active-vendor-name-text');
     if (activeVendorNameText) {
       activeVendorNameText.textContent = activeVendor;
     } else if (vendorNameHeader) {
-      vendorNameHeader.innerHTML = `🧑‍💼 <span style="font-weight: 800; color: var(--color-text-main, #152d24);">${activeVendor}</span>`;
+      vendorNameHeader.textContent = `🧑‍💼 ${activeVendor}`;
     }
     if (vendorCheckoutInput) vendorCheckoutInput.value = activeVendor;
     if (sidebarName) sidebarName.textContent = activeVendor;
@@ -1188,55 +1145,69 @@ function checkVendorAuth() {
   }
 }
 
-function handleVendorLogin(e) {
+async function handleVendorLogin(e) {
   if (e) e.preventDefault();
-  const selectEl = document.getElementById('auth-vendor-select');
+  const emailEl = document.getElementById('auth-vendor-email');
   const passEl = document.getElementById('auth-vendor-password');
 
-  if (!selectEl || !passEl) return;
+  if (!emailEl || !passEl) return false;
 
-  const selectedName = selectEl.value;
-  const typedPass = passEl.value.trim().toLowerCase();
+  const email = emailEl.value.trim().toLowerCase();
+  const typedPass = passEl.value;
 
-  if (!selectedName) {
-    setVendorLoginMessage('Seleccioná tu identidad para continuar.', 'info');
-    selectEl.focus();
-    return;
+  if (!email || !emailEl.checkValidity()) {
+    setVendorLoginMessage('Ingresá el correo válido de tu usuario de equipo.', 'info');
+    emailEl.focus();
+    return false;
   }
 
   if (!typedPass) {
     setVendorLoginMessage('Ingresá tu contraseña para continuar.', 'info');
     passEl.focus();
-    return;
+    return false;
   }
 
-  const vendorData = AUTHORIZED_VENDEDORES.find(v => v.name.toLowerCase() === selectedName.toLowerCase());
+  if (!supabaseClient || typeof SaasAuth === 'undefined') {
+    setVendorLoginMessage('El servicio de autenticación no está disponible. Recargá la página.', 'error');
+    return false;
+  }
 
-  if (vendorData) {
-    const customPass = localStorage.getItem('boeweb_vendor_password_' + vendorData.name.toLowerCase());
-    const isPassValid = customPass
-      ? typedPass === customPass.toLowerCase()
-      : (typedPass === vendorData.pass.toLowerCase() || (vendorData.altPass && typedPass === vendorData.altPass.toLowerCase()));
-
-    if (isPassValid) {
-      sessionStorage.setItem('boeweb_vendor_name', vendorData.name);
-      localStorage.setItem('boeweb_vendor_name', vendorData.name);
-      checkVendorAuth();
-      showToast(`👋 ¡Bienvenido/a, ${vendorData.name}! Sesión de vendedor activa.`);
-      passEl.value = '';
-      setVendorLoginMessage('');
-    } else {
-      setVendorLoginMessage('Los datos de acceso no coinciden. Revisá la contraseña e intentá nuevamente.');
+  const submitButton = document.querySelector('#vendor-login-form button[type="submit"]');
+  if (submitButton) submitButton.disabled = true;
+  setVendorLoginMessage('Validando sesión segura…', 'info');
+  try {
+    const result = await SaasAuth.signInWithSupabase(supabaseClient, email, typedPass);
+    if (!result.success || !result.hydrated) {
+      try {
+        await supabaseClient.auth.signOut();
+      } catch (signOutError) {
+        console.warn('No se pudo limpiar la sesión rechazada:', signOutError);
+      }
+      setVendorLoginMessage(result.error || 'El usuario no pertenece a una empresa activa.');
       passEl.select();
+      return false;
     }
-  } else {
-    setVendorLoginMessage('No pudimos validar esta identidad. Contactá al responsable del local.');
+    const context = SaasAuth.getTenantContext();
+    sessionStorage.setItem('boeweb_vendor_name', context.userName);
+    localStorage.setItem('boeweb_vendor_name', context.userName);
+    passEl.value = '';
+    setVendorLoginMessage('');
+    checkVendorAuth();
+    populatePosSalespeople();
+    showToast(`👋 Sesión segura iniciada para ${context.userName}.`);
+    return true;
+  } catch (error) {
+    console.error('No se pudo iniciar la sesión de vendedor:', error);
+    setVendorLoginMessage('No se pudo iniciar sesión. Revisá tus datos o la conexión.');
+    return false;
+  } finally {
+    if (submitButton) submitButton.disabled = false;
   }
 }
 
 function openVendorPasswordModal() {
-  const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name');
-  if (!activeVendor) {
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : { isVerified: false };
+  if (!context.isVerified) {
     showToast('⚠️ Debés iniciar sesión como vendedor primero.');
     return;
   }
@@ -1247,7 +1218,7 @@ function openVendorPasswordModal() {
   const confirmPass = document.getElementById('vendor-confirm-password');
   const msgEl = document.getElementById('vendor-change-password-msg');
 
-  if (nameEl) nameEl.textContent = activeVendor;
+  if (nameEl) nameEl.textContent = context.userName;
   if (oldPass) oldPass.value = '';
   if (newPass) newPass.value = '';
   if (confirmPass) confirmPass.value = '';
@@ -1265,10 +1236,10 @@ function closeVendorPasswordModal() {
   if (modal) modal.style.display = 'none';
 }
 
-function handleVendorChangePassword(e) {
+async function handleVendorChangePassword(e) {
   if (e) e.preventDefault();
-  const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name');
-  if (!activeVendor) return;
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : { isVerified: false };
+  if (!context.isVerified || !supabaseClient) return false;
 
   const oldPassEl = document.getElementById('vendor-old-password');
   const newPassEl = document.getElementById('vendor-new-password');
@@ -1288,47 +1259,47 @@ function handleVendorChangePassword(e) {
     msgEl.textContent = text;
   };
 
-  const vendorData = AUTHORIZED_VENDEDORES.find(v => v.name.toLowerCase() === activeVendor.toLowerCase());
-  if (!vendorData) {
-    showModalMsg('Vendedor no encontrado en el sistema.');
-    return;
-  }
-
-  const customStored = localStorage.getItem('boeweb_vendor_password_' + activeVendor.toLowerCase());
-  const isOldPassValid = customStored
-    ? oldPass.toLowerCase() === customStored.toLowerCase()
-    : (oldPass.toLowerCase() === vendorData.pass.toLowerCase() || (vendorData.altPass && oldPass.toLowerCase() === vendorData.altPass.toLowerCase()));
-
-  if (!isOldPassValid) {
-    showModalMsg('La contraseña actual ingresada es incorrecta.');
-    oldPassEl?.select();
-    return;
-  }
-
-  if (newPass.length < 4) {
-    showModalMsg('La nueva contraseña debe tener al menos 4 caracteres.');
+  if (newPass.length < 10) {
+    showModalMsg('La nueva contraseña debe tener al menos 10 caracteres.');
     newPassEl?.focus();
-    return;
+    return false;
   }
 
   if (newPass !== confirmPass) {
     showModalMsg('La nueva contraseña y la confirmación no coinciden.');
     confirmPassEl?.select();
-    return;
+    return false;
   }
 
-  // Guardar nueva contraseña en localStorage
-  localStorage.setItem('boeweb_vendor_password_' + activeVendor.toLowerCase(), newPass);
-  
-  showModalMsg('¡Contraseña actualizada con éxito!', false);
-  showToast(`🔑 Contraseña actualizada correctamente para ${activeVendor}.`);
-
-  setTimeout(() => {
-    closeVendorPasswordModal();
-  }, 900);
+  try {
+    const reauthenticated = await SaasAuth.signInWithSupabase(supabaseClient, context.userEmail, oldPass);
+    if (!reauthenticated.success || !reauthenticated.hydrated) {
+      showModalMsg('La contraseña actual no pudo validarse.');
+      oldPassEl?.select();
+      return false;
+    }
+    const { error } = await supabaseClient.auth.updateUser({ password: newPass });
+    if (error) throw error;
+    showModalMsg('Contraseña actualizada de forma segura.', false);
+    showToast(`🔑 Contraseña actualizada correctamente para ${context.userName}.`);
+    setTimeout(closeVendorPasswordModal, 900);
+    return true;
+  } catch (error) {
+    console.error('No se pudo actualizar la contraseña:', error);
+    showModalMsg(error.message || 'No se pudo actualizar la contraseña.');
+    return false;
+  }
 }
 
-function vendorLogout() {
+async function vendorLogout() {
+  if (supabaseClient?.auth) {
+    try {
+      await supabaseClient.auth.signOut();
+    } catch (error) {
+      console.warn('La sesión remota no pudo cerrarse limpiamente:', error);
+    }
+  }
+  if (typeof SaasAuth !== 'undefined') SaasAuth.logout();
   sessionStorage.removeItem('boeweb_vendor_name');
   localStorage.removeItem('boeweb_vendor_name');
   checkVendorAuth();
@@ -1431,6 +1402,11 @@ function switchVendorTab(tab) {
       vcardPortfolio.style.borderColor = '#ab47bc';
       vcardPortfolio.style.transform = 'scale(1.02)';
     }
+    Promise.all([loadCanonicalCurrentAccounts(), loadCanonicalVendorClients()]).then(() => {
+      renderCurrentAccountsUI();
+      populatePosCurrentAccountDropdown();
+      renderVendorPortfolioUI();
+    }).catch(error => console.error('No se pudo actualizar la cartera:', error));
     renderVendorPortfolioUI();
   } else if (tab === 'cash') {
     if (cashSection) {
@@ -1447,6 +1423,8 @@ function switchVendorTab(tab) {
       switchCashWorkspaceMode('classic');
     }
     renderCashSectionUI();
+    Promise.all([refreshCanonicalCashSection(), loadPosRegisters()])
+      .catch(error => console.error('No se pudo actualizar la caja central:', error));
   } else if (tab === 'map' || tab === 'estanteria') {
     if (mapSection) {
       mapSection.style.display = 'block';
@@ -1564,6 +1542,12 @@ function switchVendorTab(tab) {
       vcardRet.style.transform = 'scale(1.02)';
     }
     renderRetiredProductsUI();
+    loadWmsInventoryData(true)
+      .then(() => renderRetiredProductsUI())
+      .catch(error => {
+        console.error('No se pudo cargar el historial central de ajustes:', error);
+        renderRetiredProductsUI();
+      });
   } else if (tab === 'wms-inventory' || tab === 'wms') {
     if (wmsSection) {
       wmsSection.style.display = 'block';
@@ -1631,40 +1615,22 @@ function switchVendorTab(tab) {
 }
 
 function updateVendorNotificationCenter() {
-  let pendingOrders = 0;
-  try {
-    const rawStored = JSON.parse(localStorage.getItem('boeweb_web_orders') || localStorage.getItem('boeweb_order_history') || '[]');
-    const combined = (typeof webOrdersList !== 'undefined' && webOrdersList.length > 0 ? webOrdersList : rawStored);
-    pendingOrders = combined.filter(o => {
-      const st = String(o.status || '').toLowerCase();
-      return !st.includes('completado') && !st.includes('entregado') && !st.includes('cancelado');
-    }).length;
-  } catch (_) {}
-
-  let pendingDrafts = 0;
-  try {
-    const drafts = JSON.parse(localStorage.getItem('boeweb_pending_product_drafts') || '[]');
-    pendingDrafts = drafts.filter(d => (d.status || '').toUpperCase() === 'PENDING').length;
-  } catch (_) {}
-
-  let pendingExpirations = 0;
-  try {
-    const rawInv = JSON.parse(localStorage.getItem('boeweb_internal_inventory') || '[]');
-    const now = new Date();
-    rawInv.forEach(p => {
-      if (p.expiry_date) {
-        const exp = new Date(p.expiry_date);
-        const diffDays = Math.round((exp - now) / (1000 * 60 * 60 * 24));
-        if (diffDays <= 30) pendingExpirations++;
-      }
-    });
-  } catch (_) {}
-
-  let pendingWms = 0;
-  try {
-    const rawLocations = JSON.parse(localStorage.getItem('boeweb_wms_product_locations') || '[]');
-    pendingWms = rawLocations.filter(l => !l.shelf_code || l.shelf_code === 'SIN_ASIGNAR').length;
-  } catch (_) {}
+  const pendingOrders = (webOrdersList || []).filter(order => {
+    const status = String(order.status || '').toUpperCase();
+    return !['DELIVERED', 'CANCELLED', 'EXPIRED'].includes(status);
+  }).length;
+  const pendingDrafts = Array.from(pendingDraftCache.values())
+    .filter(draft => String(draft.status || '').toUpperCase() === 'PENDING').length;
+  const pendingExpirations = (internalCatalogProducts || []).filter(product => {
+    const expiration = product.metadata?.expiration_date || product.metadata?.expiry_date;
+    if (!expiration) return false;
+    const expiresAt = new Date(`${expiration}T00:00:00`);
+    return Number.isFinite(expiresAt.getTime())
+      && expiresAt.getTime() - Date.now() <= 30 * 24 * 60 * 60 * 1000;
+  }).length;
+  const pendingWms = (internalCatalogProducts || []).filter(product =>
+    product.track_stock !== false && (!Array.isArray(product.inventory_options) || product.inventory_options.length === 0)
+  ).length;
 
   const totalAlerts = pendingOrders + pendingDrafts + pendingExpirations + pendingWms;
 
@@ -1876,22 +1842,17 @@ function openCashWithType(type) {
 
 let storeMapDataLoaded = false;
 let storeMapDataLoading = false;
-const LOCAL_PRODUCT_LOCATIONS_KEY = 'boeweb_product_locations_v1';
 
 function readLocalProductLocations() {
-  try {
-    const rows = JSON.parse(localStorage.getItem(LOCAL_PRODUCT_LOCATIONS_KEY) || '[]');
-    return Array.isArray(rows) ? rows : [];
-  } catch (error) {
-    console.warn('No se pudieron leer las ubicaciones locales:', error);
-    return [];
-  }
+  // Compatibilidad de lectura para vistas antiguas: la fuente sigue siendo el
+  // read model central cargado desde inventory_*_v2, nunca localStorage.
+  const rows = window.__canonicalWmsProductLocations;
+  return Array.isArray(rows) ? rows.slice() : [];
 }
 
-function saveLocalProductLocation(location) {
-  const rows = readLocalProductLocations().filter(item => item.product_code !== location.product_code);
-  rows.unshift(location);
-  localStorage.setItem(LOCAL_PRODUCT_LOCATIONS_KEY, JSON.stringify(rows.slice(0, 500)));
+function saveLocalProductLocation() {
+  console.warn('Se ignoró una mutación local de ubicación: usá una RPC operativa WMS.');
+  return false;
 }
 
 function mapLocatedDraftToProductLocation(rawDraft) {
@@ -1921,62 +1882,44 @@ function mapLocatedDraftToProductLocation(rawDraft) {
 }
 
 async function loadStoreMapData(forceReload = false) {
-  if (!supabaseClient || storeMapDataLoading || (storeMapDataLoaded && !forceReload)) return;
+  if (storeMapDataLoading || (storeMapDataLoaded && !forceReload)) return;
   storeMapDataLoading = true;
   try {
-    const [shelvesResult, draftsResult] = await Promise.all([
-      supabaseClient.from('store_shelves').select('*').order('code', { ascending: true }),
-      supabaseClient
-        .from('product_drafts')
-        .select('*')
-        .eq('status', 'APPROVED')
-        .order('updated_at', { ascending: false })
-    ]);
-    const localLocations = readLocalProductLocations();
-    const draftLocations = draftsResult.error
-      ? []
-      : (draftsResult.data || []).map(mapLocatedDraftToProductLocation).filter(Boolean);
-    const localByCode = new Map(localLocations.map(item => [item.product_code, item]));
-    const mergedByCode = new Map(localByCode);
-    draftLocations.forEach(item => {
-      const knownDetails = mergedByCode.get(item.product_code) || {};
-      mergedByCode.set(item.product_code, { ...knownDetails, ...item });
-    });
-    // Also include located products from internalCatalogProducts
-    if (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts)) {
-      internalCatalogProducts.forEach(p => {
-        if (p.shelf_code || p.location || p.wms_code || p.location_label) {
-          const code = p.product_code || p.id;
-          const known = mergedByCode.get(code) || {};
-          mergedByCode.set(code, {
-            ...known,
-            product_id: p.id || code,
-            product_code: code,
-            name: p.name || code,
-            image_url: p.image || p.image_url || known.image_url || '',
-            barcode: p.barcode || known.barcode || null,
-            floor_level: Number(p.floor_level) || (String(p.wms_code || '').startsWith('DP') ? 2 : 1),
-            shelf_code: p.shelf_code || known.shelf_code || '',
-            shelf_level: Number(p.shelf_level || p.level) || known.shelf_level || 1,
-            stock: Math.max(0, Number(p.stock ?? p.on_hand) || 0),
-            shelf_position: p.shelf_position || known.shelf_position || null,
-            location_label: p.location_label || p.location || known.location_label || null,
-            wms_code: p.wms_code || known.wms_code || null
-          });
-        }
-      });
-    }
-
-    const syncLabel = draftsResult.error
-      ? 'Modo local · sin conexión al inventario'
-      : 'Inventario sincronizado';
+    await loadWmsInventoryData(forceReload);
+    if (wmsDataLoadError) throw new Error(wmsDataLoadError);
+    const shelves = getWmsModules().map(module => ({
+      id: module.id,
+      code: module.code,
+      name: module.sector_name,
+      floor_level: Number(module.metadata?.floor_level) || (String(module.code).startsWith('DP') ? 2 : 1),
+      x: Number(module.metadata?.map_x) || undefined,
+      y: Number(module.metadata?.map_y) || undefined,
+      width: Number(module.metadata?.map_width) || undefined,
+      height: Number(module.metadata?.map_height) || undefined,
+      icon: module.metadata?.map_icon || undefined,
+      location_type: module.location_type,
+      is_sellable: module.is_sellable,
+      is_default: module.is_default,
+      is_anchor: false,
+      metadata: module.metadata || {}
+    }));
+    const productLocations = getWmsLocations().map(location => ({
+      ...location,
+      floor_level: Number(location.location_metadata?.floor_level) || (String(location.module_code).startsWith('DP') ? 2 : 1),
+      shelf_code: location.module_code,
+      shelf_level: location.human_level,
+      stock: location.quantity,
+      location_label: location.location_name,
+      wms_code: location.module_code
+    }));
     if (window.setStoreMapData) {
-      window.setStoreMapData(shelvesResult.error ? [] : (shelvesResult.data || []), [...mergedByCode.values()], syncLabel);
+      window.setStoreMapData(shelves, productLocations, 'Inventario central sincronizado');
     }
     storeMapDataLoaded = true;
   } catch (error) {
     console.error('Error al sincronizar el mapa:', error);
-    if (window.setStoreMapData) window.setStoreMapData([], readLocalProductLocations(), 'Modo local');
+    if (window.setStoreMapData) window.setStoreMapData([], [], 'Inventario central no disponible');
+    storeMapDataLoaded = false;
   } finally {
     storeMapDataLoading = false;
   }
@@ -1994,6 +1937,7 @@ async function renderStoreMapUI(activeZone = null, activeShelf = null, targetLev
     }
   }
 }
+window.loadStoreMapData = loadStoreMapData;
 
 function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
   const currentShelves = (typeof window !== 'undefined' && Array.isArray(window.storeShelves)) ? window.storeShelves : [];
@@ -2001,11 +1945,10 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
   const raw = String(queryOrCode || (matchedProduct?.wms_code || matchedProduct?.location || matchedProduct?.shelf_code || '')).trim();
   const upper = raw.toUpperCase();
 
-  // Match product from catalog, local locations, or store map
+  // Match product only against tenant-scoped catalog and server-backed WMS reads.
   let matched = matchedProduct;
   const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
-  const localLocs = typeof readLocalProductLocations === 'function' ? readLocalProductLocations() : [];
-  const allProducts = [...(internalCatalogProducts || []), ...storeLocs, ...localLocs, ...(baseProducts || [])];
+  const allProducts = [...storeLocs, ...(internalCatalogProducts || [])];
 
   if (!matched && raw) {
     // 1. Direct SKU, barcode, name or ID match
@@ -2181,11 +2124,10 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
   let productId = matched?.id || matched?.product_code || '';
 
   // Photo
-  let shelfPhoto = null;
-  try {
-    const photos = JSON.parse(localStorage.getItem('boeweb_store_shelf_photos_v1') || '{}');
-    shelfPhoto = photos[layoutShelfCode] || photos[shelfCode] || matched?.placement_photo_url || null;
-  } catch (err) {}
+  const shelfPhoto = physicalShelfMatch?.metadata?.photo_url
+    || matched?.location_metadata?.photo_url
+    || matched?.placement_photo_url
+    || null;
 
   return {
     rawCode: raw,
@@ -2364,7 +2306,7 @@ function renderStoreMapLocationCard(info) {
 
         ${currentShelves.length ? `
           <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 14px; margin-bottom: 16px;">
-            <strong style="display: block; font-size: 0.85rem; color: #c2a246; margin-bottom: 10px;">📍 Asignar ubicación rápida en el plano:</strong>
+            <strong style="display: block; font-size: 0.85rem; color: #c2a246; margin-bottom: 10px;">📍 Ubicación de destino propuesta:</strong>
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
               <div>
@@ -2386,8 +2328,8 @@ function renderStoreMapLocationCard(info) {
               </div>
             </div>
 
-            <button type="button" onclick="const sEl = document.getElementById('quick-assign-shelf-select'); const lEl = document.getElementById('quick-assign-level-select'); const opt = sEl.options[sEl.selectedIndex]; assignProductToStoreShelf('${escapeFn(info.productId || info.productBarcode || info.productName)}', opt ? opt.dataset.floor : 1, sEl.value, lEl.value, 'C');" style="width: 100%; padding: 12px; border-radius: 10px; background: #c2a246; color: #152d24; font-weight: 900; border: none; cursor: pointer; font-size: 0.92rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
-              📍 Guardar y ubicar en el plano
+            <button type="button" onclick="switchVendorTab('wms-inventory')" style="width: 100%; padding: 12px; border-radius: 10px; background: #c2a246; color: #152d24; font-weight: 900; border: none; cursor: pointer; font-size: 0.92rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              ⇄ Abrir inventario físico para transferir
             </button>
           </div>
         ` : `
@@ -2494,66 +2436,10 @@ function searchShelfOnMap() {
   }
 }
 
-function assignProductToStoreShelf(productCodeOrId, floorLevel = 1, shelfCode = '', levelNum = 1, sectorCode = 'C') {
-  if (!shelfCode) {
-    if (window.showToast) window.showToast('⚠️ Seleccioná un módulo válido.');
-    return;
+function assignProductToStoreShelf() {
+  if (window.showToast) {
+    window.showToast('🔒 La asignación rápida local fue desactivada. Usá Inventario físico → Mover para registrar una transferencia central y auditable.');
   }
-  const fLevel = Number(floorLevel) || 1;
-  const lNum = Number(levelNum) || 1;
-  const sCode = String(shelfCode).trim().toUpperCase();
-
-  const wallMatch = sCode.match(/P([1-4])/);
-  const wallCode = wallMatch ? `P${wallMatch[1]}` : 'P1';
-  const zonePrefix = fLevel === 2 ? 'DP' : 'TI';
-  const compassPrefix = wallCode === 'P3' ? 'D' : wallCode === 'P4' ? 'I' : wallCode === 'P2' ? 'A' : 'F';
-  const wmsCode = `${zonePrefix}-${compassPrefix}-${wallCode}-${sCode}-N${lNum}-${sectorCode}`;
-
-  const allProds = [...(typeof internalCatalogProducts !== 'undefined' ? internalCatalogProducts : []), ...(window.storeLocationProducts || [])];
-  const prod = allProds.find(p => String(p.product_code || p.id).toUpperCase() === String(productCodeOrId).toUpperCase() || String(p.name).toLowerCase() === String(productCodeOrId).toLowerCase());
-
-  const locationEntry = {
-    product_id: prod?.id || prod?.product_code || productCodeOrId,
-    product_code: prod?.product_code || prod?.id || productCodeOrId,
-    name: prod?.name || productCodeOrId,
-    image_url: prod?.image || prod?.image_url || '',
-    barcode: prod?.barcode || null,
-    floor_level: fLevel,
-    shelf_code: sCode,
-    shelf_level: lNum,
-    stock: Math.max(0, Number(prod?.stock ?? prod?.on_hand) || 0),
-    shelf_position: `Nivel ${lNum} (${sectorCode === 'I' ? 'Izq' : sectorCode === 'D' ? 'Der' : 'Centro'})`,
-    location_label: `📍 ${fLevel === 2 ? 'Depósito' : 'Tienda'} · ${sCode} · Nivel ${lNum}`,
-    wms_code: wmsCode
-  };
-
-  saveLocalProductLocation(locationEntry);
-
-  try {
-    const raw = JSON.parse(localStorage.getItem('boeweb_wms_product_locations') || '[]');
-    const filtered = raw.filter(r => String(r.product_code || r.id).toUpperCase() !== String(locationEntry.product_code).toUpperCase());
-    filtered.unshift(locationEntry);
-    localStorage.setItem('boeweb_wms_product_locations', JSON.stringify(filtered));
-  } catch (_) {}
-
-  if (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts)) {
-    const p = internalCatalogProducts.find(item => String(item.product_code || item.id).toUpperCase() === String(locationEntry.product_code).toUpperCase());
-    if (p) {
-      p.shelf_code = sCode;
-      p.shelf_level = lNum;
-      p.floor_level = fLevel;
-      p.wms_code = wmsCode;
-      p.location = locationEntry.location_label;
-      p.location_label = locationEntry.location_label;
-    }
-  }
-
-  if (window.showToast) window.showToast(`✅ ${locationEntry.name} asignado a ${sCode} · Nivel ${lNum}.`);
-  if (typeof loadStoreMapData === 'function') loadStoreMapData(true);
-  
-  const searchInput = document.getElementById('map-search-input');
-  if (searchInput) searchInput.value = locationEntry.name;
-  searchShelfOnMap();
 }
 window.assignProductToStoreShelf = assignProductToStoreShelf;
 
@@ -2935,22 +2821,64 @@ window.toggleVoiceAssistantListening = toggleVoiceAssistantListening;
 window.startVoiceSearchOnMap = startVoiceSearchOnMap;
 
 
-function simulateCustomerQRScan() {
+async function simulateCustomerQRScan(event) {
+  event?.preventDefault?.();
   const resultBox = document.getElementById('customer-scan-result');
   const nameEl = document.getElementById('scanned-customer-name');
   const tierEl = document.getElementById('scanned-customer-tier');
   const seedsEl = document.getElementById('scanned-customer-seeds');
+  const contactEl = document.getElementById('scanned-customer-contact');
+  const input = document.getElementById('customer-credential-code');
+  const credential = input?.value.trim() || '';
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
 
-  showToast('🔍 Leyendo Código QR del celular del cliente...');
+  if (!credential) {
+    input?.focus();
+    return;
+  }
+  if (!supabaseClient || !context?.isVerified) {
+    alert('Iniciá sesión para consultar clientes centrales.');
+    return;
+  }
 
-  setTimeout(() => {
-    if (nameEl) nameEl.textContent = '👤 Franco P. (Cliente VIP BÔ)';
-    if (tierEl) tierEl.textContent = '🌳 RANGO ÁRBOL ZEN';
-    if (seedsEl) seedsEl.textContent = '650 Semillas VIP';
+  showToast('Buscando cliente en el registro central…');
+  try {
+    const isCustomerUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(credential);
+    const normalizedPhone = credential.replace(/\D/g, '');
+    let customerQuery = supabaseClient
+      .from('customers')
+      .select('id,display_name,tax_id,email,phone,status,metadata')
+      .eq('tenant_id', context.tenantId);
+    if (isCustomerUuid) customerQuery = customerQuery.eq('id', credential);
+    else if (normalizedPhone.length >= 7) customerQuery = customerQuery.eq('phone', normalizedPhone);
+    else customerQuery = customerQuery.eq('tax_id', credential);
+    const { data: customer, error } = await customerQuery.maybeSingle();
+    if (error) throw error;
+    if (!customer) throw new Error('No se encontró un cliente con esa credencial.');
+
+    const { data: account, error: accountError } = await supabaseClient
+      .from('customer_accounts')
+      .select('id,balance,credit_limit,currency,status')
+      .eq('tenant_id', context.tenantId)
+      .eq('customer_id', customer.id)
+      .maybeSingle();
+    if (accountError) throw accountError;
+
+    if (nameEl) nameEl.textContent = customer.display_name;
+    if (tierEl) tierEl.textContent = customer.status === 'ACTIVE' ? 'CLIENTE ACTIVO' : customer.status;
+    if (seedsEl) {
+      seedsEl.textContent = account
+        ? `${formatCashCurrency(account.balance)} de ${formatCashCurrency(account.credit_limit)}`
+        : 'Sin cuenta corriente';
+    }
+    if (contactEl) contactEl.textContent = [customer.phone, customer.email].filter(Boolean).join(' · ') || 'Sin datos de contacto';
     if (resultBox) resultBox.style.display = 'block';
-
-    showToast('✅ Cliente Verificado. Beneficios VIP y REPROCANN Aplicados.');
-  }, 1200);
+    showToast('Cliente verificado contra el registro central.');
+  } catch (error) {
+    console.error('No se pudo identificar al cliente:', error);
+    if (resultBox) resultBox.style.display = 'none';
+    alert(error.message || 'No se pudo consultar el cliente.');
+  }
 }
 
 // --- CASH REGISTER & SHIFT CLOSING ENGINE ---
@@ -3041,25 +2969,19 @@ function normalizeCashData(value, dateKey = getTodayDateKey()) {
 }
 
 function getVendorCashData(dateKey = getTodayDateKey()) {
-  const storageKey = `boeweb_cash_${dateKey}`;
-  const storedValue = localStorage.getItem(storageKey);
-  if (!storedValue) return getEmptyCashData(dateKey);
-
-  try {
-    return normalizeCashData(JSON.parse(storedValue), dateKey);
-  } catch (error) {
-    console.error('No se pudo leer la caja guardada:', error);
-    localStorage.setItem(`${storageKey}_recovery_${Date.now()}`, storedValue);
-    return getEmptyCashData(dateKey);
+  if (dateKey === getTodayDateKey()) {
+    if (canonicalCashView) return normalizeCashData(canonicalCashView, dateKey);
   }
+  return normalizeCashData({
+    ...getEmptyCashData(dateKey),
+    authority: 'server',
+    authorityUnavailable: true,
+    noSession: true
+  }, dateKey);
 }
 
 function saveVendorCashData(data, dateKey = getTodayDateKey()) {
-  const normalized = normalizeCashData(data, dateKey);
-  normalized.updatedAt = new Date().toISOString();
-  localStorage.setItem(`boeweb_cash_${dateKey}`, JSON.stringify(normalized));
-  renderVendorHomeUI();
-  return normalized;
+  throw new Error(`La caja local fue retirada. Usá los comandos centrales de caja (${dateKey}, ${data?.sessionId || 'sin sesión'}).`);
 }
 
 function formatCashCurrency(value) {
@@ -3107,18 +3029,21 @@ function escapeCashHtml(value) {
   }[character]));
 }
 
-function addCashMovement(event) {
+async function addCashMovement(event) {
   if (event) event.preventDefault();
-  const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
   const typeEl = document.getElementById('cash-entry-type');
   const amountEl = document.getElementById('cash-entry-amount');
   const descEl = document.getElementById('cash-entry-desc');
-  const type = typeEl?.value || 'venta_efectivo';
+  const type = typeEl?.value || '';
   const amount = Number.parseFloat(amountEl?.value || '0');
   const desc = descEl?.value.trim() || '';
-  const cashData = getVendorCashData();
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
 
-  if (!CASH_TYPE_CONFIG[type]) {
+  if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+    alert('Iniciá sesión para registrar movimientos en la caja central.');
+    return;
+  }
+  if (!['apertura', 'membresia_efectivo', 'gasto', 'retiro'].includes(type)) {
     alert('El tipo de movimiento seleccionado no es válido.');
     return;
   }
@@ -3126,35 +3051,61 @@ function addCashMovement(event) {
     alert('Ingresá un monto mayor a $0 y un detalle válido.');
     return;
   }
-  if (cashData.closed) {
-    alert('La caja de hoy ya fue cerrada. No se pueden agregar movimientos.');
-    return;
-  }
+  const submitButton = document.getElementById('cash-entry-submit');
+  if (submitButton) submitButton.disabled = true;
+  try {
+    if (type === 'apertura') {
+      const registerId = document.getElementById('pos-register-select')?.value || '';
+      await window.OperationalApi.openCashSession({
+        supabaseClient,
+        authContext,
+        registerId,
+        openingAmount: amount
+      });
+    } else {
+      if (!canonicalCashView?.sessionId || canonicalCashView.closed) {
+        throw new Error('No hay un turno OPEN. Registrá primero el fondo inicial de apertura.');
+      }
+      const typeMap = {
+        membresia_efectivo: 'INCOME',
+        gasto: 'EXPENSE',
+        retiro: 'WITHDRAWAL'
+      };
+      await window.OperationalApi.recordCashMovement({
+        supabaseClient,
+        authContext,
+        sessionId: canonicalCashView.sessionId,
+        type: typeMap[type],
+        amount,
+        category: type === 'membresia_efectivo' ? 'MEMBERSHIP' : type.toUpperCase(),
+        description: desc,
+        reference: {
+          idempotency_key: `cash-ui:${authContext.userId}:${globalThis.crypto?.randomUUID?.() || Date.now()}`
+        }
+      });
+    }
 
-  const now = new Date();
-  cashData.movements.unshift({
-    id: globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `cash_${Date.now()}`,
-    createdAt: now.toISOString(),
-    time: now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
-    type,
-    amount,
-    desc,
-    vendor: activeVendor,
-    voided: false
-  });
-  saveVendorCashData(cashData);
-
-  if (amountEl) amountEl.value = '';
-  if (descEl) {
-    descEl.value = '';
-    descEl.focus();
+    if (amountEl) amountEl.value = '';
+    if (descEl) {
+      descEl.value = '';
+      descEl.focus();
+    }
+    await Promise.all([refreshCanonicalCashSection(), loadPosRegisters()]);
+    if (window.showToast) window.showToast(`Movimiento de ${formatCashCurrency(amount)} confirmado.`);
+  } catch (error) {
+    console.error('No se confirmó el movimiento de caja:', error);
+    alert(`No se registró el movimiento.\n\n${error.message || 'Error desconocido'}`);
+  } finally {
+    if (submitButton) submitButton.disabled = false;
   }
-  renderCashSectionUI();
-  if (window.showToast) window.showToast(`Movimiento de ${formatCashCurrency(amount)} registrado.`);
 }
 
 function toggleCashMovementVoid(movementId) {
   const cashData = getVendorCashData();
+  if (cashData.authority === 'server') {
+    alert('Los movimientos centrales son inmutables. Registrá un movimiento compensatorio con trazabilidad en lugar de borrar o restaurar el original.');
+    return;
+  }
   if (cashData.closed) {
     alert('La caja está cerrada y ya no admite correcciones.');
     return;
@@ -3218,8 +3169,8 @@ function renderCashMovements(cashData) {
           <span class="cash-movement-meta">${escapeCashHtml(movement.time || '--:--')} · ${escapeCashHtml(movement.vendor || 'Vendedor')}</span>
         </div>
         <strong class="cash-movement-amount">${sign}${formatCashCurrency(movement.amount)}</strong>
-        <button type="button" class="cash-void-btn" data-movement-id="${escapeCashHtml(String(movement.id))}" ${cashData.closed ? 'disabled' : ''}>
-          ${movement.voided ? 'Restaurar' : 'Anular'}
+        <button type="button" class="cash-void-btn" data-movement-id="${escapeCashHtml(String(movement.id))}" ${cashData.closed || cashData.authority === 'server' ? 'disabled' : ''}>
+          ${cashData.authority === 'server' ? 'Inmutable' : (movement.voided ? 'Restaurar' : 'Anular')}
         </button>
       </article>`;
   }).join('');
@@ -3272,7 +3223,13 @@ function renderCashSectionUI() {
 
   const statusBadge = document.getElementById('cash-shift-status-badge');
   if (statusBadge) {
-    if (cashData.validated) {
+    if (cashData.authorityUnavailable) {
+      statusBadge.textContent = 'Caja central no disponible';
+      statusBadge.dataset.status = 'closed';
+    } else if (cashData.noSession) {
+      statusBadge.textContent = 'Sin turno abierto';
+      statusBadge.dataset.status = 'closed';
+    } else if (cashData.validated) {
       statusBadge.textContent = 'Arqueo validado';
       statusBadge.dataset.status = 'validated';
     } else if (cashData.closed) {
@@ -3286,7 +3243,7 @@ function renderCashSectionUI() {
 
   const entryForm = document.getElementById('vendor-cash-entry-form');
   entryForm?.querySelectorAll('input, select, button').forEach(control => {
-    control.disabled = cashData.closed;
+    control.disabled = cashData.closed || cashData.authorityUnavailable;
   });
 
   const closeButton = document.getElementById('btn-close-shift');
@@ -3312,81 +3269,78 @@ function renderCashSectionUI() {
   updateCashDifferencePreview();
 }
 
-function performShiftClosure() {
+async function performShiftClosure() {
   const cashData = getVendorCashData();
   if (cashData.closed) return;
 
-  const activeMovements = cashData.movements.filter(movement => !movement.voided);
   const countedEl = document.getElementById('cash-counted-amount');
   const notesEl = document.getElementById('cash-closure-notes');
   const countedCash = Number.parseFloat(countedEl?.value || '');
-  if (activeMovements.length === 0) {
-    alert('Registrá al menos un movimiento antes de cerrar la caja.');
-    return;
-  }
   if (!Number.isFinite(countedCash) || countedCash < 0) {
     alert('Ingresá el efectivo contado antes de cerrar el turno.');
     countedEl?.focus();
     return;
   }
 
-  const totals = calculateCashTotals(cashData);
-  cashData.closed = true;
-  cashData.closedBy = localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
-  cashData.closedAt = new Date().toISOString();
-  cashData.expectedCash = totals.expectedCash;
-  cashData.countedCash = countedCash;
-  cashData.difference = countedCash - totals.expectedCash;
-  cashData.closureNotes = notesEl?.value.trim() || '';
-  saveVendorCashData(cashData);
-
-  if (typeof logSecureAuditEvent === 'function') {
-    logSecureAuditEvent({
-      event_type: 'CASH_SESSION_CLOSED',
-      severity: 'INFO',
-      category: 'CASH',
-      actor_name: cashData.closedBy,
-      description: `Cierre y arqueo de caja finalizado por ${cashData.closedBy}. Esperado: ${formatCashCurrency(totals.expectedCash)}, Contado: ${formatCashCurrency(countedCash)}, Diferencia: ${formatCashCurrency(cashData.difference)}`,
-      entity_type: 'cash_session',
-      entity_id: `cash_close_${Date.now()}`,
-      details: {
-        expectedCash: totals.expectedCash,
-        countedCash,
-        difference: cashData.difference,
-        notes: cashData.closureNotes,
-        totalSales: totals.totalSales,
-        totalIncome: totals.totalIncome,
-        totalExpenses: totals.totalExpenses
-      }
-    });
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified || !cashData.sessionId) {
+    alert('No hay una sesión central de caja abierta para cerrar.');
+    return;
   }
 
-  renderCashSectionUI();
-  downloadCashBackup('json');
-  if (window.showToast) window.showToast('Caja cerrada. Se descargó un respaldo automático del arqueo.');
+  const closeButton = document.getElementById('btn-close-shift');
+  if (closeButton) closeButton.disabled = true;
+  try {
+    const closure = await window.OperationalApi.submitCashClosure({
+      supabaseClient,
+      authContext,
+      sessionId: cashData.sessionId,
+      countedAmount: countedCash,
+      notes: notesEl?.value.trim() || ''
+    });
+    await Promise.all([refreshCanonicalCashSection(), loadPosRegisters()]);
+    downloadCashBackup('json');
+    const difference = Number(closure?.difference || 0);
+    if (window.showToast) window.showToast(`Caja cerrada y enviada a supervisión. Diferencia: ${formatCashCurrency(difference)}.`);
+  } catch (error) {
+    console.error('No se pudo cerrar la caja:', error);
+    alert(`La caja no se cerró.\n\n${error.message || 'Error desconocido'}`);
+  } finally {
+    if (closeButton) closeButton.disabled = false;
+  }
 }
 
-function validateAdminClosurePrompt() {
+async function validateAdminClosurePrompt() {
   const cashData = getVendorCashData();
   if (!cashData.closed || cashData.validated) return;
-  const passEl = document.getElementById('cash-admin-password');
-  const pass = passEl?.value.trim() || '';
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(authContext?.role)) {
+    alert('Sólo un administrador o supervisor autenticado puede revisar este arqueo.');
+    return;
+  }
+  if (!cashData.closureId || !window.OperationalApi || !supabaseClient) {
+    alert('No se encontró el cierre central pendiente de revisión.');
+    return;
+  }
 
-  if (pass === 'admin123' || pass === 'boeweb2025' || pass === '1234') {
-    cashData.validated = true;
-    cashData.validatedBy = 'Admin';
-    cashData.validatedAt = new Date().toISOString();
-    saveVendorCashData(cashData);
-    if (passEl) passEl.value = '';
-    renderCashSectionUI();
+  const button = document.getElementById('btn-admin-validate');
+  if (button) button.disabled = true;
+  try {
+    await window.OperationalApi.reviewCashClosure({
+      supabaseClient,
+      authContext,
+      closureId: cashData.closureId,
+      decision: 'APPROVE',
+      reason: 'Arqueo revisado desde el panel operativo.'
+    });
+    await refreshCanonicalCashSection();
     downloadCashBackup('json');
-    if (window.showToast) window.showToast('Arqueo validado y respaldado correctamente.');
-  } else {
-    if (passEl) {
-      passEl.value = '';
-      passEl.focus();
-    }
-    alert('Contraseña de administración incorrecta.');
+    if (window.showToast) window.showToast('Arqueo aprobado con identidad de supervisor y auditoría central.');
+  } catch (error) {
+    console.error('No se pudo revisar el cierre:', error);
+    alert(`No se aprobó el arqueo.\n\n${error.message || 'Error desconocido'}`);
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 
@@ -3437,6 +3391,10 @@ function downloadCashBackup(format = 'json') {
 }
 
 async function importCashBackup(event) {
+  if (event) event.preventDefault();
+  alert('La restauración local de caja fue retirada. Los cierres y movimientos se recuperan desde el historial central inmutable.');
+  return;
+
   const fileInput = event?.target;
   const file = fileInput?.files?.[0];
   if (!file) return;
@@ -3485,21 +3443,42 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // --- VENDOR PORTFOLIO & SOCIAL SELLING ENGINE ---
-const MOCK_VENDOR_CLIENTS = [
-  { id: 101, name: 'Franco P.', phone: '5493512345678', vendor: 'Nacho Mina', tier: '🌳 ÁRBOL ZEN', regDate: '2026-05-10', lastSoilDaysAgo: 65, totalSpent: 145000 },
-  { id: 102, name: 'Sofía Martínez', phone: '5493518765432', vendor: 'Nacho Mina', tier: '🌿 BROTE ZEN', regDate: '2026-06-02', lastSoilDaysAgo: 20, totalSpent: 48000 },
-  { id: 103, name: 'Lucas Gómez', phone: '5493519998877', vendor: 'Raul', tier: '🌱 SEMILLA ZEN', regDate: '2026-04-15', lastSoilDaysAgo: 70, totalSpent: 92000 },
-  { id: 104, name: 'Agustín Benítez', phone: '5493514443322', vendor: 'Alexis', tier: '🌳 ÁRBOL ZEN', regDate: '2026-03-20', lastSoilDaysAgo: 45, totalSpent: 210000 },
-  { id: 105, name: 'Camila Rodriguez', phone: '5493516665544', vendor: 'Gino', tier: '🌿 BROTE ZEN', regDate: '2026-06-18', lastSoilDaysAgo: 10, totalSpent: 35000 },
-  { id: 106, name: 'Valentín Silva', phone: '5493511112233', vendor: 'Rodrigo', tier: '🌱 SEMILLA ZEN', regDate: '2026-05-28', lastSoilDaysAgo: 85, totalSpent: 64000 },
-  { id: 107, name: 'Martina Lopez', phone: '5493517778899', vendor: 'Felipe', tier: '🌳 ÁRBOL ZEN', regDate: '2026-02-14', lastSoilDaysAgo: 90, totalSpent: 180000 }
-];
+let canonicalVendorClients = [];
+
+async function loadCanonicalVendorClients() {
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!supabaseClient || !context?.isVerified) {
+    canonicalVendorClients = [];
+    return canonicalVendorClients;
+  }
+  const { data, error } = await supabaseClient
+    .from('customers')
+    .select('id,display_name,email,phone,tax_id,status,metadata,created_at,updated_at')
+    .eq('tenant_id', context.tenantId)
+    .neq('status', 'ARCHIVED')
+    .order('display_name', { ascending: true });
+  if (error) throw error;
+  canonicalVendorClients = (data || []).map(customer => ({
+    id: customer.id,
+    name: customer.display_name,
+    phone: customer.phone || '',
+    email: customer.email || '',
+    taxId: customer.tax_id || '',
+    tier: customer.metadata?.tier || 'Cliente',
+    regDate: customer.created_at ? customer.created_at.slice(0, 10) : '',
+    lastSoilDaysAgo: Number(customer.metadata?.last_soil_purchase_days_ago) || 0,
+    totalSpent: Number(customer.metadata?.total_spent) || 0,
+    assignedSalespersonId: customer.metadata?.salesperson_user_id || null
+  }));
+  return canonicalVendorClients;
+}
 
 function getVendorClients(vendorName) {
-  const customClients = JSON.parse(localStorage.getItem('boeweb_referred_clients') || '[]');
-  const combined = [...customClients, ...MOCK_VENDOR_CLIENTS];
-  if (!vendorName) return combined;
-  return combined.filter(c => c.vendor && c.vendor.toLowerCase() === vendorName.toLowerCase());
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  const role = String(context?.role || '').toUpperCase();
+  if (['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(role)) return [...canonicalVendorClients];
+  const assigned = canonicalVendorClients.filter(client => client.assignedSalespersonId === context?.userId);
+  return assigned;
 }
 
 function renderVendorPortfolioUI() {
@@ -3536,17 +3515,17 @@ function renderVendorPortfolioUI() {
         return `
           <tr style="border-bottom: 1px solid var(--color-border-subtle);">
             <td style="padding: 12px 10px;">
-              <strong style="color: var(--color-text-main); font-weight: 700;">${c.name}</strong>
-              <span style="display: block; font-size: 0.72rem; color: var(--color-text-muted);">Registrado/a: ${c.regDate || '2026-05-15'}</span>
+              <strong style="color: var(--color-text-main); font-weight: 700;">${escapeStockHtml(c.name)}</strong>
+              <span style="display: block; font-size: 0.72rem; color: var(--color-text-muted);">Registrado/a: ${escapeStockHtml(c.regDate || 'Sin fecha')}</span>
             </td>
             <td style="padding: 12px 10px;">
-              <a href="https://wa.me/${c.phone}" target="_blank" style="color: #25d366; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
-                💬 ${c.phone}
+              <a href="https://wa.me/${String(c.phone || '').replace(/\D/g, '')}" target="_blank" rel="noopener noreferrer" style="color: #25d366; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                💬 ${escapeStockHtml(c.phone || 'Sin teléfono')}
               </a>
             </td>
             <td style="padding: 12px 10px;">
               <span style="background: rgba(195,155,75,0.15); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 3px 8px; border-radius: 8px; font-size: 0.75rem; font-weight: 700;">
-                ${c.tier || '🌱 SEMILLA ZEN'}
+                ${escapeStockHtml(c.tier || 'Cliente')}
               </span>
             </td>
             <td style="padding: 12px 10px;">
@@ -3561,13 +3540,19 @@ function renderVendorPortfolioUI() {
               `}
             </td>
             <td style="padding: 12px 10px; text-align: right;">
-              <button type="button" class="btn btn-secondary" onclick="sendVendorWhatsAppPromo('${c.phone}', '${c.name}', 'sustrato')" style="padding: 6px 12px; font-size: 0.78rem; border-color: #25d366; color: #25d366; border-radius: 8px; font-weight: 700;">
+              <button type="button" class="btn btn-secondary portfolio-promo-button" data-client-id="${escapeStockHtml(String(c.id))}" style="padding: 6px 12px; font-size: 0.78rem; border-color: #25d366; color: #25d366; border-radius: 8px; font-weight: 700;">
                 💬 Enviar Promo Sustrato
               </button>
             </td>
           </tr>
         `;
       }).join('');
+      tableBody.querySelectorAll('.portfolio-promo-button').forEach(button => {
+        button.addEventListener('click', () => {
+          const client = canonicalVendorClients.find(item => String(item.id) === button.dataset.clientId);
+          if (client) sendVendorWhatsAppPromo(client.phone, client.name, 'sustrato');
+        });
+      });
     }
   }
 }
@@ -4612,12 +4597,12 @@ function normalizeCatalogLookup(product, fallback = {}) {
       presentation: fallback.presentation || null,
       category: fallback.category || product?.category || null,
       description: catalogDescriptionToPlainText(fallback.description || product?.description),
-      barcode: fallback.barcode || null,
+      barcode: fallback.barcode || product?.barcode || null,
       official_url: fallback.official_url || null,
       market_query: fallback.name || product?.name || null,
-      image_url: fallback.image_url || product?.image || null
+      image_url: fallback.image_url || product?.image || product?.metadata?.image_url || product?.metadata?.image || null
     },
-    sale_price: Number(fallback.sale_price) || Number(localSupplier?.price) || null,
+    sale_price: Number(fallback.sale_price) || Number(product?.price) || Number(localSupplier?.price) || null,
     sources,
     providers: ['Catálogo BÔ'],
     warnings: []
@@ -4626,13 +4611,17 @@ function normalizeCatalogLookup(product, fallback = {}) {
 
 async function fetchCatalogProductById(productId) {
   if (!productId) return null;
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!context?.isVerified || !context.tenantId) return null;
   const rows = await readStockLookupRows(
     supabaseClient
-      .from('products')
-      .select('id, name, image, category, description, supplier_products(supplier_id, name, price, stock, available, link)')
+      .from('catalog_products')
+      .select('id,sku,barcode,name,category,description,price,currency,metadata')
+      .eq('tenant_id', context.tenantId)
+      .eq('active', true)
       .eq('id', productId)
       .limit(1),
-    'Catálogo BÔ'
+    'Catálogo operativo'
   );
   return rows[0] || null;
 }
@@ -4666,31 +4655,20 @@ function isReliableCatalogNameMatch(productName, requestedName) {
 
 async function findLocalStockProduct(barcode, query) {
   if (!supabaseClient) return null;
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!context?.isVerified || !context.tenantId) return null;
   if (barcode) {
-    const location = readLocalProductLocations()
-      .find(item => cleanStockBarcode(item.barcode) === barcode);
-    if (location) {
-      const product = await fetchCatalogProductById(location.product_id);
-      return normalizeCatalogLookup(product, {
-        name: location.name,
-        barcode: location.barcode,
-        image_url: location.image_url
-      });
-    }
-
-    const draftRows = await readStockLookupRows(
+    const catalogRows = await readStockLookupRows(
       supabaseClient
-        .from('product_drafts')
-        .select('*')
-        .eq('status', 'APPROVED')
-        .order('updated_at', { ascending: false })
-        .limit(250),
-      'Productos aprobados de BÔ'
+        .from('catalog_products')
+        .select('id,sku,barcode,name,category,description,price,currency,metadata')
+        .eq('tenant_id', context.tenantId)
+        .eq('active', true)
+        .eq('barcode', barcode)
+        .limit(1),
+      'Catálogo operativo por código de barras'
     );
-    const draft = draftRows
-      .map(hydrateProductDraft)
-      .find(item => cleanStockBarcode(item.barcode) === barcode) || null;
-    if (draft) return normalizeCatalogLookup(null, draft);
+    if (catalogRows[0]) return normalizeCatalogLookup(catalogRows[0]);
   }
 
   const safeQuery = String(query || '')
@@ -4702,11 +4680,13 @@ async function findLocalStockProduct(barcode, query) {
 
   let catalogRows = await readStockLookupRows(
     supabaseClient
-      .from('products')
-      .select('id, name, image, category, description, supplier_products(supplier_id, name, price, stock, available, link)')
+      .from('catalog_products')
+      .select('id,sku,barcode,name,category,description,price,currency,metadata')
+      .eq('tenant_id', context.tenantId)
+      .eq('active', true)
       .ilike('name', `%${safeQuery}%`)
       .limit(3),
-    'Catálogo BÔ'
+    'Catálogo operativo'
   );
   if (!catalogRows.length) {
     const mostSpecificTerm = stockMatchTokens(safeQuery)
@@ -4715,11 +4695,13 @@ async function findLocalStockProduct(barcode, query) {
     if (mostSpecificTerm && mostSpecificTerm !== safeQuery.toLowerCase()) {
       catalogRows = await readStockLookupRows(
         supabaseClient
-          .from('products')
-          .select('id, name, image, category, description, supplier_products(supplier_id, name, price, stock, available, link)')
+          .from('catalog_products')
+          .select('id,sku,barcode,name,category,description,price,currency,metadata')
+          .eq('tenant_id', context.tenantId)
+          .eq('active', true)
           .ilike('name', `%${mostSpecificTerm}%`)
           .limit(3),
-        'Catálogo BÔ'
+        'Catálogo operativo'
       );
     }
   }
@@ -4732,9 +4714,17 @@ async function fetchExternalStockLookup(barcode, query) {
   const timeoutId = window.setTimeout(() => controller.abort(), 30_000);
   const criterion = getActiveStockCriterion();
   try {
+    if (!supabaseClient?.auth) throw new Error('Iniciá sesión para consultar fuentes externas.');
+    const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession();
+    if (sessionError || !sessionData?.session?.access_token) {
+      throw new Error('La sesión segura expiró. Volvé a iniciar sesión.');
+    }
     const response = await fetch('/.netlify/functions/lookup-product', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionData.session.access_token}`
+      },
       signal: controller.signal,
       body: JSON.stringify({
         barcode: barcode || null,
@@ -4743,7 +4733,12 @@ async function fetchExternalStockLookup(barcode, query) {
         vertical: criterion.vertical
       })
     });
-    const result = await response.json().catch(() => ({}));
+    let result = {};
+    try {
+      result = await response.json();
+    } catch (parseError) {
+      console.warn('La búsqueda externa devolvió una respuesta sin JSON:', parseError);
+    }
     if (!response.ok) throw new Error(result.message || 'Las fuentes externas no respondieron.');
     return result;
   } finally {
@@ -5070,9 +5065,17 @@ async function analyzeFastUploadPhoto() {
     let response;
     const criterion = getActiveStockCriterion();
     try {
+      if (!supabaseClient?.auth) throw new Error('Iniciá sesión para usar el análisis de productos.');
+      const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession();
+      if (sessionError || !sessionData?.session?.access_token) {
+        throw new Error('La sesión segura expiró. Volvé a iniciar sesión.');
+      }
       response = await fetch('/.netlify/functions/analyze-product', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionData.session.access_token}`
+        },
         signal: controller.signal,
         body: JSON.stringify({
           imageDataUrl,
@@ -5088,7 +5091,12 @@ async function analyzeFastUploadPhoto() {
     } finally {
       window.clearTimeout(timeoutId);
     }
-    const result = await response.json().catch(() => ({}));
+    let result = {};
+    try {
+      result = await response.json();
+    } catch (parseError) {
+      console.warn('El servicio de análisis devolvió una respuesta sin JSON:', parseError);
+    }
     if (!response.ok) {
       const message = response.status === 429
         ? 'Hay muchos análisis en curso. Esperá un minuto y volvé a intentar.'
@@ -5143,6 +5151,10 @@ async function submitProductDraft(event) {
   const submitBtn = document.getElementById('fastupload-submit-btn');
 
   try {
+    const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+    if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+      throw new Error('Iniciá sesión para ingresar el producto en la cola central.');
+    }
     const nameVal = document.getElementById('fastupload-name-input')?.value.trim();
     const categoryVal = document.getElementById('fastupload-category-input')?.value;
     const stockVal = Number.parseInt(document.getElementById('fastupload-stock-input')?.value || '', 10);
@@ -5221,37 +5233,42 @@ async function submitProductDraft(event) {
       qr_payload: fastUploadQrPayload
     };
     const fullDraft = {
+      sku: fastUploadProductCode,
+      name: nameVal,
+      barcode: metadata.barcode,
+      description: metadata.description,
+      brand: metadata.brand,
+      presentation: metadata.presentation,
+      category: categoryVal,
       image_url: imageUrl,
       image_path: filePath,
-      stock: stockVal,
-      location: shelfVal ? locationVal : null,
-      observations: obsVal || null,
-      seller_name: activeVendor,
-      status: 'PENDING_REVIEW',
-      ...metadata
+      sale_price: salePriceVal,
+      currency: 'ARS',
+      stock_quantity: stockVal,
+      location: shelfVal ? {
+        code: shelfVal,
+        name: locationVal || shelfVal,
+        location_type: 'SHELF',
+        is_sellable: true,
+        is_default: false,
+        metadata: {
+          floor_level: floorVal,
+          shelf_code: shelfVal,
+          shelf_level: shelfLevelVal
+        }
+      } : {},
+      metadata: {
+        ...metadata,
+        observations: obsVal || null,
+        seller_name: activeVendor
+      }
     };
-    let { error: insertError } = await supabaseClient
-      .from('product_drafts')
-      .insert([fullDraft]);
-
-    // Compatibilidad temporal con la tabla anterior hasta ejecutar la migración nueva.
-    if (insertError && /column|schema cache/i.test(insertError.message || '')) {
-      const legacyObservations = `[BÔ_META]${JSON.stringify(metadata)}\n${obsVal}`;
-      const legacyResult = await supabaseClient.from('product_drafts').insert([{
-        image_url: imageUrl,
-        image_path: filePath,
-        stock: stockVal,
-        location: locationVal,
-        observations: legacyObservations,
-        seller_name: activeVendor,
-        status: 'PENDING_REVIEW'
-      }]);
-      insertError = legacyResult.error;
-    }
-
-    if (insertError) {
-      throw new Error(`Error al guardar borrador en Supabase DB: ${insertError.message}`);
-    }
+    await window.OperationalApi.submitCatalogProductDraft({
+      supabaseClient,
+      authContext,
+      draft: fullDraft,
+      idempotencyKey: `product-draft:${authContext.userId}:${globalThis.crypto?.randomUUID?.() || Date.now()}`
+    });
 
     showToast(shelfVal
       ? `Producto ${fastUploadProductCode} enviado a revisión con ubicación ${shelfVal}.`
@@ -5298,7 +5315,7 @@ async function submitProductDraft(event) {
 }
 
 function hydrateProductDraft(rawDraft) {
-  let metadata = {};
+  let metadata = rawDraft.metadata && typeof rawDraft.metadata === 'object' ? rawDraft.metadata : {};
   let cleanObservations = rawDraft.observations || '';
   if (cleanObservations.startsWith('[BÔ_META]')) {
     const separatorIndex = cleanObservations.indexOf('\n');
@@ -5314,7 +5331,26 @@ function hydrateProductDraft(rawDraft) {
   Object.keys(metadata).forEach(key => {
     if (rawDraft[key] === null || rawDraft[key] === undefined || rawDraft[key] === '') merged[key] = metadata[key];
   });
-  return merged;
+  const locationData = rawDraft.location_data && typeof rawDraft.location_data === 'object'
+    ? rawDraft.location_data
+    : {};
+  const locationMetadata = locationData.metadata && typeof locationData.metadata === 'object'
+    ? locationData.metadata
+    : {};
+  return {
+    ...merged,
+    product_code: rawDraft.sku || merged.product_code || '',
+    stock: rawDraft.stock_quantity ?? merged.stock ?? 0,
+    sale_price: rawDraft.sale_price ?? merged.sale_price ?? 0,
+    observations: metadata.observations || cleanObservations,
+    seller_name: metadata.seller_name || merged.seller_name || 'Usuario operativo',
+    location_label: locationData.name || merged.location_label || merged.location || '',
+    location: locationData.name || merged.location || '',
+    wms_code: locationData.code || merged.wms_code || '',
+    shelf_code: locationMetadata.shelf_code || locationData.code || merged.shelf_code || '',
+    shelf_level: locationMetadata.shelf_level ?? merged.shelf_level ?? null,
+    floor_level: locationMetadata.floor_level ?? merged.floor_level ?? null
+  };
 }
 
 function isPendingLocationProduct(draft) {
@@ -5332,13 +5368,16 @@ function updatePendingLocationIndicators(count) {
 
 async function fetchPendingLocationProducts() {
   if (!supabaseClient) return [];
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!context?.isVerified) return [];
   const { data, error } = await supabaseClient
-    .from('product_drafts')
+    .from('catalog_product_drafts_v2')
     .select('*')
-    .neq('status', 'REJECTED')
+    .eq('tenant_id', context.tenantId)
+    .eq('status', 'PENDING_LOCATION')
     .order('created_at', { ascending: false });
   if (error) throw new Error(`No se pudo consultar la cola de ubicación: ${error.message}`);
-  return (data || []).map(hydrateProductDraft).filter(isPendingLocationProduct);
+  return (data || []).map(hydrateProductDraft);
 }
 
 async function refreshPendingLocationBadge() {
@@ -5750,10 +5789,6 @@ function buildLocationAssistantMetadata(draft, overrides) {
   return { ...metadata, ...overrides };
 }
 
-function serializeLocationDraftObservations(draft, metadata) {
-  return `[BÔ_META]${JSON.stringify(metadata)}\n${draft.observations || ''}`;
-}
-
 async function uploadLocationAssistantPhoto(productCode) {
   if (!locationAssistantState.photoBlob) {
     return { url: locationAssistantState.photoPreviewUrl || locationAssistantState.product?.image_url || '', path: null };
@@ -5768,27 +5803,37 @@ async function uploadLocationAssistantPhoto(productCode) {
 }
 
 async function upsertProductLocationWithFallback(location) {
-  saveLocalProductLocation(location);
-  return null;
-}
-
-async function updateDraftLocationWithFallback(draft, updatePayload, legacyObservations) {
-  let { error } = await supabaseClient
-    .from('product_drafts')
-    .update(updatePayload)
-    .eq('id', draft.id);
-  if (error && /column|schema cache/i.test(error.message || '')) {
-    const fallbackResult = await supabaseClient
-      .from('product_drafts')
-      .update({
-        location: updatePayload.location,
-        observations: legacyObservations,
-        updated_at: updatePayload.updated_at
-      })
-      .eq('id', draft.id);
-    error = fallbackResult.error;
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+    throw new Error('Se requiere una sesión verificada para guardar una ubicación central.');
   }
-  if (error) throw new Error(`No se pudo guardar la ubicación: ${error.message}`);
+  const code = String(location.wms_code || location.shelf_code || '').trim().toUpperCase();
+  if (!code) throw new Error('La ubicación no tiene un código WMS válido.');
+  const result = await window.OperationalApi.upsertInventoryLocation({
+    supabaseClient,
+    authContext,
+    location: {
+      id: location.location_id || null,
+      code,
+      name: location.location_label || location.name || code,
+      location_type: 'SHELF',
+      is_sellable: true,
+      is_default: location.is_default === true,
+      metadata: {
+        floor_level: location.floor_level || null,
+        shelf_code: location.shelf_code || null,
+        shelf_level: location.shelf_level || null,
+        area_name: location.area_name || null,
+        wall_side: location.wall_side || null,
+        shelf_position: location.shelf_position || null,
+        placement_photo_url: location.placement_photo_url || null,
+        placement_photo_path: location.placement_photo_path || null
+      }
+    }
+  });
+  const cachedLocation = { ...location, location_id: result.location_id, wms_code: result.code };
+  saveLocalProductLocation(cachedLocation);
+  return cachedLocation;
 }
 
 async function persistLocationAssistant() {
@@ -5800,6 +5845,10 @@ async function persistLocationAssistant() {
     return;
   }
   try {
+    const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+    if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+      throw new Error('Iniciá sesión para ubicar el borrador en la cola central.');
+    }
     if (status) {
       status.hidden = false;
       status.dataset.state = 'loading';
@@ -5829,7 +5878,6 @@ async function persistLocationAssistant() {
       ? `📍 ${zone.label} · ${compass.compass} de la PC · ${wall.label} · Nivel ${levelNum}`
       : `📍 ${zone.label} · ${compass.compass} de la PC · ${wall.label} · Nivel ${levelNum} · Sector ${sector.label}`;
 
-    const updatedAt = new Date().toISOString();
     const overrides = {
       floor_level: floorLevel,
       shelf_code: wallCode,
@@ -5843,17 +5891,6 @@ async function persistLocationAssistant() {
       location_status: 'LOCATED'
     };
     const metadata = buildLocationAssistantMetadata(draft, overrides);
-    const observations = serializeLocationDraftObservations(draft, metadata);
-    const draftUpdate = {
-      location: locationLabel,
-      floor_level: floorLevel,
-      shelf_code: wallCode,
-      shelf_level: levelNum,
-      observations,
-      updated_at: updatedAt
-    };
-    await updateDraftLocationWithFallback(draft, draftUpdate, observations);
-
     const productLocation = {
       product_id: productCode,
       product_code: productCode,
@@ -5871,21 +5908,30 @@ async function persistLocationAssistant() {
       placement_photo_url: photo.url,
       placement_photo_path: photo.path,
       location_label: locationLabel,
-      updated_at: updatedAt
+      updated_at: new Date().toISOString()
     };
     productLocation.wms_code = wmsCode;
+    await window.OperationalApi.locateCatalogProductDraft({
+      supabaseClient,
+      authContext,
+      draftId: draft.id,
+      location: {
+        code: wmsCode,
+        name: locationLabel,
+        location_type: 'SHELF',
+        is_sellable: true,
+        is_default: false,
+        metadata: {
+          ...metadata,
+          placement_photo_url: photo.url,
+          placement_photo_path: photo.path
+        }
+      },
+      idempotencyKey: `locate-draft:${draft.id}:${globalThis.crypto?.randomUUID?.() || Date.now()}`
+    });
+    // Copia de presentación para el mapa mientras se actualiza la vista; el
+    // servidor continúa siendo la única autoridad sobre ubicación y stock.
     saveLocalProductLocation(productLocation);
-
-    if (Array.isArray(internalCatalogProducts)) {
-      const internalItem = internalCatalogProducts.find(p => p.id === draft.id || p.product_code === productCode || p.barcode === draft.barcode);
-      if (internalItem) {
-        internalItem.location = locationLabel;
-        internalItem.location_label = locationLabel;
-        internalItem.shelf_code = wallCode;
-        internalItem.shelf_level = levelNum;
-        internalItem.wms_code = wmsCode;
-      }
-    }
 
     if (window.ensureShelfExistsForLocation) {
       window.ensureShelfExistsForLocation(wallCode, floorLevel, locationLabel);
@@ -5941,16 +5987,13 @@ async function refreshPendingDraftsBadge() {
   try {
     let count = 0;
     if (supabaseClient) {
+      const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
       const { count: c, error } = await supabaseClient
-        .from('product_drafts')
+        .from('catalog_product_drafts_v2')
         .select('*', { count: 'exact', head: true })
+        .eq('tenant_id', context?.tenantId || '')
         .eq('status', 'PENDING_REVIEW');
       if (!error && Number.isFinite(c)) count = c;
-    }
-    const localDrafts = JSON.parse(localStorage.getItem('boeweb_local_product_drafts') || '[]');
-    if (Array.isArray(localDrafts)) {
-      const pendingLocals = localDrafts.filter(d => d.status === 'PENDING_REVIEW');
-      count = Math.max(count, pendingLocals.length);
     }
 
     if (badge) {
@@ -6063,26 +6106,17 @@ async function loadPendingProductDrafts() {
   try {
     let drafts = [];
     if (supabaseClient) {
+      const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
       const { data, error } = await supabaseClient
-        .from('product_drafts')
+        .from('catalog_product_drafts_v2')
         .select('*')
+        .eq('tenant_id', context?.tenantId || '')
         .eq('status', 'PENDING_REVIEW')
         .order('created_at', { ascending: false });
 
       if (!error && Array.isArray(data)) {
         drafts = data;
       }
-    }
-
-    // Merge con borradores locales offline si existen
-    const localDrafts = JSON.parse(localStorage.getItem('boeweb_local_product_drafts') || '[]');
-    if (Array.isArray(localDrafts) && localDrafts.length > 0) {
-      const pendingLocals = localDrafts.filter(d => d.status === 'PENDING_REVIEW');
-      pendingLocals.forEach(ld => {
-        if (!drafts.some(d => String(d.id) === String(ld.id))) {
-          drafts.push(ld);
-        }
-      });
     }
 
     const normalizedDrafts = (drafts || []).map(hydrateProductDraft);
@@ -6180,130 +6214,38 @@ async function approveProductDraft(draftId) {
       return;
     }
 
-    const productId = draft.product_code || `BO-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
-    const stock = Math.max(0, Number(draft.stock) || 0);
-    const imageUrl = draft.image_url || 'assets/logo.jpg';
-
-    if (supabaseClient) {
-      const { error: prodErr } = await supabaseClient
-        .from('products')
-        .upsert([{
-          id: productId,
-          name: nameVal,
-          category: catVal,
-          image: imageUrl,
-          description: draft.description || `${draft.brand || ''} ${draft.presentation || ''}`.trim() || `Costo de referencia: $${costVal} ARS.`
-        }], { onConflict: 'id' });
-
-      if (prodErr) console.warn('Aviso creando producto en supabase:', prodErr.message);
-
-      await ensureLocalStoreSupplierExists();
-
-      const { error: spErr } = await supabaseClient
-        .from('supplier_products')
-        .upsert([{
-          supplier_id: 'local_store',
-          supplier_product_id: productId,
-          name: nameVal,
-          price: priceVal,
-          stock: stock,
-          available: true,
-          image: imageUrl,
-          mapped_product_id: productId
-        }], { onConflict: 'supplier_id,supplier_product_id' });
-
-      if (spErr) console.warn('Aviso incorporando a supplier_products:', spErr.message);
-
-      const { error: updateErr } = await supabaseClient
-        .from('product_drafts')
-        .update({
-          status: 'APPROVED',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', draftId);
-
-      if (updateErr) console.warn('Aviso actualizando product_drafts:', updateErr.message);
+    const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+    if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+      throw new Error('Iniciá sesión para aprobar el producto en el catálogo central.');
     }
-
-    const resolvedShelfCode = draft.shelf_code || String(draft.location || '').match(/[A-E]-\d/i)?.[0]?.toUpperCase() || '';
-    let productLocation = null;
-    if (resolvedShelfCode) {
-      productLocation = {
-        product_id: productId,
-        product_code: productId,
+    const approval = await window.OperationalApi.approveCatalogProductDraft({
+      supabaseClient,
+      authContext,
+      draftId,
+      overrides: {
         name: nameVal,
-        image_url: imageUrl,
-        barcode: draft.barcode || null,
-        floor_level: Number(draft.floor_level) || 1,
-        shelf_code: resolvedShelfCode,
-        shelf_level: Number(draft.shelf_level) || 2,
-        stock,
-        qr_payload: draft.qr_payload || buildProductQrPayload(productId),
-        area_name: draft.location_area || null,
-        wall_side: draft.location_wall || null,
-        shelf_position: draft.shelf_position || null,
-        placement_photo_url: draft.placement_photo_url || null,
-        placement_photo_path: draft.placement_photo_path || null,
-        location_label: draft.location_label || draft.location || null,
-        updated_at: new Date().toISOString()
-      };
-      const locationError = await upsertProductLocationWithFallback(productLocation);
-      if (locationError) console.warn('Ubicación guardada localmente:', locationError.message);
-    }
-
-    // Actualizar catálogo interno local inmediatamente
-    if (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts)) {
-      const existingIdx = internalCatalogProducts.findIndex(p => String(p.id) === String(productId) || p.product_code === productId);
-      const newCatItem = {
-        id: productId,
-        product_code: productId,
-        name: nameVal,
-        brand: draft.brand || '',
-        presentation: draft.presentation || '',
         category: catVal,
-        price: priceVal,
+        cost_price: costVal,
         sale_price: priceVal,
-        stock: stock,
-        own_stock: stock,
-        available: stock > 0,
-        image: imageUrl || 'assets/logo.jpg',
-        image_url: imageUrl || 'assets/logo.jpg',
-        barcode: draft.barcode || '',
-        location_label: draft.location_label || draft.location || resolvedShelfCode || 'Sin asignar',
-        shelf_code: resolvedShelfCode || '',
-        description: draft.description || ''
-      };
-      if (existingIdx >= 0) internalCatalogProducts[existingIdx] = newCatItem;
-      else internalCatalogProducts.unshift(newCatItem);
-      try {
-        localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
-      } catch (_) {}
-    }
-
-    // Actualizar borradores locales
-    try {
-      const localDrafts = JSON.parse(localStorage.getItem('boeweb_local_product_drafts') || '[]');
-      if (Array.isArray(localDrafts)) {
-        const lMatch = localDrafts.find(d => String(d.id) === String(draftId));
-        if (lMatch) lMatch.status = 'APPROVED';
-        localStorage.setItem('boeweb_local_product_drafts', JSON.stringify(localDrafts));
-      }
-    } catch (_) {}
-
+        metadata: {
+          approved_from: 'vendor-drafts-review'
+        }
+      },
+      idempotencyKey: `approve-draft:${draftId}`
+    });
+    pendingDraftCache.delete(draftId);
     storeMapDataLoaded = false;
-    showToast(productLocation
-      ? `✅ Producto "${nameVal}" aprobado y ubicado en ${productLocation.shelf_code}.`
-      : `✅ Producto "${nameVal}" aprobado y publicado en el catálogo.`);
-
-    // Recargar vistas
-    loadPendingProductDrafts();
-    refreshPendingLocationBadge();
-    refreshPendingDraftsBadge();
-    if (typeof renderInternalCatalogGrid === 'function') renderInternalCatalogGrid();
-    if (typeof renderStockProducts === 'function') renderStockProducts();
+    showToast(`Producto "${nameVal}" aprobado con stock y ubicación vinculados.`);
+    await Promise.all([
+      loadPendingProductDrafts(),
+      refreshPendingLocationBadge(),
+      refreshPendingDraftsBadge(),
+      loadInternalCatalog()
+    ]);
     if (typeof loadStoreMapData === 'function') await loadStoreMapData(true);
     if (typeof rerenderStoreMap === 'function') rerenderStoreMap();
     if (window.fetchB2BProducts) window.fetchB2BProducts(true);
+    return approval;
 
   } catch (err) {
     console.error('Error al aprobar borrador:', err);
@@ -6315,32 +6257,36 @@ async function handleShelfPhotoChange(event, shelfCode) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
   try {
+    const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+    if (!window.OperationalApi || !supabaseClient || !context?.isVerified || !['ADMIN', 'SUPERVISOR'].includes(context.role)) {
+      throw new Error('Sólo administración o supervisión pueden actualizar una ubicación central.');
+    }
+    await loadWmsInventoryData(true);
+    const location = getWmsModules().find(module => module.code === shelfCode);
+    if (!location) throw new Error('La ubicación no existe en el inventario central.');
     showToast(`Preparando foto del estante ${shelfCode}…`);
     const compressed = await compressImageFile(file, 800, 800, 0.70);
-    let photoUrl = URL.createObjectURL(compressed);
-    let photoPath = null;
-    if (supabaseClient) {
-      photoPath = `shelves/${shelfCode.toLowerCase()}_${Date.now()}.jpg`;
-      const { error: uploadError } = await supabaseClient.storage
-        .from('product-images')
-        .upload(photoPath, compressed, { contentType: 'image/jpeg', upsert: false });
-      if (!uploadError) {
-        const { data: urlData } = supabaseClient.storage.from('product-images').getPublicUrl(photoPath);
-        photoUrl = urlData?.publicUrl || photoUrl;
-        const { error: shelfError } = await supabaseClient.from('store_shelves').upsert([{
-          code: shelfCode,
-          photo_url: photoUrl,
-          photo_path: photoPath,
-          updated_at: new Date().toISOString()
-        }], { onConflict: 'code' });
-        if (shelfError) console.warn('La foto quedó local hasta aplicar la migración:', shelfError.message);
-      } else {
-        console.warn('La foto quedó guardada solo en este equipo:', uploadError.message);
+    const photoPath = `shelves/${location.id}_${Date.now()}.jpg`;
+    const { error: uploadError } = await supabaseClient.storage
+      .from('product-images')
+      .upload(photoPath, compressed, { contentType: 'image/jpeg', upsert: false });
+    if (uploadError) throw uploadError;
+    const { data: urlData } = supabaseClient.storage.from('product-images').getPublicUrl(photoPath);
+    const photoUrl = urlData?.publicUrl;
+    if (!photoUrl) throw new Error('El almacenamiento no devolvió una URL pública para la foto.');
+    await window.OperationalApi.upsertInventoryLocation({
+      supabaseClient,
+      authContext: context,
+      location: {
+        id: location.id,
+        code: location.code,
+        name: location.sector_name,
+        location_type: location.location_type,
+        is_sellable: location.is_sellable,
+        is_default: location.is_default,
+        metadata: { ...location.metadata, photo_url: photoUrl, photo_path: photoPath }
       }
-    }
-    const photos = JSON.parse(localStorage.getItem('boeweb_store_shelf_photos_v1') || '{}');
-    photos[shelfCode] = photoUrl;
-    localStorage.setItem('boeweb_store_shelf_photos_v1', JSON.stringify(photos));
+    });
     storeMapDataLoaded = false;
     await renderStoreMapUI(null, shelfCode, null, true);
     showToast(`Foto del estante ${shelfCode} guardada.`);
@@ -6468,18 +6414,18 @@ async function rejectProductDraft(draftId) {
   if (!confirm('¿Estás seguro de que querés rechazar este borrador?')) return;
 
   try {
-    const { error } = await supabaseClient
-      .from('product_drafts')
-      .update({
-        status: 'REJECTED',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', draftId);
-
-    if (error) throw error;
-
+    const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+    if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+      throw new Error('Iniciá sesión para revisar borradores.');
+    }
+    await window.OperationalApi.rejectCatalogProductDraft({
+      supabaseClient,
+      authContext,
+      draftId,
+      reason: 'Rechazado por supervisor desde la revisión de catálogo.'
+    });
     showToast('🚫 Borrador rechazado.');
-    loadPendingProductDrafts();
+    await Promise.all([loadPendingProductDrafts(), refreshPendingDraftsBadge(), refreshPendingLocationBadge()]);
   } catch (err) {
     console.error('Error al rechazar borrador:', err);
     showToast(`❌ Error al rechazar borrador: ${err.message}`);
@@ -6510,7 +6456,6 @@ window.performShiftClosure = performShiftClosure;
 window.validateAdminClosurePrompt = validateAdminClosurePrompt;
 window.updateCashDifferencePreview = updateCashDifferencePreview;
 window.downloadCashBackup = downloadCashBackup;
-window.importCashBackup = importCashBackup;
 window.renderVendorPortfolioUI = renderVendorPortfolioUI;
 window.copyVendorRefLink = copyVendorRefLink;
 window.sendVendorWhatsAppPromo = sendVendorWhatsAppPromo;
@@ -6607,6 +6552,278 @@ function normalizeInternalCatalogProduct(supplier, product, draft, location) {
   };
 }
 
+function mapCanonicalCashMovement(movement) {
+  const typeMap = {
+    SALE: 'venta_efectivo',
+    INCOME: 'membresia_efectivo',
+    EXPENSE: 'gasto',
+    WITHDRAWAL: 'retiro',
+    REFUND: 'gasto',
+    ADJUSTMENT: movement.direction === 'OUT' ? 'gasto' : 'membresia_efectivo',
+    REVERSAL: movement.direction === 'OUT' ? 'gasto' : 'membresia_efectivo'
+  };
+  return {
+    id: movement.id,
+    createdAt: movement.created_at,
+    time: movement.created_at
+      ? new Date(movement.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+      : '--:--',
+    type: typeMap[movement.movement_type] || (movement.direction === 'OUT' ? 'gasto' : 'membresia_efectivo'),
+    amount: Number(movement.amount) || 0,
+    desc: movement.description || movement.category || movement.movement_type,
+    vendor: movement.actor_user_id || 'Usuario autenticado',
+    voided: false
+  };
+}
+
+async function loadCanonicalCashClosureHistory() {
+  const list = document.getElementById('cash-closure-history-list');
+  const count = document.getElementById('cash-closure-history-count');
+  if (!list) return [];
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!supabaseClient || !context?.isVerified) {
+    list.innerHTML = '<div class="cash-empty-state"><p>Iniciá sesión para consultar cierres.</p></div>';
+    if (count) count.textContent = '0 cierres';
+    return [];
+  }
+  try {
+    const { data, error } = await supabaseClient
+      .from('cash_closures')
+      .select('id,session_id,expected_amount,counted_amount,difference,review_status,closed_by,closed_at,reviewed_by,reviewed_at,notes')
+      .eq('tenant_id', context.tenantId)
+      .order('closed_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    const closures = data || [];
+    const canReview = ['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(context.role);
+    if (count) count.textContent = `${closures.length} ${closures.length === 1 ? 'cierre' : 'cierres'}`;
+    if (closures.length === 0) {
+      list.innerHTML = '<div class="cash-empty-state"><p>Todavía no hay cierres centrales registrados.</p></div>';
+      return closures;
+    }
+    list.innerHTML = closures.map(closure => {
+      const difference = Number(closure.difference) || 0;
+      const status = closure.review_status === 'APPROVED'
+        ? 'Aprobado'
+        : (closure.review_status === 'REJECTED' ? 'Observado' : 'Pendiente de revisión');
+      const closedAt = closure.closed_at
+        ? new Date(closure.closed_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })
+        : 'Sin fecha';
+      return `
+        <article class="cash-movement" data-flow="${difference === 0 ? 'in' : 'out'}">
+          <div class="cash-movement-copy">
+            <span class="cash-movement-type">${escapeCashHtml(status)} · ${escapeCashHtml(closedAt)}</span>
+            <p class="cash-movement-desc">Esperado ${formatCashCurrency(closure.expected_amount)} · Contado ${formatCashCurrency(closure.counted_amount)}</p>
+            <span class="cash-movement-meta">Cerró: ${escapeCashHtml(closure.closed_by || 'usuario')} · Revisó: ${escapeCashHtml(closure.reviewed_by || 'pendiente')}</span>
+            ${closure.notes ? `<small>${escapeCashHtml(closure.notes)}</small>` : ''}
+            ${closure.review_status === 'PENDING_REVIEW' && canReview
+              ? `<button type="button" class="cash-secondary-btn cash-history-review" data-closure-id="${escapeCashHtml(closure.id)}">Aprobar arqueo</button>`
+              : ''}
+          </div>
+          <strong class="cash-movement-amount">${difference > 0 ? '+' : ''}${formatCashCurrency(difference)}</strong>
+        </article>`;
+    }).join('');
+    list.querySelectorAll('.cash-history-review').forEach(button => {
+      button.addEventListener('click', async () => {
+        if (!confirm('¿Confirmás que revisaste el arqueo y querés aprobarlo?')) return;
+        button.disabled = true;
+        try {
+          await window.OperationalApi.reviewCashClosure({
+            supabaseClient,
+            authContext: context,
+            closureId: button.dataset.closureId,
+            decision: 'APPROVE',
+            reason: 'Arqueo revisado desde el historial central.'
+          });
+          await Promise.all([loadCanonicalCashClosureHistory(), refreshCanonicalCashSection()]);
+        } catch (error) {
+          console.error('No se pudo aprobar el cierre histórico:', error);
+          alert(`El cierre no fue aprobado.\n\n${error.message || 'Error desconocido'}`);
+          button.disabled = false;
+        }
+      });
+    });
+    return closures;
+  } catch (error) {
+    console.error('No se pudo cargar el historial de cierres:', error);
+    list.innerHTML = `<div class="cash-empty-state"><p>No se cargó el historial: ${escapeCashHtml(error.message || 'Error desconocido')}</p></div>`;
+    if (count) count.textContent = 'Error';
+    return [];
+  }
+}
+
+async function refreshCanonicalCashSection() {
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!supabaseClient || !context?.isVerified || !context.tenantId) {
+    canonicalCashView = { ...getEmptyCashData(), closed: true, authorityUnavailable: true };
+    renderCashSectionUI();
+    return canonicalCashView;
+  }
+
+  try {
+    loadCanonicalCashClosureHistory().catch(error => {
+      console.error('No se pudo abrir el historial de cierres:', error);
+    });
+    const selectedRegisterId = document.getElementById('pos-register-select')?.value || null;
+    let sessionQuery = supabaseClient
+      .from('cash_sessions_v2')
+      .select('id,register_id,status,opened_by,opened_at,opening_amount,closed_by,closed_at,updated_at')
+      .eq('tenant_id', context.tenantId)
+      .gte('opened_at', `${getTodayDateKey()}T00:00:00-03:00`)
+      .order('opened_at', { ascending: false })
+      .limit(1);
+    if (selectedRegisterId) sessionQuery = sessionQuery.eq('register_id', selectedRegisterId);
+    const { data: session, error: sessionError } = await sessionQuery.maybeSingle();
+    if (sessionError) throw sessionError;
+
+    if (!session) {
+      canonicalCashView = { ...getEmptyCashData(), authority: 'server', noSession: true };
+      renderCashSectionUI();
+      return canonicalCashView;
+    }
+
+    const [movementsResult, closureResult] = await Promise.all([
+      supabaseClient
+        .from('cash_movements_v2')
+        .select('id,movement_type,direction,amount,currency,category,description,actor_user_id,created_at')
+        .eq('tenant_id', context.tenantId)
+        .eq('session_id', session.id)
+        .order('created_at', { ascending: false }),
+      supabaseClient
+        .from('cash_closures')
+        .select('id,expected_amount,counted_amount,difference,review_status,closed_by,closed_at,reviewed_by,reviewed_at,notes')
+        .eq('tenant_id', context.tenantId)
+        .eq('session_id', session.id)
+        .maybeSingle()
+    ]);
+    if (movementsResult.error) throw movementsResult.error;
+    if (closureResult.error) throw closureResult.error;
+
+    const openingMovement = Number(session.opening_amount) > 0 ? [{
+      id: `${session.id}:opening`,
+      createdAt: session.opened_at,
+      time: new Date(session.opened_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+      type: 'apertura',
+      amount: Number(session.opening_amount),
+      desc: 'Fondo inicial de caja',
+      vendor: session.opened_by,
+      voided: false
+    }] : [];
+    const movements = openingMovement.concat((movementsResult.data || []).map(mapCanonicalCashMovement));
+    const closure = closureResult.data || null;
+    canonicalCashView = {
+      ...getEmptyCashData(),
+      authority: 'server',
+      sessionId: session.id,
+      registerId: session.register_id,
+      movements,
+      sales: movements.filter(movement => movement.type === 'venta_efectivo'),
+      closed: session.status !== 'OPEN',
+      validated: closure?.review_status === 'APPROVED',
+      closureId: closure?.id || null,
+      reviewStatus: closure?.review_status || null,
+      closedBy: closure?.closed_by || session.closed_by,
+      validatedBy: closure?.reviewed_by || null,
+      closedAt: closure?.closed_at || session.closed_at,
+      countedCash: closure ? Number(closure.counted_amount) : null,
+      expectedCash: closure ? Number(closure.expected_amount) : null,
+      difference: closure ? Number(closure.difference) : null,
+      closureNotes: closure?.notes || '',
+      updatedAt: session.updated_at || session.opened_at
+    };
+    renderCashSectionUI();
+    return canonicalCashView;
+  } catch (error) {
+    console.error('No se pudo sincronizar la caja central:', error);
+    canonicalCashView = { ...getEmptyCashData(), closed: true, authorityUnavailable: true, loadError: error.message };
+    renderCashSectionUI();
+    return canonicalCashView;
+  }
+}
+
+async function fetchCanonicalInternalCatalog() {
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!supabaseClient || !context?.isVerified || !context.tenantId) {
+    throw new Error('Se requiere una sesión verificada para consultar el catálogo operativo.');
+  }
+
+  const [productsResult, balancesResult, locationsResult] = await Promise.all([
+    supabaseClient
+      .from('catalog_products')
+      .select('id,sku,barcode,name,description,category,price,currency,active,track_stock,metadata')
+      .eq('tenant_id', context.tenantId)
+      .eq('active', true)
+      .order('name', { ascending: true }),
+    supabaseClient
+      .from('inventory_balances_v2')
+      .select('product_id,location_id,on_hand,reserved,available')
+      .eq('tenant_id', context.tenantId),
+    supabaseClient
+      .from('inventory_locations_v2')
+      .select('id,code,name,is_sellable,is_default,active')
+      .eq('tenant_id', context.tenantId)
+      .eq('active', true)
+      .eq('is_sellable', true)
+  ]);
+
+  if (productsResult.error) throw productsResult.error;
+  if (balancesResult.error) throw balancesResult.error;
+  if (locationsResult.error) throw locationsResult.error;
+
+  const locations = new Map((locationsResult.data || []).map(location => [location.id, location]));
+  const bestBalanceByProduct = new Map();
+  const inventoryOptionsByProduct = new Map();
+  (balancesResult.data || []).forEach(balance => {
+    const location = locations.get(balance.location_id);
+    if (!location) return;
+    const available = Math.max(0, Number(balance.available ?? (Number(balance.on_hand) - Number(balance.reserved))) || 0);
+    const options = inventoryOptionsByProduct.get(balance.product_id) || [];
+    options.push({
+      location_id: balance.location_id,
+      code: location.code,
+      name: location.name,
+      is_default: location.is_default,
+      available
+    });
+    inventoryOptionsByProduct.set(balance.product_id, options);
+    const current = bestBalanceByProduct.get(balance.product_id);
+    if (!current || (location.is_default && !current.location?.is_default) || available > current.available) {
+      bestBalanceByProduct.set(balance.product_id, { ...balance, available, location });
+    }
+  });
+
+  return (productsResult.data || []).map(product => {
+    const balance = bestBalanceByProduct.get(product.id);
+    const inventoryOptions = (inventoryOptionsByProduct.get(product.id) || [])
+      .sort((left, right) => Number(right.is_default) - Number(left.is_default) || right.available - left.available);
+    const image = product.metadata?.image_url || product.metadata?.image || 'assets/logo.jpg';
+    return {
+      id: product.id,
+      product_id: product.id,
+      product_code: product.sku,
+      barcode: product.barcode || '',
+      name: product.name,
+      description: product.description || '',
+      category: product.category || 'Otros',
+      brand: product.metadata?.brand || '',
+      presentation: product.metadata?.presentation || '',
+      price: Number(product.price) || 0,
+      currency: product.currency || 'ARS',
+      track_stock: product.track_stock,
+      stock: product.track_stock ? (balance?.available || 0) : Number.MAX_SAFE_INTEGER,
+      available_quantity: product.track_stock ? (balance?.available || 0) : null,
+      location_id: balance?.location_id || null,
+      shelf_code: balance?.location?.code || '',
+      inventory_options: inventoryOptions,
+      image,
+      image_url: image,
+      metadata: product.metadata || {},
+      available: true,
+      source: 'catalog_products'
+    };
+  });
+}
+
 const DELETED_INTERNAL_PRODUCTS_KEY = 'boeweb_deleted_internal_product_ids_v1';
 
 function getDeletedInternalProductIds() {
@@ -6633,9 +6850,6 @@ function isProductTombstoned(idOrCode) {
   return set.has(clean);
 }
 
-window.getDeletedInternalProductIds = getDeletedInternalProductIds;
-window.addDeletedInternalProductIds = addDeletedInternalProductIds;
-window.isProductTombstoned = isProductTombstoned;
 
 async function loadInternalCatalog() {
   const grid = document.getElementById('internal-catalog-grid');
@@ -6644,59 +6858,7 @@ async function loadInternalCatalog() {
     grid.innerHTML = '';
   }
   try {
-    if (supabaseClient) {
-      const { data: supplierRows, error } = await supabaseClient
-        .from('supplier_products')
-        .select('*')
-        .eq('supplier_id', 'local_store')
-        .order('name', { ascending: true });
-      if (error) throw new Error(error.message);
-
-      const deletedIds = getDeletedInternalProductIds();
-      const rawRows = supplierRows || [];
-      const rows = rawRows.filter(supplier => {
-        const pId = String(supplier.mapped_product_id || supplier.supplier_product_id || '').toLowerCase();
-        const sId = String(supplier.id || '').toLowerCase();
-        return !deletedIds.has(pId) && !deletedIds.has(sId);
-      });
-
-      const productIds = internalCatalogProductIds(rows);
-      const related = await fetchInternalCatalogRelations(productIds);
-      const productsById = new Map(related.products.map(product => [String(product.id), product]));
-      const draftsByCode = new Map(related.drafts.map(draft => [String(draft.product_code), draft]));
-      const locationsByCode = new Map(readLocalProductLocations().map(location => [String(location.product_code), location]));
-
-      internalCatalogProducts = rows.map(supplier => {
-        const productId = String(supplier.mapped_product_id || supplier.supplier_product_id);
-        return normalizeInternalCatalogProduct(
-          supplier,
-          productsById.get(productId),
-          draftsByCode.get(productId),
-          locationsByCode.get(productId)
-        );
-      }).filter(p => {
-        const pId = String(p.id || '').toLowerCase();
-        const sId = String(p.supplierRowId || '').toLowerCase();
-        return !deletedIds.has(pId) && !deletedIds.has(sId);
-      });
-
-      try {
-        localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
-      } catch (_) {}
-    } else {
-      const cached = localStorage.getItem('boeweb_internal_catalog');
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          const deletedIds = getDeletedInternalProductIds();
-          internalCatalogProducts = (Array.isArray(parsed) ? parsed : []).filter(p => {
-            const pId = String(p.id || '').toLowerCase();
-            const sId = String(p.supplierRowId || '').toLowerCase();
-            return !deletedIds.has(pId) && !deletedIds.has(sId);
-          });
-        } catch (_) {}
-      }
-    }
+    internalCatalogProducts = await fetchCanonicalInternalCatalog();
 
     if (grid) {
       populateInternalCatalogCategoryFilter();
@@ -6705,22 +6867,11 @@ async function loadInternalCatalog() {
     }
   } catch (error) {
     console.error('Error al cargar el catálogo interno:', error);
-    const cached = localStorage.getItem('boeweb_internal_catalog');
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        const deletedIds = getDeletedInternalProductIds();
-        internalCatalogProducts = (Array.isArray(parsed) ? parsed : []).filter(p => {
-          const pId = String(p.id || '').toLowerCase();
-          const sId = String(p.supplierRowId || '').toLowerCase();
-          return !deletedIds.has(pId) && !deletedIds.has(sId);
-        });
-      } catch (_) {}
-    }
+    internalCatalogProducts = [];
     if (grid) {
       populateInternalCatalogCategoryFilter();
       renderInternalCatalogGrid();
-      setInternalCatalogStatus(`No se pudieron cargar los productos propios: ${error.message}`, 'error');
+      setInternalCatalogStatus(`Catálogo central no disponible: ${error.message}`, 'error');
     }
   }
 }
@@ -6746,15 +6897,11 @@ function filterInternalCatalog() {
 // --- INTERNAL CATALOG BATCH SELECTION & USER DELETION QUOTA (MAX 5) ---
 const MAX_USER_CATALOG_DELETIONS = 5;
 const selectedInternalCatalogIds = new Set();
-const SECURE_AUDIT_STORAGE_KEY = 'boeweb_secure_audit_trail_v1';
 let isAdminAuditUnlocked = false;
 
 function isVendorAdmin(vendorName) {
-  if (!vendorName) return false;
-  const clean = String(vendorName).trim().toLowerCase();
-  if (clean.includes('admin') || clean === 'profesor franco' || clean === 'raul' || clean === 'franco') return true;
-  const v = (typeof AUTHORIZED_VENDEDORES !== 'undefined' ? AUTHORIZED_VENDEDORES : []).find(item => item.name.toLowerCase() === clean);
-  return v?.isAdmin === true || Boolean(v?.role?.toUpperCase().includes('ADMIN'));
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : { isVerified: false };
+  return context.isVerified && (context.role === 'ADMIN' || context.role === 'SUPERADMIN');
 }
 
 function getUserCatalogDeletionCount(vendorName) {
@@ -6794,58 +6941,25 @@ function logSecureAuditEvent({
   entity_id = null,
   details = {}
 }) {
-  try {
-    const actor = actor_name || sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Sistema';
-    const now = new Date();
-    const entry = {
-      id: `sec_aud_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      timestamp: now.toISOString(),
-      formatted_date: now.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }),
-      formatted_time: now.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }),
-      actor,
-      event_type,
-      category,
-      severity,
-      description,
-      entity_type,
-      entity_id,
-      details,
-      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Node/Browser'
-    };
-
-    const rawLogs = JSON.parse(localStorage.getItem(SECURE_AUDIT_STORAGE_KEY) || '[]');
-    rawLogs.unshift(entry);
-    if (rawLogs.length > 500) rawLogs.length = 500;
-    localStorage.setItem(SECURE_AUDIT_STORAGE_KEY, JSON.stringify(rawLogs));
-
-    if (typeof AdminOperationsConsole !== 'undefined' && AdminOperationsConsole?.logAdminActivity) {
-      try {
-        AdminOperationsConsole.logAdminActivity({
-          actor_id: actor,
-          actor_name: actor,
-          tenant_id: 'boe-grow-club',
-          action: event_type,
-          entity_type: entity_type || category,
-          entity_id,
-          metadata: { description, severity, ...details }
-        });
-      } catch (_) {}
-    }
-
-    return entry;
-  } catch (err) {
-    console.warn('Secure audit logging error:', err);
-  }
+  // Compatibilidad de UI: las acciones autoritativas escriben su auditoría en
+  // la misma transacción backend. Nunca fingir persistencia segura en el browser.
+  return {
+    timestamp: new Date().toISOString(),
+    actor: actor_name || 'Sesión autenticada',
+    event_type,
+    category,
+    severity,
+    description,
+    entity_type,
+    entity_id,
+    details,
+    authority: 'server'
+  };
 }
 window.logSecureAuditEvent = logSecureAuditEvent;
 
 function getFilteredInternalCatalogProducts() {
-  const deletedIds = getDeletedInternalProductIds();
   return internalCatalogProducts.filter(product => {
-    const pId = String(product.id || '').toLowerCase();
-    const sId = String(product.supplierRowId || '').toLowerCase();
-    if (deletedIds.has(pId) || deletedIds.has(sId)) return false;
-
     const matchesCategory = internalCatalogFilterCategory === 'all' || product.category === internalCatalogFilterCategory;
     const searchText = [product.name, product.brand, product.presentation, product.category, product.id, product.barcode].filter(Boolean).join(' ').toLowerCase();
     const matchesSearch = !internalCatalogFilterQuery || searchText.includes(internalCatalogFilterQuery);
@@ -6916,6 +7030,38 @@ function updateInternalCatalogBatchToolbar() {
 }
 
 async function deleteSingleInternalCatalogProduct(productId) {
+  const protectedProduct = internalCatalogProducts.find(p => String(p.id) === String(productId) || String(p.supplierRowId) === String(productId));
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (protectedProduct) {
+    if (!context?.isVerified || !['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(context.role)) {
+      alert('Sólo un administrador o supervisor autenticado puede archivar productos.');
+      return;
+    }
+    if (protectedProduct.source !== 'catalog_products') {
+      alert('Este producto pertenece al catálogo heredado. Migrálo al catálogo central antes de archivarlo; no se permiten borrados locales destructivos.');
+      return;
+    }
+    if (!confirm(`¿Archivar "${protectedProduct.name}"?\n\nDejará de ofrecerse, pero conservará ventas, stock y auditoría histórica.`)) return;
+    try {
+      await window.OperationalApi.archiveCatalogProduct({
+        supabaseClient,
+        authContext: context,
+        productId: protectedProduct.id,
+        reason: 'Archivado desde el catálogo interno por un supervisor.'
+      });
+      selectedInternalCatalogIds.delete(String(protectedProduct.id));
+      await loadInternalCatalog();
+      showToast(`Producto "${protectedProduct.name}" archivado sin borrar su historial.`);
+    } catch (error) {
+      console.error('No se pudo archivar el producto:', error);
+      alert(`No se archivó el producto.\n\n${error.message || 'Error desconocido'}`);
+    }
+    return;
+  }
+
+  alert('El producto no existe en el catálogo central. No se ejecutó ninguna eliminación heredada.');
+  return;
+
   const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
   const remaining = getUserDeletionRemainingQuota(activeVendor);
   const isAdmin = isVendorAdmin(activeVendor);
@@ -6951,17 +7097,8 @@ async function deleteSingleInternalCatalogProduct(productId) {
   selectedInternalCatalogIds.delete(targetId);
   localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
 
-  // 3. Quitar de las ubicaciones físicas locales (WMS / Tienda local)
-  try {
-    const locs = readLocalProductLocations().filter(l => 
-      String(l.product_code || '') !== targetId && 
-      String(l.product_id || '') !== targetId &&
-      (!barcode || String(l.barcode || '') !== barcode)
-    );
-    localStorage.setItem(LOCAL_PRODUCT_LOCATIONS_KEY, JSON.stringify(locs));
-  } catch (_) {}
-
-  // 4. Quitar del mapa interactivo
+  // 3. Quitar sólo de la proyección visual. El inventario central se modifica
+  // exclusivamente mediante las RPC operativas.
   if (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) {
     window.storeLocationProducts = window.storeLocationProducts.filter(l => 
       String(l.product_code || '') !== targetId && 
@@ -7028,12 +7165,43 @@ async function deleteSingleInternalCatalogProduct(productId) {
 }
 
 async function deleteSelectedInternalCatalogProducts() {
-  const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
   const selectedList = Array.from(selectedInternalCatalogIds);
   if (selectedList.length === 0) {
     alert('Seleccioná al menos un producto para eliminar.');
     return;
   }
+
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  const selectedProducts = selectedList.map(id => internalCatalogProducts.find(product => String(product.id) === String(id)));
+  if (!context?.isVerified || !['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(context.role)) {
+    alert('Sólo un administrador o supervisor autenticado puede archivar productos.');
+    return;
+  }
+  if (!window.OperationalApi || !supabaseClient || selectedProducts.some(product => !product || product.source !== 'catalog_products')) {
+    alert('La selección contiene productos heredados o inválidos. Migrálos al catálogo central antes de archivarlos.');
+    return;
+  }
+  if (!confirm(`¿Archivar los ${selectedProducts.length} productos seleccionados?\n\nSe conservarán stock, ventas y auditoría histórica.`)) return;
+  try {
+    for (const product of selectedProducts) {
+      await window.OperationalApi.archiveCatalogProduct({
+        supabaseClient,
+        authContext: context,
+        productId: product.id,
+        reason: 'Archivado por lote desde el catálogo interno.'
+      });
+    }
+    selectedInternalCatalogIds.clear();
+    await loadInternalCatalog();
+    showToast(`${selectedProducts.length} productos archivados sin borrar su historial.`);
+  } catch (error) {
+    console.error('No se pudo completar el archivo por lote:', error);
+    alert(`El lote no se completó. Revisá el estado de cada producto.\n\n${error.message || 'Error desconocido'}`);
+  }
+  return;
+
+  /* Ruta legacy retenida temporalmente sólo como referencia de migración. */
+  const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
 
   const remaining = getUserDeletionRemainingQuota(activeVendor);
   const isAdmin = isVendorAdmin(activeVendor);
@@ -7082,18 +7250,7 @@ async function deleteSelectedInternalCatalogProducts() {
 
   localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
 
-  // 2. Limpiar de ubicaciones locales
-  try {
-    const delSet = new Set(allTombstoneIds.map(s => s.toLowerCase()));
-    const locs = readLocalProductLocations().filter(l => 
-      !delSet.has(String(l.product_code || '').toLowerCase()) && 
-      !delSet.has(String(l.product_id || '').toLowerCase()) &&
-      (!l.barcode || !delSet.has(String(l.barcode).toLowerCase()))
-    );
-    localStorage.setItem(LOCAL_PRODUCT_LOCATIONS_KEY, JSON.stringify(locs));
-  } catch (_) {}
-
-  // 3. Limpiar del mapa interactivo
+  // 2. Limpiar sólo la proyección visual; no hay escritura WMS local.
   if (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) {
     const delSet = new Set(allTombstoneIds.map(s => s.toLowerCase()));
     window.storeLocationProducts = window.storeLocationProducts.filter(l => 
@@ -7179,23 +7336,18 @@ function openAdminAuditInvestigationModal() {
 
   const authScreen = document.getElementById('admin-audit-auth-screen');
   const contentScreen = document.getElementById('admin-audit-content-screen');
-  const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || '';
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : { isVerified: false };
 
   modal.style.display = 'flex';
 
-  if (isAdminAuditUnlocked || (activeVendor && isVendorAdmin(activeVendor))) {
+  if (isAdminAuditUnlocked || (context.isVerified && ['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(context.role))) {
     isAdminAuditUnlocked = true;
     if (authScreen) authScreen.style.display = 'none';
     if (contentScreen) contentScreen.style.display = 'flex';
-    renderAdminAuditLogs();
+    renderAdminAuditLogs({ refresh: true });
   } else {
     if (authScreen) authScreen.style.display = 'flex';
     if (contentScreen) contentScreen.style.display = 'none';
-    const passInput = document.getElementById('admin-audit-pass-input');
-    if (passInput) {
-      passInput.value = '';
-      passInput.focus();
-    }
   }
 }
 
@@ -7204,25 +7356,17 @@ function closeAdminAuditModal() {
   if (modal) modal.style.display = 'none';
 }
 
-function handleAdminAuditUnlock(event) {
+async function handleAdminAuditUnlock(event) {
   if (event) event.preventDefault();
-  const passInput = document.getElementById('admin-audit-pass-input');
   const errorEl = document.getElementById('admin-audit-auth-error');
-  const pass = (passInput?.value || '').trim().toLowerCase();
-
-  const VALID_ADMIN_PASSWORDS = ['admin123', 'admin', '1234', 'boegrow2026', 'raul123'];
-  const isValid = VALID_ADMIN_PASSWORDS.includes(pass) || AUTHORIZED_VENDEDORES.some(v => {
-    if (!v.isAdmin) return false;
-    const customPass = localStorage.getItem('boeweb_vendor_password_' + v.name.toLowerCase());
-    return customPass ? pass === customPass.toLowerCase() : (v.pass.toLowerCase() === pass || v.altPass?.toLowerCase() === pass);
-  });
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : { isVerified: false };
+  const isValid = context.isVerified && ['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(context.role);
 
   if (!isValid) {
     if (errorEl) {
-      errorEl.textContent = '❌ Contraseña de Administrador incorrecta. Acceso denegado.';
+      errorEl.textContent = '❌ Tu sesión no tiene permisos de administración.';
       errorEl.style.display = 'block';
     }
-    passInput?.select();
     return;
   }
 
@@ -7234,17 +7378,54 @@ function handleAdminAuditUnlock(event) {
   if (authScreen) authScreen.style.display = 'none';
   if (contentScreen) contentScreen.style.display = 'flex';
 
-  logSecureAuditEvent({
-    event_type: 'ADMIN_ACCESS',
-    category: 'AUTH',
-    severity: 'INFO',
-    description: 'Acceso autorizado al Centro de Auditoría e Investigaciones Forenses'
-  });
-
-  renderAdminAuditLogs();
+  await renderAdminAuditLogs({ refresh: true });
 }
 
-function renderAdminAuditLogs() {
+async function loadCanonicalAdminAuditLogs({ refresh = false } = {}) {
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!supabaseClient || !context?.isVerified || !context.tenantId
+      || !['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(context.role)) {
+    throw new Error('La sesión no tiene permiso para consultar la auditoría central.');
+  }
+  if (!refresh && canonicalAdminAuditLogs.length > 0 && Date.now() - canonicalAdminAuditLoadedAt < 30_000) {
+    return canonicalAdminAuditLogs;
+  }
+  const { data, error } = await supabaseClient
+    .from('operational_audit_log')
+    .select('id,actor_user_id,action,entity_type,entity_id,before_data,after_data,correlation_id,metadata,created_at')
+    .eq('tenant_id', context.tenantId)
+    .order('created_at', { ascending: false })
+    .limit(500);
+  if (error) throw new Error(error.message || 'No se pudo consultar operational_audit_log.');
+  canonicalAdminAuditLogs = (data || []).map(entry => {
+    const createdAt = new Date(entry.created_at);
+    const metadata = entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {};
+    return {
+      id: entry.id,
+      timestamp: entry.created_at,
+      formatted_date: Number.isNaN(createdAt.getTime()) ? '' : createdAt.toLocaleDateString('es-AR'),
+      formatted_time: Number.isNaN(createdAt.getTime()) ? '' : createdAt.toLocaleTimeString('es-AR'),
+      actor: entry.actor_user_id || 'Backend verificado',
+      event_type: entry.action,
+      category: String(metadata.category || entry.entity_type || 'GENERAL').toUpperCase(),
+      severity: String(metadata.severity || 'INFO').toUpperCase(),
+      description: metadata.description || `${entry.action} · ${entry.entity_type}`,
+      entity_type: entry.entity_type,
+      entity_id: entry.entity_id,
+      details: {
+        before_data: entry.before_data,
+        after_data: entry.after_data,
+        metadata,
+        correlation_id: entry.correlation_id
+      },
+      authority: 'server'
+    };
+  });
+  canonicalAdminAuditLoadedAt = Date.now();
+  return canonicalAdminAuditLogs;
+}
+
+async function renderAdminAuditLogs({ refresh = false } = {}) {
   const listEl = document.getElementById('admin-audit-entries-list');
   const kpiTotal = document.getElementById('audit-kpi-total');
   const kpiDeleted = document.getElementById('audit-kpi-deleted');
@@ -7254,7 +7435,15 @@ function renderAdminAuditLogs() {
 
   if (!listEl) return;
 
-  const rawLogs = JSON.parse(localStorage.getItem(SECURE_AUDIT_STORAGE_KEY) || '[]');
+  listEl.innerHTML = '<div style="padding: 24px; text-align: center; color: rgba(255,255,255,0.7);">Consultando auditoría central…</div>';
+  let rawLogs;
+  try {
+    rawLogs = await loadCanonicalAdminAuditLogs({ refresh });
+  } catch (error) {
+    console.error('No se pudo cargar la auditoría central:', error);
+    listEl.innerHTML = `<div style="padding: 24px; text-align: center; color: #ef5350;">${escapeStockHtml(error.message || 'Auditoría central no disponible.')}</div>`;
+    return;
+  }
   const filterType = document.getElementById('admin-audit-filter-type')?.value || 'all';
   const searchQuery = document.getElementById('admin-audit-search')?.value.trim().toLowerCase() || '';
 
@@ -7324,8 +7513,14 @@ function filterAdminAuditLogs() {
   renderAdminAuditLogs();
 }
 
-function exportAdminAuditLogJSON() {
-  const rawLogs = JSON.parse(localStorage.getItem(SECURE_AUDIT_STORAGE_KEY) || '[]');
+async function exportAdminAuditLogJSON() {
+  let rawLogs;
+  try {
+    rawLogs = await loadCanonicalAdminAuditLogs({ refresh: true });
+  } catch (error) {
+    alert(error.message || 'No se pudo exportar la auditoría central.');
+    return;
+  }
   const blob = new Blob([JSON.stringify(rawLogs, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -7607,54 +7802,65 @@ async function saveInternalCatalogProduct(event) {
     showToast('Completá nombre, precio y stock con valores válidos.');
     return;
   }
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified
+      || !['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(authContext.role)) {
+    showToast('Sólo un administrador o supervisor puede editar la ficha y corregir stock.');
+    return;
+  }
+  if (product.source !== 'catalog_products') {
+    showToast('Migrá este producto heredado antes de editarlo.');
+    return;
+  }
+  const stockDelta = values.stock - Math.max(0, Number(product.stock) || 0);
+  if (stockDelta !== 0 && !product.location_id) {
+    showToast('No se puede corregir stock sin una ubicación central vinculada.');
+    return;
+  }
   try {
     if (saveButton) {
       saveButton.disabled = true;
       saveButton.textContent = 'Guardando…';
     }
     const image = await uploadInternalCatalogImage(product.id, product.image);
-    await updateInternalCatalogRelations(product, values, image);
-    updateInternalCatalogLocalLocation(product, values, image.url);
-
-    // Update in-memory product immediately
-    product.name = values.name;
-    product.brand = values.brand || '';
-    product.presentation = values.presentation || '';
-    product.category = values.category;
-    product.barcode = values.barcode || '';
-    product.price = values.price;
-    product.stock = values.stock;
-    product.description = values.description || '';
-    product.image = image.url;
-    try {
-      localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
-    } catch (_) {}
+    await window.OperationalApi.upsertCatalogProduct({
+      supabaseClient,
+      authContext,
+      product: {
+        id: product.id,
+        sku: product.product_code,
+        name: values.name,
+        price: values.price,
+        currency: product.currency || 'ARS',
+        track_stock: true,
+        metadata: {
+          ...(product.metadata || {}),
+          barcode: values.barcode,
+          description: values.description,
+          category: values.category,
+          brand: values.brand,
+          presentation: values.presentation,
+          image_url: image.url
+        }
+      }
+    });
+    if (stockDelta !== 0) {
+      await window.OperationalApi.adjustInventory({
+        supabaseClient,
+        authContext,
+        productId: product.id,
+        locationId: product.location_id,
+        quantityDelta: stockDelta,
+        reason: 'CATALOG_CORRECTION',
+        notes: 'Corrección explícita desde el editor de catálogo.',
+        idempotencyKey: `catalog-stock-correction:${product.id}:${globalThis.crypto?.randomUUID?.() || Date.now()}`
+      });
+    }
 
     storeMapDataLoaded = false;
     closeInternalCatalogEditor();
     await loadInternalCatalog();
     if (window.fetchB2BProducts) window.fetchB2BProducts(true);
-
-    if (typeof logSecureAuditEvent === 'function') {
-      logSecureAuditEvent({
-        event_type: 'PRODUCT_EDITED',
-        category: 'CATALOG',
-        severity: 'INFO',
-        actor_name: sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor',
-        description: `Edición de ficha de producto: "${values.name}" (Precio: $${values.price}, Stock: ${values.stock} u., Categoría: ${values.category})`,
-        entity_type: 'product',
-        entity_id: product.id,
-        details: {
-          id: product.id,
-          name: values.name,
-          brand: values.brand,
-          category: values.category,
-          price: values.price,
-          stock: values.stock,
-          barcode: values.barcode
-        }
-      });
-    }
 
     showToast(`Producto “${values.name}” actualizado en el catálogo interno.`);
   } catch (error) {
@@ -7680,10 +7886,13 @@ window.saveInternalCatalogProduct = saveInternalCatalogProduct;
    BÔ GROW CLUB — SISTEMA WMS (INVENTARIO FÍSICO & QR) - FASES 1 A 5
    ========================================================================== */
 
-const WMS_MODULES_KEY = 'boeweb_wms_store_modules_v1';
-const WMS_LOCATIONS_KEY = 'boeweb_wms_inventory_locations_v1';
-const WMS_MOVEMENTS_KEY = 'boeweb_wms_inventory_movements_v1';
-const WMS_AUDITS_KEY = 'boeweb_wms_inventory_audits_v1';
+let canonicalWmsLocations = [];
+let canonicalWmsModules = [];
+let canonicalWmsMovements = [];
+let canonicalWmsCounts = [];
+let wmsDataLoading = false;
+let wmsDataLoaded = false;
+let wmsDataLoadError = null;
 
 // currentWmsModuleCode — declared at top of file
 
@@ -7705,144 +7914,185 @@ function getHumanSectorLabel(sector) {
   return labels[code] || code;
 }
 
-function getWmsModules() {
-  try {
-    const raw = localStorage.getItem(WMS_MODULES_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {
-    console.warn('Error al leer WMS modules:', e);
+function canOperateWms(context = null) {
+  const activeContext = context || (typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null);
+  return Boolean(activeContext?.isVerified && ['ADMIN', 'SUPERVISOR', 'DEPOSITO'].includes(activeContext.role));
+}
+
+function parseWmsLevel(location) {
+  const metadataLevel = Number(location?.metadata?.shelf_level ?? location?.metadata?.human_level);
+  if (Number.isInteger(metadataLevel) && metadataLevel > 0) return metadataLevel;
+  const codeMatch = String(location?.code || '').toUpperCase().match(/(?:^|-)N(\d+)(?:-|$)/);
+  return codeMatch ? Number(codeMatch[1]) : 1;
+}
+
+function parseWmsSector(location) {
+  const metadataSector = String(location?.metadata?.sector_position || location?.metadata?.sector || '').trim().toUpperCase();
+  if (metadataSector) return metadataSector;
+  const codeMatch = String(location?.code || '').toUpperCase().match(/-([ICDU])$/);
+  return codeMatch ? codeMatch[1] : 'C';
+}
+
+function mapCanonicalWmsData(locations, balances, products, ledgerEntries, countEntries) {
+  const locationsById = new Map((locations || []).map(location => [location.id, location]));
+  const productsById = new Map((products || []).map(product => [product.id, product]));
+
+  canonicalWmsModules = (locations || []).map(location => ({
+    id: location.id,
+    code: location.code,
+    sector_name: location.name,
+    wall_code: String(location.metadata?.wall_code || location.metadata?.wall_side || location.location_type || 'WMS'),
+    module_number: 1,
+    max_levels: 1,
+    description: `${location.name} · ${location.location_type || 'Ubicación'}`,
+    location_type: location.location_type,
+    is_sellable: location.is_sellable === true,
+    is_default: location.is_default === true,
+    active: location.active !== false,
+    metadata: location.metadata || {}
+  }));
+
+  canonicalWmsLocations = (balances || []).map(balance => {
+    const location = locationsById.get(balance.location_id);
+    const product = productsById.get(balance.product_id);
+    if (!location || !product) return null;
+    return {
+      id: `${balance.product_id}:${balance.location_id}`,
+      location_id: balance.location_id,
+      module_code: location.code,
+      location_name: location.name,
+      location_metadata: location.metadata || {},
+      product_id: balance.product_id,
+      product_code: product.sku,
+      name: product.name,
+      barcode: product.barcode || '',
+      human_level: parseWmsLevel(location),
+      sector_position: parseWmsSector(location),
+      quantity: Math.max(0, Number(balance.on_hand) || 0),
+      reserved: Math.max(0, Number(balance.reserved) || 0),
+      available: Math.max(0, Number(balance.available) || 0),
+      image_url: product.metadata?.image_url || product.metadata?.image || ''
+    };
+  }).filter(Boolean);
+  window.__canonicalWmsProductLocations = canonicalWmsLocations.map(location => ({
+    ...location,
+    product_code: location.product_code,
+    stock: location.quantity,
+    shelf_code: location.module_code,
+    shelf_level: location.human_level,
+    location_label: location.location_name,
+    wms_code: location.module_code
+  }));
+
+  canonicalWmsMovements = (ledgerEntries || []).map(entry => {
+    const location = locationsById.get(entry.location_id);
+    const product = productsById.get(entry.product_id);
+    return {
+      id: entry.id,
+      movement_type: entry.event_type,
+      event_type: entry.event_type,
+      product_id: entry.product_id,
+      product_code: product?.sku || '',
+      product_name: product?.name || entry.product_id,
+      quantity: Math.abs(Number(entry.quantity_delta) || Number(entry.reserved_delta) || 0),
+      quantity_delta: Number(entry.quantity_delta) || 0,
+      on_hand_after: Number(entry.on_hand_after),
+      location_id: entry.location_id,
+      origin_module_code: entry.metadata?.origin_location_code || (entry.event_type === 'TRANSFER_OUT' ? location?.code : null),
+      destination_module_code: entry.metadata?.destination_location_code || (entry.event_type === 'TRANSFER_IN' ? location?.code : null),
+      user_name: entry.actor_user_id || 'Sistema',
+      timestamp: entry.created_at,
+      notes: entry.metadata?.notes || '',
+      reason: entry.metadata?.reason || '',
+      metadata: entry.metadata || {}
+    };
+  });
+
+  canonicalWmsCounts = (countEntries || []).map(count => ({
+    ...count,
+    product_name: productsById.get(count.product_id)?.name || count.product_id,
+    location_code: locationsById.get(count.location_id)?.code || count.location_id
+  }));
+}
+
+async function loadWmsInventoryData(forceReload = false) {
+  if (wmsDataLoading || (wmsDataLoaded && !forceReload)) return getWmsLocations();
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!supabaseClient || !context?.isVerified || !context.tenantId) {
+    canonicalWmsLocations = [];
+    canonicalWmsModules = [];
+    canonicalWmsMovements = [];
+    canonicalWmsCounts = [];
+    window.__canonicalWmsProductLocations = [];
+    wmsDataLoadError = 'Iniciá sesión para consultar el inventario físico.';
+    renderWmsModulesGrid();
+    void loadWmsInventoryData(true);
+    return [];
   }
-  const defaultModules = [
-    { code: 'PI-M01', sector_name: 'Fertilizantes y Nutrición', wall_code: 'PI', module_number: 1, max_levels: 5, description: 'Pared Izquierda - Módulo 1 (Fertilizantes orgánicos)' },
-    { code: 'PI-M02', sector_name: 'Nutrición Vegetal', wall_code: 'PI', module_number: 2, max_levels: 5, description: 'Pared Izquierda - Módulo 2 (Bioestimulantes)' },
-    { code: 'PI-M03', sector_name: 'Sustratos y Enmiendas', wall_code: 'PI', module_number: 3, max_levels: 5, description: 'Pared Izquierda - Módulo 3 (Sustratos Klasmann/Grow)' },
-    { code: 'PI-M04', sector_name: 'Módulo Principal Botánico', wall_code: 'PI', module_number: 4, max_levels: 5, description: 'Pared Izquierda - Módulo 4 (Control de plagas)' },
-    { code: 'PT-M01', sector_name: 'Luz e Iluminación Indoor', wall_code: 'PT', module_number: 1, max_levels: 5, description: 'Pared Trasera - Módulo 1 (Paneles LED y Kits)' },
-    { code: 'PT-M02', sector_name: 'Ventilación y Clima', wall_code: 'PT', module_number: 2, max_levels: 5, description: 'Pared Trasera - Módulo 2 (Extractores y filtros)' },
-    { code: 'PD-M01', sector_name: 'Macetas y Riego', wall_code: 'PD', module_number: 1, max_levels: 5, description: 'Pared Derecha - Módulo 1 (Macetas geotextiles)' },
-    { code: 'PD-M02', sector_name: 'Accesorios de Cultivo', wall_code: 'PD', module_number: 2, max_levels: 5, description: 'Pared Derecha - Módulo 2 (Tijeras y medidores)' },
-    { code: 'DEP-M01', sector_name: 'Depósito Insumos Pesados', wall_code: 'DP', module_number: 1, max_levels: 5, description: 'Depósito - Módulo 1 (Sustratos 50L en pallets)' },
-    { code: 'DEP-M02', sector_name: 'Depósito Reserva General', wall_code: 'DP', module_number: 2, max_levels: 5, description: 'Depósito - Módulo 2 (Reserva de seguridad)' }
-  ];
-  localStorage.setItem(WMS_MODULES_KEY, JSON.stringify(defaultModules));
-  return defaultModules;
+
+  wmsDataLoading = true;
+  wmsDataLoadError = null;
+  try {
+    const [locationsResult, balancesResult, productsResult, ledgerResult, countsResult] = await Promise.all([
+      supabaseClient
+        .from('inventory_locations_v2')
+        .select('id,code,name,location_type,is_sellable,is_default,active,metadata')
+        .eq('tenant_id', context.tenantId)
+        .eq('active', true)
+        .order('code', { ascending: true }),
+      supabaseClient
+        .from('inventory_balances_v2')
+        .select('product_id,location_id,on_hand,reserved,available')
+        .eq('tenant_id', context.tenantId),
+      supabaseClient
+        .from('catalog_products')
+        .select('id,sku,barcode,name,metadata')
+        .eq('tenant_id', context.tenantId)
+        .eq('active', true),
+      supabaseClient
+        .from('inventory_ledger_v2')
+        .select('id,product_id,location_id,event_type,quantity_delta,reserved_delta,on_hand_after,actor_user_id,metadata,created_at')
+        .eq('tenant_id', context.tenantId)
+        .order('created_at', { ascending: false })
+        .limit(200),
+      supabaseClient
+        .from('inventory_count_status_v2')
+        .select('count_id,product_id,location_id,expected_on_hand,expected_reserved,counted_quantity,difference,notes,submitted_by,submitted_at,review_status,reviewed_by,reviewed_at,review_reason')
+        .eq('tenant_id', context.tenantId)
+        .order('submitted_at', { ascending: false })
+        .limit(200)
+    ]);
+    const failedResult = [locationsResult, balancesResult, productsResult, ledgerResult, countsResult].find(result => result.error);
+    if (failedResult?.error) throw failedResult.error;
+    mapCanonicalWmsData(locationsResult.data, balancesResult.data, productsResult.data, ledgerResult.data, countsResult.data);
+    wmsDataLoaded = true;
+    return getWmsLocations();
+  } catch (error) {
+    canonicalWmsLocations = [];
+    canonicalWmsModules = [];
+    canonicalWmsMovements = [];
+    canonicalWmsCounts = [];
+    window.__canonicalWmsProductLocations = [];
+    wmsDataLoaded = false;
+    wmsDataLoadError = error.message || 'No se pudo leer el inventario físico central.';
+    console.error('No se pudo cargar el WMS central:', error);
+    return [];
+  } finally {
+    wmsDataLoading = false;
+    renderWmsModulesGrid();
+  }
+}
+
+function getWmsModules() {
+  return canonicalWmsModules.slice();
 }
 
 function getWmsLocations() {
-  try {
-    const raw = localStorage.getItem(WMS_LOCATIONS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {
-    console.warn('Error al leer WMS locations:', e);
-  }
-  const defaultLocations = [
-    {
-      id: 'wms-loc-1',
-      module_code: 'PI-M04',
-      product_id: 'klasmann-50l',
-      product_code: '7791234001',
-      name: 'Sustrato Klasmann Potground H 50L',
-      barcode: '7791234001',
-      human_level: 3,
-      sector_position: 'C',
-      quantity: 25,
-      image_url: 'https://astrogrow.com.ar/wp-content/uploads/2021/04/potground-h.jpg'
-    },
-    {
-      id: 'wms-loc-2',
-      module_code: 'PD-M02',
-      product_id: 'klasmann-50l',
-      product_code: '7791234001',
-      name: 'Sustrato Klasmann Potground H 50L',
-      barcode: '7791234001',
-      human_level: 2,
-      sector_position: 'I',
-      quantity: 10,
-      image_url: 'https://astrogrow.com.ar/wp-content/uploads/2021/04/potground-h.jpg'
-    },
-    {
-      id: 'wms-loc-3',
-      module_code: 'DEP-M01',
-      product_id: 'klasmann-50l',
-      product_code: '7791234001',
-      name: 'Sustrato Klasmann Potground H 50L',
-      barcode: '7791234001',
-      human_level: 5,
-      sector_position: 'C',
-      quantity: 3,
-      image_url: 'https://astrogrow.com.ar/wp-content/uploads/2021/04/potground-h.jpg'
-    },
-    {
-      id: 'wms-loc-4',
-      module_code: 'PI-M04',
-      product_id: 'top-bud-250ml',
-      product_code: '7791234002',
-      name: 'Top Crop Top Bud Bioestimulante 250ml',
-      barcode: '7791234002',
-      human_level: 4,
-      sector_position: 'D',
-      quantity: 14,
-      image_url: 'https://astrogrow.com.ar/wp-content/uploads/2020/05/top-bud-250.jpg'
-    },
-    {
-      id: 'wms-loc-5',
-      module_code: 'PI-M01',
-      product_id: 'top-bud-250ml',
-      product_code: '7791234002',
-      name: 'Top Crop Top Bud Bioestimulante 250ml',
-      barcode: '7791234002',
-      human_level: 1,
-      sector_position: 'C',
-      quantity: 6,
-      image_url: 'https://astrogrow.com.ar/wp-content/uploads/2020/05/top-bud-250.jpg'
-    },
-    {
-      id: 'wms-loc-6',
-      module_code: 'PI-M04',
-      product_id: 'mamboreta-aba-30ml',
-      product_code: '7791234003',
-      name: 'Mamboretá ABA Acaricida 30ml',
-      barcode: '7791234003',
-      human_level: 2,
-      sector_position: 'I',
-      quantity: 8,
-      image_url: ''
-    }
-  ];
-  localStorage.setItem(WMS_LOCATIONS_KEY, JSON.stringify(defaultLocations));
-  return defaultLocations;
-}
-
-function saveWmsLocations(locations) {
-  localStorage.setItem(WMS_LOCATIONS_KEY, JSON.stringify(locations));
+  return canonicalWmsLocations.slice();
 }
 
 function getWmsMovements() {
-  try {
-    const raw = localStorage.getItem(WMS_MOVEMENTS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  return [];
-}
-
-function saveWmsMovement(movement) {
-  const list = getWmsMovements();
-  list.unshift(movement);
-  localStorage.setItem(WMS_MOVEMENTS_KEY, JSON.stringify(list.slice(0, 200)));
-}
-
-function getWmsAudits() {
-  try {
-    const raw = localStorage.getItem(WMS_AUDITS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  return [];
-}
-
-function saveWmsAudit(audit) {
-  const list = getWmsAudits();
-  list.unshift(audit);
-  localStorage.setItem(WMS_AUDITS_KEY, JSON.stringify(list.slice(0, 100)));
+  return canonicalWmsMovements.slice();
 }
 
 function closeWmsModal(modalId) {
@@ -7855,13 +8105,22 @@ function renderWmsModulesGrid() {
   const filterWall = (document.getElementById('wms-filter-wall-select')?.value || 'all').toUpperCase();
   if (!container) return;
 
+  if (wmsDataLoading) {
+    container.innerHTML = `<div class="location-empty-state"><p>Sincronizando ubicaciones y saldos con el servidor…</p></div>`;
+    return;
+  }
+  if (wmsDataLoadError) {
+    container.innerHTML = `<div class="location-empty-state"><strong>Inventario central no disponible</strong><p>${escapeStockHtml(wmsDataLoadError)}</p><button type="button" class="wms-btn wms-btn-primary" onclick="loadWmsInventoryData(true)">Reintentar</button></div>`;
+    return;
+  }
+
   const modules = getWmsModules();
   const locations = getWmsLocations();
 
   const filtered = filterWall === 'ALL' ? modules : modules.filter(m => String(m.wall_code).toUpperCase() === filterWall);
 
   if (filtered.length === 0) {
-    container.innerHTML = `<div class="location-empty-state"><p>No se encontraron módulos para esta pared.</p></div>`;
+    container.innerHTML = `<div class="location-empty-state"><p>No hay ubicaciones centrales activas para este filtro.</p></div>`;
     return;
   }
 
@@ -7882,26 +8141,39 @@ function renderWmsModulesGrid() {
         </div>
         <div class="wms-module-btn-group">
           <button type="button" class="wms-btn wms-btn-primary" onclick="openWmsModuleModal('${m.code}')">👁️ Ver Contenido</button>
-          <button type="button" class="wms-btn wms-btn-warning" onclick="openWmsAuditModal('${m.code}')">📋 Auditar</button>
+          ${canOperateWms() ? `<button type="button" class="wms-btn wms-btn-warning" onclick="openWmsAuditModal('${m.code}')">📋 Auditar</button>` : ''}
         </div>
       </div>
     `;
   }).join('');
 }
 
-function openWmsQrScannerModal() {
+async function openWmsQrScannerModal() {
+  await loadWmsInventoryData(true);
+  const select = document.getElementById('wms-demo-module-select');
+  if (select) {
+    const modules = getWmsModules();
+    select.innerHTML = modules.length
+      ? modules.map(module => `<option value="${escapeStockHtml(module.code)}">${escapeStockHtml(module.code)} — ${escapeStockHtml(module.sector_name)}</option>`).join('')
+      : '<option value="">No hay ubicaciones centrales activas</option>';
+  }
   const modal = document.getElementById('wms-qr-modal');
   if (modal) modal.style.display = 'flex';
 }
 
 function confirmWmsQrScanFromSelect() {
   const select = document.getElementById('wms-demo-module-select');
-  const code = select ? select.value : 'PI-M04';
+  const code = select?.value || '';
+  if (!code) {
+    showToast('No hay una ubicación central seleccionada.');
+    return;
+  }
   closeWmsModal('wms-qr-modal');
-  openWmsModuleModal(code);
+  void openWmsModuleModal(code);
 }
 
-function openWmsModuleModal(moduleCode) {
+async function openWmsModuleModal(moduleCode) {
+  if (!wmsDataLoaded) await loadWmsInventoryData();
   currentWmsModuleCode = moduleCode;
   const modal = document.getElementById('wms-module-detail-modal');
   const title = document.getElementById('wms-detail-title');
@@ -7909,7 +8181,11 @@ function openWmsModuleModal(moduleCode) {
   const container = document.getElementById('wms-module-items-container');
 
   const modules = getWmsModules();
-  const mod = modules.find(m => m.code === moduleCode) || { code: moduleCode, sector_name: 'Módulo', wall_code: 'Pared' };
+  const mod = modules.find(m => m.code === moduleCode);
+  if (!mod) {
+    showToast('La ubicación solicitada no existe o ya no está activa.');
+    return;
+  }
 
   if (title) title.textContent = `Módulo ${mod.code}`;
   if (wallBadge) wallBadge.textContent = `${mod.sector_name} (${mod.wall_code})`;
@@ -7969,12 +8245,14 @@ function renderWmsModuleDetails(moduleCode, container) {
               </div>
               <div style="text-align: right; display: flex; align-items: center; gap: 14px;">
                 <div>
-                  <span style="font-size: 1.2rem; font-weight: 800; color: var(--vendor-forest); display: block;">${item.quantity} u.</span>
-                  <small style="color: var(--vendor-muted); font-size: 0.75rem;">Disponibles</small>
+                  <span style="font-size: 1.2rem; font-weight: 800; color: var(--vendor-forest); display: block;">${item.available} u.</span>
+                  <small style="color: var(--vendor-muted); font-size: 0.75rem;">Disponibles · ${item.quantity} físicas · ${item.reserved} reservadas</small>
                 </div>
-                <button type="button" class="wms-btn wms-btn-primary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="openWmsTransferModal('${moduleCode}', '${item.product_id}', ${item.human_level}, '${item.sector_position}')">
-                  ⇄ Mover
-                </button>
+                ${item.available > 0 && canOperateWms() ? `
+                  <button type="button" class="wms-btn wms-btn-primary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="openWmsTransferModal('${moduleCode}', '${item.product_id}', ${item.human_level}, '${item.sector_position}')">
+                    ⇄ Mover
+                  </button>
+                ` : '<span class="wms-sector-badge">Sin saldo transferible</span>'}
               </div>
             </div>
           `).join('')}
@@ -7987,6 +8265,10 @@ function renderWmsModuleDetails(moduleCode, container) {
 }
 
 function openWmsTransferModal(originModuleCode, productId, humanLevel, sectorPos) {
+  if (!canOperateWms()) {
+    showToast('🔒 Sólo administración, supervisión o depósito pueden transferir stock.');
+    return;
+  }
   const modal = document.getElementById('wms-transfer-modal');
   const productNameEl = document.getElementById('wms-tr-product-name');
   const originLabelEl = document.getElementById('wms-tr-origin-label');
@@ -8009,10 +8291,10 @@ function openWmsTransferModal(originModuleCode, productId, humanLevel, sectorPos
 
   if (productNameEl) productNameEl.textContent = targetLoc.name;
   if (originLabelEl) originLabelEl.textContent = `Origen: ${originModuleCode} (${getHumanLevelLabel(targetLoc.human_level)} / Sector ${getHumanSectorLabel(targetLoc.sector_position)})`;
-  if (availableLabelEl) availableLabelEl.textContent = `Disponible: ${targetLoc.quantity} u.`;
+  if (availableLabelEl) availableLabelEl.textContent = `Disponible para mover: ${targetLoc.available} u. (${targetLoc.reserved} reservadas)`;
 
   if (qtyInput) {
-    qtyInput.max = targetLoc.quantity;
+    qtyInput.max = targetLoc.available;
     qtyInput.value = 1;
   }
 
@@ -8020,11 +8302,11 @@ function openWmsTransferModal(originModuleCode, productId, humanLevel, sectorPos
   if (destSelect) {
     const modules = getWmsModules();
     destSelect.innerHTML = modules.map(m => `
-      <option value="${m.code}" ${m.code === originModuleCode ? 'disabled' : ''}>${m.code} — ${m.sector_name} (${m.wall_code})</option>
+      <option value="${m.id}" ${m.id === targetLoc.location_id ? 'disabled' : ''}>${m.code} — ${m.sector_name} (${m.wall_code})</option>
     `).join('');
 
-    const availableModule = modules.find(m => m.code !== originModuleCode);
-    if (availableModule) destSelect.value = availableModule.code;
+    const availableModule = modules.find(m => m.id !== targetLoc.location_id);
+    if (availableModule) destSelect.value = availableModule.id;
   }
 
   window._wmsCurrentTransferOrigin = {
@@ -8032,8 +8314,10 @@ function openWmsTransferModal(originModuleCode, productId, humanLevel, sectorPos
     productId,
     humanLevel: Number(humanLevel),
     sectorPos: String(sectorPos).toUpperCase(),
-    maxQty: targetLoc.quantity,
-    item: targetLoc
+    originLocationId: targetLoc.location_id,
+    maxQty: targetLoc.available,
+    item: targetLoc,
+    idempotencyKey: `inventory-transfer:${targetLoc.product_id}:${globalThis.crypto?.randomUUID?.() || Date.now()}`
   };
 
   const resultCard = document.getElementById('wms-transfer-result-card');
@@ -8045,7 +8329,7 @@ function openWmsTransferModal(originModuleCode, productId, humanLevel, sectorPos
 }
 
 function triggerWmsTransferFromCurrentModule() {
-  const locations = getWmsLocations().filter(loc => loc.module_code === currentWmsModuleCode && loc.quantity > 0);
+  const locations = getWmsLocations().filter(loc => loc.module_code === currentWmsModuleCode && loc.available > 0);
   if (locations.length === 0) {
     showToast('El módulo actual está vacío.');
     return;
@@ -8061,17 +8345,11 @@ async function handleWmsTransferSubmit(event) {
 
   const qtyInput = document.getElementById('wms-tr-qty');
   const destSelect = document.getElementById('wms-tr-dest-module');
-  const destLevelSelect = document.getElementById('wms-tr-dest-level');
-  const destSectorSelect = document.getElementById('wms-tr-dest-sector');
-
   const transferQty = Number(qtyInput?.value) || 0;
-  const destModuleCode = destSelect?.value;
-  const destLevel = Number(destLevelSelect?.value) || 3;
-  const destSector = String(destSectorSelect?.value || 'C').toUpperCase();
+  const destinationLocationId = String(destSelect?.value || '').trim();
+  const destination = getWmsModules().find(module => module.id === destinationLocationId);
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
 
-  const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'Vendedor Local';
-
-  // ATOMIC VALIDATIONS
   if (transferQty <= 0) {
     showToast('❌ La cantidad a mover debe ser mayor a cero.');
     return;
@@ -8082,82 +8360,31 @@ async function handleWmsTransferSubmit(event) {
     return;
   }
 
-  if (originState.originModuleCode === destModuleCode && 
-      originState.humanLevel === destLevel && 
-      originState.sectorPos === destSector) {
-    showToast('❌ El módulo y posición de origen y destino no pueden ser idénticos.');
+  if (!destination || destinationLocationId === originState.originLocationId) {
+    showToast('❌ Seleccioná una ubicación central de destino distinta del origen.');
     return;
   }
 
+  if (!window.OperationalApi || !supabaseClient || !canOperateWms(context)) {
+    showToast('🔒 Sólo administración, supervisión o depósito pueden registrar transferencias.');
+    return;
+  }
+
+  const submitButton = event.currentTarget?.querySelector('button[type="submit"]');
+  if (submitButton) submitButton.disabled = true;
   try {
-    const locations = getWmsLocations();
-    const originIdx = locations.findIndex(loc => 
-      loc.module_code === originState.originModuleCode &&
-      loc.product_id === originState.productId &&
-      Number(loc.human_level) === originState.humanLevel &&
-      String(loc.sector_position).toUpperCase() === originState.sectorPos
-    );
-
-    if (originIdx === -1 || locations[originIdx].quantity < transferQty) {
-      showToast('❌ Error de concurrencia: El stock de origen fue modificado.');
-      return;
-    }
-
-    // Decrement Origin
-    locations[originIdx].quantity -= transferQty;
-    const originItem = locations[originIdx];
-
-    // Remove empty origin row
-    if (locations[originIdx].quantity <= 0) {
-      locations.splice(originIdx, 1);
-    }
-
-    // Increment/Upsert Destination
-    const destIdx = locations.findIndex(loc =>
-      loc.module_code === destModuleCode &&
-      loc.product_id === originState.productId &&
-      Number(loc.human_level) === destLevel &&
-      String(loc.sector_position).toUpperCase() === destSector
-    );
-
-    if (destIdx !== -1) {
-      locations[destIdx].quantity += transferQty;
-    } else {
-      locations.push({
-        id: `wms-loc-${Date.now()}`,
-        module_code: destModuleCode,
-        product_id: originState.productId,
-        product_code: originItem.product_code,
-        name: originItem.name,
-        barcode: originItem.barcode,
-        image_url: originItem.image_url,
-        human_level: destLevel,
-        sector_position: destSector,
-        quantity: transferQty
-      });
-    }
-
-    saveWmsLocations(locations);
-
-    // Record Append-Only Movement Log
-    const movementRecord = {
-      id: `wms-mov-${Date.now()}`,
-      movement_type: 'TRANSFERENCIA',
-      product_id: originState.productId,
-      product_name: originItem.name,
+    await window.OperationalApi.transferInventory({
+      supabaseClient,
+      authContext: context,
+      productId: originState.productId,
+      originLocationId: originState.originLocationId,
+      destinationLocationId,
       quantity: transferQty,
-      origin_module_code: originState.originModuleCode,
-      origin_level: originState.humanLevel,
-      origin_sector: originState.sectorPos,
-      destination_module_code: destModuleCode,
-      destination_level: destLevel,
-      destination_sector: destSector,
-      user_name: activeVendor,
-      timestamp: new Date().toISOString()
-    };
-    saveWmsMovement(movementRecord);
+      notes: `Transferencia WMS ${originState.originModuleCode} → ${destination.code}`,
+      idempotencyKey: originState.idempotencyKey
+    });
+    await loadWmsInventoryData(true);
 
-    // Show Confirmation Receipt Card
     const form = document.getElementById('wms-transfer-form');
     const resultCard = document.getElementById('wms-transfer-result-card');
     if (form) form.style.display = 'none';
@@ -8167,24 +8394,25 @@ async function handleWmsTransferSubmit(event) {
       resultCard.innerHTML = `
         <div class="wms-receipt-card">
           <div class="wms-receipt-title">✅ MOVIMIENTO COMPLETADO</div>
-          <div class="wms-receipt-row"><span>Producto:</span><strong>${originItem.name}</strong></div>
+          <div class="wms-receipt-row"><span>Producto:</span><strong>${originState.item.name}</strong></div>
           <div class="wms-receipt-row"><span>Cantidad:</span><strong>${transferQty} unidades</strong></div>
           <div class="wms-receipt-row"><span>Origen:</span><strong>${originState.originModuleCode} (${getHumanLevelLabel(originState.humanLevel)})</strong></div>
-          <div class="wms-receipt-row"><span>Destino:</span><strong>${destModuleCode} (${getHumanLevelLabel(destLevel)})</strong></div>
-          <div class="wms-receipt-row"><span>Operador:</span><strong>${activeVendor}</strong></div>
+          <div class="wms-receipt-row"><span>Destino:</span><strong>${destination.code}</strong></div>
+          <div class="wms-receipt-row"><span>Operador:</span><strong>${context.userId}</strong></div>
           <div class="wms-receipt-row"><span>Fecha / Hora:</span><strong>${new Date().toLocaleTimeString()}</strong></div>
-          <button type="button" class="wms-btn wms-btn-primary" style="width: 100%; margin-top: 16px;" onclick="closeWmsModal('wms-transfer-modal'); openWmsModuleModal('${destModuleCode}');">
-            👁️ VER CONTENIDO DEL DESTINO (${destModuleCode})
+          <button type="button" class="wms-btn wms-btn-primary" style="width: 100%; margin-top: 16px;" onclick="closeWmsModal('wms-transfer-modal'); openWmsModuleModal('${destination.code}');">
+            👁️ VER CONTENIDO DEL DESTINO (${destination.code})
           </button>
         </div>
       `;
     }
 
-    showToast(`✅ Transferidos ${transferQty} u. a ${destModuleCode}`);
-
-  } catch (err) {
-    console.error('Error al ejecutar transferencia WMS:', err);
-    showToast(`❌ Error: ${err.message}`);
+    showToast(`✅ Transferidos ${transferQty} u. a ${destination.code}`);
+  } catch (error) {
+    console.error('Error al ejecutar transferencia WMS:', error);
+    showToast(`❌ Error: ${error.message}`);
+  } finally {
+    if (submitButton) submitButton.disabled = false;
   }
 }
 
@@ -8279,6 +8507,7 @@ function openWmsAuditModal(moduleCode) {
   const modal = document.getElementById('wms-audit-modal');
   const title = document.getElementById('wms-audit-title');
   const container = document.getElementById('wms-audit-items-list');
+  window._wmsCurrentAuditBatchId = globalThis.crypto?.randomUUID?.() || `${Date.now()}`;
 
   if (title) title.textContent = `Auditando Módulo ${moduleCode}`;
 
@@ -8319,81 +8548,140 @@ function triggerWmsAuditFromCurrentModule() {
   openWmsAuditModal(currentWmsModuleCode);
 }
 
-function submitWmsAuditWithStatus(forcedStatus) {
-  const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'Vendedor Local';
+async function submitWmsAuditWithStatus(forcedStatus) {
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
   const locations = getWmsLocations().filter(loc => loc.module_code === currentWmsModuleCode && loc.quantity > 0);
-
-  const auditRecord = {
-    id: `wms-audit-${Date.now()}`,
-    module_code: currentWmsModuleCode,
-    auditor_user: activeVendor,
-    status: forcedStatus || 'CORRECTO',
-    timestamp: new Date().toISOString(),
-    items: locations.map((loc, idx) => {
-      const input = document.getElementById(`wms-audit-qty-${idx}`);
-      const foundQty = input ? Number(input.value) : loc.quantity;
-      return {
-        product_id: loc.product_id,
-        name: loc.name,
-        expected_qty: loc.quantity,
-        found_qty: foundQty,
-        difference: foundQty - loc.quantity,
-        human_level: loc.human_level,
-        sector_position: loc.sector_position
-      };
-    })
-  };
-
-  saveWmsAudit(auditRecord);
-
-  // Record Audit Movement Log
-  saveWmsMovement({
-    id: `wms-mov-${Date.now()}`,
-    movement_type: 'AJUSTE_AUDITORIA',
-    product_id: currentWmsModuleCode,
-    product_name: `Auditoría Módulo ${currentWmsModuleCode}`,
-    quantity: locations.length,
-    origin_module_code: currentWmsModuleCode,
-    destination_module_code: currentWmsModuleCode,
-    user_name: activeVendor,
-    timestamp: new Date().toISOString(),
-    notes: `Estado: ${auditRecord.status}`
-  });
-
-  const notice = document.getElementById('wms-audit-result-notice');
-  if (notice) {
-    notice.style.display = 'block';
-    notice.innerHTML = `
-      <strong>📋 Auditoría Registrada (${auditRecord.status}):</strong> 
-      Se guardó el control del Módulo ${currentWmsModuleCode}. 
-      <br><small><strong>REGLA DE SEGURIDAD:</strong> El stock comercial y las cantidades de producción NO sufren alteraciones automáticas.</small>
-    `;
+  if (!window.OperationalApi || !supabaseClient || !canOperateWms(context)) {
+    showToast('🔒 Sólo administración, supervisión o depósito pueden registrar conteos.');
+    return;
+  }
+  if (locations.length === 0) {
+    showToast('No hay saldos centrales en esta ubicación para contar.');
+    return;
   }
 
-  showToast(`📋 Auditoría de ${currentWmsModuleCode} registrada correctamente.`);
+  const items = locations.map((location, index) => {
+    const input = document.getElementById(`wms-audit-qty-${index}`);
+    const countedQuantity = input ? Number(input.value) : location.quantity;
+    return { location, countedQuantity };
+  });
+  if (items.some(item => !Number.isFinite(item.countedQuantity) || item.countedQuantity < 0)) {
+    showToast('❌ Todos los conteos deben ser números iguales o mayores que cero.');
+    return;
+  }
+
+  const batchId = window._wmsCurrentAuditBatchId || globalThis.crypto?.randomUUID?.() || `${Date.now()}`;
+  try {
+    await Promise.all(items.map(({ location, countedQuantity }, index) => window.OperationalApi.submitInventoryCount({
+      supabaseClient,
+      authContext: context,
+      productId: location.product_id,
+      locationId: location.location_id,
+      countedQuantity,
+      notes: `Conteo WMS ${currentWmsModuleCode} · declaración ${forcedStatus || 'PENDIENTE_APROBACION'}`,
+      idempotencyKey: `inventory-count:${batchId}:${index}`
+    })));
+
+    const notice = document.getElementById('wms-audit-result-notice');
+    if (notice) {
+      notice.style.display = 'block';
+      notice.innerHTML = `
+        <strong>📋 Conteo central registrado:</strong>
+        Se enviaron ${items.length} controles de ${currentWmsModuleCode} para revisión.
+        <br><small><strong>REGLA DE SEGURIDAD:</strong> el conteo no modifica stock; un supervisor debe revisarlo y cualquier ajuste queda en el ledger.</small>
+      `;
+    }
+    showToast(`📋 Conteo de ${currentWmsModuleCode} enviado a supervisión.`);
+  } catch (error) {
+    console.error('No se pudo registrar el conteo WMS:', error);
+    showToast(`❌ No se pudo registrar el conteo: ${error.message}`);
+  }
 }
 
-function handleWmsAuditSubmit(event) {
+async function handleWmsAuditSubmit(event) {
   event.preventDefault();
-  submitWmsAuditWithStatus('PENDIENTE_APROBACION');
+  await submitWmsAuditWithStatus('PENDIENTE_APROBACION');
 }
 
-function openWmsMovementsHistoryModal() {
+async function reviewWmsInventoryCount(countId, decision) {
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  const normalizedDecision = String(decision || '').trim().toUpperCase();
+  if (!window.OperationalApi || !supabaseClient || !context?.isVerified || !['ADMIN', 'SUPERVISOR'].includes(context.role)) {
+    showToast('🔒 Sólo administración o supervisión pueden resolver conteos.');
+    return;
+  }
+  const count = canonicalWmsCounts.find(item => item.count_id === countId && item.review_status === 'PENDING_REVIEW');
+  if (!count || !['APPROVE', 'REJECT'].includes(normalizedDecision)) {
+    showToast('El conteo ya fue resuelto o no es válido.');
+    return;
+  }
+  const reason = window.prompt(
+    normalizedDecision === 'APPROVE'
+      ? `Motivo de aprobación. La diferencia ${count.difference} se aplicará al stock central:`
+      : 'Motivo del rechazo del conteo:'
+  );
+  if (!String(reason || '').trim()) {
+    showToast('La revisión requiere un motivo auditable.');
+    return;
+  }
+  try {
+    await window.OperationalApi.reviewInventoryCount({
+      supabaseClient,
+      authContext: context,
+      countId,
+      decision: normalizedDecision,
+      reason,
+      idempotencyKey: `inventory-count-review:${countId}:${globalThis.crypto?.randomUUID?.() || Date.now()}`
+    });
+    showToast(normalizedDecision === 'APPROVE' ? '✅ Conteo aprobado y conciliado.' : 'Conteo rechazado sin modificar stock.');
+    await openWmsMovementsHistoryModal();
+    await loadStoreMapData(true);
+  } catch (error) {
+    console.error('No se pudo revisar el conteo WMS:', error);
+    showToast(`❌ No se pudo resolver el conteo: ${error.message}`);
+  }
+}
+
+async function openWmsMovementsHistoryModal() {
   const modal = document.getElementById('wms-history-modal');
   const container = document.getElementById('wms-history-table-container');
+
+  await loadWmsInventoryData(true);
 
   const movements = getWmsMovements();
 
   if (!container) return;
 
-  if (movements.length === 0) {
-    container.innerHTML = `
-      <div class="location-empty-state">
-        <p>No se registraron movimientos en esta sesión.</p>
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  const canReviewCounts = ['ADMIN', 'SUPERVISOR'].includes(context?.role);
+  const countsHtml = canonicalWmsCounts.length ? `
+    <section style="margin-bottom: 22px;">
+      <h4 style="margin: 0 0 10px; color: var(--vendor-forest);">Conteos y supervisión</h4>
+      <div style="display: grid; gap: 8px;">
+        ${canonicalWmsCounts.map(count => `
+          <article style="border: 1px solid var(--vendor-line); border-radius: 12px; padding: 12px; background: #fff;">
+            <div style="display: flex; justify-content: space-between; gap: 12px; align-items: center;">
+              <div>
+                <strong>${escapeStockHtml(count.product_name)}</strong>
+                <small style="display: block; color: var(--vendor-muted);">${escapeStockHtml(count.location_code)} · esperado ${count.expected_on_hand} · contado ${count.counted_quantity} · diferencia ${count.difference}</small>
+                <small style="display: block; color: var(--vendor-muted);">${new Date(count.submitted_at).toLocaleString()} · ${escapeStockHtml(count.review_status)}</small>
+              </div>
+              ${count.review_status === 'PENDING_REVIEW' && canReviewCounts ? `
+                <div style="display: flex; gap: 6px;">
+                  <button type="button" class="wms-btn wms-btn-primary" onclick="reviewWmsInventoryCount('${count.count_id}', 'APPROVE')">Aprobar</button>
+                  <button type="button" class="wms-btn wms-btn-warning" onclick="reviewWmsInventoryCount('${count.count_id}', 'REJECT')">Rechazar</button>
+                </div>
+              ` : ''}
+            </div>
+          </article>
+        `).join('')}
       </div>
-    `;
-  } else {
-    container.innerHTML = `
+    </section>
+  ` : '<div class="location-empty-state"><p>No hay conteos centrales registrados.</p></div>';
+
+  const movementsHtml = movements.length ? `
+    <section>
+      <h4 style="margin: 0 0 10px; color: var(--vendor-forest);">Ledger de inventario</h4>
       <table style="width: 100%; border-collapse: collapse; font-size: 0.86rem; text-align: left;">
         <thead>
           <tr style="background: rgba(62,95,31,0.1); border-bottom: 2px solid var(--vendor-line); color: var(--vendor-forest);">
@@ -8418,8 +8706,10 @@ function openWmsMovementsHistoryModal() {
           `).join('')}
         </tbody>
       </table>
-    `;
-  }
+    </section>
+  ` : '<div class="location-empty-state"><p>No hay movimientos centrales registrados.</p></div>';
+
+  container.innerHTML = countsHtml + movementsHtml;
 
   if (modal) modal.style.display = 'flex';
 }
@@ -8440,6 +8730,7 @@ window.openWmsAuditModal = openWmsAuditModal;
 window.triggerWmsAuditFromCurrentModule = triggerWmsAuditFromCurrentModule;
 window.submitWmsAuditWithStatus = submitWmsAuditWithStatus;
 window.handleWmsAuditSubmit = handleWmsAuditSubmit;
+window.reviewWmsInventoryCount = reviewWmsInventoryCount;
 window.openWmsMovementsHistoryModal = openWmsMovementsHistoryModal;
 window.openMovementsHistoryModal = openWmsMovementsHistoryModal;
 window.closeWmsModal = closeWmsModal;
@@ -9264,8 +9555,74 @@ function getPosCartEngine() {
   return globalPosCart;
 }
 
+async function loadPosRegisters() {
+  const select = document.getElementById('pos-register-select');
+  const status = document.getElementById('pos-register-status');
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!select) return [];
+  if (!supabaseClient || !context?.isVerified) {
+    select.innerHTML = '<option value="">Sesión operativa requerida</option>';
+    select.disabled = true;
+    if (status) status.textContent = 'Iniciá sesión para seleccionar una caja.';
+    return [];
+  }
+
+  try {
+    const [registersResult, sessionsResult] = await Promise.all([
+      supabaseClient
+        .from('cash_registers')
+        .select('id,code,name,currency,active')
+        .eq('tenant_id', context.tenantId)
+        .eq('active', true)
+        .order('name', { ascending: true }),
+      supabaseClient
+        .from('cash_sessions_v2')
+        .select('id,register_id,opened_by,opened_at,status')
+        .eq('tenant_id', context.tenantId)
+        .eq('status', 'OPEN')
+    ]);
+    if (registersResult.error) throw registersResult.error;
+    if (sessionsResult.error) throw sessionsResult.error;
+
+    const openByRegister = new Map((sessionsResult.data || []).map(session => [session.register_id, session]));
+    const registers = (registersResult.data || []).map(register => ({
+      ...register,
+      session: openByRegister.get(register.id) || null
+    }));
+    select.innerHTML = '<option value="">-- Seleccionar caja --</option>' + registers.map(register => {
+      const sessionLabel = register.session ? 'abierta' : 'cerrada';
+      return `<option value="${escapeStockHtml(register.id)}" data-session-id="${escapeStockHtml(register.session?.id || '')}">${escapeStockHtml(register.name || register.code)} · ${sessionLabel}</option>`;
+    }).join('');
+    const preferred = registers.find(register => register.session?.opened_by === context.userId)
+      || registers.find(register => register.session)
+      || registers[0];
+    if (preferred) select.value = preferred.id;
+    select.disabled = registers.length === 0;
+    if (status) {
+      status.textContent = preferred?.session
+        ? `Turno abierto desde ${new Date(preferred.session.opened_at).toLocaleString('es-AR')}.`
+        : 'La caja seleccionada no tiene un turno abierto; abrilo desde Caja & Arqueo antes de cobrar efectivo.';
+    }
+    select.onchange = () => {
+      const selected = registers.find(register => register.id === select.value);
+      if (status) status.textContent = selected?.session
+        ? `Turno abierto desde ${new Date(selected.session.opened_at).toLocaleString('es-AR')}.`
+        : 'Esta caja no tiene un turno abierto.';
+    };
+    return registers;
+  } catch (error) {
+    console.error('No se pudieron cargar las cajas operativas:', error);
+    select.innerHTML = '<option value="">Cajas no disponibles</option>';
+    select.disabled = true;
+    if (status) status.textContent = error.message || 'No se pudieron cargar las cajas.';
+    return [];
+  }
+}
+
 async function initPosWorkspace() {
   populatePosSalespeople();
+  await Promise.all([loadPosRegisters(), loadCanonicalCurrentAccounts()]);
+  populatePosCurrentAccountDropdown();
 
   const cashierDisplay = document.getElementById('pos-cashier-display');
   if (cashierDisplay && typeof SaasAuth !== 'undefined') {
@@ -9339,6 +9696,7 @@ let mobilePosAssistantState = {
   customerAccountName: '',
   adjustmentType: 'NONE', // 'NONE' | 'DISCOUNT_PERCENT' | 'DISCOUNT_FIXED' | 'INCREASE_PERCENT' | 'INCREASE_FIXED'
   adjustmentValue: 0,
+  salespersonId: '',
   salespersonName: '',
   customerWhatsApp: '',
   notes: '',
@@ -9377,6 +9735,10 @@ window.switchPosWorkspaceMode = switchPosWorkspaceMode;
 function startMobilePosAssistant() {
   const cart = getPosCartEngine();
   const hasItems = cart && cart.getItemCount() > 0;
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : {};
+  if (!mobilePosAssistantState.salespersonId && context.userId) {
+    setMobilePosSalesperson(context.userId);
+  }
   mobilePosAssistantState.step = hasItems ? 'cart-summary' : 'mode';
   mobilePosAssistantState.selectedProduct = null;
   mobilePosAssistantState.quantity = 1;
@@ -9393,33 +9755,30 @@ function setMobilePosAssistantStep(step) {
 window.setMobilePosAssistantStep = setMobilePosAssistantStep;
 
 function getAllSearchableProducts() {
-  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
-  let localLocs = [];
-  try {
-    localLocs = typeof readLocalProductLocations === 'function' ? readLocalProductLocations() : JSON.parse(localStorage.getItem('boeweb_store_location_products') || '[]');
-  } catch (_) {}
-
-  let internal = [];
-  if (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) && internalCatalogProducts.length > 0) {
-    internal = internalCatalogProducts;
-  } else {
-    try {
-      internal = JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
-    } catch (_) {}
-  }
-
-  let drafts = [];
-  try {
-    drafts = JSON.parse(localStorage.getItem('boeweb_vendor_stock_entry_drafts') || '[]');
-  } catch (_) {}
-
-  const base = Array.isArray(baseProducts) ? baseProducts : [];
-  const rawList = [...internal, ...storeLocs, ...localLocs, ...drafts, ...base];
+  // El POS sólo busca productos del catálogo operativo confirmado. Borradores,
+  // proveedores y cachés locales nunca se convierten en artículos vendibles.
+  const canonicalProducts = Array.isArray(internalCatalogProducts)
+    ? internalCatalogProducts.filter(product => product?.source === 'catalog_products')
+    : [];
+  const rawList = canonicalProducts.flatMap(product => {
+    if (product.track_stock === false) return [product];
+    const options = Array.isArray(product.inventory_options) ? product.inventory_options : [];
+    if (options.length === 0) return [{ ...product, stock: 0, available_quantity: 0 }];
+    return options.map(option => ({
+      ...product,
+      cart_key: `${product.id}::${option.location_id}`,
+      location_id: option.location_id,
+      shelf_code: option.code,
+      location_name: option.name,
+      stock: option.available,
+      available_quantity: option.available
+    }));
+  });
 
   const unique = new Map();
   rawList.forEach(p => {
     if (!p) return;
-    const id = String(p.product_code || p.id || p.barcode || p.name || '').trim();
+    const id = String(p.cart_key || p.product_code || p.id || p.barcode || p.name || '').trim();
     if (!id) return;
     const existing = unique.get(id);
     const stockVal = Math.max(0, Number(p.stock !== undefined ? p.stock : (p.own_stock !== undefined ? p.own_stock : (p.on_hand || 0))));
@@ -9438,7 +9797,7 @@ function getAllSearchableProducts() {
         product_code: codeVal,
         barcode: barcodeVal,
         name: nameVal,
-        price: priceVal || 1000,
+        price: priceVal,
         stock: stockVal,
         category: categoryVal,
         image: imageVal,
@@ -9451,18 +9810,6 @@ function getAllSearchableProducts() {
       if (existing.image === 'assets/logo.jpg' && imageVal !== 'assets/logo.jpg') existing.image = imageVal;
     }
   });
-
-  // Fallback defaults if catalog is completely empty so that the assistant always has products to show
-  if (unique.size === 0) {
-    const defaultCatalog = [
-      { id: 'PROD-SUST-50L', product_code: 'PROD-SUST-50L', barcode: '7791234567890', name: 'Sustrato Profesional 50L', price: 18500, stock: 24, category: 'Sustratos', image: 'assets/logo.jpg', shelf_code: 'P4-G1-N3-C' },
-      { id: 'PROD-FERT-TRIOPACK', product_code: 'PROD-FERT-TRIOPACK', barcode: '7791234567891', name: 'Trio Fertilizantes Orgánicos 250ml', price: 29900, stock: 15, category: 'Fertilizantes', image: 'assets/logo.jpg', shelf_code: 'P2-G2-N2-M' },
-      { id: 'PROD-CARPA-80', product_code: 'PROD-CARPA-80', barcode: '7791234567892', name: 'Carpa Indoor Pro 80x80x160', price: 145000, stock: 6, category: 'Indoor', image: 'assets/logo.jpg', shelf_code: 'P1-G1-N1-A' },
-      { id: 'PROD-LED-200W', product_code: 'PROD-LED-200W', barcode: '7791234567893', name: 'Panel LED Quantum Board 200W', price: 189000, stock: 8, category: 'Iluminación', image: 'assets/logo.jpg', shelf_code: 'P3-G1-N2-C' },
-      { id: 'PROD-PICADOR-ALU', product_code: 'PROD-PICADOR-ALU', barcode: '7791234567894', name: 'Picador Grinder Aluminio 4 Partes', price: 12500, stock: 30, category: 'Parafernalia', image: 'assets/logo.jpg', shelf_code: 'P4-G3-N4-M' }
-    ];
-    defaultCatalog.forEach(p => unique.set(p.id, p));
-  }
 
   return Array.from(unique.values());
 }
@@ -9490,9 +9837,9 @@ function renderMobilePosAssistantSearchResults(query = '') {
       <div style="padding: 24px 16px; text-align: center; color: var(--color-text-muted); background: rgba(21,45,36,0.03); border-radius: 12px; border: 1px dashed var(--color-border-subtle); margin-top: 10px;">
         <span style="font-size: 1.8rem; display: block; margin-bottom: 6px;">🔍</span>
         <strong style="color: var(--color-text-main); font-size: 0.92rem; display: block;">No se encontraron coincidencias para "${escapeStockHtml(query)}"</strong>
-        <p style="font-size: 0.78rem; margin: 4px 0 10px 0;">Probá escribiendo parte del nombre o pasá a Venta Express.</p>
-        <button type="button" class="stock-entry-secondary-btn" onclick="chooseMobilePosMode('express')" style="font-size: 0.8rem; padding: 6px 12px;">
-          ⚡ Usar Venta Express
+        <p style="font-size: 0.78rem; margin: 4px 0 10px 0;">Probá escribiendo parte del nombre o ingresá el producto al catálogo central.</p>
+        <button type="button" class="stock-entry-secondary-btn" onclick="switchVendorTab('fast-upload')" style="font-size: 0.8rem; padding: 6px 12px;">
+          ＋ Ingresar producto
         </button>
       </div>
     `;
@@ -9505,7 +9852,7 @@ function renderMobilePosAssistantSearchResults(query = '') {
         ${filtered.length} producto${filtered.length > 1 ? 's' : ''} disponible${filtered.length > 1 ? 's' : ''} (Tocá para elegir):
       </small>
       ${filtered.map((p, idx) => {
-        const pId = escapeStockHtml(String(p.id || p.product_code));
+        const pId = escapeStockHtml(String(p.cart_key || p.id || p.product_code));
         const safeName = escapeStockHtml(p.name || 'Producto');
         const price = Number(p.price || 0);
         const stock = Number(p.stock || 0);
@@ -9549,7 +9896,9 @@ window.handleMobilePosAssistantSearch = handleMobilePosAssistantSearch;
 
 function selectMobilePosAssistantProduct(productId) {
   const prods = getAllSearchableProducts();
-  const product = prods.find(p => String(p.id) === String(productId) || String(p.product_code) === String(productId));
+  const product = prods.find(p => String(p.cart_key) === String(productId)
+    || String(p.id) === String(productId)
+    || String(p.product_code) === String(productId));
   if (!product) return;
 
   mobilePosAssistantState.selectedProduct = product;
@@ -9570,7 +9919,8 @@ function updateMobilePosQty(delta) {
 window.updateMobilePosQty = updateMobilePosQty;
 
 function setMobilePosQtyValue(val) {
-  const parsed = Math.max(1, parseInt(val, 10) || 1);
+  const available = Math.max(0, Number(mobilePosAssistantState.selectedProduct?.stock || 0));
+  const parsed = Math.min(Math.max(1, parseInt(val, 10) || 1), Math.max(1, available));
   mobilePosAssistantState.quantity = parsed;
 
   const input = document.getElementById('mobile-pos-qty-input');
@@ -9602,12 +9952,21 @@ function confirmMobilePosItem() {
   if (!prod) return;
 
   const qty = mobilePosAssistantState.quantity || 1;
+  const available = Math.max(0, Number(prod.stock || 0));
+  if (available <= 0 || qty > available) {
+    alert(`Stock insuficiente. Disponibilidad central: ${available} u.`);
+    return;
+  }
   const cart = getPosCartEngine();
   if (cart) {
-    cart.addItem({
+    const added = cart.addItem({
       ...prod,
       quantity: qty
     });
+    if (!added) {
+      alert('No se agregó el producto: la cantidad acumulada supera el stock disponible en esa ubicación.');
+      return;
+    }
     renderPosCartItems();
   }
 
@@ -9621,36 +9980,17 @@ function confirmMobilePosItem() {
 window.confirmMobilePosItem = confirmMobilePosItem;
 
 function confirmMobilePosExpressItem() {
-  const nameInput = document.getElementById('pos-express-name');
-  const catInput = document.getElementById('pos-express-category');
-  const priceInput = document.getElementById('pos-express-price');
-
-  const name = nameInput?.value.trim() || 'Producto Express';
-  const category = catInput?.value || 'Otros';
-  const price = Math.max(1, parseFloat(priceInput?.value) || 0);
-
-  if (price <= 0) {
-    alert('Por favor ingresá un precio válido para la venta express.');
-    return;
-  }
-
-  const expressProduct = {
-    id: `EXPRESS-${Date.now()}`,
-    product_code: `EXPRESS-${Date.now()}`,
-    name,
-    category,
-    price,
-    stock: 999,
-    image: 'assets/logo.jpg'
-  };
-
-  mobilePosAssistantState.selectedProduct = expressProduct;
-  mobilePosAssistantState.quantity = 1;
-  setMobilePosAssistantStep('quantity');
+  alert('La venta libre está deshabilitada. Ingresá y aprobá el producto en el catálogo central.');
 }
 window.confirmMobilePosExpressItem = confirmMobilePosExpressItem;
 
 function chooseMobilePosMode(mode) {
+  if (mode !== 'stock') {
+    alert(mode === 'express'
+      ? 'Para vender un artículo primero ingresalo y aprobalo en el catálogo central. Así la venta conserva producto, precio, stock y auditoría.'
+      : 'Los encargos sin stock necesitan una reserva/preorden propia y no pueden cerrarse como venta POS. Usá por ahora productos con disponibilidad central.');
+    return;
+  }
   mobilePosAssistantState.mode = mode;
   setMobilePosAssistantStep('search');
 }
@@ -9681,7 +10021,7 @@ function renderMobilePosAssistant() {
     }
     container.innerHTML = `
       <p class="assistant-question">Elegí la modalidad de la venta:</p>
-      <p class="assistant-help">Seleccioná una opción para que el asistente te guíe de forma óptima.</p>
+      <p class="assistant-help">El POS confirma únicamente productos aprobados con stock y ubicación central.</p>
       <div class="pos-assistant-mode-grid">
         <button type="button" class="pos-assistant-mode-card featured" onclick="chooseMobilePosMode('stock')">
           <span class="pos-mode-icon">🌿</span>
@@ -9690,21 +10030,10 @@ function renderMobilePosAssistant() {
             <small>Stock disponible en el local · Entrega y cobro en el acto</small>
           </div>
         </button>
-        <button type="button" class="pos-assistant-mode-card" onclick="chooseMobilePosMode('nostock')">
-          <span class="pos-mode-icon">📦</span>
-          <div class="pos-mode-info">
-            <strong>2. Producto sin Stock / Preventa</strong>
-            <small>A encargar o venta a futuro · Fecha de entrega pactada y seña</small>
-          </div>
-        </button>
-        <button type="button" class="pos-assistant-mode-card" onclick="chooseMobilePosMode('express')">
-          <span class="pos-mode-icon">⚡</span>
-          <div class="pos-mode-info">
-            <strong>3. Venta Express</strong>
-            <small>Producto físico en tienda que aún no fue cargado al inventario</small>
-          </div>
-        </button>
       </div>
+      <button type="button" class="stock-entry-secondary-btn" onclick="switchVendorTab('fast-upload')" style="width: 100%; margin-top: 10px;">
+        ＋ Ingresar primero un producto nuevo
+      </button>
     `;
     return;
   }
@@ -10091,8 +10420,11 @@ function renderMobilePosAssistant() {
     const total = cart ? cart.getTotal() : 0;
     const subtotal = cart ? cart.getSubtotal() : 0;
     const items = cart ? cart.getItems() : [];
-    const activeVendor = sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
-    const currentVendor = mobilePosAssistantState.salespersonName || activeVendor;
+    const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : {};
+    const salespeople = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantUsers() : [];
+    const currentSalespersonId = mobilePosAssistantState.salespersonId || authContext.userId || '';
+    const currentSalesperson = salespeople.find(user => (user.id || user.user_id) === currentSalespersonId);
+    const currentVendor = currentSalesperson?.name || mobilePosAssistantState.salespersonName || authContext.userName || 'Vendedor';
 
     if (titleEl) titleEl.textContent = 'Resumen Final & Confirmar';
     if (mobilePosAssistantState.voiceActive) {
@@ -10108,8 +10440,6 @@ function renderMobilePosAssistant() {
     } else if (mobilePosAssistantState.paymentMethod === 'MIXTO') {
       paymentLabel = `Pago Mixto ($${mobilePosAssistantState.mixedCashAmount.toLocaleString('es-AR')} Efvo + $${mobilePosAssistantState.mixedSecondaryAmount.toLocaleString('es-AR')} ${mobilePosAssistantState.mixedSecondaryMethod})`;
     }
-
-    const salespeople = [...new Set([currentVendor, activeVendor, 'Franco', 'Nodira', 'Vendedor 1', 'Vendedor 2'].filter(Boolean))];
 
     container.innerHTML = `
       <div style="padding: 14px; border-radius: 16px; background: var(--color-card-bg); border: 1.5px solid var(--color-accent-gold); margin-bottom: 16px;">
@@ -10144,12 +10474,14 @@ function renderMobilePosAssistant() {
         <label style="display: block; font-size: 0.78rem; font-weight: 800; color: var(--color-text-main); margin-bottom: 4px;">
           🧑‍💼 Vendedor a cargo de la venta (Comisión):
         </label>
-        <select id="mobile-pos-salesperson-select" class="b2b-form-input" onchange="mobilePosAssistantState.salespersonName = this.value">
-          ${salespeople.map(name => `
-            <option value="${escapeStockHtml(name)}" ${name === currentVendor ? 'selected' : ''}>
-              ${escapeStockHtml(name)}
+        <select id="mobile-pos-salesperson-select" class="b2b-form-input" onchange="setMobilePosSalesperson(this.value)">
+          ${salespeople.map(user => {
+            const userId = user.id || user.user_id;
+            return `
+            <option value="${escapeStockHtml(userId)}" ${userId === currentSalespersonId ? 'selected' : ''}>
+              ${escapeStockHtml(user.name || user.email || 'Vendedor')}
             </option>
-          `).join('')}
+          `; }).join('')}
         </select>
       </div>
 
@@ -10172,6 +10504,14 @@ function renderMobilePosAssistant() {
   }
 }
 window.renderMobilePosAssistant = renderMobilePosAssistant;
+
+function setMobilePosSalesperson(userId) {
+  const users = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantUsers() : [];
+  const user = users.find(item => (item.id || item.user_id) === userId);
+  mobilePosAssistantState.salespersonId = user ? userId : '';
+  mobilePosAssistantState.salespersonName = user?.name || user?.email || '';
+}
+window.setMobilePosSalesperson = setMobilePosSalesperson;
 
 function setMobilePosPaymentMethod(method) {
   mobilePosAssistantState.paymentMethod = method;
@@ -10276,10 +10616,19 @@ async function completeMobilePosSale(sendWhatsApp = false) {
 
   // Sincronizar vendedor seleccionado
   const salespersonSelect = document.getElementById('mobile-pos-salesperson-select');
-  const selectedSalesperson = salespersonSelect?.value || mobilePosAssistantState.salespersonName || sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : {};
+  const selectedSalespersonId = salespersonSelect?.value || mobilePosAssistantState.salespersonId || authContext.userId || '';
+  const selectedSalespersonUser = (typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantUsers() : [])
+    .find(user => (user.id || user.user_id) === selectedSalespersonId);
+  if (!selectedSalespersonUser) {
+    showToast('⚠️ Seleccioná un vendedor válido del equipo activo.');
+    return;
+  }
+  const selectedSalesperson = selectedSalespersonUser.name || selectedSalespersonUser.email || 'Vendedor';
+  setMobilePosSalesperson(selectedSalespersonId);
 
   const globalSalespersonSelect = document.getElementById('pos-salesperson-select');
-  if (globalSalespersonSelect) globalSalespersonSelect.value = selectedSalesperson;
+  if (globalSalespersonSelect) globalSalespersonSelect.value = selectedSalespersonId;
 
   // Sincronizar medio de pago y configuraciones en el motor POS principal
   const paymentSelect = document.getElementById('pos-payment-method-select');
@@ -10682,14 +11031,14 @@ function populatePosSalespeople() {
   if (!select) return;
 
   const verifiedUsers = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantUsers() : [];
-  const activeVendor = sessionStorage.getItem('boeweb_vendor_name')
-    || localStorage.getItem('boeweb_vendor_name')
-    || 'Vendedor';
-  const users = verifiedUsers.length > 0 ? verifiedUsers : [{
-    id: `legacy-${activeVendor.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-    name: activeVendor,
-    role: 'VENDEDOR'
-  }];
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : {};
+  const users = verifiedUsers;
+
+  if (users.length === 0) {
+    select.innerHTML = '<option value="">Sesión de equipo requerida</option>';
+    select.disabled = true;
+    return;
+  }
 
   select.innerHTML = users.map(user => {
     const id = escapeStockHtml(user.id || user.user_id || 'vendedor');
@@ -10697,6 +11046,8 @@ function populatePosSalespeople() {
     const role = escapeStockHtml(user.role || 'VENDEDOR');
     return `<option value="${id}">${name} (${role})</option>`;
   }).join('');
+  select.disabled = false;
+  if (users.some(user => (user.id || user.user_id) === context.userId)) select.value = context.userId;
 }
 
 function clearPosUnifiedSearch() {
@@ -10714,9 +11065,7 @@ function handlePosBarcodeOrDirectSearch(rawQuery) {
   if (!rawQuery) return;
   const clean = String(rawQuery).trim().toLowerCase();
 
-  const prods = (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) && internalCatalogProducts.length > 0)
-    ? internalCatalogProducts
-    : JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
+  const prods = getAllSearchableProducts();
 
   // 1. Coincidencia exacta por código de barras, SKU o ID
   const exactMatch = prods.find(p =>
@@ -10854,7 +11203,7 @@ function renderPosSearchResults(query = '') {
     const isOutOfStock = stockVal <= 0;
     const prodImg = p.image || p.image_url || 'assets/logo.jpg';
     const prodPrice = Number(p.price || 0);
-    const prodId = escapeStockHtml(String(p.id || p.product_code));
+    const prodId = escapeStockHtml(String(p.cart_key || p.id || p.product_code));
     const safeName = escapeStockHtml(p.name || 'Producto');
     const safeCat = escapeStockHtml(p.category || 'Venta mostrador');
 
@@ -10888,11 +11237,11 @@ function renderPosSearchResults(query = '') {
 }
 
 function openPosProductModalById(productId) {
-  const prods = (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) && internalCatalogProducts.length > 0)
-    ? internalCatalogProducts
-    : JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
+  const prods = getAllSearchableProducts();
 
-  const product = prods.find(p => String(p.id) === String(productId) || String(p.product_code) === String(productId));
+  const product = prods.find(p => String(p.cart_key) === String(productId)
+    || String(p.id) === String(productId)
+    || String(p.product_code) === String(productId));
   if (product) {
     showPosProductConfirmModal(product);
   }
@@ -10942,14 +11291,9 @@ function showPosProductConfirmModal(product) {
     qtyError.textContent = '';
   }
 
-  let locLabel = '📍 Sin ubicación asignada';
-  if (typeof readLocalProductLocations === 'function') {
-    const locs = readLocalProductLocations();
-    const found = locs.find(l => l.product_code === product.id || l.product_code === product.product_code || l.barcode === product.barcode);
-    if (found && found.shelf_code) {
-      locLabel = `📍 Estante: ${found.shelf_code} (Piso ${found.floor_level || 1}, Nivel ${found.shelf_level || 2})`;
-    }
-  }
+  const locLabel = product.shelf_code
+    ? `📍 Estante: ${product.shelf_code}`
+    : '📍 Sin ubicación asignada';
   if (locationEl) locationEl.textContent = locLabel;
 
   modal.style.display = 'flex';
@@ -11023,10 +11367,14 @@ function confirmAddPosProductToCart() {
 
   const cart = getPosCartEngine();
   if (cart) {
-    cart.addItem({
+    const added = cart.addItem({
       ...posScanPendingProduct,
       quantity: qty
     });
+    if (!added) {
+      alert('No se agregó el producto: el stock central disponible no alcanza para la cantidad acumulada.');
+      return;
+    }
     renderPosCartItems();
     if (typeof showToast === 'function') {
       showToast(`✓ Agregado al ticket: ${qty}x ${posScanPendingProduct.name}`);
@@ -11048,9 +11396,15 @@ function confirmAddPosProductToCart() {
 function addPosProductToCart(product) {
   const cart = getPosCartEngine();
   if (cart) {
-    cart.addItem(product);
+    const added = cart.addItem(product);
+    if (!added) {
+      alert('No se agregó el producto: verificá precio, stock y ubicación central.');
+      return false;
+    }
     renderPosCartItems();
+    return true;
   }
+  return false;
 }
 
 let currentPosMobileView = 'catalog';
@@ -11134,6 +11488,7 @@ function renderPosCartItems() {
       <div style="flex: 1; min-width: 0; padding-right: 8px;">
         <strong style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--color-text-main);">${escapeStockHtml(item.name)}</strong>
         <small style="color: var(--color-text-muted);">$${Number(item.price).toLocaleString('es-AR', { minimumFractionDigits: 2 })} c/u</small>
+        ${item.shelf_code ? `<small style="display: block; color: var(--color-accent-gold);">📍 ${escapeStockHtml(item.shelf_code)}</small>` : ''}
       </div>
       <div style="display: flex; align-items: center; gap: 6px;">
         <button type="button" onclick="updatePosCartItemQty('${item.id}', ${item.quantity - 1})" style="min-width: 28px; min-height: 28px; border-radius: 6px; border: 1px solid var(--color-border-accent); background: #fff; font-weight: 800; cursor: pointer;">-</button>
@@ -11209,7 +11564,10 @@ function renderPosCartItems() {
 function updatePosCartItemQty(id, qty) {
   const cart = getPosCartEngine();
   if (cart) {
-    cart.updateQuantity(id, qty);
+    const updated = cart.updateQuantity(id, qty);
+    if (!updated) {
+      showToast('La cantidad supera el stock conocido. Actualizá inventario o elegí una cantidad menor.', true);
+    }
     renderPosCartItems();
   }
 }
@@ -11273,7 +11631,9 @@ function clearPosDiscount() {
 }
 window.clearPosDiscount = clearPosDiscount;
 
-async function submitPosSaleDraft() {
+// Referencia de migración aislada en un binding léxico e imposible de ejecutar.
+// Se conserva sólo hasta poder retirar el bloque legacy en una limpieza mecánica.
+const submitPosSaleDraftLegacyUnsafe = false ? async function legacyUnsafeSaleReference() {
   const cart = getPosCartEngine();
   if (!cart || cart.getItemCount() === 0) {
     alert('Agregá al menos un producto al ticket antes de confirmar la venta.');
@@ -11593,6 +11953,167 @@ async function submitPosSaleDraft() {
 
   if (typeof renderVendorHomeUI === 'function') renderVendorHomeUI();
   switchVendorTab('home');
+} : null;
+
+async function submitPosSaleDraft() {
+  const cart = getPosCartEngine();
+  if (!cart || cart.getItemCount() === 0) {
+    alert('Agregá al menos un producto al ticket antes de confirmar la venta.');
+    return false;
+  }
+
+  const authContext = typeof SaasAuth !== 'undefined'
+    ? SaasAuth.getTenantContext()
+    : { isVerified: false };
+  if (!supabaseClient || !authContext.isVerified || !authContext.userId) {
+    alert('🔒 Para vender necesitás iniciar sesión con tu usuario seguro de Supabase. No se modificó stock, caja ni cuenta corriente.');
+    return false;
+  }
+  if (!window.OperationalApi) {
+    alert('No se pudo cargar el servicio transaccional de ventas. Recargá la página antes de continuar.');
+    return false;
+  }
+
+  const pendingRecords = window.OperationalApi
+    .readOutbox(authContext.tenantId, authContext.userId)
+    .filter(record => record.state === 'PENDING' || record.state === 'FAILED');
+  if (pendingRecords.length > 0) {
+    const retryResults = await window.OperationalApi.retryPending({ supabaseClient, authContext });
+    const stillPending = window.OperationalApi
+      .readOutbox(authContext.tenantId, authContext.userId)
+      .filter(record => record.state === 'PENDING' || record.state === 'FAILED');
+    if (stillPending.length > 0) {
+      alert('⚠️ Hay una venta anterior pendiente de confirmación. No se permite iniciar otra hasta resolverla para evitar cobros o descuentos duplicados.');
+      return false;
+    }
+    if (retryResults.some(result => result.state === 'SYNCED')) {
+      cart.clear();
+      clearPosDiscount();
+      renderPosCartItems();
+      alert('✅ La venta pendiente anterior quedó confirmada. El carrito fue limpiado; revisá el comprobante antes de iniciar otra venta.');
+      return true;
+    }
+  }
+
+  const salespersonSelect = document.getElementById('pos-salesperson-select');
+  const tenantUsers = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantUsers() : [];
+  const selectedSalespersonId = salespersonSelect?.value || authContext.userId;
+  const salesperson = tenantUsers.find(user => (user.id || user.user_id) === selectedSalespersonId)
+    || (selectedSalespersonId === authContext.userId
+      ? { id: authContext.userId, name: authContext.userName }
+      : null);
+  if (!salesperson) {
+    alert('El vendedor seleccionado no pertenece al equipo activo. Volvé a elegirlo antes de cobrar.');
+    return false;
+  }
+
+  const paymentMethod = document.getElementById('pos-payment-method-select')?.value || 'EFECTIVO';
+  let paymentBreakdown = null;
+  if (paymentMethod === 'MIXTO') {
+    const cashAmount = Number(document.getElementById('pos-mixed-cash-amount')?.value || 0);
+    const secondaryMethod = document.getElementById('pos-mixed-secondary-method')?.value || 'TRANSFERENCIA';
+    const secondaryAmount = Number(document.getElementById('pos-mixed-secondary-amount')?.value || 0);
+    if (Math.abs((cashAmount + secondaryAmount) - cart.calculateTotal()) > 0.01) {
+      alert('La suma de las formas de pago no coincide con el total del ticket.');
+      return false;
+    }
+    paymentBreakdown = {
+      cash_amount: cashAmount,
+      secondary_method: secondaryMethod,
+      secondary_amount: secondaryAmount
+    };
+  }
+
+  const registerSelect = document.getElementById('pos-register-select');
+  const selectedRegisterId = registerSelect?.value || null;
+  const selectedRegisterOption = registerSelect?.selectedOptions?.[0];
+  const requiresOpenCashSession = paymentMethod === 'EFECTIVO'
+    || (paymentMethod === 'MIXTO' && Number(paymentBreakdown?.cash_amount || 0) > 0);
+  if (requiresOpenCashSession && (!selectedRegisterId || !selectedRegisterOption?.dataset.sessionId)) {
+    alert('Para cobrar efectivo seleccioná una caja con turno abierto. Podés abrirla desde Caja & Arqueo.');
+    return false;
+  }
+
+  const draft = cart.createSaleDraft({
+    tenantId: authContext.tenantId,
+    cashierUser: { id: authContext.userId, name: authContext.userName },
+    salespersonUser: {
+      id: salesperson.id || salesperson.user_id,
+      name: salesperson.name || salesperson.email || 'Vendedor'
+    },
+    paymentMethod,
+    paymentBreakdown,
+    notes: document.getElementById('pos-notes-input')?.value || ''
+  });
+
+  const usesCurrentAccount = paymentMethod === 'CUENTA_CORRIENTE'
+    || (paymentMethod === 'MIXTO' && paymentBreakdown?.secondary_method === 'CUENTA_CORRIENTE');
+  if (usesCurrentAccount) {
+    const customerId = document.getElementById('pos-current-account-select')?.value || '';
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(customerId)) {
+      alert('Seleccioná un cliente centralizado y habilitado para cuenta corriente. Las cuentas locales antiguas no pueden utilizarse en una venta nueva.');
+      return false;
+    }
+    draft.customer_id = customerId;
+    draft.customer_account_due = document.getElementById('pos-cc-due-date')?.value || null;
+  }
+
+  const submitButton = document.getElementById('pos-create-draft-btn');
+  const originalLabel = submitButton?.textContent || '';
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = 'Confirmando operación…';
+  }
+
+  try {
+    const result = await window.OperationalApi.checkoutSale({
+      supabaseClient,
+      authContext,
+      draft,
+      registerId: selectedRegisterId,
+      allowQueue: true
+    });
+
+    if (result.state === 'PENDING') {
+      alert('⚠️ La venta quedó PENDIENTE por falta de conexión. No se descontó stock ni se registró dinero todavía. No entregues mercadería hasta que aparezca como confirmada.');
+      return false;
+    }
+
+    const receipt = result.receipt || {};
+    try {
+      localStorage.setItem(
+        `boeweb:last-sale-receipt:v2:${authContext.tenantId}:${authContext.userId}`,
+        JSON.stringify({ ...receipt, cached_at: new Date().toISOString() })
+      );
+    } catch (storageError) {
+      console.warn('No se pudo guardar la copia local del comprobante:', storageError);
+    }
+
+    cart.clear();
+    clearPosDiscount();
+    renderPosCartItems();
+    renderPosSearchResults('');
+    if (typeof fetchB2BProducts === 'function') await fetchB2BProducts(true);
+    if (typeof loadStoreMapData === 'function') await loadStoreMapData(true);
+    if (typeof renderInternalCatalogGrid === 'function') renderInternalCatalogGrid();
+    if (typeof renderCashSectionUI === 'function') renderCashSectionUI();
+    if (typeof renderVendorHomeUI === 'function') renderVendorHomeUI();
+
+    const saleNumber = receipt.sale_number || receipt.sale_id || draft.draft_id;
+    const confirmedTotal = Number(receipt.total ?? draft.total);
+    alert(`✅ Venta confirmada\n\nN.º: ${saleNumber}\nTotal: $${confirmedTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}\n\nStock, pagos, caja y cuenta corriente se confirmaron en una única transacción.`);
+    switchVendorTab('home');
+    return true;
+  } catch (error) {
+    console.error('La venta fue rechazada sin modificar el estado operativo:', error);
+    alert(`No se confirmó la venta. No se modificó stock, caja ni deuda.\n\n${error.message || 'Error desconocido'}`);
+    return false;
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = originalLabel;
+    }
+  }
 }
 
 window.initPosWorkspace = initPosWorkspace;
@@ -11627,11 +12148,9 @@ function setWebOrdersStatus(message, state = 'info') {
 }
 
 function refreshWebOrdersBadges() {
-  const rawStored = JSON.parse(localStorage.getItem('boeweb_web_orders') || localStorage.getItem('boeweb_order_history') || '[]');
-  const combined = (webOrdersList.length > 0 ? webOrdersList : rawStored);
-  const pendingCount = combined.filter(o => {
-    const st = String(o.status || '').toLowerCase();
-    return !st.includes('completado') && !st.includes('entregado') && !st.includes('cancelado');
+  const pendingCount = webOrdersList.filter(order => {
+    const status = String(order.status || '').toUpperCase();
+    return !['DELIVERED', 'CANCELLED', 'EXPIRED'].includes(status);
   }).length;
 
   const kpiCountEl = document.getElementById('vendor-kpi-web-orders-count');
@@ -11657,67 +12176,47 @@ async function loadWebOrders(forceReload = false) {
   if (!listEl) return;
 
   setWebOrdersStatus('Cargando pedidos de la tienda online...', 'loading');
-
-  let localOrders = [];
-  try {
-    const w1 = JSON.parse(localStorage.getItem('boeweb_web_orders') || '[]');
-    const w2 = JSON.parse(localStorage.getItem('boeweb_order_history') || '[]');
-    localOrders = [...w1, ...w2];
-  } catch (_) {
-    localOrders = [];
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!supabaseClient || !context?.isVerified) {
+    webOrdersList = [];
+    renderWebOrders();
+    setWebOrdersStatus('Iniciá sesión para ver los pedidos centrales.', 'error');
+    return;
   }
-
-  let remoteOrders = [];
-  if (supabaseClient) {
-    try {
-      const { data, error } = await supabaseClient
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (!error && Array.isArray(data)) {
-        remoteOrders = data.map(r => ({
-          id: r.order_id || r.id,
-          order_id: r.order_id || r.id,
-          customer_name: r.customer_name || 'Cliente Web',
-          customer_phone: r.customer_phone || '',
-          delivery_type: r.delivery_type || 'store_pickup',
-          payment_method: r.payment_method || 'Efectivo / Transferencia',
-          total: Number(r.total_amount || r.total || 0),
-          total_amount: Number(r.total_amount || r.total || 0),
-          status: r.status || 'Pendiente Vendedor',
-          notes: r.notes || '',
-          items: r.items_json || r.items || [],
-          created_at: r.created_at || new Date().toISOString(),
-          date: r.created_at || new Date().toISOString()
-        }));
-      }
-    } catch (sbErr) {
-      console.warn('Aviso al leer pedidos de Supabase:', sbErr);
-    }
-  }
-
-  // Merge and deduplicate by ID
-  const map = new Map();
-  remoteOrders.forEach(o => map.set(String(o.order_id || o.id), o));
-  localOrders.forEach(o => {
-    const key = String(o.order_id || o.id);
-    if (!map.has(key)) {
-      map.set(key, o);
-    }
-  });
-
-  webOrdersList = Array.from(map.values()).sort((a, b) => {
-    return new Date(b.created_at || b.date || 0) - new Date(a.created_at || a.date || 0);
-  });
-
   try {
-    localStorage.setItem('boeweb_web_orders', JSON.stringify(webOrdersList));
-  } catch (_) {}
-
-  refreshWebOrdersBadges();
-  renderWebOrders();
-  setWebOrdersStatus('');
+    const { data, error } = await supabaseClient
+      .from('public_orders_v2')
+      .select('id,order_number,customer_name,customer_email,customer_phone,delivery_type,delivery_address,notes,items,subtotal,discount,total,currency,status,payment_status,payment_provider,created_at,updated_at')
+      .eq('tenant_id', context.tenantId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    webOrdersList = (data || []).map(order => ({
+      ...order,
+      order_id: order.id,
+      total_amount: Number(order.total) || 0,
+      payment_method: order.payment_provider || (order.payment_status === 'APPROVED' ? 'Pago online aprobado' : 'Pendiente de confirmación'),
+      address: order.delivery_address || ''
+    }));
+    refreshWebOrdersBadges();
+    renderWebOrders();
+    setWebOrdersStatus('');
+  } catch (error) {
+    console.error('No se pudieron leer los pedidos centrales:', error);
+    webOrdersList = [];
+    renderWebOrders();
+    setWebOrdersStatus(`No se cargaron los pedidos: ${error.message}`, 'error');
+  }
 }
+
+const PUBLIC_ORDER_STATUS_LABELS = Object.freeze({
+  PENDING_PAYMENT: 'Pendiente de pago',
+  CONFIRMED: 'Pago aprobado',
+  PREPARING: 'En preparación',
+  READY: 'Listo para retiro/entrega',
+  DELIVERED: 'Entregado',
+  CANCELLED: 'Cancelado',
+  EXPIRED: 'Expirado'
+});
 
 function filterWebOrders() {
   const searchInput = document.getElementById('web-orders-search');
@@ -11732,7 +12231,7 @@ function renderWebOrders() {
   const countEl = document.getElementById('web-orders-count');
   if (!listEl) return;
 
-  const locations = typeof readLocalProductLocations === 'function' ? readLocalProductLocations() : [];
+  const locations = Array.isArray(internalCatalogProducts) ? internalCatalogProducts : [];
 
   const filtered = webOrdersList.filter(order => {
     const query = webOrdersFilterQuery;
@@ -11741,16 +12240,16 @@ function renderWebOrders() {
       String(order.customer_name || order.name || '').toLowerCase().includes(query) ||
       String(order.customer_phone || order.phone || '').toLowerCase().includes(query);
 
-    const st = String(order.status || '').toLowerCase();
+    const st = String(order.status || '').toUpperCase();
     let matchesStatus = true;
     if (webOrdersFilterStatus === 'PENDING') {
-      matchesStatus = st.includes('pendiente');
+      matchesStatus = ['PENDING_PAYMENT', 'CONFIRMED'].includes(st);
     } else if (webOrdersFilterStatus === 'IN_PREPARATION') {
-      matchesStatus = st.includes('preparaci');
+      matchesStatus = st === 'PREPARING';
     } else if (webOrdersFilterStatus === 'READY') {
-      matchesStatus = st.includes('listo') || st.includes('retiro');
+      matchesStatus = st === 'READY';
     } else if (webOrdersFilterStatus === 'COMPLETED') {
-      matchesStatus = st.includes('completado') || st.includes('entregado');
+      matchesStatus = ['DELIVERED', 'CANCELLED', 'EXPIRED'].includes(st);
     }
 
     return matchesQuery && matchesStatus;
@@ -11773,7 +12272,7 @@ function renderWebOrders() {
     const customerName = order.customer_name || order.name || 'Cliente Anónimo';
     const customerPhone = order.customer_phone || order.phone || '';
     const cleanPhone = customerPhone.replace(/\D/g, '');
-    const delivery = order.delivery_type === 'shipping' || order.deliveryType === 'shipping'
+    const delivery = String(order.delivery_type || order.deliveryType || '').toUpperCase() !== 'PICKUP'
       ? `🚚 Envío a domicilio: ${order.address || 'Sin dirección'}`
       : '🏬 Retiro por el local';
     const payment = order.payment_method || order.paymentMethod || 'Efectivo / Transferencia';
@@ -11781,26 +12280,37 @@ function renderWebOrders() {
     const dateStr = order.created_at || order.date
       ? new Date(order.created_at || order.date).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })
       : 'Reciente';
-    const status = order.status || 'Pendiente Vendedor';
+    const statusCode = String(order.status || 'PENDING_PAYMENT').toUpperCase();
+    const status = PUBLIC_ORDER_STATUS_LABELS[statusCode] || statusCode;
+    const escapedOrderId = escapeStockHtml(orderId);
+    const orderIdArgument = escapeStockHtml(JSON.stringify(String(orderId)))
+      .replace(/&lt;/g, '\\u003c')
+      .replace(/&gt;/g, '\\u003e');
+    const escapedCustomerName = escapeStockHtml(customerName);
+    const escapedCustomerPhone = escapeStockHtml(customerPhone);
+    const escapedDelivery = escapeStockHtml(delivery);
+    const escapedPayment = escapeStockHtml(payment);
+    const escapedStatus = escapeStockHtml(status);
+    const escapedDate = escapeStockHtml(dateStr);
 
     let statusBadgeColor = '#ffb74d';
     let statusBg = 'rgba(255,183,77,0.15)';
     const statusLower = status.toLowerCase();
-    const isCancelled = statusLower.includes('cancelado');
+    const isCancelled = statusCode === 'CANCELLED' || statusCode === 'EXPIRED';
 
     if (isCancelled) {
       statusBadgeColor = '#ef5350';
       statusBg = 'rgba(239,83,80,0.18)';
-    } else if (statusLower.includes('comprobado') || statusLower.includes('pago aprobado') || statusLower.includes('pago verificado') || statusLower.includes('pagado')) {
+    } else if (statusCode === 'CONFIRMED') {
       statusBadgeColor = '#25d366';
       statusBg = 'rgba(37,211,102,0.18)';
-    } else if (statusLower.includes('completado') || statusLower.includes('entregado')) {
+    } else if (statusCode === 'DELIVERED') {
       statusBadgeColor = '#66bb6a';
       statusBg = 'rgba(102,187,106,0.15)';
-    } else if (statusLower.includes('preparaci')) {
+    } else if (statusCode === 'PREPARING') {
       statusBadgeColor = '#42a5f5';
       statusBg = 'rgba(66,165,245,0.15)';
-    } else if (statusLower.includes('listo')) {
+    } else if (statusCode === 'READY') {
       statusBadgeColor = '#ab47bc';
       statusBg = 'rgba(171,71,188,0.15)';
     }
@@ -11808,19 +12318,19 @@ function renderWebOrders() {
     const items = order.items || order.items_json || [];
 
     const itemsHtml = items.map(item => {
-      const pCode = item.product_code || item.id || '';
+      const pCode = item.product_id || item.sku || item.product_code || item.id || '';
       const foundLoc = locations.find(l => String(l.product_code) === String(pCode) || String(l.barcode) === String(pCode));
-      const locText = foundLoc && foundLoc.shelf_code
-        ? `📍 ${foundLoc.shelf_code} (Nivel ${foundLoc.shelf_level || 1})`
+      const locText = foundLoc && (foundLoc.shelf_code || foundLoc.wms_code)
+        ? `📍 ${foundLoc.shelf_code || foundLoc.wms_code}`
         : '📍 Sin ubicación asignada';
 
       return `
         <li style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,0.08); font-size: 0.85rem;">
           <div style="flex: 1;">
-            <strong>${item.quantity}x ${item.name}</strong>
-            <div style="font-size: 0.74rem; color: #42a5f5; margin-top: 2px;">${locText}</div>
+            <strong>${escapeStockHtml(item.quantity)}x ${escapeStockHtml(item.name || 'Producto')}</strong>
+            <div style="font-size: 0.74rem; color: #42a5f5; margin-top: 2px;">${escapeStockHtml(locText)}</div>
           </div>
-          <span style="font-weight: 700; color: var(--color-accent-gold);">$${Number((item.price || 0) * (item.quantity || 1)).toLocaleString('es-AR')}</span>
+          <span style="font-weight: 700; color: var(--color-accent-gold);">$${Number(item.line_total ?? ((item.unit_price || item.price || 0) * (item.quantity || 1))).toLocaleString('es-AR')}</span>
         </li>
       `;
     }).join('');
@@ -11833,20 +12343,20 @@ function renderWebOrders() {
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
             <div>
               <span style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 700;">ORDEN WEB</span>
-              <h3 style="margin: 0; font-size: 1.15rem; color: var(--color-accent-gold); font-family: var(--font-display);">${orderId}</h3>
-              <small style="color: var(--color-text-muted); font-size: 0.75rem;">📅 ${dateStr}</small>
+              <h3 style="margin: 0; font-size: 1.15rem; color: var(--color-accent-gold); font-family: var(--font-display);">${escapedOrderId}</h3>
+              <small style="color: var(--color-text-muted); font-size: 0.75rem;">📅 ${escapedDate}</small>
             </div>
             <span style="font-size: 0.75rem; font-weight: 800; color: ${statusBadgeColor}; background: ${statusBg}; border: 1px solid ${statusBadgeColor}; padding: 4px 10px; border-radius: 12px; text-transform: uppercase;">
-              ${status}
+              ${escapedStatus}
             </span>
           </div>
 
           <div style="background: rgba(0,0,0,0.15); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 0.85rem; line-height: 1.4;">
-            <div>👤 <strong>${customerName}</strong></div>
-            ${customerPhone ? `<div>📞 <a href="${waLink}" target="_blank" style="color: #25d366; text-decoration: none; font-weight: 700;">${customerPhone} (WhatsApp)</a></div>` : ''}
-            <div>${delivery}</div>
-            <div>💳 Método: <strong>${payment}</strong></div>
-            ${order.notes ? `<div style="margin-top: 4px; color: var(--color-accent-gold); font-style: italic;">💬 "${order.notes}"</div>` : ''}
+            <div>👤 <strong>${escapedCustomerName}</strong></div>
+            ${customerPhone ? `<div>📞 <a href="${escapeStockHtml(waLink)}" target="_blank" rel="noopener noreferrer" style="color: #25d366; text-decoration: none; font-weight: 700;">${escapedCustomerPhone} (WhatsApp)</a></div>` : ''}
+            <div>${escapedDelivery}</div>
+            <div>💳 Método: <strong>${escapedPayment}</strong></div>
+            ${order.notes ? `<div style="margin-top: 4px; color: var(--color-accent-gold); font-style: italic;">💬 "${escapeStockHtml(order.notes)}"</div>` : ''}
           </div>
 
           <div style="margin-bottom: 10px;">
@@ -11858,8 +12368,8 @@ function renderWebOrders() {
 
           ${isCancelled ? `
             <div style="background: rgba(239,83,80,0.12); border: 1px solid #ef5350; border-radius: 10px; padding: 10px 12px; font-size: 0.82rem; color: #ffcdd2; margin-top: 6px;">
-              <strong style="color: #ef5350; display: block; margin-bottom: 2px;">🚫 Pedido Cancelado (Stock Restituido)</strong>
-              <div><strong>Motivo:</strong> ${escapeStockHtml(order.cancellation_reason || 'Sin especificar')}</div>
+              <strong style="color: #ef5350; display: block; margin-bottom: 2px;">🚫 Pedido Cancelado (reserva liberada)</strong>
+              <div><strong>Motivo:</strong> ${escapeStockHtml(order.cancellation_reason || order.notes || 'Registrado en auditoría')}</div>
               ${order.cancellation_notes ? `<div><strong>Detalle:</strong> "${escapeStockHtml(order.cancellation_notes)}"</div>` : ''}
               ${order.cancelled_by ? `<small style="color: rgba(255,255,255,0.6); display: block; margin-top: 2px;">Por: ${escapeStockHtml(order.cancelled_by)}</small>` : ''}
             </div>
@@ -11872,33 +12382,22 @@ function renderWebOrders() {
             <strong style="font-size: 1.3rem; color: var(--color-accent-gold); font-weight: 900;">$${total.toLocaleString('es-AR')}</strong>
           </div>
 
-          ${!isCancelled ? `
+          ${!['DELIVERED', 'CANCELLED', 'EXPIRED'].includes(statusCode) ? `
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-              <button type="button" class="btn btn-primary" onclick="loadWebOrderToPos('${orderId}')" style="grid-column: 1 / -1; padding: 10px; font-weight: 800; font-size: 0.88rem; background: #2e7d32; border-color: #2e7d32; color: #fff; border-radius: 10px; cursor: pointer;">
-                💳 Pasar a Caja POS / Cobrar
-              </button>
-              <button type="button" class="btn btn-secondary" onclick="updateWebOrderStatus('${orderId}', 'Pago Comprobado')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #25d366; border-color: #25d366; font-weight: 700;">
-                ✅ Pago Comprobado
-              </button>
-              <button type="button" class="btn btn-secondary" onclick="updateWebOrderStatus('${orderId}', 'En Preparación')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer;">
-                📋 En Preparación
-              </button>
-              <button type="button" class="btn btn-secondary" onclick="updateWebOrderStatus('${orderId}', 'Listo para Retiro')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #ab47bc; border-color: #ab47bc;">
-                🟢 Listo para Retiro
-              </button>
-              <button type="button" class="btn btn-secondary" onclick="updateWebOrderStatus('${orderId}', 'Completado')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #66bb6a; border-color: #66bb6a;">
-                ✓ Completado
-              </button>
-              <button type="button" class="btn btn-secondary" onclick="sendWebOrderWhatsApp('${orderId}')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #25d366; border-color: #25d366;">
+              ${statusCode === 'CONFIRMED' ? `<button type="button" class="btn btn-primary" onclick="updateWebOrderStatus(${orderIdArgument}, 'PREPARING')" style="grid-column: 1 / -1; padding: 10px; font-weight: 800;">📋 Comenzar preparación</button>` : ''}
+              ${statusCode === 'PREPARING' ? `<button type="button" class="btn btn-primary" onclick="updateWebOrderStatus(${orderIdArgument}, 'READY')" style="grid-column: 1 / -1; padding: 10px; font-weight: 800;">🟢 Marcar listo</button>` : ''}
+              ${statusCode === 'READY' ? `<button type="button" class="btn btn-primary" onclick="updateWebOrderStatus(${orderIdArgument}, 'DELIVERED')" style="grid-column: 1 / -1; padding: 10px; font-weight: 800;">✓ Confirmar entrega</button>` : ''}
+              ${statusCode === 'PENDING_PAYMENT' ? `<p style="grid-column: 1 / -1; margin: 0; font-size: 0.8rem; color: var(--color-text-muted);">El pago se valida desde el backend/webhook. No puede aprobarse manualmente.</p>` : ''}
+              <button type="button" class="btn btn-secondary" onclick="sendWebOrderWhatsApp(${orderIdArgument})" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #25d366; border-color: #25d366;">
                 💬 Notificar WhatsApp
               </button>
-              <button type="button" class="btn btn-secondary" onclick="openCancelWebOrderModal('${orderId}')" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #ef5350; border-color: #ef5350; font-weight: 800;">
+              ${statusCode === 'PENDING_PAYMENT' ? `<button type="button" class="btn btn-secondary" onclick="openCancelWebOrderModal(${orderIdArgument})" style="padding: 6px 8px; font-size: 0.75rem; border-radius: 8px; cursor: pointer; color: #ef5350; border-color: #ef5350; font-weight: 800;">
                 🚫 Cancelar Pedido
-              </button>
+              </button>` : ''}
             </div>
           ` : `
             <div style="display: flex; gap: 8px;">
-              <button type="button" class="btn btn-secondary" onclick="sendWebOrderWhatsApp('${orderId}')" style="flex: 1; padding: 8px; font-size: 0.78rem; border-radius: 8px; cursor: pointer; color: #25d366; border-color: #25d366;">
+              <button type="button" class="btn btn-secondary" onclick="sendWebOrderWhatsApp(${orderIdArgument})" style="flex: 1; padding: 8px; font-size: 0.78rem; border-radius: 8px; cursor: pointer; color: #25d366; border-color: #25d366;">
                 💬 Avisar por WhatsApp
               </button>
             </div>
@@ -11940,8 +12439,8 @@ function openCancelWebOrderModal(orderId) {
   if (itemsListEl) {
     itemsListEl.innerHTML = items.map(it => `
       <li style="display: flex; justify-content: space-between; font-size: 0.85rem; padding: 4px 0; border-bottom: 1px dashed rgba(255,255,255,0.1);">
-        <span>📦 <strong>${it.quantity}x</strong> ${it.name}</span>
-        <span style="color: #81c784; font-weight: 700;">+${it.quantity} u. al stock</span>
+        <span>📦 <strong>${escapeStockHtml(it.quantity)}x</strong> ${escapeStockHtml(it.name || 'Producto')}</span>
+        <span style="color: #81c784; font-weight: 700;">+${escapeStockHtml(it.quantity)} u. al stock</span>
       </li>
     `).join('');
   }
@@ -12015,6 +12514,33 @@ async function confirmCancelWebOrder() {
     return;
   }
 
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+    alert('Iniciá sesión para cancelar el pedido central.');
+    return;
+  }
+  const cancelledOrderId = currentCancelOrderId;
+  try {
+    await window.OperationalApi.transitionPublicOrder({
+      supabaseClient,
+      authContext,
+      orderId: cancelledOrderId,
+      status: 'CANCELLED',
+      notes: `${reason}${notes ? `: ${notes}` : ''}`,
+      idempotencyKey: `cancel-public-order:${cancelledOrderId}`
+    });
+    closeCancelWebOrderModal();
+    await Promise.all([loadWebOrders(true), loadInternalCatalog()]);
+    storeMapDataLoaded = false;
+    if (typeof loadStoreMapData === 'function') await loadStoreMapData(true);
+    if (window.showToast) window.showToast(`Pedido #${order.order_number || cancelledOrderId} cancelado; la reserva fue liberada por el servidor.`);
+  } catch (error) {
+    console.error('No se pudo cancelar el pedido central:', error);
+    alert(`El pedido no fue cancelado.\n\n${error.message || 'Error desconocido'}`);
+  }
+  return;
+
+  /* Ruta legacy inaccesible; no debe volver a habilitarse. */
   const vendorName = (typeof getCurrentMapUser === 'function') ? getCurrentMapUser() : (sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor');
 
   // Restituir stock si estaba descontado (o por defecto si fue generado en la web)
@@ -12153,43 +12679,44 @@ async function confirmCancelWebOrder() {
 window.confirmCancelWebOrder = confirmCancelWebOrder;
 
 function loadWebOrderToPos(orderId) {
-  const order = webOrdersList.find(o => (o.id || o.order_id) === orderId);
-  if (!order) {
-    alert(`Pedido #${orderId} no encontrado.`);
-    return;
-  }
-
-  const cart = typeof getPosCartEngine === 'function' ? getPosCartEngine() : null;
-  if (!cart) {
-    alert('Motor de carrito POS no disponible.');
-    return;
-  }
-
-  cart.clear();
-  const items = order.items || order.items_json || [];
-  items.forEach(item => {
-    cart.addItem({
-      id: item.id || item.product_code,
-      product_code: item.product_code || item.id,
-      name: item.name,
-      price: Number(item.price) || 0,
-      quantity: Number(item.quantity) || 1
-    });
-  });
-
-  const notesInput = document.getElementById('pos-notes-input');
-  if (notesInput) {
-    notesInput.value = `Pedido Web #${orderId} (${order.customer_name || order.name || 'Cliente'})`;
-  }
-
-  switchVendorTab('pos');
-  renderPosCartItems();
-  if (window.showToast) window.showToast(`✓ Pedido #${orderId} cargado en Caja POS para cobrar.`);
+  alert(`El pedido #${orderId} ya tiene reserva y ciclo de pago propios. No puede copiarse al POS porque duplicaría stock e ingresos.`);
 }
 
 async function updateWebOrderStatus(orderId, newStatus) {
   const order = webOrdersList.find(o => (o.id || o.order_id) === orderId);
   if (order) {
+    const statusMap = {
+      'EN PREPARACIÓN': 'PREPARING',
+      'LISTO PARA RETIRO': 'READY',
+      COMPLETADO: 'DELIVERED',
+      PREPARING: 'PREPARING',
+      READY: 'READY',
+      DELIVERED: 'DELIVERED'
+    };
+    const targetStatus = statusMap[String(newStatus || '').toUpperCase()];
+    const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+    if (!targetStatus || !window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+      alert('La transición solicitada no es válida o no hay una sesión verificada.');
+      return;
+    }
+    try {
+      await window.OperationalApi.transitionPublicOrder({
+        supabaseClient,
+        authContext,
+        orderId,
+        status: targetStatus,
+        notes: `Actualizado desde el panel operativo a ${targetStatus}.`,
+        idempotencyKey: `public-order-transition:${orderId}:${targetStatus}`
+      });
+      await loadWebOrders(true);
+      if (window.showToast) window.showToast(`Pedido #${order.order_number || orderId}: ${PUBLIC_ORDER_STATUS_LABELS[targetStatus]}.`);
+    } catch (error) {
+      console.error('No se actualizó el pedido central:', error);
+      alert(`El estado no cambió.\n\n${error.message || 'Error desconocido'}`);
+    }
+    return;
+
+    /* Ruta legacy inaccesible; el stock de e-commerce se mueve en sus RPC. */
     const isNowCompleted = (newStatus.toLowerCase().includes('completado') || newStatus.toLowerCase().includes('entregado'));
     
     // Si se pasa a Completado / Entregado y aún no se descontó el stock:
@@ -12480,30 +13007,57 @@ function filterExpirationsByTime(timeframe) {
   renderExpirationsSection();
 }
 
-function applyPromoForExpiringProduct(productId) {
+async function applyPromoForExpiringProduct(productId) {
   const p = (internalCatalogProducts || []).find(prod => String(prod.id) === String(productId));
   if (!p) return;
   const promoDiscount = 20; // 20% liquidación
   const originalPrice = Number(p.price || 0);
   const newPrice = Math.round(originalPrice * (1 - promoDiscount / 100));
 
-  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : { isSuperadmin: false };
-  const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'Vendedor';
-  const quota = canVendorAdjustPrice(activeVendor, authContext.isSuperadmin);
-
-  if (!quota.allowed) {
-    alert(`⚠️ Límite de modificaciones de precio diario alcanzado (5 de 5 hoy).\nPara este turno se mantendrá el precio fijado.`);
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+    showToast('Iniciá sesión para modificar el precio en el catálogo central.');
+    return;
+  }
+  if (!['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(String(authContext.role || '').toUpperCase())) {
+    showToast('La liquidación requiere autorización de un administrador o supervisor.');
     return;
   }
 
   if (confirm(`¿Aplicar descuento de liquidación por vencimiento del ${promoDiscount}% a "${p.name}"?\nPrecio actual: $${originalPrice} -> Nuevo precio: $${newPrice}`)) {
-    p.price = newPrice;
-    recordVendorPriceAdjustment(activeVendor, authContext.isSuperadmin);
     try {
-      localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
-    } catch (_) {}
-    renderExpirationsSection();
-    if (window.showToast) window.showToast(`✓ Promo liquidación aplicada ($${newPrice})`);
+      await window.OperationalApi.upsertCatalogProduct({
+        supabaseClient,
+        authContext,
+        product: {
+          id: p.id,
+          sku: p.product_code,
+          name: p.name,
+          price: newPrice,
+          currency: p.currency || 'ARS',
+          track_stock: p.track_stock !== false,
+          metadata: {
+            ...(p.metadata || {}),
+            barcode: p.barcode || p.metadata?.barcode || null,
+            description: p.description || p.metadata?.description || null,
+            category: p.category || p.metadata?.category || null,
+            last_price_adjustment: {
+              type: 'EXPIRATION_PROMO',
+              percent: promoDiscount,
+              previous_price: originalPrice,
+              actor_user_id: authContext.userId,
+              at: new Date().toISOString()
+            }
+          }
+        }
+      });
+      await loadInternalCatalog();
+      renderExpirationsSection();
+      showToast(`✓ Promo central confirmada ($${newPrice})`);
+    } catch (error) {
+      console.error('No se pudo confirmar la liquidación en el catálogo central:', error);
+      alert(`El precio no fue modificado.\n\n${error.message || 'Error desconocido'}`);
+    }
   }
 }
 
@@ -12764,88 +13318,88 @@ function recordVendorPriceAdjustment(vendorName, isSuperadmin = false) {
    ========================================================================== */
 
 function getCurrentAccounts() {
-  let accounts = null;
-  try {
-    const stored = localStorage.getItem('boeweb_current_accounts');
-    if (stored) accounts = JSON.parse(stored);
-  } catch (_) {}
+  return canonicalCurrentAccounts.map(account => ({
+    ...account,
+    ledger: Array.isArray(account.ledger) ? account.ledger.map(entry => ({ ...entry })) : []
+  }));
+}
 
-  if (!accounts || !Array.isArray(accounts) || accounts.length === 0) {
-    accounts = [
-      {
-        id: 'CC-001',
-        customer_name: 'Juan Pérez Cultivador',
-        dni: '34567890',
-        phone: '5493434675428',
-        credit_limit: 400000,
-        current_balance: 65000,
-        first_payment_due: '2026-09-01',
-        ledger: [
-          {
-            id: 'MOV-1',
-            date: '2026-08-10',
-            concept: 'Venta Mostrador #POS-9812',
-            amount: 65000,
-            type: 'DEBIT',
-            balance_after: 65000,
-            sale_draft_id: 'POS-9812',
-            items: [
-              { id: 'PROD-BIO-1', product_code: 'BIO-GROW-1L', name: 'BioBizz Bio Grow 1L', quantity: 2, unit_price: 22500, subtotal: 45000, image: 'assets/logo.jpg' },
-              { id: 'PROD-SUST-1', product_code: 'SUST-GROW-20L', name: 'Sustrato Growers Original 20L', quantity: 1, unit_price: 20000, subtotal: 20000, image: 'assets/logo.jpg' }
-            ]
-          }
-        ]
-      },
-      {
-        id: 'CC-002',
-        customer_name: 'María González Indoor',
-        dni: '38123456',
-        phone: '5493434112233',
-        credit_limit: 600000,
-        current_balance: 140000,
-        first_payment_due: '2026-08-25',
-        ledger: [
-          {
-            id: 'MOV-2',
-            date: '2026-08-01',
-            concept: 'Venta Mostrador #POS-9740',
-            amount: 140000,
-            type: 'DEBIT',
-            balance_after: 140000,
-            sale_draft_id: 'POS-9740',
-            items: [
-              { id: 'PROD-LED-1', product_code: 'LED-CITIZEN-150', name: 'Panel LED 150W Citizen CLU048', quantity: 1, unit_price: 140000, subtotal: 140000, image: 'assets/logo.jpg' }
-            ]
-          }
-        ]
-      }
-    ];
-  } else {
-    // Ensure existing mock entries have items
-    accounts.forEach(acc => {
-      if (Array.isArray(acc.ledger)) {
-        acc.ledger.forEach(m => {
-          if (m.type === 'DEBIT' && (!m.items || m.items.length === 0)) {
-            m.items = [
-              { id: 'PROD-1', product_code: 'PROD-GEN', name: m.concept || 'Productos Varios BÔ', quantity: 1, unit_price: m.amount || 0, subtotal: m.amount || 0, image: 'assets/logo.jpg' }
-            ];
-          }
-        });
-      }
-    });
+async function loadCanonicalCurrentAccounts() {
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!supabaseClient || !context?.isVerified || !context.tenantId) {
+    canonicalCurrentAccounts = [];
+    return canonicalCurrentAccounts;
   }
-  return accounts;
+
+  try {
+    const [accountsResult, customersResult, ledgerResult] = await Promise.all([
+      supabaseClient
+        .from('customer_accounts')
+        .select('id,customer_id,currency,credit_limit,balance,status,payment_terms_days,updated_at')
+        .eq('tenant_id', context.tenantId)
+        .neq('status', 'CLOSED'),
+      supabaseClient
+        .from('customers')
+        .select('id,display_name,tax_id,email,phone,status')
+        .eq('tenant_id', context.tenantId)
+        .neq('status', 'ARCHIVED'),
+      supabaseClient
+        .from('accounts_receivable_ledger')
+        .select('id,account_id,customer_id,entry_type,direction,amount,balance_after,currency,sale_id,due_date,description,created_at')
+        .eq('tenant_id', context.tenantId)
+        .order('created_at', { ascending: false })
+        .limit(500)
+    ]);
+    if (accountsResult.error) throw accountsResult.error;
+    if (customersResult.error) throw customersResult.error;
+    if (ledgerResult.error) throw ledgerResult.error;
+
+    const customers = new Map((customersResult.data || []).map(customer => [customer.id, customer]));
+    const ledgerByAccount = new Map();
+    (ledgerResult.data || []).forEach(entry => {
+      const entries = ledgerByAccount.get(entry.account_id) || [];
+      entries.push({
+        id: entry.id,
+        date: entry.created_at,
+        concept: entry.description || entry.entry_type,
+        amount: Number(entry.amount) || 0,
+        type: entry.direction === 'DEBIT' ? 'DEBIT' : 'CREDIT',
+        balance_after: Number(entry.balance_after) || 0,
+        sale_id: entry.sale_id,
+        due_date: entry.due_date,
+        items: []
+      });
+      ledgerByAccount.set(entry.account_id, entries);
+    });
+
+    canonicalCurrentAccounts = (accountsResult.data || []).map(account => {
+      const customer = customers.get(account.customer_id) || {};
+      return {
+        id: account.customer_id,
+        account_id: account.id,
+        customer_name: customer.display_name || 'Cliente',
+        dni: customer.tax_id || '',
+        phone: customer.phone || '',
+        email: customer.email || '',
+        currency: account.currency || 'ARS',
+        credit_limit: Number(account.credit_limit) || 0,
+        current_balance: Number(account.balance) || 0,
+        first_payment_due: ledgerByAccount.get(account.id)?.find(entry => entry.due_date)?.due_date || '',
+        status: account.status,
+        payment_terms_days: Number(account.payment_terms_days) || 0,
+        ledger: ledgerByAccount.get(account.id) || []
+      };
+    });
+    return getCurrentAccounts();
+  } catch (error) {
+    console.error('No se pudieron cargar las cuentas corrientes centralizadas:', error);
+    canonicalCurrentAccounts = [];
+    return [];
+  }
 }
 
 function saveCurrentAccount(account) {
-  const accounts = getCurrentAccounts();
-  const idx = accounts.findIndex(a => a.id === account.id);
-  if (idx >= 0) {
-    accounts[idx] = account;
-  } else {
-    accounts.push(account);
-  }
-  localStorage.setItem('boeweb_current_accounts', JSON.stringify(accounts));
+  throw new Error(`La cuenta corriente local fue retirada. Usá los comandos centrales (${account?.id || 'sin cliente'}).`);
 }
 
 function switchPortfolioSubtab(subtab) {
@@ -12865,7 +13419,12 @@ function switchPortfolioSubtab(subtab) {
     if (btnGeneral) btnGeneral.classList.add('active');
     if (panelCc) panelCc.style.display = 'none';
     if (panelGeneral) panelGeneral.style.display = 'block';
-    renderVendorPortfolioUI();
+    loadCanonicalVendorClients()
+      .then(renderVendorPortfolioUI)
+      .catch(error => {
+        console.error('No se pudo cargar la cartera central:', error);
+        renderVendorPortfolioUI();
+      });
   }
 }
 
@@ -13409,9 +13968,18 @@ function sendCcDetailedWhatsAppFromModal() {
   }
 }
 
-function openNewCurrentAccountModal() {
+function openNewCurrentAccountModal(mode = 'credit') {
   const modal = document.getElementById('modal-new-current-account');
-  if (modal) modal.style.display = 'flex';
+  if (!modal) return;
+  const isGeneral = mode === 'general';
+  modal.dataset.mode = isGeneral ? 'general' : 'credit';
+  const title = document.getElementById('modal-cc-title');
+  const creditFields = document.getElementById('cc-new-credit-fields');
+  const submitButton = document.getElementById('cc-new-submit-button');
+  if (title) title.textContent = isGeneral ? '👤 Alta de cliente' : '📋 Alta de Cuenta Corriente';
+  if (creditFields) creditFields.style.display = isGeneral ? 'none' : 'grid';
+  if (submitButton) submitButton.textContent = isGeneral ? 'Guardar cliente' : 'Guardar Cuenta';
+  modal.style.display = 'flex';
 }
 
 function closeNewCurrentAccountModal() {
@@ -13419,30 +13987,54 @@ function closeNewCurrentAccountModal() {
   if (modal) modal.style.display = 'none';
 }
 
-function handleCreateCurrentAccount(event) {
+async function handleCreateCurrentAccount(event) {
   event.preventDefault();
   const name = document.getElementById('cc-new-name').value.trim();
   const dni = document.getElementById('cc-new-dni').value.trim();
   const phone = document.getElementById('cc-new-phone').value.replace(/\D/g, '');
-  const limit = Number(document.getElementById('cc-new-limit').value) || 300000;
+  const isGeneralCustomer = document.getElementById('modal-new-current-account')?.dataset.mode === 'general';
+  const limit = isGeneralCustomer ? 0 : (Number(document.getElementById('cc-new-limit').value) || 300000);
   const dueDate = document.getElementById('cc-new-due-date').value || null;
 
-  const newAccount = {
-    id: 'CC-' + Date.now(),
-    customer_name: name,
-    dni,
-    phone,
-    credit_limit: limit,
-    current_balance: 0,
-    first_payment_due: dueDate,
-    ledger: []
-  };
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+    alert('Iniciá sesión para crear clientes centrales.');
+    return;
+  }
 
-  saveCurrentAccount(newAccount);
-  closeNewCurrentAccountModal();
-  renderCurrentAccountsUI();
-  populatePosCurrentAccountDropdown();
-  if (window.showToast) window.showToast(`✓ Cuenta Corriente de "${name}" creada`);
+  const submitButton = event.submitter;
+  if (submitButton) submitButton.disabled = true;
+  try {
+    await window.OperationalApi.upsertCustomer({
+      supabaseClient,
+      authContext,
+      customer: {
+        display_name: name,
+        dni,
+        phone,
+        credit_limit: limit,
+        currency: 'ARS',
+        metadata: {
+          preferred_first_due_date: dueDate,
+          salesperson_user_id: authContext.userId,
+          source: isGeneralCustomer ? 'customer-form' : 'current-account-form'
+        }
+      }
+    });
+    await Promise.all([loadCanonicalCurrentAccounts(), loadCanonicalVendorClients()]);
+    closeNewCurrentAccountModal();
+    renderCurrentAccountsUI();
+    renderVendorPortfolioUI();
+    populatePosCurrentAccountDropdown();
+    if (window.showToast) window.showToast(isGeneralCustomer
+      ? `Cliente "${name}" creado en el registro central.`
+      : `Cuenta corriente de "${name}" creada en el registro central.`);
+  } catch (error) {
+    console.error('No se pudo crear la cuenta corriente:', error);
+    alert(`No se creó el cliente.\n\n${error.message || 'Error desconocido'}`);
+  } finally {
+    if (submitButton) submitButton.disabled = false;
+  }
 }
 
 function openRecordCcPaymentModal(ccId) {
@@ -13464,7 +14056,7 @@ function closeRecordCcPaymentModal() {
   if (modal) modal.style.display = 'none';
 }
 
-function handleRecordCcPaymentSubmit(event) {
+async function handleRecordCcPaymentSubmit(event) {
   event.preventDefault();
   const ccId = document.getElementById('cc-pay-account-id').value;
   const amount = Number(document.getElementById('cc-pay-amount').value);
@@ -13479,46 +14071,52 @@ function handleRecordCcPaymentSubmit(event) {
   const accounts = getCurrentAccounts();
   const account = accounts.find(a => a.id === ccId);
   if (!account) return;
-
-  const newBalance = Math.max(0, (account.current_balance || 0) - amount);
-  account.current_balance = newBalance;
-  if (!account.ledger) account.ledger = [];
-  account.ledger.push({
-    id: 'PAG-' + Date.now(),
-    date: new Date().toISOString().slice(0, 10),
-    concept: `Cobro Cuenta Corriente (${method}) - ${note || 'Pago a cuenta'}`,
-    amount,
-    type: 'CREDIT',
-    balance_after: newBalance
-  });
-
-  saveCurrentAccount(account);
-
-  // If paid in cash, add to Caja BÔ shift
-  if (method === 'EFECTIVO') {
-    try {
-      const today = getTodayDateKey();
-      const cashData = getVendorCashData(today);
-      cashData.sales.push({
-        id: 'CC-PAY-' + Date.now(),
-        amount: amount,
-        time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
-        paymentMethod: 'EFECTIVO',
-        seller: localStorage.getItem('boeweb_vendor_name') || 'Vendedor',
-        itemsSummary: `Cobro CC: ${account.customer_name}`
-      });
-      saveVendorCashData(cashData, today);
-    } catch (_) {}
+  if (amount > Number(account.current_balance || 0)) {
+    alert(`El cobro no puede superar la deuda actual de ${formatCashCurrency(account.current_balance)}.`);
+    return;
   }
 
-  closeRecordCcPaymentModal();
-  renderCurrentAccountsUI();
-  if (modalCcDetailsIsOpen()) {
-    renderCcDetailsMovements(account);
-    const debtEl = document.getElementById('cc-details-debt-badge');
-    if (debtEl) debtEl.textContent = `$${newBalance.toLocaleString('es-AR')}`;
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+    alert('Iniciá sesión para registrar la cobranza central.');
+    return;
   }
-  if (window.showToast) window.showToast(`✓ Pago de $${amount.toLocaleString('es-AR')} registrado con éxito`);
+  const registerId = method === 'EFECTIVO' ? (document.getElementById('pos-register-select')?.value || null) : null;
+  if (method === 'EFECTIVO' && !registerId) {
+    alert('Seleccioná una caja con turno abierto antes de cobrar en efectivo.');
+    return;
+  }
+
+  const submitButton = event.submitter;
+  if (submitButton) submitButton.disabled = true;
+  try {
+    const result = await window.OperationalApi.recordCustomerAccountPayment({
+      supabaseClient,
+      authContext,
+      customerId: account.id,
+      amount,
+      method,
+      registerId,
+      notes: note || 'Pago a cuenta',
+      idempotencyKey: `ar-payment:${authContext.userId}:${globalThis.crypto?.randomUUID?.() || Date.now()}`
+    });
+    await Promise.all([loadCanonicalCurrentAccounts(), refreshCanonicalCashSection(), loadPosRegisters()]);
+    closeRecordCcPaymentModal();
+    renderCurrentAccountsUI();
+    populatePosCurrentAccountDropdown();
+    if (modalCcDetailsIsOpen()) {
+      const refreshed = getCurrentAccounts().find(item => item.id === ccId);
+      if (refreshed) renderCcDetailsMovements(refreshed);
+      const debtEl = document.getElementById('cc-details-debt-badge');
+      if (debtEl) debtEl.textContent = formatCashCurrency(result.balance);
+    }
+    if (window.showToast) window.showToast(`Pago de ${formatCashCurrency(amount)} confirmado. Saldo: ${formatCashCurrency(result.balance)}.`);
+  } catch (error) {
+    console.error('No se confirmó la cobranza:', error);
+    alert(`No se registró el pago.\n\n${error.message || 'Error desconocido'}`);
+  } finally {
+    if (submitButton) submitButton.disabled = false;
+  }
 }
 
 function modalCcDetailsIsOpen() {
@@ -13531,17 +14129,7 @@ function sendCcWhatsAppReminder(ccId) {
 }
 
 function openPosExpressItemModal() {
-  const modal = document.getElementById('pos-express-item-modal');
-  const nameInput = document.getElementById('pos-express-name');
-  const priceInput = document.getElementById('pos-express-price');
-  const qtyInput = document.getElementById('pos-express-qty');
-  if (nameInput) nameInput.value = '';
-  if (priceInput) priceInput.value = '';
-  if (qtyInput) qtyInput.value = '1';
-  if (modal) {
-    modal.style.display = 'flex';
-    if (nameInput) setTimeout(() => nameInput.focus(), 50);
-  }
+  alert('La venta libre está deshabilitada. Ingresá y aprobá el producto para mantener precio, stock y auditoría vinculados.');
 }
 
 function closePosExpressItemModal() {
@@ -13551,6 +14139,10 @@ function closePosExpressItemModal() {
 
 function handlePosExpressItemSubmit(e) {
   if (e) e.preventDefault();
+  alert('La venta libre está deshabilitada. Usá un producto del catálogo central.');
+  return;
+
+  /* Ruta legacy inaccesible. */
   const nameInput = document.getElementById('pos-express-name');
   const priceInput = document.getElementById('pos-express-price');
   const qtyInput = document.getElementById('pos-express-qty');
@@ -14162,7 +14754,6 @@ window.canVendorAdjustPrice = canVendorAdjustPrice;
 window.recordVendorPriceAdjustment = recordVendorPriceAdjustment;
 
 window.getCurrentAccounts = getCurrentAccounts;
-window.saveCurrentAccount = saveCurrentAccount;
 window.switchPortfolioSubtab = switchPortfolioSubtab;
 window.renderCurrentAccountsUI = renderCurrentAccountsUI;
 window.openNewCurrentAccountModal = openNewCurrentAccountModal;
@@ -14208,7 +14799,6 @@ window.canVendorAdjustPrice = canVendorAdjustPrice;
 window.recordVendorPriceAdjustment = recordVendorPriceAdjustment;
 
 window.getCurrentAccounts = getCurrentAccounts;
-window.saveCurrentAccount = saveCurrentAccount;
 window.switchPortfolioSubtab = switchPortfolioSubtab;
 window.renderCurrentAccountsUI = renderCurrentAccountsUI;
 window.openNewCurrentAccountModal = openNewCurrentAccountModal;
@@ -14230,35 +14820,51 @@ window.updatePosCurrentAccountInfo = updatePosCurrentAccountInfo;
    PRODUCTOS RETIRADOS & AJUSTES DE STOCK (MERMAS, ROTURAS, VENCIMIENTOS)
    ========================================================================== */
 
-const RETIRED_PRODUCTS_STORAGE_KEY = 'boeweb_retired_products_history_v1';
-
 function getRetiredProductsHistory() {
-  try {
-    return JSON.parse(localStorage.getItem(RETIRED_PRODUCTS_STORAGE_KEY) || '[]');
-  } catch (err) {
-    return [];
-  }
+  const adjustmentEvents = new Set(['ADJUSTMENT_POSITIVE', 'ADJUSTMENT_NEGATIVE', 'COUNT_ADJUSTMENT']);
+  const movements = canonicalWmsMovements.filter(entry => adjustmentEvents.has(entry.event_type || entry.movement_type));
+  const reversalTargets = new Set(movements.map(entry => {
+    const match = String(entry.notes || '').match(/^Reversión compensatoria del ajuste ([0-9a-f-]{36})$/i);
+    return match?.[1] || null;
+  }).filter(Boolean));
+  const reasonMap = {
+    DAMAGE: ['defectuoso', 'Defectuoso / roto'],
+    SHRINKAGE: ['vencido', 'Vencido / merma'],
+    INTERNAL_USE: ['otro', 'Uso interno'],
+    RESTOCK: ['otro', 'Reposición'],
+    CORRECTION: ['otro', 'Corrección']
+  };
+
+  return movements.map(entry => {
+    const quantityDelta = Number(entry.quantity_delta) || 0;
+    const reason = String(entry.reason || entry.metadata?.reason || 'CORRECTION').toUpperCase();
+    const [reasonKey, reasonLabel] = reasonMap[reason] || ['otro', reason];
+    const timestamp = entry.timestamp || new Date(0).toISOString();
+    const onHandAfter = Number.isFinite(entry.on_hand_after) ? entry.on_hand_after : null;
+    return {
+      id: entry.id,
+      date: timestamp.slice(0, 10),
+      created_at: timestamp,
+      product_id: entry.product_id,
+      product_code: entry.product_code || '',
+      product_name: entry.product_name,
+      location_id: entry.location_id,
+      type: quantityDelta < 0 ? 'remove' : 'add',
+      quantity: Math.abs(quantityDelta),
+      previous_stock: onHandAfter === null ? null : onHandAfter - quantityDelta,
+      new_stock: onHandAfter,
+      reason: reasonKey,
+      reason_code: reason,
+      reason_label: reasonLabel,
+      notes: entry.notes || '',
+      vendor_name: entry.user_name || 'Sistema',
+      reversed_at: reversalTargets.has(entry.id) ? 'central' : null
+    };
+  });
 }
 
 function saveRetiredProductAdjustment(adjustment) {
-  const history = getRetiredProductsHistory();
-  history.unshift(adjustment);
-  localStorage.setItem(RETIRED_PRODUCTS_STORAGE_KEY, JSON.stringify(history));
-
-  if (typeof logSecureAuditEvent === 'function') {
-    logSecureAuditEvent({
-      event_type: adjustment.type === 'add' ? 'STOCK_RESTOCKED' : 'PRODUCT_RETIRED_MERMA',
-      category: 'WMS',
-      severity: ['perdida', 'danado', 'vencido'].includes(adjustment.reason) ? 'WARNING' : 'INFO',
-      actor_name: adjustment.vendor_name || sessionStorage.getItem('boeweb_vendor_name') || localStorage.getItem('boeweb_vendor_name') || 'Vendedor',
-      description: `Ajuste de inventario (${adjustment.type === 'add' ? '+' : '-'}${adjustment.quantity} u.): "${adjustment.product_name}" - Motivo: ${adjustment.reason_label || adjustment.reason}`,
-      entity_type: 'product_stock',
-      entity_id: adjustment.product_id || adjustment.product_code,
-      details: adjustment
-    });
-  }
-
-  return history;
+  throw new Error(`La escritura local de ajustes fue retirada. Usá adjust_inventory_v2 (${adjustment?.id || 'sin id'}).`);
 }
 
 function openStockAdjustmentModal(productIdentifier = null, actionType = 'remove') {
@@ -14621,7 +15227,6 @@ async function handleStockAdjustmentSubmit(event) {
   event.preventDefault();
   const actionType = document.getElementById('adjustment-action-type')?.value || 'remove';
   const qty = Math.max(1, parseInt(document.getElementById('adjustment-quantity')?.value, 10) || 1);
-  const dateVal = document.getElementById('adjustment-date')?.value || new Date().toISOString().slice(0, 10);
   const reason = document.getElementById('adjustment-reason')?.value || 'otro';
   const notes = document.getElementById('adjustment-notes')?.value.trim() || '';
 
@@ -14635,6 +15240,20 @@ async function handleStockAdjustmentSubmit(event) {
 
   if (!product) {
     showToast('Seleccioná un producto válido antes de guardar.');
+    return;
+  }
+
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+    showToast('Iniciá sesión para registrar el ajuste en el inventario central.');
+    return;
+  }
+  if (product.source !== 'catalog_products') {
+    showToast('Este producto todavía pertenece al catálogo heredado. Migrálo antes de ajustar stock.');
+    return;
+  }
+  if (!product.location_id) {
+    showToast('El producto no tiene una ubicación central asignada. Ubicalo antes de ajustar stock.');
     return;
   }
 
@@ -14652,112 +15271,58 @@ async function handleStockAdjustmentSubmit(event) {
     }
   }
 
-  let newStock = prevStock;
-  if (actionType === 'remove') {
-    newStock = Math.max(0, prevStock - qty);
-  } else {
-    newStock = prevStock + qty;
+  if (reason === 'vendido') {
+    showToast('Las salidas por venta sólo se registran desde el POS para vincular stock, pago, vendedor y caja.');
+    return;
+  }
+  if (reason === 'otro' && !notes) {
+    showToast('Describí el motivo del ajuste para mantener una auditoría útil.');
+    return;
   }
 
-  product.stock = newStock;
-  product.own_stock = newStock;
-  
-  // 1. Actualizar catálogo interno
-  if (Array.isArray(internalCatalogProducts)) {
-    const intItem = internalCatalogProducts.find(p => String(p.id) === String(product.id) || p.product_code === product.product_code || (product.barcode && p.barcode === product.barcode));
-    if (intItem) {
-      intItem.stock = newStock;
-      intItem.own_stock = newStock;
-    }
-    try {
-      localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
-    } catch (_) {}
-  }
-
-  // 2. Actualizar ubicaciones físicas locales
-  if (typeof readLocalProductLocations === 'function' && typeof saveLocalProductLocation === 'function') {
-    const locs = readLocalProductLocations();
-    const loc = locs.find(l => String(l.product_code) === String(product.product_code || product.id) || l.product_id === product.id || (product.barcode && l.barcode === product.barcode));
-    if (loc) {
-      loc.stock = newStock;
-      saveLocalProductLocation(loc);
-    }
-  }
-
-  // 3. Actualizar productos del mapa interactivo
-  if (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) {
-    const mapItem = window.storeLocationProducts.find(l => String(l.product_code) === String(product.product_code || product.id) || l.product_id === product.id || (product.barcode && l.barcode === product.barcode));
-    if (mapItem) {
-      mapItem.stock = newStock;
-    }
-  }
-
-  // 4. Actualizar Supabase (product_drafts y supplier_products para sincronizar con la tienda web)
-  if (supabaseClient) {
-    try {
-      if (product.id) {
-        supabaseClient.from('product_drafts').update({ stock: newStock, updated_at: new Date().toISOString() }).eq('id', product.id).then();
-      }
-      const targetSku = product.product_code || product.id;
-      if (targetSku) {
-        supabaseClient.from('supplier_products')
-          .update({ stock: newStock, available: newStock > 0, updated_at: new Date().toISOString() })
-          .eq('supplier_id', 'local_store')
-          .or(`mapped_product_id.eq.${targetSku},supplier_product_id.eq.${targetSku}`)
-          .then();
-      }
-    } catch (_) {}
-  }
-
-  const reasonLabels = {
-    'vendido': 'Vendido (Mostrador)',
-    'defectuoso': 'Defectuoso / Roto',
-    'vencido': 'Vencido',
-    'otro': 'Otro motivo'
+  const reasonMap = {
+    defectuoso: 'DAMAGE',
+    vencido: 'SHRINKAGE',
+    otro: actionType === 'add' ? 'RESTOCK' : 'INTERNAL_USE'
   };
+  const quantityDelta = actionType === 'remove' ? -qty : qty;
+  const submitButton = event.submitter || event.currentTarget?.querySelector('[type="submit"]');
+  if (submitButton) submitButton.disabled = true;
 
-  const currentVendor = localStorage.getItem('boeweb_active_vendor_name') || (typeof getCurrentMapUser === 'function' ? getCurrentMapUser() : 'Vendedor');
-
-  const adjustmentRecord = {
-    id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    date: dateVal,
-    created_at: new Date().toISOString(),
-    product_id: product.id || '',
-    product_code: product.product_code || '',
-    product_name: product.name || 'Producto',
-    barcode: product.barcode || '',
-    type: actionType,
-    quantity: qty,
-    previous_stock: prevStock,
-    new_stock: newStock,
-    reason: reason,
-    reason_label: reasonLabels[reason] || reason,
-    notes: notes,
-    vendor_name: currentVendor
-  };
-
-  saveRetiredProductAdjustment(adjustmentRecord);
-
-  closeStockAdjustmentModal();
-  showToast(actionType === 'remove' 
-    ? `🗑️ Retiro registrado: -${qty} u. de "${product.name}". Nuevo stock: ${newStock} u.`
-    : `📥 Stock agregado: +${qty} u. de "${product.name}". Nuevo stock: ${newStock} u.`
-  );
-
-  renderRetiredProductsUI();
-  if (typeof renderInternalCatalog === 'function') renderInternalCatalog();
-  if (typeof loadStoreMapData === 'function') await loadStoreMapData(true);
-  if (typeof rerenderStoreMap === 'function') rerenderStoreMap();
-
-  if (document.getElementById('store-map-search-result-card')?.style.display !== 'none') {
-    const info = decodeHumanWmsLocation(product.product_code || product.name, product);
-    renderStoreMapLocationCard(info);
+  try {
+    const result = await window.OperationalApi.adjustInventory({
+      supabaseClient,
+      authContext,
+      productId: product.id,
+      locationId: product.location_id,
+      quantityDelta,
+      reason: reasonMap[reason] || 'INTERNAL_USE',
+      notes,
+      idempotencyKey: `inventory-adjust:${authContext.userId}:${globalThis.crypto?.randomUUID?.() || Date.now()}`
+    });
+    closeStockAdjustmentModal();
+    await Promise.all([loadInternalCatalog(), loadWmsInventoryData(true)]);
+    storeMapDataLoaded = false;
+    if (typeof loadStoreMapData === 'function') await loadStoreMapData(true);
+    if (typeof rerenderStoreMap === 'function') rerenderStoreMap();
+    const newStock = Number(result?.on_hand);
+    const suffix = Number.isFinite(newStock) ? ` Nuevo stock físico: ${newStock} u.` : '';
+    showToast(quantityDelta < 0
+      ? `Retiro central confirmado: ${quantityDelta} u. de "${product.name}".${suffix}`
+      : `Ingreso central confirmado: +${quantityDelta} u. de "${product.name}".${suffix}`);
+  } catch (error) {
+    console.error('No se confirmó el ajuste central de inventario:', error);
+    alert(`El stock no fue modificado.\n\n${error.message || 'Error desconocido'}`);
+  } finally {
+    if (submitButton) submitButton.disabled = false;
   }
 }
 
 function renderRetiredProductsUI() {
   const tbody = document.getElementById('retired-products-table-body');
   const history = getRetiredProductsHistory();
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  const canReverse = ['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(authContext?.role);
 
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
@@ -14765,7 +15330,7 @@ function renderRetiredProductsUI() {
   let totalRemoved = 0;
   let damagedUnits = 0;
   let expiredUnits = 0;
-  let soldUnits = 0;
+  let positiveUnits = 0;
 
   history.forEach(item => {
     const itemDate = new Date(item.date + 'T00:00:00');
@@ -14773,19 +15338,18 @@ function renderRetiredProductsUI() {
       if (itemDate >= thirtyDaysAgo) totalRemoved += item.quantity;
       if (item.reason === 'defectuoso') damagedUnits += item.quantity;
       else if (item.reason === 'vencido') expiredUnits += item.quantity;
-      else if (item.reason === 'vendido') soldUnits += item.quantity;
-    }
+    } else if (itemDate >= thirtyDaysAgo) positiveUnits += item.quantity;
   });
 
   const kpiTotal = document.getElementById('retired-kpi-total-units');
   const kpiDamaged = document.getElementById('retired-kpi-damaged-units');
   const kpiExpired = document.getElementById('retired-kpi-expired-units');
-  const kpiSold = document.getElementById('retired-kpi-sold-units');
+  const kpiPositive = document.getElementById('retired-kpi-positive-units');
 
   if (kpiTotal) kpiTotal.textContent = `${totalRemoved} u.`;
   if (kpiDamaged) kpiDamaged.textContent = `${damagedUnits} u.`;
   if (kpiExpired) kpiExpired.textContent = `${expiredUnits} u.`;
-  if (kpiSold) kpiSold.textContent = `${soldUnits} u.`;
+  if (kpiPositive) kpiPositive.textContent = `${positiveUnits} u.`;
 
   if (!tbody) return;
 
@@ -14825,9 +15389,12 @@ function renderRetiredProductsUI() {
 
   tbody.innerHTML = filtered.map(item => {
     const isRemove = item.type === 'remove';
-    const movementBadge = isRemove 
-      ? `<span style="color: #ef5350; font-weight: 800;">-${item.quantity} u.</span> <small style="color: var(--color-text-muted);">(${item.previous_stock} → ${item.new_stock})</small>`
-      : `<span style="color: #81c784; font-weight: 800;">+${item.quantity} u.</span> <small style="color: var(--color-text-muted);">(${item.previous_stock} → ${item.new_stock})</small>`;
+    const stockTrace = item.previous_stock === null || item.new_stock === null
+      ? ''
+      : ` <small style="color: var(--color-text-muted);">(${item.previous_stock} → ${item.new_stock})</small>`;
+    const movementBadge = isRemove
+      ? `<span style="color: #ef5350; font-weight: 800;">-${item.quantity} u.</span>${stockTrace}`
+      : `<span style="color: #81c784; font-weight: 800;">+${item.quantity} u.</span>${stockTrace}`;
 
     const badgeStyle = reasonBadgeStyles[item.reason] || reasonBadgeStyles['otro'];
 
@@ -14855,8 +15422,8 @@ function renderRetiredProductsUI() {
           🧑‍💼 ${escapeFn(item.vendor_name || 'Vendedor')}
         </td>
         <td style="padding: 12px 10px; text-align: right; white-space: nowrap;">
-          <button type="button" onclick="revertRetiredProductAdjustment('${item.id}')" style="padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.08); border: 1px solid var(--color-border-subtle); color: var(--color-text-muted); font-size: 0.76rem; cursor: pointer;" title="Revertir este ajuste si fue un error">
-            ↩ Deshacer
+          <button type="button" onclick="revertRetiredProductAdjustment('${item.id}')" ${item.reversed_at || !canReverse ? 'disabled' : ''} style="padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.08); border: 1px solid var(--color-border-subtle); color: var(--color-text-muted); font-size: 0.76rem; cursor: ${item.reversed_at || !canReverse ? 'not-allowed' : 'pointer'};" title="${item.reversed_at ? 'Reversión compensatoria ya registrada' : (!canReverse ? 'Requiere supervisor' : 'Registrar una reversión compensatoria auditada')}">
+            ${item.reversed_at ? '✓ Revertido' : (canReverse ? '↩ Revertir' : 'Supervisor')}
           </button>
         </td>
       </tr>
@@ -14878,29 +15445,47 @@ function handleRetiredSearchInput(val) {
   renderRetiredProductsUI();
 }
 
-function revertRetiredProductAdjustment(adjustmentId) {
+async function revertRetiredProductAdjustment(adjustmentId) {
   if (!confirm('¿Deseás deshacer este ajuste de stock y restaurar las unidades?')) return;
-  const history = getRetiredProductsHistory();
-  const index = history.findIndex(h => h.id === adjustmentId);
-  if (index === -1) return;
-
-  const item = history[index];
-  if (Array.isArray(internalCatalogProducts)) {
-    const product = internalCatalogProducts.find(p => String(p.id) === String(item.product_id) || p.product_code === item.product_code);
-    if (product) {
-      if (item.type === 'remove') {
-        product.stock = Math.max(0, (Number(product.stock) || 0) + item.quantity);
-      } else {
-        product.stock = Math.max(0, (Number(product.stock) || 0) - item.quantity);
-      }
-      localStorage.setItem('boeweb_internal_catalog', JSON.stringify(internalCatalogProducts));
-    }
+  const item = getRetiredProductsHistory().find(entry => entry.id === adjustmentId);
+  if (!item) return;
+  if (item.reversed_at) {
+    showToast('Este ajuste ya posee una reversión registrada.');
+    return;
+  }
+  const product = (internalCatalogProducts || []).find(p =>
+    String(p.id) === String(item.product_id) || p.product_code === item.product_code
+  );
+  const locationId = item.location_id || product?.location_id;
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(authContext?.role)) {
+    showToast('La reversión compensatoria requiere aprobación de un supervisor autenticado.');
+    return;
+  }
+  if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified || !product?.id || !locationId) {
+    showToast('No se puede revertir: falta la operación o ubicación central vinculada.');
+    return;
   }
 
-  history.splice(index, 1);
-  localStorage.setItem(RETIRED_PRODUCTS_STORAGE_KEY, JSON.stringify(history));
-  showToast('↩ Ajuste revertido correctamente.');
-  renderRetiredProductsUI();
+  const inverseDelta = item.type === 'remove' ? Number(item.quantity) : -Number(item.quantity);
+  try {
+    await window.OperationalApi.adjustInventory({
+      supabaseClient,
+      authContext,
+      productId: product.id,
+      locationId,
+      quantityDelta: inverseDelta,
+      reason: 'CORRECTION',
+      notes: `Reversión compensatoria del ajuste ${item.id}`,
+      idempotencyKey: `inventory-reversal:${item.id}`
+    });
+    await Promise.all([loadInternalCatalog(), loadWmsInventoryData(true)]);
+    showToast('↩ Reversión compensatoria confirmada y auditada.');
+    renderRetiredProductsUI();
+  } catch (error) {
+    console.error('No se pudo confirmar la reversión de inventario:', error);
+    alert(`El ajuste original se conserva y no fue revertido.\n\n${error.message || 'Error desconocido'}`);
+  }
 }
 
 function exportRetiredProductsCsv() {
@@ -15052,7 +15637,6 @@ window.renderStoreMapLocationCard = renderStoreMapLocationCard;
 window.closeStoreMapLocationCard = closeStoreMapLocationCard;
 
 window.getRetiredProductsHistory = getRetiredProductsHistory;
-window.saveRetiredProductAdjustment = saveRetiredProductAdjustment;
 window.openStockAdjustmentModal = openStockAdjustmentModal;
 window.handleAdjustmentProductDropdownChange = handleAdjustmentProductDropdownChange;
 window.closeStockAdjustmentModal = closeStockAdjustmentModal;

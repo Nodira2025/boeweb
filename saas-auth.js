@@ -43,10 +43,13 @@ class SaasAuthEngine {
     this.userRole = 'VENDEDOR';
     this.verifiedSession = false;
     this.tenantUsers = [];
+    this.activeTenantProfile = null;
   }
 
   getTenantContext() {
-    const tenant = SAAS_TENANTS.find(item => item.id === this.activeTenantId) || SAAS_TENANTS[0];
+    const tenant = this.activeTenantProfile
+      || SAAS_TENANTS.find(item => item.id === this.activeTenantId)
+      || { id: this.activeTenantId, slug: '', name: 'Empresa activa', status: 'ACTIVE' };
     const role = SAAS_ROLES[this.userRole] || SAAS_ROLES.VENDEDOR;
     const isSuperadmin = this.verifiedSession && this.userRole === 'SUPERADMIN';
 
@@ -100,13 +103,53 @@ class SaasAuthEngine {
         return false;
       }
 
+      let isSuperadmin = false;
+      try {
+        if (typeof client.rpc !== 'function') throw new Error('RPC no disponible');
+        const { data: superadminResult, error: superadminError } = await client.rpc('is_superadmin');
+        if (!superadminError) isSuperadmin = superadminResult === true;
+      } catch (superadminCheckError) {
+        // La ausencia del RPC nunca eleva privilegios; se conserva el rol de membresía.
+      }
+
+      let tenantProfile = null;
+      try {
+        const { data: tenantData, error: tenantError } = await client
+          .from('tenants')
+          .select('id,slug,name,status')
+          .eq('id', membership.tenant_id)
+          .maybeSingle();
+        if (!tenantError && tenantData?.id === membership.tenant_id) tenantProfile = tenantData;
+      } catch (tenantError) {
+        console.warn('No se pudo cargar el perfil de empresa:', tenantError);
+      }
+
+      let tenantUsers = [{ ...membership, id: membership.user_id }];
+      try {
+        const teamQuery = client
+          .from('tenant_users')
+          .select('tenant_id,user_id,email,name,role,active')
+          .eq('tenant_id', membership.tenant_id)
+          .eq('active', true);
+        const teamResult = typeof teamQuery.order === 'function'
+          ? await teamQuery.order('name', { ascending: true })
+          : { data: null, error: null };
+        const { data: teamData, error: teamError } = teamResult;
+        if (!teamError && Array.isArray(teamData) && teamData.length > 0) {
+          tenantUsers = teamData.map(user => ({ ...user, id: user.user_id }));
+        }
+      } catch (teamError) {
+        console.warn('No se pudo cargar la nómina del tenant:', teamError);
+      }
+
       this.activeTenantId = membership.tenant_id;
+      this.activeTenantProfile = tenantProfile;
       this.userId = authUser.id;
       this.userName = membership.name || authUser.email || 'Usuario BÔ';
       this.userEmail = membership.email || authUser.email || '';
-      this.userRole = SAAS_ROLES[membership.role] ? membership.role : 'VENDEDOR';
+      this.userRole = isSuperadmin ? 'SUPERADMIN' : (SAAS_ROLES[membership.role] ? membership.role : 'VENDEDOR');
       this.verifiedSession = true;
-      this.tenantUsers = [{ ...membership, id: membership.user_id }];
+      this.tenantUsers = tenantUsers;
       return true;
     } catch (error) {
       console.error('No se pudo validar la sesion SaaS:', error);
@@ -154,6 +197,7 @@ class SaasAuthEngine {
     this.userRole = 'VENDEDOR';
     this.verifiedSession = false;
     this.tenantUsers = [];
+    this.activeTenantProfile = null;
   }
 
   logout() {

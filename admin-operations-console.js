@@ -71,17 +71,35 @@ class AdminOperationsConsoleEngine {
       throw new Error('🔒 Operación denegada: Un ADMIN local no puede otorgar ni promover a un usuario al rol SUPERADMIN.');
     }
 
-    // 3. Invocación Backend Real (RPC Supabase `rpc_manage_tenant_user_saas` o Function)
+    // 3. Invocación backend real. La función vuelve a validar JWT, tenant y rol;
+    // requesterContext nunca se usa como autoridad en el servidor.
     if (typeof window !== 'undefined' && window.supabaseClient) {
-      const { data, error } = await window.supabaseClient.rpc('rpc_manage_tenant_user_saas', {
-        p_target_tenant_id: targetTenantId,
-        p_action: action,
-        p_target_user_id: targetUserId,
-        p_new_role: newRole,
-        p_name: name
+      const { data: sessionData, error: sessionError } = await window.supabaseClient.auth.getSession();
+      if (sessionError || !sessionData?.session?.access_token) {
+        throw new Error('🔒 La sesión expiró. Volvé a iniciar sesión.');
+      }
+      const response = await fetch('/.netlify/functions/manage-tenant-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionData.session.access_token}`
+        },
+        body: JSON.stringify({
+          targetTenantId,
+          action,
+          targetUserId,
+          newRole,
+          name
+        })
       });
-      if (error) throw new Error(`🔒 Error Supabase RPC: ${error.message}`);
-      return data;
+      let result = {};
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        console.warn('La gestión de usuarios devolvió una respuesta sin JSON:', parseError);
+      }
+      if (!response.ok) throw new Error(`🔒 ${result.error || `Error de gestión (${response.status})`}`);
+      return result;
     }
 
     // Fallback de Simulación Síncrona para Entorno Node Test / Server Offline

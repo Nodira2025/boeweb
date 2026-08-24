@@ -24,13 +24,9 @@ const LEVEL_NAMES = {
   6: 'Nv.6 Tope (Arriba)'
 };
 
-const MAP_LAYOUT_KEY = 'boeweb_custom_store_layout_gba_v7';
-const MAP_PHOTOS_KEY = 'boeweb_store_shelf_photos_v1';
-const MAP_HISTORY_KEY = 'boeweb_store_map_history_v1';
-const DELETED_SHELVES_KEY = 'boeweb_deleted_store_shelves_v1';
-
-let storeShelves = loadSavedStoreLayout();
+let storeShelves = structuredClone(DEFAULT_STORE_SHELVES);
 let storeLocationProducts = [];
+let mapHistoryEntries = [];
 let selectedFloorLevel = 1;
 let selectedShelfCode = 'PC-CENTRO';
 let selectedInternalLevel = 3;
@@ -51,52 +47,28 @@ function escapeMapHtml(value) {
 }
 
 function getDeletedStoreShelves() {
-  try {
-    const list = JSON.parse(localStorage.getItem(DELETED_SHELVES_KEY) || '[]');
-    return new Set(Array.isArray(list) ? list.map(s => String(s).trim().toUpperCase()) : []);
-  } catch (_) {
-    return new Set();
-  }
+  return new Set();
 }
 
-function addDeletedStoreShelf(shelfCode) {
-  try {
-    const set = getDeletedStoreShelves();
-    set.add(String(shelfCode).trim().toUpperCase());
-    localStorage.setItem(DELETED_SHELVES_KEY, JSON.stringify(Array.from(set)));
-  } catch (_) {}
+function addDeletedStoreShelf() {
+  return false;
 }
 
-function removeDeletedStoreShelf(shelfCode) {
-  try {
-    const set = getDeletedStoreShelves();
-    set.delete(String(shelfCode).trim().toUpperCase());
-    localStorage.setItem(DELETED_SHELVES_KEY, JSON.stringify(Array.from(set)));
-  } catch (_) {}
+function removeDeletedStoreShelf() {
+  return false;
 }
 
 function getCurrentMapUser() {
-  try {
-    const authSess = JSON.parse(localStorage.getItem('boeweb_saas_auth_session_v1') || '{}');
-    if (authSess.user?.name || authSess.user?.email) return authSess.user.name || authSess.user.email;
-    const vendorSess = JSON.parse(localStorage.getItem('saas_active_tenant_session') || '{}');
-    if (vendorSess.user_name) return vendorSess.user_name;
-  } catch (e) {}
-  return 'Vendedor / Operador';
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  return context?.isVerified ? (context.userName || context.userId) : 'Sesión no verificada';
 }
 
 function getMapHistory() {
-  try {
-    const history = JSON.parse(localStorage.getItem(MAP_HISTORY_KEY) || '[]');
-    return Array.isArray(history) ? history : [];
-  } catch (err) {
-    return [];
-  }
+  return mapHistoryEntries.slice();
 }
 
 function logMapHistoryAction(action, label, details, shelfCode = null, floorLevel = null) {
   try {
-    const history = getMapHistory();
     const entry = {
       id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
       timestamp: new Date().toISOString(),
@@ -107,8 +79,8 @@ function logMapHistoryAction(action, label, details, shelfCode = null, floorLeve
       shelf_code: shelfCode || null,
       floor_level: floorLevel || selectedFloorLevel
     };
-    history.unshift(entry);
-    localStorage.setItem(MAP_HISTORY_KEY, JSON.stringify(history.slice(0, 200)));
+    mapHistoryEntries.unshift(entry);
+    mapHistoryEntries = mapHistoryEntries.slice(0, 200);
     return entry;
   } catch (err) {
     console.warn('No se pudo registrar historial del mapa:', err);
@@ -117,7 +89,7 @@ function logMapHistoryAction(action, label, details, shelfCode = null, floorLeve
 
 function clearMapHistory() {
   if (confirm('¿Deseás borrar el historial de modificaciones del plano?')) {
-    localStorage.removeItem(MAP_HISTORY_KEY);
+    mapHistoryEntries = [];
     if (window.showToast) window.showToast('🗑️ Historial de modificaciones vaciado.');
     rerenderStoreMap();
   }
@@ -150,31 +122,15 @@ function exportMapHistoryCSV() {
 }
 
 function loadSavedStoreLayout() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(MAP_LAYOUT_KEY) || 'null');
-    return Array.isArray(saved) && saved.length ? saved : structuredClone(DEFAULT_STORE_SHELVES);
-  } catch (error) {
-    console.warn('No se pudo leer el plano guardado:', error);
-    return structuredClone(DEFAULT_STORE_SHELVES);
-  }
+  return structuredClone(DEFAULT_STORE_SHELVES);
 }
 
 function getLocalShelfPhotos() {
-  try {
-    return JSON.parse(localStorage.getItem(MAP_PHOTOS_KEY) || '{}');
-  } catch (error) {
-    console.warn('No se pudieron leer las fotos locales de estantes:', error);
-    return {};
-  }
+  return {};
 }
 
 function saveStoreLayout() {
-  try {
-    localStorage.setItem(MAP_LAYOUT_KEY, JSON.stringify(storeShelves));
-    window.storeShelves = storeShelves;
-  } catch (error) {
-    console.error('No se pudo guardar el plano:', error);
-  }
+  window.storeShelves = storeShelves;
 }
 
 let movingShelfId = null;
@@ -220,56 +176,26 @@ function calculateDefaultCoordinatesForShelf(wallCode, floorLevel) {
 function ensureShelfExistsForLocation(shelfCode, floorLevel = 1, locationLabel = '') {
   if (!shelfCode || shelfCode === 'PC-CENTRO') return null;
   const normalizedCode = String(shelfCode).trim().toUpperCase();
-  
-  // Guard: if this shelf was explicitly deleted, do NOT resurrect it automatically
-  if (getDeletedStoreShelves().has(normalizedCode)) return null;
-
   const existing = storeShelves.find(s => s.code.toUpperCase() === normalizedCode && s.floor_level === floorLevel);
-  if (existing) return existing;
-
-  const wallMatch = normalizedCode.match(/P([1-4])/);
-  const wallCode = wallMatch ? `P${wallMatch[1]}` : 'P1';
-  const coords = calculateDefaultCoordinatesForShelf(wallCode, floorLevel);
-  const roomName = floorLevel === 2 ? 'dep' : 'tie';
-
-  const newShelf = {
-    id: `${roomName}-${normalizedCode.toLowerCase()}-${Date.now()}`,
-    code: normalizedCode,
-    zone_code: wallCode,
-    name: locationLabel || `${wallCode} · Módulo ${normalizedCode}`,
-    floor_level: floorLevel,
-    x: coords.x,
-    y: coords.y,
-    width: coords.width,
-    height: coords.height,
-    icon: coords.icon || '🗄️',
-    is_anchor: false
-  };
-
-  storeShelves.push(newShelf);
-  saveStoreLayout();
-  logMapHistoryAction(
-    'CREAR_ESTANTE',
-    'Módulo agregado por ubicación física',
-    `Se creó el módulo ${normalizedCode} (${locationLabel || 'Asignado a producto'})`,
-    normalizedCode,
-    floorLevel
-  );
-  return newShelf;
+  return existing || null;
 }
 
 function setStoreMapData(shelves = [], products = [], syncLabel = 'Inventario WMS sincronizado') {
   storeLocationProducts = Array.isArray(products) ? products : [];
-  
-  const deletedSet = getDeletedStoreShelves();
-  storeLocationProducts.forEach(prod => {
-    if (prod.shelf_code && prod.shelf_code !== 'PC-CENTRO') {
-      const codeUpper = String(prod.shelf_code).trim().toUpperCase();
-      if (!deletedSet.has(codeUpper)) {
-        const fLevel = Number(prod.floor_level) || (String(prod.wms_code || '').startsWith('DP') ? 2 : 1);
-        ensureShelfExistsForLocation(prod.shelf_code, fLevel, prod.location_label || prod.location);
-      }
+  storeShelves = structuredClone(DEFAULT_STORE_SHELVES);
+  (Array.isArray(shelves) ? shelves : []).forEach(rawShelf => {
+    if (!rawShelf?.id || !rawShelf?.code) return;
+    const shelf = normalizeShelf(rawShelf);
+    if (!Number.isFinite(Number(rawShelf.x)) || !Number.isFinite(Number(rawShelf.y))) {
+      const wallMatch = String(shelf.code).toUpperCase().match(/P([1-4])/);
+      const coords = calculateDefaultCoordinatesForShelf(wallMatch ? `P${wallMatch[1]}` : 'ISLA', shelf.floor_level);
+      shelf.x = coords.x;
+      shelf.y = coords.y;
+      shelf.width = Number(rawShelf.width) || coords.width;
+      shelf.height = Number(rawShelf.height) || coords.height;
+      shelf.icon = rawShelf.icon || coords.icon;
     }
+    storeShelves.push(shelf);
   });
 
   storeMapSyncLabel = syncLabel;
@@ -370,14 +296,57 @@ function focusStoreMapProduct(productCode) {
   return true;
 }
 
-function moveStoreItem(id, dx, dy) {
+function getMapOperationalContext() {
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  const supabaseClient = window.supabaseClient;
+  if (!window.OperationalApi || !supabaseClient || !context?.isVerified || !['ADMIN', 'SUPERVISOR'].includes(context.role)) {
+    throw new Error('Sólo administración o supervisión pueden modificar ubicaciones centrales.');
+  }
+  return { context, supabaseClient };
+}
+
+async function persistStoreShelf(shelf) {
+  const { context, supabaseClient } = getMapOperationalContext();
+  return window.OperationalApi.upsertInventoryLocation({
+    supabaseClient,
+    authContext: context,
+    location: {
+      id: shelf.id || null,
+      code: shelf.code,
+      name: shelf.name || shelf.code,
+      location_type: shelf.location_type || 'SHELF',
+      is_sellable: shelf.is_sellable !== false,
+      is_default: shelf.is_default === true,
+      metadata: {
+        ...(shelf.metadata || {}),
+        floor_level: Number(shelf.floor_level) || 1,
+        map_x: Number(shelf.x),
+        map_y: Number(shelf.y),
+        map_width: Number(shelf.width),
+        map_height: Number(shelf.height),
+        map_icon: shelf.icon || '📦'
+      }
+    }
+  });
+}
+
+async function moveStoreItem(id, dx, dy) {
   const shelf = storeShelves.find(item => item.id === id);
   if (!shelf || shelf.is_anchor) return;
+  const previous = { x: shelf.x, y: shelf.y };
   shelf.x = Math.max(2, Math.min(88, shelf.x + Number(dx || 0)));
   shelf.y = Math.max(2, Math.min(84, shelf.y + Number(dy || 0)));
-  saveStoreLayout();
-  logMapHistoryAction('MOVER_ESTANTE', 'Módulo desplazado', `Estante ${shelf.code} movido a posición (X:${shelf.x}%, Y:${shelf.y}%)`, shelf.code, shelf.floor_level);
-  rerenderStoreMap();
+  try {
+    await persistStoreShelf(shelf);
+    saveStoreLayout();
+    logMapHistoryAction('MOVER_ESTANTE', 'Módulo desplazado', `Estante ${shelf.code} movido a posición (X:${shelf.x}%, Y:${shelf.y}%)`, shelf.code, shelf.floor_level);
+    rerenderStoreMap();
+  } catch (error) {
+    shelf.x = previous.x;
+    shelf.y = previous.y;
+    if (window.showToast) window.showToast(`❌ No se pudo mover la ubicación: ${error.message}`);
+    rerenderStoreMap();
+  }
 }
 
 function deleteStoreShelf(shelfCode) {
@@ -388,56 +357,12 @@ function deleteStoreShelf(shelfCode) {
     return;
   }
 
-  const assignedProducts = getShelfProducts(shelfCode);
-  const msg = assignedProducts.length
-    ? `⚠️ Este estante tiene ${assignedProducts.length} producto(s) asignado(s). Al eliminarlo, quedarán desvinculados físicamente. ¿Eliminar definitivamente el estante ${shelfCode}?`
-    : `¿Eliminar el estante ${shelfCode} del plano?`;
-
-  if (confirm(msg)) {
-    // 1. Mark in deleted tombstone so it won't be resurrected
-    addDeletedStoreShelf(shelfCode);
-
-    // 2. Remove from active shelves
-    storeShelves = storeShelves.filter(item => item.code !== shelfCode);
-
-    // 3. Unassign product locations in localStorage
-    try {
-      const locKey = 'boeweb_wms_product_locations';
-      const rawLocs = JSON.parse(localStorage.getItem(locKey) || '[]');
-      if (Array.isArray(rawLocs)) {
-        const updated = rawLocs.map(loc => {
-          if (String(loc.shelf_code || '').toUpperCase() === shelfCode.toUpperCase()) {
-            return { ...loc, shelf_code: null, wms_code: null, location: 'Sin ubicación', location_label: 'Sin ubicación' };
-          }
-          return loc;
-        });
-        localStorage.setItem(locKey, JSON.stringify(updated));
-      }
-    } catch (_) {}
-
-    // 4. Unassign in memory
-    storeLocationProducts.forEach(prod => {
-      if (String(prod.shelf_code || '').toUpperCase() === shelfCode.toUpperCase()) {
-        prod.shelf_code = null;
-        prod.wms_code = null;
-        prod.location = 'Sin ubicación';
-        prod.location_label = 'Sin ubicación';
-      }
-    });
-
-    saveStoreLayout();
-    logMapHistoryAction('ELIMINAR_ESTANTE', 'Módulo eliminado', `Se eliminó el estante ${shelfCode} de ${FLOOR_NAMES[shelf.floor_level]}`, shelfCode, shelf.floor_level);
-    
-    if (selectedShelfCode === shelfCode) {
-      const fallback = storeShelves.find(s => s.floor_level === shelf.floor_level && !s.is_anchor);
-      selectedShelfCode = fallback ? fallback.code : 'PC-CENTRO';
-    }
-    if (window.showToast) window.showToast(`🗑️ Estante ${shelfCode} eliminado definitivamente.`);
-    rerenderStoreMap();
+  if (window.showToast) {
+    window.showToast(`🔒 ${shelfCode} es una ubicación central. No se puede borrar ni desvincular stock desde el plano.`);
   }
 }
 
-function addNewStoreShelf(floorLevel, wallCode, shelfType, shelfNumber, customName = '') {
+async function addNewStoreShelf(floorLevel, wallCode, shelfType, shelfNumber, customName = '') {
   const typeCodeMap = { 'E': 'E', 'VIT': 'VIT', 'HEL': 'HEL', 'PIS': 'PIS', 'EST': 'EST' };
   const typePrefix = typeCodeMap[shelfType] || 'E';
   const fullCode = `${wallCode}-${typePrefix}${shelfNumber}`;
@@ -448,9 +373,6 @@ function addNewStoreShelf(floorLevel, wallCode, shelfType, shelfNumber, customNa
     return false;
   }
 
-  // If was previously deleted, remove from tombstone
-  removeDeletedStoreShelf(fullCode);
-
   const wallLabels = {
     'P1': 'Pared 1 (Frente / Norte)',
     'P2': 'Pared 2 (Fondo / Sur)',
@@ -460,10 +382,9 @@ function addNewStoreShelf(floorLevel, wallCode, shelfType, shelfNumber, customNa
   };
 
   const coords = calculateDefaultCoordinatesForShelf(wallCode, Number(floorLevel));
-  const roomName = Number(floorLevel) === 2 ? 'dep' : 'tie';
 
   const newShelf = {
-    id: `${roomName}-${fullCode.toLowerCase()}-${Date.now()}`,
+    id: null,
     code: fullCode,
     zone_code: wallCode,
     name: customName || `${wallLabels[wallCode] || wallCode} · ${fullCode}`,
@@ -476,51 +397,40 @@ function addNewStoreShelf(floorLevel, wallCode, shelfType, shelfNumber, customNa
     is_anchor: false
   };
 
-  storeShelves.push(newShelf);
-  saveStoreLayout();
-  selectedShelfCode = fullCode;
-  selectedFloorLevel = Number(floorLevel);
-  logMapHistoryAction('CREAR_ESTANTE', 'Nuevo módulo creado', `Se creó el módulo ${fullCode} en ${wallLabels[wallCode]}`, fullCode, Number(floorLevel));
-  if (window.showToast) window.showToast(`✅ Estante ${fullCode} creado correctamente.`);
-  isAddShelfModalOpen = false;
-  rerenderStoreMap();
-  return true;
+  try {
+    const result = await persistStoreShelf(newShelf);
+    newShelf.id = result.location_id;
+    storeShelves.push(newShelf);
+    saveStoreLayout();
+    selectedShelfCode = fullCode;
+    selectedFloorLevel = Number(floorLevel);
+    logMapHistoryAction('CREAR_ESTANTE', 'Nuevo módulo creado', `Se creó el módulo ${fullCode} en ${wallLabels[wallCode]}`, fullCode, Number(floorLevel));
+    if (window.showToast) window.showToast(`✅ Ubicación central ${fullCode} creada correctamente.`);
+    isAddShelfModalOpen = false;
+    if (typeof window.loadStoreMapData === 'function') await window.loadStoreMapData(true);
+    rerenderStoreMap();
+    return true;
+  } catch (error) {
+    if (window.showToast) window.showToast(`❌ No se pudo crear la ubicación: ${error.message}`);
+    return false;
+  }
 }
 
 function clearAllStoreShelves() {
-  if (confirm('¿Vaciar todos los estantes del plano y dejar únicamente la Terminal Central? Los productos quedarán desvinculados físicamente.')) {
-    storeShelves.forEach(s => {
-      if (!s.is_anchor) addDeletedStoreShelf(s.code);
-    });
-
-    try {
-      const locKey = 'boeweb_wms_product_locations';
-      const rawLocs = JSON.parse(localStorage.getItem(locKey) || '[]');
-      if (Array.isArray(rawLocs)) {
-        const updated = rawLocs.map(loc => ({ ...loc, shelf_code: null, wms_code: null, location: 'Sin ubicación', location_label: 'Sin ubicación' }));
-        localStorage.setItem(locKey, JSON.stringify(updated));
-      }
-      const locKey2 = 'boeweb_product_locations_v1';
-      localStorage.removeItem(locKey2);
-    } catch (_) {}
-
-    storeLocationProducts.forEach(prod => {
-      prod.shelf_code = null;
-      prod.wms_code = null;
-      prod.location = 'Sin ubicación';
-      prod.location_label = 'Sin ubicación';
-    });
-
-    storeShelves = DEFAULT_STORE_SHELVES.filter(s => s.is_anchor);
-    saveStoreLayout();
-    selectedShelfCode = 'PC-CENTRO';
-    logMapHistoryAction('VACIAR_PLANO', 'Plano reiniciado', 'Se vaciaron todos los estantes. Solo quedó la Terminal Central.');
-    if (window.showToast) window.showToast('🧹 Plano vaciado correctamente (solo Terminal Central).');
-    rerenderStoreMap();
+  if (window.showToast) {
+    window.showToast('🔒 El plano refleja ubicaciones centrales y no puede vaciarse desde el navegador.');
   }
 }
 
 function toggleStoreLayoutEditMode() {
+  if (!isEditMode) {
+    try {
+      getMapOperationalContext();
+    } catch (error) {
+      if (window.showToast) window.showToast(`🔒 ${error.message}`);
+      return;
+    }
+  }
   isEditMode = !isEditMode;
   movingShelfId = null;
   saveStoreLayout();
@@ -544,7 +454,7 @@ function handleShelfClickInEditMode(id, code, event) {
   rerenderStoreMap();
 }
 
-function handleCanvasTapToMove(event) {
+async function handleCanvasTapToMove(event) {
   if (!isEditMode || !movingShelfId) return;
   if (event.target.closest('.gba-shelf-delete-btn') || event.target.closest('.gba-editor-arrows')) return;
 
@@ -560,16 +470,31 @@ function handleCanvasTapToMove(event) {
   const newX = Math.max(2, Math.min(88, Math.round((clickX - (shelf.width / 2)) / 2) * 2));
   const newY = Math.max(2, Math.min(84, Math.round((clickY - (shelf.height / 2)) / 2) * 2));
 
+  const previous = { x: shelf.x, y: shelf.y };
   shelf.x = newX;
   shelf.y = newY;
-  saveStoreLayout();
-  logMapHistoryAction('MOVER_ESTANTE', 'Módulo reubicado', `Estante ${shelf.code} reposicionado a (X:${newX}%, Y:${newY}%)`, shelf.code, shelf.floor_level);
-  if (window.showToast) window.showToast(`✅ ${shelf.code} posicionado en (X:${newX}%, Y:${newY}%).`);
-  movingShelfId = null;
-  rerenderStoreMap();
+  try {
+    await persistStoreShelf(shelf);
+    saveStoreLayout();
+    logMapHistoryAction('MOVER_ESTANTE', 'Módulo reubicado', `Estante ${shelf.code} reposicionado a (X:${newX}%, Y:${newY}%)`, shelf.code, shelf.floor_level);
+    if (window.showToast) window.showToast(`✅ ${shelf.code} posicionado en (X:${newX}%, Y:${newY}%).`);
+    movingShelfId = null;
+    rerenderStoreMap();
+  } catch (error) {
+    shelf.x = previous.x;
+    shelf.y = previous.y;
+    if (window.showToast) window.showToast(`❌ No se pudo mover la ubicación: ${error.message}`);
+    rerenderStoreMap();
+  }
 }
 
 function openAddShelfModal() {
+  try {
+    getMapOperationalContext();
+  } catch (error) {
+    if (window.showToast) window.showToast(`🔒 ${error.message}`);
+    return;
+  }
   isAddShelfModalOpen = true;
   rerenderStoreMap();
 }

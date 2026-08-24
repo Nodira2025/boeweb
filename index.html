@@ -27,6 +27,7 @@
   <!-- Stylesheet -->
   <link rel="stylesheet" href="index.css?v=white_label_v2">
   <link rel="stylesheet" href="storefront.css?v=white_label_v2">
+  <script src="app-config.js?v=config_v2"></script>
   <script src="theme.js?v=white_label_v2"></script>
 </head>
 <body>
@@ -36,10 +37,10 @@
 
   <div class="brand-utility-bar" aria-label="Información de atención">
     <div class="brand-utility-inner">
-      <span class="utility-status"><span class="utility-status-dot" aria-hidden="true"></span>Atención hoy de 11:00 a 21:30</span>
+      <span class="utility-status"><span class="utility-status-dot" aria-hidden="true"></span><span data-app-brand-slogan>Espacio Zen para Cultivo Premium</span></span>
       <div class="utility-links">
         <a href="pacientes.html">Pacientes</a>
-        <a href="https://wa.me/5493813023185" target="_blank" rel="noopener">Hablar con un asesor</a>
+        <span data-app-contact-row="whatsapp" hidden><a data-app-brand-whatsapp target="_blank" rel="noopener"></a></span>
       </div>
     </div>
   </div>
@@ -187,13 +188,7 @@
     </div>
   </section>
 
-  <nav class="home-category-strip" aria-label="Categorías destacadas">
-    <button type="button" class="category-btn home-category-btn" data-category="Semillas">Semillas</button>
-    <button type="button" class="category-btn home-category-btn" data-category="Indoor">Indoor y luz</button>
-    <button type="button" class="category-btn home-category-btn" data-category="Sustratos">Sustratos</button>
-    <button type="button" class="category-btn home-category-btn" data-category="Fertilizantes">Fertilizantes</button>
-    <button type="button" class="category-btn home-category-btn" data-category="Parafernalia">Accesorios</button>
-  </nav>
+  <nav class="home-category-strip" aria-label="Categorías destacadas" hidden></nav>
 
   <!-- Main Catalog Section -->
   <main class="catalog-section" id="catalog-section">
@@ -219,18 +214,7 @@
               </h4>
               <div class="facet-content">
                 <ul class="category-list" id="category-list">
-                  <li><button class="category-btn active" data-category="all">Todos los Productos <span class="facet-count" id="count-cat-all">(0)</span></button></li>
-                  <li><button class="category-btn" data-category="Semillas">🌱 Semillas <span class="facet-count" id="count-cat-semillas">(0)</span></button></li>
-                  <li><button class="category-btn" data-category="Sustratos">🌿 Sustratos <span class="facet-count" id="count-cat-sustratos">(0)</span></button></li>
-                  <li><button class="category-btn" data-category="Fertilizantes">🧪 Fertilizantes <span class="facet-count" id="count-cat-fertilizantes">(0)</span></button></li>
-                  <li><button class="category-btn" data-category="Indoor">🏠 Indoor & Luz <span class="facet-count" id="count-cat-indoor">(0)</span></button></li>
-                  <li><button class="category-btn" data-category="Vaporizadores">💨 Vaporizadores <span class="facet-count" id="count-cat-vaporizadores">(0)</span></button></li>
-                  <li><button class="category-btn" data-category="Macetas">🪴 Macetas <span class="facet-count" id="count-cat-macetas">(0)</span></button></li>
-                  <li><button class="category-btn" data-category="Medición y Riego">📐 Medición y Riego <span class="facet-count" id="count-cat-medicion">(0)</span></button></li>
-                  <li><button class="category-btn" data-category="Parafernalia">🍁 Parafernalia <span class="facet-count" id="count-cat-parafernalia">(0)</span></button></li>
-                  <li><button class="category-btn" data-category="Tabaco de Armar">🍂 Tabaco de Armar <span class="facet-count" id="count-cat-tabaco-armar">(0)</span></button></li>
-                  <li><button class="category-btn" data-category="Tabaco de Pipa">💨 Tabaco de Pipa <span class="facet-count" id="count-cat-tabaco-pipa">(0)</span></button></li>
-                  <li><button class="category-btn" data-category="Otros">✨ Otros <span class="facet-count" id="count-cat-otros">(0)</span></button></li>
+                  <li><button type="button" class="category-btn active" data-category="all">Todos <span class="facet-count">(0)</span></button></li>
                 </ul>
               </div>
             </div>
@@ -1074,20 +1058,15 @@
         <h3>Explorar</h3>
         <ul>
           <li><a href="#catalog-section">Todos los Productos</a></li>
-          <li><a href="#catalog-section" class="footer-cat-link" data-category="Semillas">Semillas</a></li>
-          <li><a href="#catalog-section" class="footer-cat-link" data-category="Fertilizantes">Fertilizantes</a></li>
-          <li><a href="#catalog-section" class="footer-cat-link" data-category="Vaporizadores">Vaporizadores</a></li>
           <li><a href="pacientes.html">Pacientes y REPROCANN</a></li>
         </ul>
       </div>
 
       <div class="footer-contact-info">
         <h3>Contacto</h3>
-        <p>📱 WhatsApp: <a href="https://wa.me/5493813023185" target="_blank" rel="noopener">+54 9 3813 02-3185</a></p>
-        <p>📸 Instagram: <a href="https://www.instagram.com/bo.growclub/" target="_blank" rel="noopener">@bo.growclub</a></p>
-        <p>👥 Facebook: <a href="https://www.facebook.com/p/BO-growclub-61579315981629/" target="_blank" rel="noopener">BO growclub</a></p>
-        <p>📍 <a href="https://www.google.com/search?q=growshop&oq=growshop&gs_lcrp=EgZjaHJvbWUqCAgAEEUYJxg7MggIABBFGCcYOzIKCAEQABiSAxiABDINCAIQABiSAxiABBiKBTIHCAMQABiABDIHCAQQABiABDIHCAUQABiABDIHCAYQABiABDINCAcQLhivARjHARiABDIHCAgQABiABDIHCAkQABiABNIBCDYxODdqMGo3qAIAsAIA&sourceid=chrome&source=chrome.ob&ie=UTF-8#sv=CAwS_wEKBmxjbF9wdhIxCgNwdnESKkNnMHZaeTh4TVd0aWQzQmtkekkzSWc0S0NHZHliM2R6YUc5d0VBSVlBdxKKAQoDbHFpEoIBQ2dobmNtOTNjMmh2Y0VqSDJObTZxN0dBZ0FoYURCQUFJZ2huY205M2MyaHZjSklCRG1OaGJtNWhZbWx6WDNOMGIzSmxtZ0VrUTJoa1JGTlZhRTVOUnpsdVV6QldTbEV3Um01VFZWSTJUa2RXZUU1dVJtNVNVa0ZDLWdFRUNHUVFNURISCgN0YnMSC2xyZjohM3NJQUU9Eg0KAXESCGdyb3dzaG9wGhJsb2NhbC1wbGFjZS12aWV3ZXIYCiCNheXIBA" target="_blank" rel="noopener">Estudio de Cultivo Privado (Tucumán, Argentina)</a></p>
-        <p>🕒 L a V 11:00 a 21:30 hs | Sáb 11:00 a 14:00 y 17:00 a 21:30 hs</p>
+        <p data-app-contact-row="whatsapp" hidden>📱 WhatsApp: <a data-app-brand-whatsapp target="_blank" rel="noopener"></a></p>
+        <p data-app-contact-row="instagram" hidden>📸 Instagram: <a data-app-brand-instagram target="_blank" rel="noopener"></a></p>
+        <p data-app-contact-row="address" hidden>📍 <span data-app-brand-address></span></p>
       </div>
     </div>
     
@@ -1096,7 +1075,7 @@
         "El que cuida una planta, cuida su propia mente."
       </div>
       <a href="vendedor.html" class="footer-team-access">Acceso del equipo</a>
-      <p>&copy; 2026 BO growclub. Todos los derechos reservados. Cultivando con amor y conciencia.</p>
+      <p data-app-brand-copyright>&copy; 2026 BÔ Grow Club. Todos los derechos reservados.</p>
     </div>
   </footer>
 
@@ -1690,6 +1669,7 @@
 
   <!-- Main JavaScript Files -->
   <script src="public-catalog-unification.js?v=cat_v2"></script>
+  <script src="public-order-api.js?v=orders_v2"></script>
   <script src="mercadopago-checkout.js?v=1.0"></script>
   <script src="index.js?v=3.0"></script>
   <script src="hero-slider.js?v=white_label_v2"></script>

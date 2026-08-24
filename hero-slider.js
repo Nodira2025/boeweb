@@ -12,7 +12,57 @@
   let touchStartX = 0;
   let touchEndX = 0;
 
+  function escapeHeroHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function mapCanonicalHero(config) {
+    const normalized = window.AppConfig?.normalizeConfig(config);
+    if (!normalized) return null;
+    const hero = normalized.brand.hero;
+    const visuals = normalized.brand.visuals;
+    const texts = normalized.brand.texts;
+    return {
+      isActive: hero.enabled && hero.slides.length > 0,
+      slides: hero.slides.map(slide => ({
+        id: slide.id,
+        type: slide.type,
+        media_url: slide.mediaUrl,
+        title: slide.title,
+        subtitle: slide.subtitle,
+        target_url: slide.targetUrl,
+        cta_text: slide.ctaText,
+        duration_seconds: slide.durationSeconds,
+        overlay_enabled: slide.overlayEnabled
+      })),
+      brand: {
+        brand_name: texts.name,
+        slogan: texts.slogan,
+        primary_color: visuals.primaryColor,
+        accent_color: visuals.accentColor
+      }
+    };
+  }
+
   function getHeroConfig() {
+    if (window.boeStorefrontAppConfig?.revision > 0) {
+      return mapCanonicalHero(window.boeStorefrontAppConfig);
+    }
+    try {
+      const tenantId = window.AppConfig?.getActiveTenantId?.();
+      const cacheKey = window.AppConfig?.createStorageKey?.(tenantId, 'published');
+      const cached = cacheKey ? JSON.parse(localStorage.getItem(cacheKey) || 'null') : null;
+      if (cached?.revision > 0) return mapCanonicalHero(cached);
+    } catch (error) {
+      console.warn('No se pudo leer la portada canónica en caché:', error);
+    }
+
+    // Compatibilidad de lectura para instalaciones que aún no publicaron AppConfig v2.
     let brand = null;
     try {
       brand = JSON.parse(localStorage.getItem('boeweb_tenant_profile_published') || 'null');
@@ -28,6 +78,14 @@
       slides = brand.hero_slides;
     }
 
+    if (window.AppConfig) {
+      const migrated = window.AppConfig.normalizeConfig({
+        brand,
+        hero_slider_active: brand?.hero_slider_active,
+        hero_slides: slides || brand?.hero_slides || []
+      });
+      return mapCanonicalHero(migrated);
+    }
     const isActive = brand?.hero_slider_active !== false && slides && slides.length > 0;
     return { isActive, slides: slides || [], brand };
   }
@@ -72,23 +130,24 @@
       <div class="hero-slider-track" id="hero-slider-track">
         ${slides.map((slide, idx) => {
           const isVideo = slide.type === 'video';
-          const targetUrl = slide.target_url || '#catalog-section';
-          const ctaText = slide.cta_text || 'Ver';
-          const title = slide.title || brand?.brand_name || 'Promoción Especial';
-          const subtitle = slide.subtitle || brand?.slogan || '';
+          const targetUrl = escapeHeroHtml(slide.target_url || '#catalog-section');
+          const ctaText = escapeHeroHtml(slide.cta_text || 'Ver');
+          const title = escapeHeroHtml(slide.title || brand?.brand_name || 'Promoción Especial');
+          const subtitle = escapeHeroHtml(slide.subtitle || brand?.slogan || '');
+          const mediaUrl = escapeHeroHtml(slide.media_url || 'assets/hero-banner1.jpg');
 
           return `
             <div class="hero-slide-item ${idx === 0 ? 'active' : ''}" data-index="${idx}" data-duration="${slide.duration_seconds || 5}">
               <div class="hero-slide-media-container">
                 ${isVideo ? `
-                  <video class="hero-slide-video" src="${slide.media_url}" autoplay muted loop playsinline></video>
+                  <video class="hero-slide-video" src="${mediaUrl}" autoplay muted loop playsinline></video>
                 ` : `
-                  <img class="hero-slide-image" src="${slide.media_url || 'assets/hero-banner1.jpg'}" alt="${title}">
+                  <img class="hero-slide-image" src="${mediaUrl}" alt="${title}">
                 `}
               </div>
               <div class="hero-slide-overlay">
                 <div class="hero-slide-content">
-                  <span class="hero-slide-badge">${brand?.brand_name || 'Destacado'}</span>
+                  <span class="hero-slide-badge">${escapeHeroHtml(brand?.brand_name || 'Destacado')}</span>
                   <h2 class="hero-slide-title">${title}</h2>
                   ${subtitle ? `<p class="hero-slide-subtitle">${subtitle}</p>` : ''}
                   <div class="hero-slide-actions">
@@ -240,6 +299,7 @@
   }
 
   window.addEventListener('boeweb_brand_updated', initHeroSlider);
+  window.addEventListener('boeweb_app_config_loaded', initHeroSlider);
   window.addEventListener('storage', (e) => {
     if (e.key === 'boeweb_hero_slides' || e.key === 'boeweb_tenant_profile_published') {
       initHeroSlider();

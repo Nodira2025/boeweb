@@ -1163,20 +1163,11 @@
           <p>Ingresá a las herramientas de venta, caja, clientes e inventario del local.</p>
         </div>
 
-        <form id="vendor-login-form" class="vendor-login-form" onsubmit="handleVendorLogin(event)" novalidate>
+        <form id="vendor-login-form" class="vendor-login-form" onsubmit="handleVendorLogin(event)">
           <div class="vendor-login-field">
-            <label for="auth-vendor-select">Identidad</label>
+            <label for="auth-vendor-email">Correo del equipo</label>
             <div class="vendor-login-select-wrap">
-              <select id="auth-vendor-select" required onchange="selectVendorCard(this.value)" autocomplete="username">
-                <option value="" disabled selected>Seleccioná tu nombre</option>
-                <option value="Raul">Raul</option>
-                <option value="Nacho Mina">Nacho Mina</option>
-                <option value="Alexis">Alexis</option>
-                <option value="Gino">Gino</option>
-                <option value="Rodrigo">Rodrigo</option>
-                <option value="Felipe">Felipe</option>
-                <option value="Mariano">Mariano</option>
-              </select>
+              <input type="email" id="auth-vendor-email" placeholder="nombre@tuempresa.com" required autocomplete="username" inputmode="email">
             </div>
           </div>
 
@@ -1458,7 +1449,6 @@
         <button type="button" class="vendor-flow-card vendor-flow-card-featured" id="vcard-pos" onclick="switchVendorTab('pos')">
           <div class="vendor-flow-top">
             <span class="vendor-flow-icon">🏷️🛒</span>
-            <span class="vendor-flow-num">1</span>
           </div>
           <div>
             <strong class="vendor-flow-title">Vender producto</strong>
@@ -1470,7 +1460,6 @@
         <button type="button" class="vendor-flow-card" id="vcard-cash" onclick="switchVendorTab('cash')">
           <div class="vendor-flow-top">
             <span class="vendor-flow-icon">💰💵</span>
-            <span class="vendor-flow-num">2</span>
           </div>
           <div>
             <strong class="vendor-flow-title">Caja & Arqueo Diario</strong>
@@ -1780,7 +1769,7 @@
               <span id="pos-scanner-indicator" class="pos-scanner-badge">⚡ Lector láser listo</span>
               <span id="pos-voice-status" class="pos-voice-status"></span>
               <span id="pos-search-count-badge" style="color: var(--color-text-muted); font-weight: 700;">Catálogo interno</span>
-              <button type="button" class="btn btn-secondary" id="pos-express-item-btn" onclick="openPosExpressItemModal()" style="padding: 4px 12px; font-size: 0.8rem; font-weight: 700; border-radius: 8px; background: rgba(195,155,75,0.12); color: var(--color-accent-gold); border: 1px solid var(--color-accent-gold); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-left: auto;">
+              <button type="button" class="btn btn-secondary" id="pos-express-item-btn" onclick="openPosExpressItemModal()" aria-disabled="true" title="Primero ingresá y aprobá el producto en el catálogo central" style="padding: 4px 12px; font-size: 0.8rem; font-weight: 700; border-radius: 8px; background: rgba(195,155,75,0.12); color: var(--color-accent-gold); border: 1px solid var(--color-accent-gold); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-left: auto;">
                 ⚡ + Ítem Exprés / Venta Libre
               </button>
             </div>
@@ -1850,6 +1839,11 @@
                 <span>🔑 Cobró / Cajero (Auth): </span>
                 <strong id="pos-cashier-display" style="color: var(--color-text-main);">Profesor Franco</strong>
               </div>
+              <label for="pos-register-select" style="font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin: 8px 0 4px;">🧰 Caja física:</label>
+              <select id="pos-register-select" class="b2b-form-input" style="font-size: 0.85rem; font-weight: 700; background: #fff;">
+                <option value="">Cargando cajas habilitadas…</option>
+              </select>
+              <small id="pos-register-status" role="status" aria-live="polite" style="display: block; margin-top: 4px; color: var(--color-text-muted);">El efectivo requiere un turno de caja abierto.</small>
             </div>
 
             <!-- Listado de Ítems POS -->
@@ -2856,23 +2850,19 @@
           <h3 id="wms-qr-modal-title" style="margin: 0; color: var(--vendor-forest); font-family: var(--font-display);">📷 Escanear QR de Módulo Físico</h3>
           <button type="button" class="stock-entry-close" onclick="closeWmsModal('wms-qr-modal')">×</button>
         </div>
-        <p style="font-size: 0.88rem; color: var(--vendor-muted); margin-bottom: 16px;">Apuntá la cámara a la etiqueta QR del módulo (ej: <strong>PI-M04</strong>) o seleccioná un módulo demo:</p>
+        <p style="font-size: 0.88rem; color: var(--vendor-muted); margin-bottom: 16px;">Apuntá la cámara a la etiqueta QR de una ubicación o seleccionala desde el inventario central:</p>
         <div style="background: rgba(0,0,0,0.04); border: 2px dashed var(--vendor-gold); border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 16px;">
           <div style="font-size: 3rem; margin-bottom: 8px;">📷</div>
           <p style="font-size: 0.85rem; margin-bottom: 14px;">Escanear código de barras o QR de módulo con la cámara</p>
           <button type="button" class="wms-btn wms-btn-primary" style="width: 100%; margin-bottom: 14px; background: var(--vendor-forest); font-weight: 800;" onclick="closeWmsModal('wms-qr-modal'); openUniversalCameraScanner('wms');">
             ⚡ ACTIVAR CÁMARA EN VIVO
           </button>
-          <label style="display: block; margin-bottom: 8px; font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest);">O seleccionar módulo demo:</label>
+          <label style="display: block; margin-bottom: 8px; font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest);">O seleccionar ubicación central:</label>
           <select id="wms-demo-module-select" class="wms-btn" style="width: 100%; margin-bottom: 14px;">
-            <option value="PI-M04">PI-M04 (Pared Izquierda - Control de plagas)</option>
-            <option value="PD-M02">PD-M02 (Pared Derecha - Accesorios)</option>
-            <option value="DEP-M01">DEP-M01 (Depósito - Sustratos 50L)</option>
-            <option value="PI-M01">PI-M01 (Pared Izquierda - Nutrición)</option>
-            <option value="PT-M01">PT-M01 (Pared Trasera - Iluminación)</option>
+            <option value="">Sincronizando ubicaciones…</option>
           </select>
           <button type="button" class="wms-btn" style="width: 100%;" onclick="confirmWmsQrScanFromSelect()">
-            Abrir módulo demo seleccionado
+            Abrir ubicación seleccionada
           </button>
         </div>
       </div>
@@ -2930,33 +2920,12 @@
             <p style="margin: 0 0 10px 0; font-size: 0.88rem; font-weight: 800; color: var(--vendor-forest);">Destino Físico</p>
 
             <label class="internal-editor-field" style="margin-bottom: 10px;">
-              <span>Módulo Destino *</span>
+              <span>Ubicación central de destino *</span>
               <select id="wms-tr-dest-module" required style="font-weight: 700;">
                 <!-- Populated dynamically -->
               </select>
             </label>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-              <label class="internal-editor-field">
-                <span>Nivel Humano Destino *</span>
-                <select id="wms-tr-dest-level" required>
-                  <option value="1">Nivel 1 — abajo</option>
-                  <option value="2">Nivel 2 — bajo</option>
-                  <option value="3" selected>Nivel 3 — altura media</option>
-                  <option value="4">Nivel 4 — alto</option>
-                  <option value="5">Nivel 5 — arriba</option>
-                </select>
-              </label>
-
-              <label class="internal-editor-field">
-                <span>Posición Sector *</span>
-                <select id="wms-tr-dest-sector" required>
-                  <option value="I">Izquierda</option>
-                  <option value="C" selected>Centro</option>
-                  <option value="D">Derecha</option>
-                </select>
-              </label>
-            </div>
+            <small style="display: block; color: var(--vendor-muted);">El nivel y sector pertenecen a la ubicación seleccionada; no se inventan en el navegador.</small>
           </div>
 
           <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
@@ -3131,6 +3100,7 @@
           <!-- Search & Filter General -->
           <div style="margin-bottom: 20px; display: flex; gap: 10px;">
             <input type="text" id="portfolio-search-input" onkeyup="renderVendorPortfolioUI()" placeholder="Buscar cliente por nombre o teléfono..." style="flex: 1; padding: 10px 14px; border-radius: 10px; border: 1.5px solid var(--color-border-accent); background: var(--color-card-bg); color: var(--color-text-main); font-size: 0.9rem;">
+            <button type="button" class="btn btn-secondary" onclick="openNewCurrentAccountModal('general')" style="border-color: #ab47bc; color: #ab47bc; font-weight: 800; border-radius: 10px;">＋ Nuevo cliente</button>
           </div>
 
           <!-- General Table -->
@@ -3234,7 +3204,7 @@
           <div>
             <span style="background: rgba(194,162,70,0.15); border: 1px solid #c2a246; color: #c2a246; padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 800;">GESTIÓN DE INVENTARIO & MERMAS</span>
             <h2 id="vendor-retired-title" style="font-family: var(--font-serif); color: var(--color-text-main); font-size: 1.6rem; margin: 6px 0 0 0;">📦 Productos Retirados y Ajustes de Stock</h2>
-            <p style="font-size: 0.88rem; color: var(--color-text-muted); margin: 4px 0 0 0;">Registro y control de salidas de stock por venta fuera de sistema, productos defectuosos, vencidos u otros motivos con dictado por voz.</p>
+            <p style="font-size: 0.88rem; color: var(--color-text-muted); margin: 4px 0 0 0;">Historial central e inmutable de mermas, reposiciones y correcciones. Las ventas se registran exclusivamente desde el POS.</p>
           </div>
           <div style="display: flex; gap: 10px; align-items: center;">
             <button type="button" class="btn btn-primary" onclick="openStockAdjustmentModal(null, 'remove')" style="background: #2e7d32; border-color: #81c784; font-weight: 800; font-size: 0.88rem; padding: 10px 18px; border-radius: 12px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
@@ -3262,8 +3232,8 @@
             <strong id="retired-kpi-expired-units" style="display: block; font-size: 1.5rem; color: #ffd54f; margin-top: 4px;">0 u.</strong>
           </div>
           <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 14px 18px;">
-            <span style="font-size: 0.76rem; text-transform: uppercase; color: var(--color-text-muted); font-weight: 700;">Ventas Mostrador / Otros</span>
-            <strong id="retired-kpi-sold-units" style="display: block; font-size: 1.5rem; color: #81c784; margin-top: 4px;">0 u.</strong>
+            <span style="font-size: 0.76rem; text-transform: uppercase; color: var(--color-text-muted); font-weight: 700;">Reposiciones / Correcciones +</span>
+            <strong id="retired-kpi-positive-units" style="display: block; font-size: 1.5rem; color: #81c784; margin-top: 4px;">0 u.</strong>
           </div>
         </div>
 
@@ -3271,7 +3241,6 @@
         <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
           <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="retired-filter-chips">
             <button type="button" class="b2b-filter-chip active" id="ret-filter-all" onclick="filterRetiredProducts('all')">Todos</button>
-            <button type="button" class="b2b-filter-chip" id="ret-filter-vendido" onclick="filterRetiredProducts('vendido')" style="border-color: #81c784; color: #81c784;">🛒 Vendidos</button>
             <button type="button" class="b2b-filter-chip" id="ret-filter-defectuoso" onclick="filterRetiredProducts('defectuoso')" style="border-color: #ef5350; color: #ef5350;">⚠️ Defectuosos</button>
             <button type="button" class="b2b-filter-chip" id="ret-filter-vencido" onclick="filterRetiredProducts('vencido')" style="border-color: #ffd54f; color: #ffd54f;">⏳ Vencidos</button>
             <button type="button" class="b2b-filter-chip" id="ret-filter-otro" onclick="filterRetiredProducts('otro')">📝 Otros</button>
@@ -3403,7 +3372,7 @@
                 <span class="cash-panel-step">Paso 1</span>
                 <h3>Registrar movimiento</h3>
               </div>
-              <span class="cash-panel-note">Los movimientos quedan guardados en este equipo.</span>
+              <span class="cash-panel-note">Los movimientos se confirman en el historial central.</span>
             </div>
             <form id="vendor-cash-entry-form" onsubmit="addCashMovement(event)">
               <div class="cash-form-grid">
@@ -3411,10 +3380,7 @@
                   <label for="cash-entry-type">Tipo de movimiento</label>
                   <select id="cash-entry-type" class="b2b-form-input">
                     <option value="apertura">🌱 Fondo inicial / Apertura</option>
-                    <option value="venta_efectivo" selected>💵 Venta en efectivo</option>
-                    <option value="venta_transf">📱 Venta por transferencia</option>
-                    <option value="membresia_efectivo">⭐ Membresía en efectivo</option>
-                    <option value="membresia_transf">⭐ Membresía por transferencia</option>
+                    <option value="membresia_efectivo" selected>↑ Otro ingreso en efectivo</option>
                     <option value="gasto">↓ Gasto de caja</option>
                     <option value="retiro">↓ Retiro de propietario</option>
                   </select>
@@ -3444,20 +3410,31 @@
             </div>
             <div id="cash-movements-list" class="cash-movements-list" aria-live="polite"></div>
           </section>
+
+          <section class="cash-panel cash-history-panel" aria-labelledby="cash-closure-history-title">
+            <div class="cash-panel-heading">
+              <div>
+                <span class="cash-panel-step">Supervisión central</span>
+                <h3 id="cash-closure-history-title">Historial de cierres</h3>
+              </div>
+              <span id="cash-closure-history-count" class="cash-count-pill">0 cierres</span>
+            </div>
+            <div id="cash-closure-history-list" class="cash-movements-list" aria-live="polite">
+              <div class="cash-empty-state"><p>Cargando historial central…</p></div>
+            </div>
+          </section>
         </div>
 
         <aside class="cash-side-column">
           <section class="cash-panel cash-backup-panel">
             <span class="cash-panel-step">Respaldo</span>
             <h3>Protegé el trabajo del día</h3>
-            <p>Descargá una copia legible. El archivo permite conservar los movimientos aunque cambies de navegador.</p>
+            <p>Descargá una copia legible para consulta. La fuente autoritativa continúa siendo el historial central.</p>
             <div class="cash-backup-actions">
               <button type="button" class="cash-secondary-btn" onclick="downloadCashBackup('json')">Descargar respaldo</button>
               <button type="button" class="cash-text-btn" onclick="downloadCashBackup('csv')">Exportar CSV</button>
-              <label class="cash-text-btn cash-import-btn" for="cash-backup-file">Recuperar respaldo</label>
-              <input type="file" id="cash-backup-file" accept="application/json,.json" onchange="importCashBackup(event)" hidden>
             </div>
-            <small id="cash-last-saved">Guardado local pendiente</small>
+            <small id="cash-last-saved">Sincronizando con caja central</small>
           </section>
 
           <section class="cash-panel cash-closure-panel">
@@ -3482,11 +3459,8 @@
             <button type="button" class="cash-close-btn" onclick="performShiftClosure()" id="btn-close-shift">Cerrar caja y finalizar turno</button>
 
             <div id="cash-admin-validation" class="cash-admin-validation" hidden>
-              <div class="cash-field">
-                <label for="cash-admin-password">Validación del administrador</label>
-                <input type="password" id="cash-admin-password" class="b2b-form-input" placeholder="Contraseña de administración" autocomplete="current-password">
-              </div>
-              <button type="button" class="cash-secondary-btn" onclick="validateAdminClosurePrompt()" id="btn-admin-validate">Validar arqueo</button>
+              <p>El cierre queda pendiente hasta que un administrador o supervisor autenticado lo revise.</p>
+              <button type="button" class="cash-secondary-btn" onclick="validateAdminClosurePrompt()" id="btn-admin-validate">Aprobar arqueo como supervisor</button>
             </div>
           </section>
         </aside>
@@ -3535,12 +3509,14 @@
         <h2 style="font-family: var(--font-display); color: #66bb6a; font-size: 1.8rem; margin: 8px 0 4px 0;">Escanear Credencial VIP del Cliente</h2>
         <p style="font-size: 0.88rem; color: rgba(247,246,242,0.8); max-width: 500px; margin: 0 auto 20px auto;">Pedile al cliente que te muestre el Código QR de su Pase Digital desde su celular para verificar sus Semillas y Beneficios VIP.</p>
 
-        <div style="background: rgba(0,0,0,0.4); border: 2px dashed #66bb6a; border-radius: 16px; padding: 30px; max-width: 400px; margin: 0 auto 20px auto;">
+        <form onsubmit="simulateCustomerQRScan(event)" style="background: rgba(0,0,0,0.4); border: 2px dashed #66bb6a; border-radius: 16px; padding: 30px; max-width: 400px; margin: 0 auto 20px auto;">
           <div style="font-size: 3rem; margin-bottom: 10px;">📷</div>
-          <button class="btn btn-primary" onclick="simulateCustomerQRScan()" style="background: #2e7d32; border-color: #66bb6a; font-size: 0.95rem; padding: 10px 20px;">
-            ⚡ ESCANEAR QR CON CÁMARA DEMO
+          <label for="customer-credential-code" style="display: block; margin-bottom: 6px; font-weight: 700;">Credencial, DNI o teléfono</label>
+          <input id="customer-credential-code" class="b2b-form-input" autocomplete="off" placeholder="Escaneá o ingresá el código" required style="margin-bottom: 10px; background: #fff; color: #152d24;">
+          <button type="submit" class="btn btn-primary" style="background: #2e7d32; border-color: #66bb6a; font-size: 0.95rem; padding: 10px 20px; min-height: 44px;">
+            Buscar cliente central
           </button>
-        </div>
+        </form>
 
         <!-- Perfil Detectado del Cliente -->
         <div id="customer-scan-result" style="display: none; text-align: left; background: rgba(15,30,24,0.9); border: 1px solid var(--color-accent-gold); border-radius: 16px; padding: 20px; margin-top: 20px;">
@@ -3548,9 +3524,8 @@
             <h3 id="scanned-customer-name" style="color: var(--color-accent-gold); margin: 0; font-size: 1.3rem;"></h3>
             <span id="scanned-customer-tier" style="padding: 4px 12px; border-radius: 12px; background: var(--color-accent-gold); color: #0f1e18; font-weight: 900; font-size: 0.8rem;"></span>
           </div>
-          <p style="font-size: 0.9rem; margin-bottom: 6px; color: #fff;"><strong>🌱 Semillas Acumuladas:</strong> <span id="scanned-customer-seeds" style="color: var(--color-accent-gold); font-weight: 700;"></span></p>
-          <p style="font-size: 0.9rem; margin-bottom: 6px; color: #fff;"><strong>📜 Descuento REPROCANN:</strong> <span style="color: #66bb6a;">15% OFF Habilitado</span></p>
-          <p style="font-size: 0.9rem; margin-bottom: 0; color: #fff;"><strong>🎡 Rueda Zen Activa:</strong> <span style="color: var(--color-accent-gold);">10% OFF en Compras Presenciales</span></p>
+          <p style="font-size: 0.9rem; margin-bottom: 6px; color: #fff;"><strong>Cuenta corriente:</strong> <span id="scanned-customer-seeds" style="color: var(--color-accent-gold); font-weight: 700;"></span></p>
+          <p id="scanned-customer-contact" style="font-size: 0.9rem; margin-bottom: 0; color: #fff;"></p>
         </div>
 
       </div>
@@ -3748,7 +3723,7 @@
               <input type="tel" id="cc-new-phone" class="b2b-form-input" placeholder="Ej: 5493434123456" required>
             </div>
           </div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+          <div id="cc-new-credit-fields" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
             <div>
               <label style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-forest); display: block; margin-bottom: 4px;">Límite de Crédito ($)</label>
               <input type="number" id="cc-new-limit" class="b2b-form-input" value="300000" min="0" step="1000">
@@ -3760,7 +3735,7 @@
           </div>
           <div style="display: flex; justify-content: flex-end; gap: 10px;">
             <button type="button" class="btn btn-secondary" onclick="closeNewCurrentAccountModal()">Cancelar</button>
-            <button type="submit" class="wms-btn wms-btn-primary">Guardar Cuenta</button>
+            <button type="submit" id="cc-new-submit-button" class="wms-btn wms-btn-primary">Guardar Cuenta</button>
           </div>
         </form>
       </div>
@@ -4396,16 +4371,15 @@
         <button type="button" onclick="closeAdminAuditModal()" style="background: rgba(255,255,255,0.12); border: none; color: #fff; font-size: 1.2rem; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;" aria-label="Cerrar">✕</button>
       </div>
 
-      <!-- Password Lock Screen (if not yet authenticated as admin) -->
+      <!-- Session verification screen -->
       <div id="admin-audit-auth-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; text-align: center; gap: 16px;">
         <div style="font-size: 2.8rem;">🔒</div>
         <h4 style="margin: 0; font-size: 1.15rem; color: #ffd54f;">Acceso Restringido para Investigación</h4>
         <p style="max-width: 480px; color: rgba(255,255,255,0.75); font-size: 0.86rem; margin: 0;">
-          Para consultar la bitácora de productos eliminados y operaciones críticas, ingresá tu clave de Administrador:
+          Para consultar la bitácora central, verificaremos tu sesión Supabase y tu rol de administrador o supervisor.
         </p>
         <form onsubmit="handleAdminAuditUnlock(event)" style="display: flex; gap: 8px; width: 100%; max-width: 380px;">
-          <input type="password" id="admin-audit-pass-input" placeholder="Contraseña de Administrador" required style="flex: 1; padding: 12px 14px; border-radius: 10px; border: 1.5px solid rgba(194,162,70,0.5); background: rgba(0,0,0,0.5); color: #fff; font-size: 0.92rem;">
-          <button type="submit" style="background: #2e7d32; border: 1.5px solid #81c784; color: #fff; font-weight: 800; padding: 0 18px; border-radius: 10px; cursor: pointer; font-size: 0.88rem;">🔓 Ingresar</button>
+          <button type="submit" style="width: 100%; background: #2e7d32; border: 1.5px solid #81c784; color: #fff; font-weight: 800; padding: 12px 18px; border-radius: 10px; cursor: pointer; font-size: 0.88rem;">Verificar sesión y abrir auditoría</button>
         </form>
         <div id="admin-audit-auth-error" style="color: #ef5350; font-size: 0.82rem; display: none;"></div>
       </div>
@@ -4547,6 +4521,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="mapa-local.js?v=gba_leafgreen_v5"></script>
   <script src="saas-auth.js?v=saas_v2"></script>
+  <script src="app-config.js?v=config_v2"></script>
   <script src="business-verticals.js?v=verticals_v1"></script>
   <script src="tenant-theme.js?v=theme_v1"></script>
   <script src="migration-ai.js?v=migration_v1"></script>
@@ -4554,6 +4529,7 @@
   <script src="migration-center.js?v=migration_v1"></script>
   <script src="tenant-onboarding.js?v=onboarding_v1"></script>
   <script src="pos-cart-engine.js?v=cart_v2"></script>
+  <script src="operational-api.js?v=core_v2"></script>
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>

@@ -4,6 +4,17 @@ import { readFile } from 'node:fs/promises';
 import lookupProduct from '../netlify/functions/lookup-product.mjs';
 
 const originalFetch = globalThis.fetch;
+const originalEnvironment = {
+  SUPABASE_URL: process.env.SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  PUBLIC_SITE_URL: process.env.PUBLIC_SITE_URL
+};
+const TEST_USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const TEST_TENANT_ID = '11111111-1111-1111-1111-111111111111';
+
+process.env.SUPABASE_URL = 'https://unit-test.supabase.co';
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'unit-test-service-role';
+process.env.PUBLIC_SITE_URL = 'https://boeweb.netlify.app';
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -15,14 +26,40 @@ function jsonResponse(body, status = 200) {
 function lookupRequest(body) {
   return {
     method: 'POST',
-    headers: new Headers({ Origin: 'https://boeweb.netlify.app' }),
+    headers: new Headers({
+      Origin: 'https://boeweb.netlify.app',
+      Authorization: 'Bearer unit-test-user-token'
+    }),
     json: async () => body
   };
 }
 
+function requestUrl(input) {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.href;
+  return input?.url || String(input);
+}
+
+function supabaseAuthResponse(url) {
+  if (url.includes('/auth/v1/user')) {
+    return jsonResponse({ id: TEST_USER_ID, aud: 'authenticated', role: 'authenticated' });
+  }
+  if (url.includes('/rest/v1/tenant_users')) {
+    return jsonResponse({
+      tenant_id: TEST_TENANT_ID,
+      user_id: TEST_USER_ID,
+      role: 'VENDEDOR',
+      active: true
+    });
+  }
+  return null;
+}
+
 function installFetchMock(searchHtml, yahooHtml = '', astroHtml = '', publicPages = {}) {
   globalThis.fetch = async url => {
-    const href = String(url);
+    const href = requestUrl(url);
+    const authResponse = supabaseAuthResponse(href);
+    if (authResponse) return authResponse;
     if (href.includes('customsearch.googleapis.com')) return jsonResponse({}, 403);
     if (href.includes('search.yahoo.com/search')) return new Response(yahooHtml, { status: 200 });
     if (href.includes('astrogrow.com.ar/search/')) return new Response(astroHtml, { status: 200 });
@@ -37,6 +74,13 @@ function installFetchMock(searchHtml, yahooHtml = '', astroHtml = '', publicPage
 
 test.afterEach(() => {
   globalThis.fetch = originalFetch;
+});
+
+test.after(() => {
+  Object.entries(originalEnvironment).forEach(([key, value]) => {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  });
 });
 
 test('descarta la portada de un growshop cuando no contiene el código buscado', async () => {
@@ -189,10 +233,12 @@ test('el catálogo interno queda separado de proveedores y permite editar produc
   assert.match(sellerSource, /async function updateInternalCatalogRelations/);
 });
 
-test('lookup-product admite país y rubro dinámicos (ej: Perú + Verdulería)', async () => {
+test('lookup-product admite país dinámico pero resuelve el rubro desde el tenant autenticado', async () => {
   let capturedMlUrl = '';
   globalThis.fetch = async url => {
-    const href = String(url);
+    const href = requestUrl(url);
+    const authResponse = supabaseAuthResponse(href);
+    if (authResponse) return authResponse;
     if (href.includes('api.mercadolibre.com')) {
       capturedMlUrl = href;
       return jsonResponse({
@@ -216,7 +262,7 @@ test('lookup-product admite país y rubro dinámicos (ej: Perú + Verdulería)',
 
   assert.equal(response.status, 200);
   assert.equal(result.country, 'PE');
-  assert.equal(result.vertical, 'verduleria');
+  assert.equal(result.vertical, 'growshop');
   assert.match(capturedMlUrl, /\/sites\/MPE\/search/);
   assert.equal(result.market.currency, 'PEN');
   assert.equal(result.market.provider, 'Mercado Libre');

@@ -106,8 +106,8 @@ test('2. Compra Web: Genera contrato de pedido completo para mediación del vend
 
 test('3. Mediación Vendedor: Localización WMS de ítems y carga directa al POS para cobro presencial', () => {
   const storeLocations = [
-    { product_code: 'BO-PROD-001', shelf_code: 'E-03', floor_level: 1, shelf_level: 2 },
-    { product_code: 'BO-PROD-002', shelf_code: 'A-01', floor_level: 1, shelf_level: 1 }
+    { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', product_code: 'BO-PROD-001', shelf_code: 'E-03', floor_level: 1, shelf_level: 2, available_quantity: 2 },
+    { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', product_code: 'BO-PROD-002', shelf_code: 'A-01', floor_level: 1, shelf_level: 1, available_quantity: 1 }
   ];
 
   const incomingOrder = {
@@ -139,12 +139,17 @@ test('3. Mediación Vendedor: Localización WMS de ítems y carga directa al POS
   posCart.clear();
 
   incomingOrder.items.forEach(item => {
+    const reservedLocation = storeLocations.find(location => location.product_code === item.product_code);
     posCart.addItem({
       id: item.id,
       product_code: item.product_code,
       name: item.name,
       price: item.price,
-      quantity: item.quantity
+      quantity: item.quantity,
+      location_id: reservedLocation.id,
+      shelf_code: reservedLocation.shelf_code,
+      available_quantity: reservedLocation.available_quantity,
+      availability: 'EN_STOCK'
     });
   });
 

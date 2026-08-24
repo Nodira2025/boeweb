@@ -15,7 +15,7 @@ test('1. PosCartEngine: Aislamiento por Modos (POS vs B2B vs PUBLIC_ORDER)', () 
   const posCart = new PosCartEngine('POS');
   const b2bCart = new PosCartEngine('B2B_PURCHASE');
 
-  posCart.addItem({ id: 'P01', name: 'Maceta 10L', price: 5000, quantity: 2, availability: 'EN_STOCK' });
+  posCart.addItem({ id: 'P01', name: 'Maceta 10L', price: 5000, quantity: 2, stock: 2, availability: 'EN_STOCK' });
   b2bCart.addItem({ id: 'B2B-99', name: 'Top Crop 1L', price: 12000, quantity: 5, availability: 'A_PEDIDO' });
 
   assert.equal(posCart.getItemCount(), 2);
@@ -62,7 +62,7 @@ test('2. PublicCatalogUnifier: Deduplicación y Badges EN STOCK vs A PEDIDO', ()
 test('3. Sale Draft Contract (Contrato de Venta Fase 11A)', () => {
   const cart = new PosCartEngine('POS');
   cart.clear();
-  cart.addItem({ id: 'P01', name: 'Tornillo Industrial 10mm', price: 200, quantity: 50 });
+  cart.addItem({ id: 'P01', name: 'Tornillo Industrial 10mm', price: 200, quantity: 50, stock: 50, availability: 'EN_STOCK' });
 
   const draft = cart.createSaleDraft({
     tenantId: '22222222-2222-2222-2222-222222222222',
@@ -81,7 +81,10 @@ test('3. Sale Draft Contract (Contrato de Venta Fase 11A)', () => {
   assert.equal(draft.total, 10000);
   assert.equal(draft.payment_method, 'EFECTIVO');
   assert.equal(draft.status, 'DRAFT_READY_FOR_11B');
-  assert.ok(draft.idempotency_key.includes('pos_draft_'));
+  assert.match(
+    draft.idempotency_key,
+    /^pos_(?:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|\d+_[a-z0-9]+)$/i
+  );
 });
 
 test('4. Identidad del Vendedor no se inventa sin sesión autenticada', () => {
@@ -100,7 +103,7 @@ test('5. Aislamiento de Drafts vs Caja (Previene Doble Contabilización)', () =>
   };
 
   const cart = new PosCartEngine('POS');
-  cart.addItem({ id: 'P01', name: 'Sustrato 50L', price: 12000, quantity: 1 });
+  cart.addItem({ id: 'P01', name: 'Sustrato 50L', price: 12000, quantity: 1, stock: 1, availability: 'EN_STOCK' });
   const draft = cart.createSaleDraft({
     tenantId: '11111111-1111-1111-1111-111111111111',
     cashierUser: { id: 'usr-franco', name: 'Profesor Franco' },

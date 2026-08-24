@@ -25,7 +25,19 @@ class PosCartEngine {
     if (typeof localStorage === 'undefined') return [];
     try {
       const stored = localStorage.getItem(this.storageKey);
-      return stored ? JSON.parse(stored) : [];
+      const parsed = stored ? JSON.parse(stored) : [];
+      if (!Array.isArray(parsed)) return [];
+      if (this.mode !== 'POS') return parsed;
+      return parsed.filter(item => {
+        const quantity = Math.trunc(Number(item?.quantity));
+        const available = Number(item?.available_quantity);
+        return !item?.is_express
+          && item?.availability === 'EN_STOCK'
+          && Number(item?.price) > 0
+          && quantity > 0
+          && Number.isFinite(available)
+          && available >= quantity;
+      });
     } catch (e) {
       console.error(`[CartEngine] Error cargando storage para modo ${this.mode}:`, e);
       return [];
@@ -43,26 +55,47 @@ class PosCartEngine {
 
   addItem(product) {
     if (!product || (!product.id && !product.product_code)) return false;
+    if (this.mode === 'POS' && product.is_express) return false;
 
     const code = product.product_code || product.id;
-    const existingIndex = this.items.findIndex(item => (item.product_code || item.id) === code);
-    const qty = Number(product.quantity) || 1;
+    const locationId = product.location_id || product.inventory_location_id || null;
+    const cartKey = String(product.cart_key || (locationId ? `${code}::${locationId}` : code));
+    const existingIndex = this.items.findIndex(item => String(item.cart_key || item.id) === cartKey);
+    const qty = Math.max(1, Math.trunc(Number(product.quantity) || 1));
     const unitPrice = Number(product.price) || 0;
+    const rawAvailable = product.available_quantity ?? product.stock ?? product.own_stock;
+    const availableQuantity = Number.isFinite(Number(rawAvailable))
+      ? Math.max(0, Math.trunc(Number(rawAvailable)))
+      : null;
 
     let defaultAvail = 'A_PEDIDO';
     if (product.availability) {
       defaultAvail = product.availability;
     } else if (product.is_express) {
       defaultAvail = 'EXPRESS_UNMAPPED';
-    } else if (product.own_stock > 0) {
+    } else if (product.own_stock > 0 || availableQuantity > 0) {
       defaultAvail = 'EN_STOCK';
     }
 
+    if (this.mode === 'POS' && (unitPrice <= 0 || availableQuantity === 0 || defaultAvail !== 'EN_STOCK')) {
+      return false;
+    }
+
     if (existingIndex >= 0) {
-      this.items[existingIndex].quantity += qty;
+      const existingItem = this.items[existingIndex];
+      const limit = existingItem.available_quantity !== null
+        && existingItem.available_quantity !== undefined
+        && Number.isFinite(Number(existingItem.available_quantity))
+        ? Number(existingItem.available_quantity)
+        : availableQuantity;
+      if (limit !== null && existingItem.quantity + qty > limit) return false;
+      existingItem.quantity += qty;
     } else {
+      if (availableQuantity !== null && !product.is_express && qty > availableQuantity) return false;
       this.items.push({
-        id: code,
+        id: cartKey,
+        cart_key: cartKey,
+        product_id: product.product_id || product.id || code,
         product_code: code,
         name: product.name || 'Producto Sin Nombre',
         price: unitPrice,
@@ -70,7 +103,10 @@ class PosCartEngine {
         availability: defaultAvail,
         is_express: !!(product.is_express || defaultAvail === 'EXPRESS_UNMAPPED'),
         supplier_code: product.supplier_code || 'own',
-        image_url: product.image_url || 'assets/logo.jpg'
+        image_url: product.image_url || 'assets/logo.jpg',
+        available_quantity: availableQuantity,
+        location_id: locationId,
+        shelf_code: product.shelf_code || product.location_code || ''
       });
     }
 
@@ -79,22 +115,31 @@ class PosCartEngine {
   }
 
   removeItem(productCode) {
-    this.items = this.items.filter(item => (item.product_code || item.id) !== productCode);
+    this.items = this.items.filter(item => String(item.cart_key || item.id) !== String(productCode));
     this.saveToStorage();
   }
 
   updateQuantity(productCode, newQuantity) {
-    const qty = Number(newQuantity);
+    const qty = Math.trunc(Number(newQuantity));
+    if (!Number.isFinite(qty)) return false;
     if (qty <= 0) {
       this.removeItem(productCode);
-      return;
+      return true;
     }
 
-    const item = this.items.find(i => (i.product_code || i.id) === productCode);
+    const item = this.items.find(i => String(i.cart_key || i.id) === String(productCode));
     if (item) {
+      if (item.available_quantity !== null
+        && item.available_quantity !== undefined
+        && Number.isFinite(Number(item.available_quantity))
+        && qty > Number(item.available_quantity)) {
+        return false;
+      }
       item.quantity = qty;
       this.saveToStorage();
+      return true;
     }
+    return false;
   }
 
   clear() {
@@ -223,6 +268,10 @@ class PosCartEngine {
     const total = options.total !== undefined ? Number(options.total) : this.getTotal();
     const dateNow = new Date();
 
+    const randomId = typeof globalThis.crypto?.randomUUID === 'function'
+      ? globalThis.crypto.randomUUID()
+      : `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+
     return {
       draft_id: `draft_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       tenant_id: options.tenantId || '11111111-1111-1111-1111-111111111111',
@@ -231,7 +280,8 @@ class PosCartEngine {
       salesperson_user_id: salespersonUser.id || salespersonUser.user_id || 'anonymous',
       salesperson_name_snapshot: salespersonUser.name || salespersonUser.email || 'Vendedor Mostrador',
       items: this.items.map(i => ({
-        product_id: i.product_code || i.id,
+        product_id: i.product_id || i.product_code || i.id,
+        ...(i.location_id ? { location_id: i.location_id } : {}),
         name: i.name,
         quantity: i.quantity,
         unit_price: i.price,
@@ -250,7 +300,7 @@ class PosCartEngine {
       payment_method: options.paymentMethod || 'EFECTIVO',
       payment_breakdown: options.paymentBreakdown || null,
       notes: options.notes || '',
-      idempotency_key: `pos_draft_${Date.now()}_${total}`,
+      idempotency_key: `pos_${randomId}`,
       created_at: dateNow.toISOString(),
       status: 'DRAFT_READY_FOR_11B'
     };

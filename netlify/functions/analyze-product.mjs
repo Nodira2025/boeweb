@@ -1,8 +1,19 @@
+import { createClient } from '@supabase/supabase-js';
+import { authenticateBearer, requireServerConfig } from './_shared/http-auth.mjs';
+
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 const OPENROUTER_RESPONSES_URL = 'https://openrouter.ai/api/v1/responses';
 const REQUEST_WINDOW_MS = 60_000;
 const REQUEST_LIMIT_PER_WINDOW = 12;
 const requestBuckets = new Map();
+
+export const config = {
+  rateLimit: {
+    windowLimit: 12,
+    windowSize: 60,
+    aggregateBy: ['domain', 'ip']
+  }
+};
 
 const COUNTRY_CONFIGS = {
   AR: { code: 'AR', name: 'Argentina', mlSite: 'MLA', currency: 'ARS', domainSuffix: '.ar', mlDomain: 'mercadolibre.com.ar', lang: 'es-AR' },
@@ -74,10 +85,33 @@ function validateImageDataUrl(value) {
 }
 
 function isAllowedOrigin(request) {
-  const configuredOrigin = process.env.PRODUCT_ANALYSIS_ALLOWED_ORIGIN;
-  if (!configuredOrigin) return true;
+  const configuredOrigin = process.env.PRODUCT_ANALYSIS_ALLOWED_ORIGIN || process.env.PUBLIC_SITE_URL;
   const origin = request.headers.get('origin');
-  return !origin || origin === configuredOrigin;
+  if (!origin) return true;
+  if (configuredOrigin && origin.replace(/\/$/, '') === configuredOrigin.replace(/\/$/, '')) return true;
+  return /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(origin);
+}
+
+async function authenticateProductAnalyst(request) {
+  const { supabaseUrl, serviceRoleKey } = requireServerConfig();
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+  const user = await authenticateBearer(supabaseAdmin, request.headers);
+  const { data: membership, error } = await supabaseAdmin
+    .from('tenant_users')
+    .select('tenant_id,user_id,role,active')
+    .eq('user_id', user.id)
+    .eq('active', true)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!membership) {
+    const authError = new Error('El usuario no pertenece a una empresa activa.');
+    authError.statusCode = 403;
+    throw authError;
+  }
+  return membership;
 }
 
 function isRateLimited(request, context) {
@@ -275,14 +309,15 @@ export default async function handler(request, context) {
   if (request.method !== 'POST') return jsonResponse(405, { message: 'Método no permitido.' });
   if (!isAllowedOrigin(request)) return jsonResponse(403, { message: 'Origen no autorizado.' });
   if (isRateLimited(request, context)) return jsonResponse(429, { message: 'Demasiados análisis. Esperá un minuto y volvé a intentar.' });
-  const aiProvider = getAiProviderConfig();
-  if (!aiProvider) {
-    return jsonResponse(503, {
-      code: 'IA_NOT_CONFIGURED',
-      message: 'La IA todavía no tiene configurada OPENROUTER_API_KEY u OPENAI_API_KEY en el servidor.'
-    });
-  }
   try {
+    await authenticateProductAnalyst(request);
+    const aiProvider = getAiProviderConfig();
+    if (!aiProvider) {
+      return jsonResponse(503, {
+        code: 'IA_NOT_CONFIGURED',
+        message: 'La IA todavía no tiene configurada OPENROUTER_API_KEY u OPENAI_API_KEY en el servidor.'
+      });
+    }
     const body = await request.json();
     if (!validateImageDataUrl(body.imageDataUrl)) {
       return jsonResponse(400, { message: 'La imagen no es válida o es demasiado grande.' });
@@ -306,7 +341,8 @@ export default async function handler(request, context) {
     });
   } catch (error) {
     console.error('Error al analizar producto:', error.message);
-    return jsonResponse(502, { message: `No se pudo completar el análisis: ${error.message}` });
+    const status = Number(error.statusCode || error.status || 502);
+    return jsonResponse(status, { message: `No se pudo completar el análisis: ${error.message}` });
   }
 }
 

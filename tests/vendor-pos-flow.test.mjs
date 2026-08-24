@@ -89,8 +89,8 @@ test('3. Flujo POS: Carrito acumulativo sumando productos y cantidades', () => {
   const cart = new PosCartEngine('POS');
   cart.clear();
 
-  cart.addItem({ id: 'P1', product_code: 'P1', name: 'Item A', price: 1000, quantity: 3 });
-  cart.addItem({ id: 'P2', product_code: 'P2', name: 'Item B', price: 2500, quantity: 2 });
+  cart.addItem({ id: 'P1', product_code: 'P1', name: 'Item A', price: 1000, quantity: 3, stock: 5, availability: 'EN_STOCK' });
+  cart.addItem({ id: 'P2', product_code: 'P2', name: 'Item B', price: 2500, quantity: 2, stock: 2, availability: 'EN_STOCK' });
 
   assert.equal(cart.getItemCount(), 5);
   assert.equal(cart.getSubtotal(), (1000 * 3) + (2500 * 2)); // 3000 + 5000 = 8000
@@ -104,7 +104,7 @@ test('3. Flujo POS: Carrito acumulativo sumando productos y cantidades', () => {
 test('4. Flujo POS: Aplicar descuento en porcentaje (%) y en monto fijo ($)', () => {
   const cart = new PosCartEngine('POS');
   cart.clear();
-  cart.addItem({ id: 'P1', product_code: 'P1', name: 'Kit Cultivo', price: 20000, quantity: 1 });
+  cart.addItem({ id: 'P1', product_code: 'P1', name: 'Kit Cultivo', price: 20000, quantity: 1, stock: 1, availability: 'EN_STOCK' });
 
   assert.equal(cart.getSubtotal(), 20000);
   assert.equal(cart.getTotal(), 20000);

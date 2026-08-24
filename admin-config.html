@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BÔ growclub - Panel de Configuración de Pasarelas & Pagos</title>
+  <title>BÔ Grow Club - Centro de Configuración</title>
   <meta name="robots" content="noindex, nofollow">
   
   <!-- Google Fonts -->
@@ -16,6 +16,7 @@
   
   <!-- Stylesheet -->
   <link rel="stylesheet" href="index.css?v=white_label_v2">
+  <link rel="stylesheet" href="app-config.css?v=config_v1">
   <script src="theme.js?v=white_label_v2"></script>
   
   <style>
@@ -24,29 +25,6 @@
       color: #f7f6f2;
       font-family: var(--font-sans);
       min-height: 100vh;
-    }
-
-    .admin-login-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(15, 30, 24, 0.95);
-      backdrop-filter: blur(15px);
-      z-index: 9999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-
-    .login-card {
-      background: rgba(21, 45, 36, 0.9);
-      border: 1px solid rgba(195, 155, 75, 0.4);
-      border-radius: 20px;
-      padding: 40px 32px;
-      max-width: 420px;
-      width: 100%;
-      text-align: center;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
     }
 
     .admin-container {
@@ -169,20 +147,28 @@
 </head>
 <body>
 
-  <!-- ADMIN AUTH LOGIN MODAL -->
-  <div class="admin-login-overlay" id="admin-login-modal">
-    <div class="login-card">
-      <div style="font-size: 2.5rem; margin-bottom: 12px;">🔐</div>
-      <h2 style="font-family: var(--font-display); color: var(--color-accent-gold); margin-bottom: 8px;">Panel Administrador</h2>
-      <p style="font-size: 0.85rem; color: rgba(247,246,242,0.7); margin-bottom: 24px;">Ingresá la clave de administrador para gestionar credenciales y pagos.</p>
-      
-      <div style="margin-bottom: 20px;">
-        <input type="password" id="admin-passcode-input" class="admin-input" placeholder="Clave de Administrador" style="text-align: center;">
-      </div>
-      <button onclick="checkAdminPasscode()" class="btn-admin-save">Ingresar al Panel</button>
-      <p id="admin-login-error" style="color: #ff6b6b; font-size: 0.85rem; margin-top: 12px; display: none;">Clave incorrecta. Reintentá.</p>
-    </div>
-  </div>
+  <!-- La autorización proviene de Supabase Auth y de la membresía tenant_users. -->
+  <main class="admin-access-gate" id="admin-login-modal" aria-labelledby="admin-access-title">
+    <section class="admin-access-card">
+      <span aria-hidden="true" style="font-size: 2.5rem;">🔐</span>
+      <h1 id="admin-access-title">Centro de configuración</h1>
+      <p>Verificamos tu sesión y tu rol administrativo antes de mostrar o publicar cambios. Las claves locales no otorgan permisos.</p>
+      <form class="admin-access-form" onsubmit="handleAdminSessionLogin(event)">
+        <div class="app-config-field">
+          <label for="admin-session-email">Correo administrativo</label>
+          <input type="email" id="admin-session-email" autocomplete="username" required>
+        </div>
+        <div class="app-config-field">
+          <label for="admin-session-password">Contraseña de la cuenta</label>
+          <input type="password" id="admin-session-password" autocomplete="current-password" required>
+        </div>
+        <button type="submit" id="admin-session-login" class="btn-admin-save">Iniciar sesión segura</button>
+      </form>
+      <button type="button" id="admin-session-check" onclick="authorizeAdminSession()" class="app-config-action" style="width: 100%; margin-top: 12px;">Ya tengo una sesión: volver a verificar</button>
+      <p id="admin-auth-status" role="status" aria-live="polite">Comprobando sesión segura…</p>
+      <a href="vendedor.html" class="btn btn-secondary" style="display: inline-flex; min-height: 44px; align-items: center; margin-top: 8px; text-decoration: none;">Ir al portal para iniciar sesión</a>
+    </section>
+  </main>
 
   <!-- MAIN ADMIN DASHBOARD (Hidden until auth) -->
   <div id="admin-dashboard-content" style="display: none;">
@@ -204,14 +190,14 @@
 
     <div class="admin-container">
       
-      <!-- Mercado Pago Credentials Card -->
+      <!-- Mercado Pago public configuration. Private credentials belong to server environment variables. -->
       <div class="admin-card">
         <div class="admin-card-title">
           <svg style="width: 24px; height: 24px;" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
-          <span>Mercado Pago API (Checkout Automatizado)</span>
+          <span>Mercado Pago (integración segura)</span>
         </div>
         <p class="admin-card-subtitle">
-          Ingresá tus credenciales de Mercado Pago. Podés usar tu Access Token de Producción (`APP_USR-...`) o tu Token de Pruebas (`TEST-...`).
+          El secreto privado se configura únicamente en el entorno seguro del servidor. Este panel nunca lo muestra, transmite ni guarda en el navegador.
         </p>
 
         <div class="toggle-row">
@@ -226,17 +212,9 @@
         </div>
 
         <div style="margin-bottom: 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <label class="admin-label" for="mp-access-token" style="margin: 0;">Mercado Pago Access Token *</label>
-            <button type="button" onclick="testCurrentMpToken()" class="btn btn-secondary" style="font-size: 0.76rem; padding: 4px 12px; border-color: var(--color-accent-gold); cursor: pointer;">⚡ Probar Token</button>
-          </div>
-          <input type="text" id="mp-access-token" class="admin-input" placeholder="Ej: APP_USR-1234567890123456-abcdef..." autocomplete="off">
-          <small id="mp-test-status" style="display: none; margin-top: 6px; font-weight: 700; font-size: 0.82rem;"></small>
-        </div>
-
-        <div style="margin-bottom: 20px;">
-          <label class="admin-label" for="mp-public-key">Mercado Pago Public Key (Opcional)</label>
+          <label class="admin-label" for="mp-public-key">Mercado Pago Public Key</label>
           <input type="text" id="mp-public-key" class="admin-input" placeholder="Ej: APP_USR-78901234-5678-..." autocomplete="off">
+          <small style="display: block; margin-top: 8px; color: rgba(246,243,232,0.72);">Es un identificador público. La creación de preferencias se realiza en una función del servidor.</small>
         </div>
       </div>
 
@@ -370,12 +348,12 @@
 
         <!-- Logo Upload -->
         <div style="margin-bottom: 20px; background: rgba(15, 30, 24, 0.5); padding: 16px; border-radius: 12px; border: 1px solid rgba(195, 155, 75, 0.15);">
-          <label class="admin-label" for="brand-logo-file">📁 Logo de Marca Oficial (Archivo PNG / JPG / SVG)</label>
+          <label class="admin-label" for="brand-logo-file">📁 Logo de Marca Oficial (PNG / JPG / WebP, máximo 2 MB)</label>
           <div style="display: flex; gap: 16px; align-items: center; margin-top: 8px; flex-wrap: wrap;">
             <div id="brand-logo-preview-box" style="width: 68px; height: 68px; border-radius: 14px; border: 2px solid var(--color-accent-gold); background: #152d24; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
               <img id="brand-logo-preview-img" src="assets/logo.jpg" alt="Logo preview" style="width: 100%; height: 100%; object-fit: contain;">
             </div>
-            <input type="file" id="brand-logo-file" accept="image/*" class="admin-input" style="flex: 1; min-width: 220px; padding: 10px;" onchange="handleBrandLogoFileSelect(event)">
+            <input type="file" id="brand-logo-file" accept="image/png,image/jpeg,image/webp" class="admin-input" style="flex: 1; min-width: 220px; padding: 10px;" onchange="handleBrandLogoFileSelect(event)">
           </div>
         </div>
 
@@ -505,6 +483,132 @@
         </div>
       </div>
 
+      <!-- Versioned, tenant-scoped configuration foundation -->
+      <section class="admin-card app-config-shell" id="future-config" aria-labelledby="future-config-title">
+        <div class="app-config-hero">
+          <div>
+            <span class="app-config-eyebrow">Configuración versionada por empresa</span>
+            <h2 class="app-config-title" id="future-config-title">Marca, catálogo y reglas operativas</h2>
+            <p class="app-config-copy">Prepará cambios como borrador y publicalos cuando estén listos. El caché del navegador se separa por empresa y nunca funciona como autoridad de permisos.</p>
+          </div>
+          <span class="app-config-status" id="app-config-stage-status" role="status" aria-live="polite">Sin cambios</span>
+        </div>
+
+        <nav class="app-config-nav" aria-label="Áreas de configuración">
+          <a href="#app-config-visuals">Visuales</a>
+          <a href="#app-config-texts">Textos</a>
+          <a href="#app-config-catalog">Catálogo</a>
+          <a href="#app-config-rules">Reglas</a>
+        </nav>
+
+        <div class="app-config-grid">
+          <section class="app-config-panel" id="app-config-visuals" aria-labelledby="app-config-visuals-title">
+            <h3 id="app-config-visuals-title">Visuales de marca</h3>
+            <p>Logo, paleta y tipografías se administran en el Estudio de Marca de esta misma página y se incorporan al borrador versionado.</p>
+            <button type="button" class="app-config-action" onclick="focusBrandConfig('brand-logo-file')">Editar logo y paleta</button>
+          </section>
+
+          <section class="app-config-panel" id="app-config-texts" aria-labelledby="app-config-texts-title">
+            <h3 id="app-config-texts-title">Textos y terminología</h3>
+            <p>Nombre, eslogan, contactos y términos del negocio se normalizan antes de guardarse y no aceptan contenido ejecutable.</p>
+            <button type="button" class="app-config-action" onclick="focusBrandConfig('brand-name-input')">Editar textos de marca</button>
+          </section>
+
+          <fieldset class="app-config-panel" id="app-config-catalog">
+            <legend>Catálogo público</legend>
+            <p>Define qué fuente y disponibilidad podrá exponer cada canal en una integración futura.</p>
+            <div class="app-config-field">
+              <label for="app-catalog-source">Fuente canónica</label>
+              <select id="app-catalog-source">
+                <option value="unified">Catálogo unificado</option>
+                <option value="internal">Solo catálogo interno</option>
+                <option value="disabled">Catálogo deshabilitado</option>
+              </select>
+            </div>
+            <div class="app-config-field">
+              <label for="app-catalog-visibility">Visibilidad</label>
+              <select id="app-catalog-visibility">
+                <option value="public">Público</option>
+                <option value="members">Solo miembros</option>
+                <option value="private">Privado</option>
+              </select>
+            </div>
+            <div class="app-config-field">
+              <label for="app-catalog-currency">Moneda ISO</label>
+              <input id="app-catalog-currency" inputmode="text" maxlength="3" value="ARS" autocomplete="off">
+            </div>
+            <div class="app-config-field">
+              <label for="app-catalog-low-stock">Umbral de stock bajo</label>
+              <input id="app-catalog-low-stock" type="number" min="0" max="9999" step="1" value="3">
+            </div>
+            <label class="app-config-toggle" for="app-catalog-show-out">
+              <strong>Mostrar productos agotados</strong>
+              <input id="app-catalog-show-out" type="checkbox" checked>
+            </label>
+            <label class="app-config-toggle" for="app-catalog-backorders">
+              <strong>Permitir pedidos sin stock</strong>
+              <input id="app-catalog-backorders" type="checkbox">
+            </label>
+          </fieldset>
+
+          <fieldset class="app-config-panel" id="app-config-rules">
+            <legend>Reglas operativas</legend>
+            <p>Estas reglas se publican por empresa. Los límites comerciales se validan en el checkout del backend; las protecciones bloqueadas son invariantes de seguridad.</p>
+            <label class="app-config-toggle" for="app-rule-vendor-adjustments">
+              <strong>Permitir ajustes comerciales al vendedor</strong>
+              <input id="app-rule-vendor-adjustments" type="checkbox">
+            </label>
+            <div class="app-config-field">
+              <label for="app-rule-max-discount">Descuento máximo (%)</label>
+              <input id="app-rule-max-discount" type="number" min="0" max="100" step="0.5" value="15">
+            </div>
+            <div class="app-config-field">
+              <label for="app-rule-max-discount-fixed">Descuento fijo máximo</label>
+              <input id="app-rule-max-discount-fixed" type="number" min="0" step="0.01" value="0">
+            </div>
+            <div class="app-config-field">
+              <label for="app-rule-cash-tolerance">Tolerancia de diferencia de caja</label>
+              <input id="app-rule-cash-tolerance" type="number" min="0" step="0.01" value="0">
+            </div>
+            <label class="app-config-toggle" for="app-rule-require-location">
+              <strong>Exigir ubicación al recibir stock (protección obligatoria)</strong>
+              <input id="app-rule-require-location" type="checkbox" checked disabled>
+            </label>
+            <label class="app-config-toggle" for="app-rule-negative-stock">
+              <strong>Stock negativo bloqueado (protección obligatoria)</strong>
+              <input id="app-rule-negative-stock" type="checkbox" disabled aria-describedby="app-rule-negative-stock-help">
+            </label>
+            <small id="app-rule-negative-stock-help">Las mermas y faltantes se registran como movimientos auditables; nunca se ocultan permitiendo saldo negativo.</small>
+            <label class="app-config-toggle" for="app-rule-open-shift">
+              <strong>Exigir caja abierta para vender (protección obligatoria)</strong>
+              <input id="app-rule-open-shift" type="checkbox" checked disabled>
+            </label>
+            <label class="app-config-toggle" for="app-rule-supervisor-difference">
+              <strong>Revisión de cierre por supervisor (protección obligatoria)</strong>
+              <input id="app-rule-supervisor-difference" type="checkbox" checked disabled>
+            </label>
+            <label class="app-config-toggle" for="app-rule-credit-customer">
+              <strong>Exigir cliente para cuenta corriente</strong>
+              <input id="app-rule-credit-customer" type="checkbox" checked>
+            </label>
+            <label class="app-config-toggle" for="app-rule-credit-limit">
+              <strong>Exigir límite de crédito (protección obligatoria)</strong>
+              <input id="app-rule-credit-limit" type="checkbox" checked disabled>
+            </label>
+            <label class="app-config-toggle" for="app-rule-block-overdue">
+              <strong>Bloquear cuentas vencidas (protección obligatoria)</strong>
+              <input id="app-rule-block-overdue" type="checkbox" checked disabled>
+            </label>
+          </fieldset>
+        </div>
+
+        <div class="app-config-actions">
+          <button type="button" class="app-config-action" onclick="saveFutureAppConfigDraft()">Guardar borrador</button>
+          <button type="button" class="app-config-action app-config-action-primary" onclick="publishFutureAppConfig()">Publicar configuración</button>
+        </div>
+        <p class="app-config-message" id="app-config-message" role="status" aria-live="polite"></p>
+      </section>
+
       <!-- Bank Transfer Config Card -->
       <div class="admin-card">
         <div class="admin-card-title">
@@ -549,21 +653,9 @@
         </div>
       </div>
 
-      <!-- Security Settings Card -->
-      <div class="admin-card">
-        <div class="admin-card-title">
-          <svg style="width: 24px; height: 24px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-          <span>Seguridad del Panel</span>
-        </div>
-        <div style="margin-bottom: 20px;">
-          <label class="admin-label" for="admin-new-passcode">Cambiar Clave de Acceso del Administrador</label>
-          <input type="password" id="admin-new-passcode" class="admin-input" placeholder="Dejar en blanco para mantener clave actual (boeweb2026)">
-        </div>
-      </div>
-
       <!-- Submit Action -->
       <div style="margin-bottom: 60px;">
-        <button onclick="saveAdminConfig()" class="btn-admin-save">💾 Guardar Configuración General & Identidad de Marca</button>
+        <button type="button" onclick="saveAdminConfig()" class="btn-admin-save">Publicar configuración general e identidad de marca</button>
         <p id="admin-save-msg" style="text-align: center; color: #25D366; font-weight: 600; margin-top: 12px; display: none;">
           ✓ ¡Configuración guardada con éxito!
         </p>
@@ -574,7 +666,8 @@
 
   <script src="business-verticals.js"></script>
   <script src="tenant-theme.js"></script>
-  <script src="mercadopago-checkout.js"></script>
-  <script src="admin-config.js?v=2.0"></script>
+  <script src="saas-auth.js?v=auth_v1"></script>
+  <script src="app-config.js?v=config_v2"></script>
+  <script src="admin-config.js?v=3.0"></script>
 </body>
 </html>

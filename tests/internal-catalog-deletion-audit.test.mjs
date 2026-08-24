@@ -6,179 +6,70 @@ import path from 'node:path';
 const projectRoot = path.resolve('.');
 const vendedorHtml = fs.readFileSync(path.join(projectRoot, 'vendedor.html'), 'utf8');
 const vendedorJs = fs.readFileSync(path.join(projectRoot, 'vendedor.js'), 'utf8');
+const operationalSql = fs.readFileSync(path.join(projectRoot, 'scripts/migrations/004_operational_core_and_config.sql'), 'utf8');
 
-test('1. Resetear Pruebas button is completely removed from vendor views', () => {
-  assert.equal(vendedorHtml.includes('Resetear Pruebas'), false, 'El botón Resetear Pruebas no debe existir en el HTML del vendedor');
-  assert.equal(vendedorHtml.includes('purgeProductionTestData(false)'), false, 'No deben quedar llamadas a purgeProductionTestData en los botones del portal');
+function extractFunction(source, name, nextName) {
+  const start = source.indexOf(`function ${name}`);
+  const end = nextName ? source.indexOf(`function ${nextName}`, start + 1) : -1;
+  assert.notEqual(start, -1, `No se encontró ${name}`);
+  return source.slice(start, end > start ? end : source.length);
+}
+
+test('el portal no expone acciones de reseteo o importación local de caja', () => {
+  assert.doesNotMatch(vendedorHtml, /Resetear Pruebas|purgeProductionTestData\(/);
+  assert.doesNotMatch(vendedorJs, /window\.importCashBackup\s*=/);
+  assert.doesNotMatch(vendedorJs, /window\.saveCurrentAccount\s*=/);
+  assert.doesNotMatch(vendedorJs, /window\.submitPosSaleDraftLegacyUnsafe\s*=/);
 });
 
-test('2. Internal Catalog includes batch actions, checkboxes, quota badge and delete buttons', () => {
-  assert.match(vendedorHtml, /id="internal-catalog-batch-bar"/, 'Debe existir la barra de acciones por lote en el catálogo interno');
-  assert.match(vendedorHtml, /id="internal-catalog-select-all"/, 'Debe existir el checkbox de seleccionar todos');
-  assert.match(vendedorHtml, /id="btn-internal-catalog-bulk-delete"/, 'Debe existir el botón de eliminar seleccionados');
-  assert.match(vendedorHtml, /id="internal-catalog-quota-left"/, 'Debe existir el contador de cupo de eliminación');
-  assert.match(vendedorJs, /deleteSingleInternalCatalogProduct/, 'Debe existir la función de eliminación individual');
-  assert.match(vendedorJs, /deleteSelectedInternalCatalogProducts/, 'Debe existir la función de eliminación por lote');
+test('caja y cuenta corriente no aceptan persistencia operativa local', () => {
+  const cashReader = extractFunction(vendedorJs, 'getVendorCashData', 'saveVendorCashData');
+  const cashWriter = extractFunction(vendedorJs, 'saveVendorCashData', 'formatCashCurrency');
+  const accountWriter = extractFunction(vendedorJs, 'saveCurrentAccount', 'switchPortfolioSubtab');
+  assert.match(cashReader, /authority: 'server'/);
+  assert.doesNotMatch(cashReader, /localStorage/);
+  assert.match(cashWriter, /La caja local fue retirada/);
+  assert.doesNotMatch(cashWriter, /localStorage/);
+  assert.match(accountWriter, /La cuenta corriente local fue retirada/);
+  assert.doesNotMatch(accountWriter, /localStorage/);
 });
 
-test('3. Enforces 5-deletions maximum quota per user', () => {
-  // Simular almacenamiento en memoria para el test
-  const memoryStore = {};
-  const mockLocalStorage = {
-    getItem: (key) => memoryStore[key] || null,
-    setItem: (key, val) => { memoryStore[key] = String(val); }
-  };
-
-  const MAX_USER_CATALOG_DELETIONS = 5;
-
-  function getUserCatalogDeletionCount(vendorName) {
-    if (!vendorName) return 0;
-    const cleanName = String(vendorName).trim().toLowerCase();
-    try {
-      const quotaMap = JSON.parse(mockLocalStorage.getItem('boeweb_user_deletion_quotas') || '{}');
-      return Number(quotaMap[cleanName] || 0);
-    } catch (_) {
-      return 0;
-    }
-  }
-
-  function getUserDeletionRemainingQuota(vendorName, isAdmin = false) {
-    if (isAdmin) return 9999;
-    const used = getUserCatalogDeletionCount(vendorName);
-    return Math.max(0, MAX_USER_CATALOG_DELETIONS - used);
-  }
-
-  function incrementUserCatalogDeletionCount(vendorName, count = 1, isAdmin = false) {
-    if (!vendorName || isAdmin) return;
-    const cleanName = String(vendorName).trim().toLowerCase();
-    try {
-      const quotaMap = JSON.parse(mockLocalStorage.getItem('boeweb_user_deletion_quotas') || '{}');
-      quotaMap[cleanName] = (Number(quotaMap[cleanName] || 0)) + count;
-      mockLocalStorage.setItem('boeweb_user_deletion_quotas', JSON.stringify(quotaMap));
-    } catch (_) {}
-  }
-
-  const vendor = 'Nacho Mina';
-
-  // Al inicio tiene 5 restantes
-  assert.equal(getUserDeletionRemainingQuota(vendor), 5);
-
-  // Elimina 2 productos
-  incrementUserCatalogDeletionCount(vendor, 2);
-  assert.equal(getUserCatalogDeletionCount(vendor), 2);
-  assert.equal(getUserDeletionRemainingQuota(vendor), 3);
-
-  // Elimina 3 productos más
-  incrementUserCatalogDeletionCount(vendor, 3);
-  assert.equal(getUserCatalogDeletionCount(vendor), 5);
-  assert.equal(getUserDeletionRemainingQuota(vendor), 0);
-
-  // Intentar eliminar con cupo 0 no permite cupos negativos
-  assert.equal(getUserDeletionRemainingQuota(vendor) < 1, true);
-
-  // Admin tiene cupo ilimitado
-  assert.equal(getUserDeletionRemainingQuota('Franco (Admin)', true), 9999);
+test('archivo individual y por lote usan el comando central y conservan historia', () => {
+  const single = extractFunction(vendedorJs, 'deleteSingleInternalCatalogProduct', 'deleteSelectedInternalCatalogProducts');
+  const batch = extractFunction(vendedorJs, 'deleteSelectedInternalCatalogProducts', 'openAdminAuditInvestigationModal');
+  assert.match(single, /OperationalApi\.archiveCatalogProduct/);
+  assert.match(single, /source !== 'catalog_products'/);
+  assert.match(batch, /OperationalApi\.archiveCatalogProduct/);
+  assert.match(batch, /productos heredados o inválidos/);
+  assert.match(batch, /sin borrar su historial/);
 });
 
-test('4. Secure Audit Log records immutable trail of sensitive operations', () => {
-  const auditLogs = [];
-  const SECURE_AUDIT_STORAGE_KEY = 'boeweb_secure_audit_trail_v1';
-
-  function logSecureAuditEvent({
-    event_type,
-    severity = 'INFO',
-    category = 'GENERAL',
-    actor_name = 'Sistema',
-    description,
-    entity_type = null,
-    entity_id = null,
-    details = {}
-  }) {
-    const entry = {
-      id: `sec_aud_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      timestamp: new Date().toISOString(),
-      actor: actor_name,
-      event_type,
-      category,
-      severity,
-      description,
-      entity_type,
-      entity_id,
-      details
-    };
-    auditLogs.unshift(entry);
-    return entry;
-  }
-
-  // 1. Log eliminación de producto
-  const delEvent = logSecureAuditEvent({
-    event_type: 'PRODUCT_DELETED',
-    category: 'CATALOG',
-    severity: 'CRITICAL',
-    actor_name: 'Raul',
-    description: 'Eliminación de producto individual: "Sustrato Premium 50L"',
-    entity_id: 'prod_123',
-    details: { name: 'Sustrato Premium 50L', price: 15000, stock: 4 }
-  });
-  assert.equal(delEvent.event_type, 'PRODUCT_DELETED');
-  assert.equal(delEvent.severity, 'CRITICAL');
-  assert.equal(delEvent.actor, 'Raul');
-
-  // 2. Log anulación de movimiento de caja
-  const cashVoidEvent = logSecureAuditEvent({
-    event_type: 'CASH_MOVEMENT_VOIDED',
-    category: 'CASH',
-    severity: 'WARNING',
-    actor_name: 'Alexis',
-    description: 'Anulación de movimiento de caja: "Gasto de limpieza" por $2.500',
-    entity_id: 'cash_456',
-    details: { amount: 2500, type: 'egreso' }
-  });
-  assert.equal(cashVoidEvent.event_type, 'CASH_MOVEMENT_VOIDED');
-  assert.equal(cashVoidEvent.category, 'CASH');
-
-  // 3. Log merma / ajuste de stock
-  const mermaEvent = logSecureAuditEvent({
-    event_type: 'PRODUCT_RETIRED_MERMA',
-    category: 'WMS',
-    severity: 'WARNING',
-    actor_name: 'Gino',
-    description: 'Ajuste de inventario (-1 u.): "Bong de Vidrio 30cm" - Motivo: dañado',
-    entity_id: 'prod_789',
-    details: { quantity: 1, reason: 'danado' }
-  });
-  assert.equal(mermaEvent.event_type, 'PRODUCT_RETIRED_MERMA');
-
-  // 4. Log cancelación de pedido web
-  const cancelOrderEvent = logSecureAuditEvent({
-    event_type: 'WEB_ORDER_CANCELLED',
-    category: 'ORDERS',
-    severity: 'WARNING',
-    actor_name: 'Franco (Admin)',
-    description: 'Cancelación de pedido web #BO-2026-0814-1234 con restitución de stock',
-    entity_id: 'BO-2026-0814-1234'
-  });
-  assert.equal(cancelOrderEvent.event_type, 'WEB_ORDER_CANCELLED');
-
-  assert.equal(auditLogs.length, 4);
+test('un tombstone del navegador no puede ocultar el catálogo canónico', () => {
+  const filter = extractFunction(vendedorJs, 'getFilteredInternalCatalogProducts', 'toggleSelectInternalCatalogItem');
+  assert.doesNotMatch(filter, /getDeletedInternalProductIds|deletedIds|isProductTombstoned/);
+  assert.doesNotMatch(vendedorJs, /window\.(?:getDeletedInternalProductIds|addDeletedInternalProductIds|isProductTombstoned)\s*=/);
 });
 
-test('5. Admin Investigation & Audit Modal is restricted and properly defined in HTML & JS', () => {
-  assert.match(vendedorHtml, /id="modal-admin-investigation-audit"/, 'Debe existir el modal de auditoría forense en vendedor.html');
-  assert.match(vendedorHtml, /id="admin-audit-auth-screen"/, 'Debe existir la pantalla de bloqueo con clave para administradores');
-  assert.match(vendedorHtml, /id="admin-audit-content-screen"/, 'Debe existir la consola de investigación forense');
-  assert.match(vendedorHtml, /id="admin-audit-entries-list"/, 'Debe existir la lista de eventos auditables');
-  assert.match(vendedorJs, /openAdminAuditInvestigationModal/, 'Debe existir el handler para abrir el centro de auditoría');
-  assert.match(vendedorJs, /handleAdminAuditUnlock/, 'Debe existir la validación de contraseña de administrador');
-  assert.match(vendedorJs, /exportAdminAuditLogJSON/, 'Debe existir la función de exportar auditoría a JSON');
+test('el Centro de Auditoría verifica sesión y consulta operational_audit_log', () => {
+  assert.match(vendedorHtml, /id="modal-admin-investigation-audit"/);
+  assert.doesNotMatch(vendedorHtml, /id="admin-audit-pass-input"|Contraseña de Administrador/);
+  assert.match(vendedorHtml, /Verificar sesión y abrir auditoría/);
+  assert.match(vendedorJs, /loadCanonicalAdminAuditLogs/);
+  assert.match(vendedorJs, /\.from\('operational_audit_log'\)/);
+  assert.match(vendedorJs, /\.eq\('tenant_id', context\.tenantId\)/);
+  assert.match(vendedorJs, /authority: 'server'/);
+  assert.doesNotMatch(vendedorJs, /boeweb_secure_audit_trail_v1/);
 });
 
-test('6. Tombstone persistence and multi-table deletion prevents reappearance on refresh', () => {
-  assert.match(vendedorJs, /boeweb_deleted_internal_product_ids_v1/, 'Debe usar el tombstone key persistente');
-  assert.match(vendedorJs, /getDeletedInternalProductIds/, 'Debe existir getDeletedInternalProductIds');
-  assert.match(vendedorJs, /addDeletedInternalProductIds/, 'Debe existir addDeletedInternalProductIds');
-  assert.match(vendedorJs, /\.from\('supplier_products'\)\s*\.delete\(\)/, 'Debe eliminar de supplier_products');
-  assert.match(vendedorJs, /\.from\('product_drafts'\)\s*\.delete\(\)/, 'Debe eliminar de product_drafts');
-  assert.match(vendedorJs, /\.from\('products'\)\s*\.delete\(\)/, 'Debe eliminar de products');
+test('la auditoría central tiene RLS de supervisor y no admite escritura directa', () => {
+  assert.match(operationalSql, /operational_audit_supervisor_read_v2[\s\S]*?ARRAY\['ADMIN', 'SUPERVISOR'\]/);
+  assert.match(operationalSql, /REVOKE ALL ON TABLE[\s\S]*?public\.operational_audit_log[\s\S]*?FROM anon, authenticated/);
+  assert.match(operationalSql, /GRANT SELECT ON[\s\S]*?public\.operational_audit_log[\s\S]*?TO authenticated/);
 });
 
+test('la exportación usa el mismo snapshot central y falla cerrada', () => {
+  const exporter = extractFunction(vendedorJs, 'exportAdminAuditLogJSON', 'renderInternalCatalogGrid');
+  assert.match(exporter, /await loadCanonicalAdminAuditLogs\(\{ refresh: true \}\)/);
+  assert.match(exporter, /catch \(error\)/);
+  assert.doesNotMatch(exporter, /localStorage/);
+});

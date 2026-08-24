@@ -144,18 +144,8 @@
   position: relative;
 }
 
-.vendor-login-select-wrap::after {
-  position: absolute;
-  top: 50%;
-  right: 17px;
-  color: #6b4e2e;
-  content: "⌄";
-  font-size: 1.15rem;
-  pointer-events: none;
-  transform: translateY(-58%);
-}
-
 .vendor-login-select-wrap select,
+.vendor-login-select-wrap input,
 .vendor-login-password-wrap input {
   width: 100%;
   min-height: 54px;
@@ -184,6 +174,7 @@
 }
 
 .vendor-login-select-wrap select:focus,
+.vendor-login-select-wrap input:focus,
 .vendor-login-password-wrap input:focus {
   border-color: #7ea642;
   background: #ffffff;

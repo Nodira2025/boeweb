@@ -15,6 +15,58 @@ if (window.supabase) {
   }
 }
 
+function readLegacyPublicPaymentConfig() {
+  try {
+    const raw = localStorage.getItem('boeweb_payment_config');
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    const sanitized = window.AppConfig?.sanitizeClientConfig(parsed) || {};
+    if (JSON.stringify(parsed) !== JSON.stringify(sanitized)) localStorage.removeItem('boeweb_payment_config');
+    return sanitized;
+  } catch (error) {
+    try { localStorage.removeItem('boeweb_payment_config'); } catch (_) {}
+    console.warn('Se descartó una configuración pública heredada inválida.', error);
+    return {};
+  }
+}
+
+async function loadStorefrontAppConfig() {
+  if (!window.AppConfig) return null;
+  try {
+    const tenantId = window.AppConfig.getActiveTenantId();
+    const repository = window.AppConfig.createRepository({ tenantId, supabaseClient });
+    const published = await repository.loadPublished();
+    if (published.revision > 0) {
+      window.AppConfig.applyCssVariables(published);
+      window.boeStorefrontAppConfig = published;
+      window.dispatchEvent(new CustomEvent('boeweb_app_config_loaded', { detail: published }));
+      return published;
+    }
+
+    const legacyPayments = readLegacyPublicPaymentConfig();
+    if (!Object.keys(legacyPayments).length) {
+      window.boeStorefrontAppConfig = published;
+      window.dispatchEvent(new CustomEvent('boeweb_app_config_loaded', { detail: published }));
+      return published;
+    }
+
+    const normalizedLegacyPayments = window.AppConfig.normalizeConfig(legacyPayments, { tenantId }).payments;
+    const legacyConfig = window.AppConfig.normalizeConfig({
+      ...published,
+      payments: normalizedLegacyPayments
+    }, { tenantId });
+    window.boeStorefrontAppConfig = legacyConfig;
+    window.dispatchEvent(new CustomEvent('boeweb_app_config_loaded', { detail: legacyConfig }));
+    return legacyConfig;
+  } catch (error) {
+    console.warn('No se pudo cargar AppConfig; se usan valores públicos seguros.', error);
+    const fallback = window.AppConfig.normalizeConfig({ tenantId: window.AppConfig.getActiveTenantId() });
+    window.boeStorefrontAppConfig = fallback;
+    window.dispatchEvent(new CustomEvent('boeweb_app_config_loaded', { detail: fallback }));
+    return fallback;
+  }
+}
+
 window.toggleNavMoreMenu = function() {
   const dropdown = document.getElementById('nav-more-menu-dropdown');
   if (dropdown) dropdown.classList.toggle('active');
@@ -25,17 +77,8 @@ window.closeNavMoreMenu = function() {
   if (dropdown) dropdown.classList.remove('active');
 };
 
-if (localStorage.getItem('boeweb_production_clean_v1') !== 'true') {
-  try {
-    localStorage.removeItem('boeweb_cart');
-    localStorage.removeItem('boeweb_order_history');
-    localStorage.removeItem('boeweb_web_orders');
-    localStorage.removeItem('boeweb_last_mp_order');
-    localStorage.setItem('boeweb_production_clean_v1', 'true');
-  } catch (_) {}
-}
-
 document.addEventListener('DOMContentLoaded', () => {
+  const storefrontAppConfigReady = loadStorefrontAppConfig();
   // --- STATE MANAGEMENT ---
   let products = [];
   let filteredProducts = [];
@@ -85,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const totalCountEl = document.getElementById('total-count');
   
   // Category Pill Buttons
-  const categoryButtons = document.querySelectorAll('.category-btn');
+  let categoryButtons = document.querySelectorAll('.category-btn');
   const activeFiltersArea = document.getElementById('active-filters-area');
   const filterBadgeText = document.getElementById('filter-badge-text');
   const removeFilterBtn = document.getElementById('remove-filter-btn');
@@ -217,182 +260,65 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- INITIALIZE & FETCH CATALOG ---
   async function loadCatalog() {
     try {
-      let initialLoaded = false;
-
-    // 1. Instant Load from Local/Cached Storage or products.json
-    try {
-      const cached = localStorage.getItem('boeweb_internal_catalog');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          products = parsed;
-          filteredProducts = [...products];
-          if (totalCountEl) totalCountEl.textContent = products.length;
-          applyFiltersAndRender(true);
-          updateCartBadge();
-          initialLoaded = true;
-        }
+      if (!supabaseClient || !window.AppConfig) {
+        throw new Error('El catálogo central no está disponible en este navegador.');
       }
-    } catch (_) {}
-
-    if (!initialLoaded) {
-      try {
-        const response = await fetch('products.json');
-        if (response.ok) {
-          const rawJson = await response.json();
-          if (Array.isArray(rawJson) && rawJson.length > 0) {
-            products = rawJson.filter(p => p && p.id && p.name);
-            filteredProducts = [...products];
-            if (totalCountEl) totalCountEl.textContent = products.length;
-            applyFiltersAndRender(true);
-            updateCartBadge();
-            initialLoaded = true;
-          }
-        }
-      } catch (jsonErr) {
-        console.warn('Instant local products.json load failed, will rely on Supabase:', jsonErr);
+      const managedConfig = await storefrontAppConfigReady;
+      const catalogConfig = managedConfig?.catalog || window.AppConfig.DEFAULT_CONFIG.catalog;
+      if (catalogConfig.source === 'disabled' || catalogConfig.visibility !== 'public') {
+        throw new Error('El catálogo público está deshabilitado por la configuración de esta tienda.');
       }
-    }
+      const tenantId = window.AppConfig.getActiveTenantId();
+      const { data: catalogRows, error: catalogError } = await supabaseClient
+        .from('public_catalog_products_v2')
+        .select('tenant_id,id,sku,barcode,name,description,category,brand,price,currency,image_url,track_stock,available_quantity')
+        .eq('tenant_id', tenantId)
+        .order('name', { ascending: true });
+      if (catalogError) throw catalogError;
 
-    // 2. Fetch live data from Supabase and Unify
-    if (window.supabase) {
-      try {
-        const supabaseUrl = 'https://sxbhrgvizqylnfcqzhin.supabase.co';
-        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4YmhyZ3ZpenF5bG5mY3F6aGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMjM1MzEsImV4cCI6MjA5Njg5OTUzMX0.UUOwXsHXKNCjlJKdxMUlAuCtNAnNWgAroBwMlWAdTag';
-        const client = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
-
-        const { data: allSupplierRows, error: suppErr } = await client
-          .from('supplier_products')
-          .select('*')
-          .order('name', { ascending: true });
-
-        if (!suppErr && allSupplierRows && allSupplierRows.length > 0) {
-          const productIds = [...new Set(allSupplierRows.map(r => r.mapped_product_id || r.supplier_product_id).filter(Boolean))];
-          let metadataMap = new Map();
-          if (productIds.length > 0) {
-            const { data: prodMeta } = await client.from('products').select('*').in('id', productIds);
-            if (prodMeta) {
-              prodMeta.forEach(pm => metadataMap.set(String(pm.id), pm));
-            }
-          }
-
-          let localCatalogMap = new Map();
-          try {
-            const cachedCat = JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
-            if (Array.isArray(cachedCat)) {
-              cachedCat.forEach(item => {
-                const code = String(item.product_code || item.id || '').toUpperCase();
-                if (code) localCatalogMap.set(code, item);
-              });
-            }
-          } catch (_) {}
-
-          const ownRows = allSupplierRows.filter(r => r.supplier_id === 'local_store' || r.supplier_id === 'propio' || !r.supplier_id);
-          const b2bRows = allSupplierRows.filter(r => r.supplier_id && r.supplier_id !== 'local_store' && r.supplier_id !== 'propio');
-
-          const ownParsed = ownRows.map(r => {
-            const pid = String(r.mapped_product_id || r.supplier_product_id || r.id);
-            const meta = metadataMap.get(pid) || {};
-            const localOverride = localCatalogMap.get(pid.toUpperCase());
-            const finalStock = localOverride !== undefined && localOverride.stock !== undefined
-              ? Math.max(0, Number(localOverride.stock) || 0)
-              : Math.max(0, Number(r.stock) || 0);
-            const isAvail = r.available !== false && finalStock > 0;
-            return {
-              id: pid,
-              product_code: pid,
-              name: meta.name || r.name || 'Producto BÔ',
-              price: Number(r.price) || 0,
-              image: meta.image || r.image || 'assets/logo.jpg',
-              link: r.link || '',
-              slug: (meta.name || r.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-              stock: finalStock,
-              own_stock: finalStock,
-              available: isAvail,
-              category: meta.category || 'Otros',
-              description: meta.description || r.description || ''
-            };
-          });
-
-          // Also include products from products.json as own products if not already in ownParsed
-          if (Array.isArray(products) && products.length > 0) {
-            products.forEach(p => {
-              if (p.stock > 0 && !ownParsed.some(op => op.id === p.id || op.name === p.name)) {
-                ownParsed.push(p);
-              }
-            });
-          }
-
-          const b2bParsed = b2bRows.map(r => {
-            const pid = String(r.mapped_product_id || r.supplier_product_id || r.id);
-            const meta = metadataMap.get(pid) || {};
-            return {
-              id: pid,
-              product_code: pid,
-              name: meta.name || r.name || 'Producto B2B',
-              price: Number(r.price) || 0,
-              image: meta.image || r.image || 'assets/logo.jpg',
-              link: r.link || '',
-              slug: (meta.name || r.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-              stock: 0,
-              own_stock: 0,
-              available: true,
-              category: meta.category || 'Otros',
-              description: meta.description || r.description || '',
-              supplier_code: r.supplier_id,
-              supplier_name: r.supplier_id
-            };
-          });
-
-          let localStores = [];
-          try {
-            const cachedLocalStores = localStorage.getItem('boeweb_nearby_stores_catalog');
-            if (cachedLocalStores) localStores = JSON.parse(cachedLocalStores);
-          } catch (_) {}
-
-          let unified = [];
-          if (typeof window.PublicCatalogUnifier !== 'undefined') {
-            unified = window.PublicCatalogUnifier.unifyProducts(ownParsed, b2bParsed, {
-              localStoresProducts: localStores
-            });
-          } else {
-            unified = [...ownParsed, ...b2bParsed];
-          }
-
-          unified = unified.filter(p => p.id && p.name);
-          if (unified.length > 0) {
-            products = unified;
-            try {
-              localStorage.setItem('boeweb_internal_catalog', JSON.stringify(products));
-            } catch (_) {}
-            if (totalCountEl) totalCountEl.textContent = products.length;
-            applyFiltersAndRender(false);
-            updateCartBadge();
-            initialLoaded = true;
-          }
-        }
-      } catch (spErr) {
-        console.warn('Supabase catalog fetch failed:', spErr);
-      }
-    }
-
-    if (!initialLoaded && products.length === 0) {
-      throw new Error('No se pudo establecer conexión con el catálogo de productos.');
-    }
-
-      // Default Sort Order: Relevance (relevance matches index order)
+      products = (catalogRows || []).map(row => {
+        const availableQuantity = row.track_stock === false
+          ? null
+          : Math.max(0, Number(row.available_quantity) || 0);
+        const canBackorder = row.track_stock !== false && catalogConfig.allowBackorders === true;
+        const isAvailable = row.track_stock === false || availableQuantity > 0 || canBackorder;
+        return {
+          id: row.id,
+          product_id: row.id,
+          product_code: row.sku,
+          barcode: row.barcode || '',
+          name: row.name,
+          description: row.description || '',
+          category: row.category || 'Otros',
+          brand: row.brand || '',
+          price: Number(row.price) || 0,
+          currency: row.currency || 'ARS',
+          image: row.image_url || 'assets/logo.jpg',
+          image_url: row.image_url || 'assets/logo.jpg',
+          track_stock: row.track_stock !== false,
+          stock: availableQuantity,
+          own_stock: availableQuantity,
+          available_quantity: availableQuantity,
+          available: isAvailable,
+          availability: row.track_stock === false || availableQuantity > 0 ? 'EN_STOCK' : (canBackorder ? 'A_PEDIDO' : 'SIN_STOCK'),
+          allow_backorder: canBackorder,
+          supplier_code: 'own'
+        };
+      }).filter(product => catalogConfig.showOutOfStock || product.available);
+      renderCatalogTaxonomy();
+      const availableById = new Map(products.map(product => [String(product.id), product]));
+      cart = cart.filter(item => {
+        const product = availableById.get(String(item.id || item.product_id || item.product_code));
+        return product
+          && product.available
+          && Number(item.quantity) > 0
+          && (product.allow_backorder || product.available_quantity === null || Number(item.quantity) <= product.available_quantity);
+      });
+      localStorage.setItem('boeweb_cart', JSON.stringify(cart));
       filteredProducts = [...products];
-      
-      // Update UI counts
-      totalCountEl.textContent = products.length;
-      
-      // Render Initial View
-      applyFiltersAndRender();
-      
-      // Render Cart Badge count
+      if (totalCountEl) totalCountEl.textContent = products.length;
+      applyFiltersAndRender(true);
       updateCartBadge();
-
-      // Deep link to product from universal QR code scan
       handleUrlProductDeepLink();
     } catch (error) {
       console.error("Error loading products catalog:", error);
@@ -428,97 +354,66 @@ document.addEventListener('DOMContentLoaded', () => {
     lowStockOnly: false
   };
 
-  const KNOWN_BRANDS = [
-    'Biobizz', 'Grotek', 'Plagron', 'Advanced Nutrients', 'Storz & Bickel', 'Grenco',
-    'Davinci', 'Pax', 'Puffco', 'Dutch Passion', 'Buddha Seeds', 'BSF', 'Paradise Seeds',
-    'Sensi Seeds', 'Santa Planta', 'Growmix', 'Mad Grow', 'Jiffy', 'Klassmann', 'Top Crop',
-    'Namaste', 'Kawsay', 'Vamp', 'Ecocrop', 'Crop', 'Biolab', 'Treemix', 'Canna', 'Atami', 'Hesi'
-  ];
-
   function extractProductFacets(product) {
-    const text = `${product.name || ''} ${product.description || ''}`.toLowerCase();
-    let foundBrand = null;
-    for (const b of KNOWN_BRANDS) {
-      if (text.includes(b.toLowerCase())) {
-        foundBrand = b;
-        break;
-      }
+    return {
+      brand: String(product.brand || '').trim() || null,
+      subcategory: null,
+      attributes: {}
+    };
+  }
+
+  function renderCatalogTaxonomy() {
+    const categories = Array.from(new Set(products
+      .map(product => String(product.category || '').trim())
+      .filter(Boolean)))
+      .sort((left, right) => left.localeCompare(right, 'es'));
+    if (currentCategory !== 'all' && !categories.includes(currentCategory)) currentCategory = 'all';
+
+    const categoryList = document.getElementById('category-list');
+    if (categoryList) {
+      categoryList.innerHTML = [
+        '<li><button type="button" class="category-btn active" data-category="all">Todos <span class="facet-count">(0)</span></button></li>',
+        ...categories.map(category => `<li><button type="button" class="category-btn" data-category="${escapeHtml(category)}">${escapeHtml(category)} <span class="facet-count">(0)</span></button></li>`)
+      ].join('');
     }
 
-    let subcategory = null;
-    let attributes = {};
-    const cat = product.category || 'Otros';
-
-    if (cat === 'Semillas') {
-      if (text.includes('auto')) attributes.tipo = 'Autofloreciente';
-      else if (text.includes('foto') || text.includes('feminizada')) attributes.tipo = 'Fotoperiódica';
-      else if (text.includes('cbd')) attributes.tipo = 'CBD';
-
-      if (text.includes('importad') || text.includes('dutch') || text.includes('buddha') || text.includes('bsf') || text.includes('sensi')) {
-        attributes.origen = 'Importada';
-      } else {
-        attributes.origen = 'Nacional';
-      }
-
-      const qtyMatch = text.match(/x\s*(\d+)/i);
-      if (qtyMatch) attributes.cantidad = `x${qtyMatch[1]}`;
-
-    } else if (cat === 'Parafernalia') {
-      if (text.includes('bong')) subcategory = 'Bongs';
-      else if (text.includes('pipa')) subcategory = 'Pipas';
-      else if (text.includes('papel') || text.includes('seda')) subcategory = 'Papeles';
-      else if (text.includes('filtro') || text.includes('tip')) subcategory = 'Filtros';
-      else if (text.includes('picador') || text.includes('grinder')) subcategory = 'Picadores';
-      else if (text.includes('extrac')) subcategory = 'Extracción';
-
-      if (text.includes('vidrio') || text.includes('pyrex')) attributes.material = 'Vidrio';
-      else if (text.includes('silicona')) attributes.material = 'Silicona';
-      else if (text.includes('metal') || text.includes('aluminio')) attributes.material = 'Metal';
-      else if (text.includes('cáñamo') || text.includes('canamo')) attributes.material = 'Cáñamo';
-      else if (text.includes('3d')) attributes.material = 'Impresión 3D';
-      else if (text.includes('acrílico') || text.includes('acrilico')) attributes.material = 'Acrílico';
-
-    } else if (cat === 'Fertilizantes') {
-      if (text.includes('estimul') || text.includes('root') || text.includes('tricho') || text.includes('mico')) subcategory = 'Bioestimulantes';
-      else if (text.includes('crecimiento') || text.includes('veg')) subcategory = 'Crecimiento';
-      else if (text.includes('floración') || text.includes('flora') || text.includes('bloom')) subcategory = 'Floración';
-      else subcategory = 'Aditivos y complementos';
-
-    } else if (cat === 'Vaporizadores') {
-      if (text.includes('extrac') || text.includes('wax')) attributes.uso = 'Para extracciones';
-      else if (text.includes('flor')) attributes.uso = 'Para flores';
-      else attributes.uso = 'Híbrido';
+    const homeStrip = document.querySelector('.home-category-strip');
+    if (homeStrip) {
+      homeStrip.innerHTML = categories.slice(0, 6)
+        .map(category => `<button type="button" class="category-btn home-category-btn" data-category="${escapeHtml(category)}">${escapeHtml(category)}</button>`)
+        .join('');
+      homeStrip.hidden = categories.length === 0;
     }
 
-    return { brand: foundBrand, subcategory, attributes };
+    categoryButtons = document.querySelectorAll('.category-btn');
+    bindCategoryButtons();
+    updateCategoryActiveState();
   }
 
   function renderFacetedBrandsList() {
     const container = document.getElementById('facet-brands-list');
     if (!container) return;
 
-    const brandCounts = {};
-    KNOWN_BRANDS.forEach(b => brandCounts[b] = 0);
-
-    products.forEach(p => {
-      const facets = extractProductFacets(p);
-      if (facets.brand && brandCounts[facets.brand] !== undefined) {
-        brandCounts[facets.brand]++;
-      }
-    });
-
-    const activeBrands = KNOWN_BRANDS.filter(b => brandCounts[b] > 0);
+    const brandCounts = products.reduce((counts, product) => {
+      const brand = extractProductFacets(product).brand;
+      if (brand) counts.set(brand, (counts.get(brand) || 0) + 1);
+      return counts;
+    }, new Map());
+    const activeBrands = Array.from(brandCounts.keys()).sort((left, right) => left.localeCompare(right, 'es'));
 
     container.innerHTML = activeBrands.map(b => {
       const isChecked = facetedState.selectedBrands.includes(b);
       return `
         <label class="facet-check-item">
-          <input type="checkbox" value="${b}" ${isChecked ? 'checked' : ''} onchange="toggleBrandFilter('${b}')">
-          <span>${b}</span>
-          <span class="facet-count">(${brandCounts[b]})</span>
+          <input type="checkbox" value="${escapeHtml(b)}" data-brand="${escapeHtml(b)}" ${isChecked ? 'checked' : ''}>
+          <span>${escapeHtml(b)}</span>
+          <span class="facet-count">(${brandCounts.get(b)})</span>
         </label>
       `;
     }).join('');
+    container.querySelectorAll('input[data-brand]').forEach(input => {
+      input.addEventListener('change', () => window.toggleBrandFilter(input.dataset.brand));
+    });
   }
 
   window.toggleBrandFilter = function(brand) {
@@ -956,18 +851,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   // --- CATEGORY PILLS FILTER ---
-  categoryButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      currentCategory = btn.getAttribute('data-category');
-      updateCategoryActiveState();
-      applyFiltersAndRender(true);
-      if (btn.classList.contains('home-category-btn')) {
-        document.getElementById('catalog-section')?.scrollIntoView({ behavior: 'smooth' });
-      } else if (btn.closest('#mobile-filter-drawer')) {
-        closeMobileFilterDrawer();
-      }
+  function bindCategoryButtons() {
+    categoryButtons.forEach(btn => {
+      if (btn.dataset.categoryBound === 'true') return;
+      btn.dataset.categoryBound = 'true';
+      btn.addEventListener('click', () => {
+        currentCategory = btn.getAttribute('data-category');
+        updateCategoryActiveState();
+        applyFiltersAndRender(true);
+        if (btn.classList.contains('home-category-btn')) {
+          document.getElementById('catalog-section')?.scrollIntoView({ behavior: 'smooth' });
+        } else if (btn.closest('#mobile-filter-drawer')) {
+          closeMobileFilterDrawer();
+        }
+      });
     });
-  });
+  }
+  bindCategoryButtons();
 
   function updateCategoryActiveState() {
     categoryButtons.forEach(btn => {
@@ -1162,7 +1062,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    const total = Math.max(0, subtotal - discount);
+    let total = Math.max(0, subtotal - discount);
 
     cartSubtotalEl.textContent = `$${formatPrice(subtotal)}`;
     if (cartDiscountLabelEl) {
@@ -1307,7 +1207,7 @@ document.addEventListener('DOMContentLoaded', () => {
         discountLabel = `Descuento Club BÔ (${getMemberTierName()})`;
       }
     }
-    const total = Math.max(0, subtotal - discount);
+    let total = Math.max(0, subtotal - discount);
     const orderId = 'BO-' + Math.floor(100000 + Math.random() * 900000);
 
     // Save order history locally
@@ -1354,54 +1254,27 @@ document.addEventListener('DOMContentLoaded', () => {
       status: payment.includes('Mercado') ? 'Pendiente Mercado Pago' : 'Pendiente Vendedor',
       source: 'WEB'
     };
-    orderHistory.unshift(newOrder);
-    localStorage.setItem('boeweb_order_history', JSON.stringify(orderHistory));
-
-    // Save for store vendor mediation
-    try {
-      let webOrders = JSON.parse(localStorage.getItem('boeweb_web_orders') || '[]');
-      webOrders.unshift(newOrder);
-      localStorage.setItem('boeweb_web_orders', JSON.stringify(webOrders));
-    } catch (_) {}
-
-    // Save to Supabase orders table if client available
-    if (window.supabase) {
+    const cacheConfirmedOrder = confirmedOrder => {
       try {
-        const client = window.supabase.createClient('https://sxbhrgvizqylnfcqzhin.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4YmhyZ3ZpenF5bG5mY3F6aGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMjM1MzEsImV4cCI6MjA5Njg5OTUzMX0.UUOwXsHXKNCjlJKdxMUlAuCtNAnNWgAroBwMlWAdTag');
-        await client.from('orders').insert([{
-          order_id: orderId,
-          customer_name: name,
-          customer_phone: phone,
-          delivery_type: deliveryType,
-          payment_method: payment,
-          total_amount: total,
-          items_json: newOrder.items,
-          notes: notes || '',
-          status: newOrder.status,
-          created_at: new Date().toISOString()
-        }]);
-      } catch (sbErr) {
-        console.warn('Could not record order in Supabase orders table:', sbErr);
+        const nextHistory = orderHistory.filter(order => order.order_id !== confirmedOrder.order_id);
+        nextHistory.unshift(confirmedOrder);
+        localStorage.setItem('boeweb_order_history', JSON.stringify(nextHistory.slice(0, 100)));
+      } catch (cacheError) {
+        console.warn('No se pudo guardar el comprobante local del cliente:', cacheError);
       }
-    }
+    };
 
-    // Load admin payment gateway config (with Supabase store_config cloud sync)
-    let config = JSON.parse(localStorage.getItem('boeweb_payment_config')) || {};
-    if (!config.mpAccessToken && typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try {
-        const { data: scData } = await supabaseClient.from('store_config').select('*').eq('id', 'main_config').maybeSingle();
-        if (scData && scData.config_json) {
-          config = { ...config, ...scData.config_json };
-          try { localStorage.setItem('boeweb_payment_config', JSON.stringify(config)); } catch (_) {}
-        }
-      } catch (_) {}
+    const managedConfig = await storefrontAppConfigReady;
+    const publicPayments = managedConfig?.payments || window.AppConfig?.DEFAULT_CONFIG.payments;
+    if (payment.includes('Transferencia') && !publicPayments?.bankTransfer.enabled) {
+      alert('La transferencia bancaria no está habilitada para esta tienda. Seleccioná otro método de pago.');
+      return;
     }
 
     // 1. MERCADO PAGO AUTOMATED CHECKOUT
     if (payment.includes('Mercado Pago')) {
-      const mpToken = (config.mpAccessToken || '').trim();
-      if (!mpToken) {
-        alert('⚠️ El Administrador aún no configuró el Access Token de Mercado Pago. Podés ingresar a admin-config.html para configurarlo o seleccionar otro método de pago.');
+      if (!publicPayments?.mercadoPago.enabled) {
+        alert('Mercado Pago no está habilitado para esta tienda. Seleccioná otro método de pago.');
         return;
       }
 
@@ -1427,10 +1300,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const pref = await window.createMercadoPagoPreference({
           orderId: orderId,
+          idempotencyKey: orderId,
+          tenantId: window.AppConfig?.getActiveTenantId?.() || '11111111-1111-1111-1111-111111111111',
           customerName: name,
+          customerEmail: currentMember?.email || '',
           customerPhone: phone,
-          items: cart.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, price: i.price }))
-        }, mpToken);
+          deliveryType,
+          address,
+          notes,
+          couponCode: appliedCoupon?.code || null,
+          items: cart.map(i => ({ id: i.id, product_code: i.product_code || i.id, quantity: i.quantity }))
+        });
+
+        newOrder.id = pref.order_number;
+        newOrder.order_id = pref.order_number;
+        newOrder.remote_order_id = pref.order_id;
+        newOrder.total = Number(pref.total);
+        newOrder.total_amount = Number(pref.total);
+        newOrder.status = 'Pendiente Mercado Pago';
+        cacheConfirmedOrder(newOrder);
 
         // Clear cart
         cart = [];
@@ -1451,12 +1339,49 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    let canonicalOrder;
+    try {
+      if (!window.PublicOrderApi) throw new Error('No se cargó el servicio seguro de pedidos.');
+      canonicalOrder = await window.PublicOrderApi.createPublicOrder({
+        orderId,
+        idempotencyKey: orderId,
+        tenantId: window.AppConfig?.getActiveTenantId?.() || '11111111-1111-1111-1111-111111111111',
+        customerName: name,
+        customerEmail: currentMember?.email || '',
+        customerPhone: phone,
+        deliveryType,
+        address,
+        notes,
+        couponCode: appliedCoupon?.code || null,
+        items: cart.map(item => ({
+          id: item.id,
+          product_code: item.product_code || item.id,
+          quantity: item.quantity
+        }))
+      });
+      total = Number(canonicalOrder.total);
+      newOrder.id = canonicalOrder.order_number;
+      newOrder.order_id = canonicalOrder.order_number;
+      newOrder.remote_order_id = canonicalOrder.order_id;
+      newOrder.subtotal = Number(canonicalOrder.subtotal ?? canonicalOrder.total);
+      newOrder.discount = Number(canonicalOrder.discount || 0);
+      newOrder.total = total;
+      newOrder.total_amount = total;
+      newOrder.items = Array.isArray(canonicalOrder.items) ? canonicalOrder.items : newOrder.items;
+      newOrder.status = canonicalOrder.status || 'Pendiente Vendedor';
+      cacheConfirmedOrder(newOrder);
+    } catch (orderError) {
+      console.error('El pedido público no pudo confirmarse:', orderError);
+      alert(`No se registró el pedido. No se reservó stock ni se generó un cobro.\n\n${orderError.message}`);
+      return;
+    }
+
     // 2. BANK TRANSFER AUTOMATED DISPLAY
     if (payment.includes('Transferencia')) {
-      const bankName = config.bankName || 'Banco Galicia';
-      const bankHolder = config.bankHolder || 'BÔ GROWCLUB S.A.';
-      const bankCbu = config.bankCbu || '0000003100012345678901';
-      const bankAlias = config.bankAlias || 'BO.GROWCLUB.MP';
+      const bankName = publicPayments.bankTransfer.bankName;
+      const bankHolder = publicPayments.bankTransfer.accountHolder;
+      const bankCbu = publicPayments.bankTransfer.cbu;
+      const bankAlias = publicPayments.bankTransfer.alias;
 
       let bankMsg = `✨ *BO growclub - Datos de Transferencia* ✨\n\n`;
       bankMsg += `📦 *Pedido N°:* ${orderId}\n`;
@@ -1470,8 +1395,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const waPhone = "5493813023185";
       const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(bankMsg)}`;
       
-      // Descontar stock inmediatamente para reserva
-      deductWebOrderStock(newOrder.items, orderId);
+      // La reserva de stock ya fue realizada atómicamente por create_public_order_v2.
       newOrder.stock_deducted = true;
 
       cart = [];
@@ -1511,8 +1435,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const waPhone = "5493813023185";
     const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
 
-    // Descontar stock inmediatamente para reserva
-    deductWebOrderStock(newOrder.items, orderId);
+    // La reserva de stock ya fue realizada atómicamente por create_public_order_v2.
     newOrder.stock_deducted = true;
 
     cart = [];
@@ -1526,55 +1449,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.open(waUrl, '_blank');
     showWebOrderReceipt(newOrder, waUrl);
   });
-
-  function deductWebOrderStock(items, orderId) {
-    try {
-      const rawCatalog = JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
-      let catalogChanged = false;
-
-      items.forEach(soldItem => {
-        const code = String(soldItem.product_id || soldItem.id || soldItem.product_code || '');
-        const barcode = String(soldItem.barcode || '');
-        const name = String(soldItem.name || '').toLowerCase();
-        const qty = Math.max(1, Number(soldItem.quantity) || 1);
-
-        if (Array.isArray(rawCatalog)) {
-          const intP = rawCatalog.find(p =>
-            (code && (String(p.id) === code || String(p.product_code) === code)) ||
-            (barcode && p.barcode === barcode) ||
-            (name && p.name && p.name.toLowerCase() === name)
-          );
-          if (intP) {
-            const prev = Number(intP.stock || 0);
-            intP.stock = Math.max(0, prev - qty);
-            intP.available = intP.stock > 0;
-            catalogChanged = true;
-          }
-        }
-
-        try {
-          const rawLocs = JSON.parse(localStorage.getItem('boeweb_product_locations') || '[]');
-          if (Array.isArray(rawLocs)) {
-            const loc = rawLocs.find(l =>
-              (code && (String(l.product_code) === code || String(l.product_id) === code)) ||
-              (barcode && l.barcode === barcode) ||
-              (name && l.name && l.name.toLowerCase() === name)
-            );
-            if (loc) {
-              loc.stock = Math.max(0, Number(loc.stock || 0) - qty);
-              localStorage.setItem('boeweb_product_locations', JSON.stringify(rawLocs));
-            }
-          }
-        } catch (_) {}
-      });
-
-      if (catalogChanged) {
-        localStorage.setItem('boeweb_internal_catalog', JSON.stringify(rawCatalog));
-      }
-    } catch (e) {
-      console.warn('Error al descontar stock en pedido web:', e);
-    }
-  }
 
   let currentReceiptOrder = null;
 

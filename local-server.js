@@ -5,6 +5,14 @@ require('dotenv').config({ quiet: true });
 
 const root = process.cwd();
 const port = Number(process.env.PORT || 4173);
+const blockedRootEntries = new Set([
+  '.agents', '.codex', '.git', '.github', 'netlify', 'node_modules', 'scripts', 'tests'
+]);
+const blockedFileNames = new Set([
+  '.env', '.env.local', '.env.production', '.gitignore', 'netlify.toml',
+  'package.json', 'package-lock.json'
+]);
+const blockedExtensions = new Set(['.sql', '.md', '.log', '.map', '.ps1', '.sh', '.yml', '.yaml']);
 const contentTypes = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -23,8 +31,24 @@ const contentTypes = {
 };
 
 function sendText(response, status, message) {
-  response.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+  response.writeHead(status, {
+    'Content-Type': 'text/plain; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer'
+  });
   response.end(message);
+}
+
+function isBlockedStaticPath(relativePath) {
+  const normalized = relativePath.replace(/\\/g, '/');
+  const segments = normalized.split('/').filter(Boolean);
+  const firstSegment = String(segments[0] || '').toLowerCase();
+  const fileName = String(segments.at(-1) || '').toLowerCase();
+  if (segments.some(segment => segment.startsWith('.'))) return true;
+  if (blockedRootEntries.has(firstSegment) || blockedFileNames.has(fileName)) return true;
+  return blockedExtensions.has(path.extname(fileName));
 }
 
 async function readRequestBody(request, maxBytes = 9_000_000) {
@@ -78,6 +102,10 @@ function handleStaticFile(request, response) {
   try {
     const urlPath = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
     const relativePath = urlPath === '/' ? 'index.html' : urlPath.replace(/^\/+/, '');
+    if (isBlockedStaticPath(relativePath)) {
+      sendText(response, 404, 'No encontrado.');
+      return;
+    }
     const filePath = path.resolve(root, relativePath);
     if (filePath !== root && !filePath.startsWith(`${root}${path.sep}`)) {
       sendText(response, 403, 'Acceso denegado.');
@@ -90,7 +118,11 @@ function handleStaticFile(request, response) {
       }
       response.writeHead(200, {
         'Content-Type': contentTypes[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
-        'Cache-Control': 'no-cache'
+        'Cache-Control': 'no-cache',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
+        'Permissions-Policy': 'camera=(self), microphone=(self), geolocation=()'
       });
       fs.createReadStream(filePath).on('error', streamError => {
         console.error('Error al leer archivo:', streamError.message);

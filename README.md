@@ -1,5 +1,9 @@
 # BO growclub - Cultivo & Bienestar Zen
 
+> **Arquitectura operativa v2:** el storefront puede servirse como sitio estático, pero ventas, inventario, caja, clientes, cuenta corriente, pedidos y administración requieren Supabase/PostgreSQL y funciones server-side. Consultá [Arquitectura v2](docs/ARCHITECTURE_V2.md) y [corte seguro](docs/CUTOVER_V2.md) antes de usar datos reales.
+
+Para que otra IA o desarrollador pueda retomar sin repetir la auditoría, usar el [handoff técnico](docs/AI_HANDOFF.md).
+
 Sitio web autogestionable y premium para **BO growclub**, un espacio zen para cultivo premium. Combina catálogo de e-commerce, una Rueda Zen de descuentos interactiva y una sección completa de Guías de Cultivo (Blog).
 
 ## 🌟 Características
@@ -48,9 +52,9 @@ Luego abre tu navegador en: [http://localhost:8000/](http://localhost:8000/)
 
 ---
 
-## 🚀 Despliegue en GitHub Pages
+## 🚀 Despliegue sólo del escaparate en GitHub Pages
 
-Este sitio web es **100% estático**, lo que significa que puedes alojarlo gratis en GitHub Pages en menos de un minuto:
+La parte pública básica puede alojarse en GitHub Pages. La aplicación operativa completa no es 100% estática: necesita Supabase y endpoints server-side, por lo que debe desplegarse en un entorno compatible (por ejemplo Netlify) con las variables privadas configuradas.
 
 1. Crea un repositorio en tu cuenta de GitHub (ej: `bo-growclub`).
 2. Sube todos los archivos de esta carpeta a tu repositorio:
