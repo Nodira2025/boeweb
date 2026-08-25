@@ -5,6 +5,8 @@ import lookupProduct from '../netlify/functions/lookup-product.mjs';
 
 const ENVIRONMENT_KEYS = [
   'SUPABASE_URL',
+  'PUBLIC_SUPABASE_URL',
+  'SUPABASE_PROJECT_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
   'PRODUCT_ANALYSIS_ALLOWED_ORIGIN',
   'PUBLIC_SITE_URL',
@@ -22,14 +24,23 @@ function recognitionRequest(origin) {
   };
 }
 
+function createTestServiceRoleJwt() {
+  const encodePart = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+  return [
+    encodePart({ alg: 'HS256', typ: 'JWT' }),
+    encodePart({ role: 'service_role', ref: 'sxbhrgvizqylnfcqzhin' }),
+    'firma-de-prueba'
+  ].join('.');
+}
+
 test('búsqueda y análisis aceptan el sitio actual aunque PUBLIC_SITE_URL todavía apunte al dominio anterior', async () => {
   const originalEnvironment = Object.fromEntries(
     ENVIRONMENT_KEYS.map(key => [key, process.env[key]])
   );
 
   try {
-    process.env.SUPABASE_URL = 'https://unit-test.supabase.co';
-    process.env.SUPABASE_SERVICE_ROLE_KEY = 'unit-test-service-role';
+    process.env.SUPABASE_URL = 'https://sxbhrgvizqylnfcqzhin.supabase.co';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = createTestServiceRoleJwt();
     delete process.env.PRODUCT_ANALYSIS_ALLOWED_ORIGIN;
     process.env.PUBLIC_SITE_URL = 'https://boegrowclub.netlify.app';
     delete process.env.URL;
@@ -49,6 +60,31 @@ test('búsqueda y análisis aceptan el sitio actual aunque PUBLIC_SITE_URL todav
       { ip: 'origin-external' }
     );
     assert.equal(externalResponse.status, 403);
+  } finally {
+    Object.entries(originalEnvironment).forEach(([key, value]) => {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    });
+  }
+});
+
+test('búsqueda y análisis avanzan a autenticación cuando SUPABASE_URL está malformada en Netlify', async () => {
+  const originalEnvironment = Object.fromEntries(
+    ENVIRONMENT_KEYS.map(key => [key, process.env[key]])
+  );
+
+  try {
+    process.env.SUPABASE_URL = 'SUPABASE_URL';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = createTestServiceRoleJwt();
+    process.env.PUBLIC_SITE_URL = 'https://boeweb.netlify.app';
+
+    const [lookupResponse, analysisResponse] = await Promise.all([
+      lookupProduct(recognitionRequest('https://boeweb.netlify.app'), { ip: 'config-lookup' }),
+      analyzeProduct(recognitionRequest('https://boeweb.netlify.app'), { ip: 'config-analysis' })
+    ]);
+
+    assert.equal(lookupResponse.status, 401);
+    assert.equal(analysisResponse.status, 401);
   } finally {
     Object.entries(originalEnvironment).forEach(([key, value]) => {
       if (value === undefined) delete process.env[key];

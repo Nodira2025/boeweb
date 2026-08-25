@@ -4,6 +4,7 @@ const JSON_HEADERS = Object.freeze({
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer'
 });
+const PUBLIC_SUPABASE_FALLBACK_URL = 'https://sxbhrgvizqylnfcqzhin.supabase.co';
 
 export function jsonResponse(status, payload, extraHeaders = {}) {
   const bodyless = status === 204 || status === 205 || status === 304;
@@ -42,6 +43,74 @@ function normalizeHttpOrigin(value) {
   }
 }
 
+function cleanEnvironmentValue(value) {
+  const candidate = String(value || '').trim();
+  if (candidate.length < 2) return candidate;
+  const firstCharacter = candidate[0];
+  const lastCharacter = candidate[candidate.length - 1];
+  if ((firstCharacter === '"' || firstCharacter === "'") && firstCharacter === lastCharacter) {
+    return candidate.slice(1, -1).trim();
+  }
+  return candidate;
+}
+
+function serverConfigError() {
+  const error = new Error('La función no tiene configuradas las credenciales server-side requeridas.');
+  error.statusCode = 503;
+  return error;
+}
+
+function resolveSupabaseProjectUrl() {
+  const configuredValues = [
+    process.env.SUPABASE_URL,
+    process.env.PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_PROJECT_URL
+  ];
+
+  for (const value of configuredValues) {
+    const configuredValue = cleanEnvironmentValue(value);
+    if (!configuredValue) continue;
+    let configuredUrl;
+    try {
+      configuredUrl = new URL(configuredValue);
+    } catch (error) {
+      continue;
+    }
+    // El cliente público ya está ligado a este proyecto. Nunca enviar la service key a otro host.
+    const isExactPublicProject = configuredUrl.origin === PUBLIC_SUPABASE_FALLBACK_URL
+      && configuredUrl.protocol === 'https:'
+      && !configuredUrl.username
+      && !configuredUrl.password
+      && !configuredUrl.port
+      && (configuredUrl.pathname === '/' || configuredUrl.pathname === '')
+      && !configuredUrl.search
+      && !configuredUrl.hash;
+    if (!isExactPublicProject) throw serverConfigError();
+    return { supabaseUrl: PUBLIC_SUPABASE_FALLBACK_URL, usedFallback: false };
+  }
+
+  return { supabaseUrl: PUBLIC_SUPABASE_FALLBACK_URL, usedFallback: true };
+}
+
+function validateServiceRoleProject(serviceRoleKey, supabaseUrl, usedFallback) {
+  const segments = serviceRoleKey.split('.');
+  if (segments.length !== 3) {
+    // Una clave opaca sólo es segura cuando la URL canónica fue configurada explícitamente.
+    if (usedFallback || !/^sb_secret_[a-z0-9_-]+$/i.test(serviceRoleKey)) throw serverConfigError();
+    return;
+  }
+
+  try {
+    const payload = JSON.parse(Buffer.from(segments[1], 'base64url').toString('utf8'));
+    const expectedProjectRef = new URL(supabaseUrl).hostname.split('.')[0];
+    if (payload.role !== 'service_role') throw serverConfigError();
+    if (payload.ref !== expectedProjectRef) throw serverConfigError();
+  } catch (error) {
+    if (error?.statusCode === 503) throw error;
+    throw serverConfigError();
+  }
+}
+
 function splitConfiguredOrigins(value) {
   return String(value || '')
     .split(/[\n,]+/)
@@ -73,13 +142,10 @@ export function isAllowedRequestOrigin(request, extraOrigins = []) {
 }
 
 export function requireServerConfig() {
-  const supabaseUrl = String(process.env.SUPABASE_URL || '').trim();
-  const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-  if (!supabaseUrl || !serviceRoleKey) {
-    const error = new Error('La función no tiene configuradas las credenciales server-side requeridas.');
-    error.statusCode = 503;
-    throw error;
-  }
+  const { supabaseUrl, usedFallback } = resolveSupabaseProjectUrl();
+  const serviceRoleKey = cleanEnvironmentValue(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  if (!serviceRoleKey) throw serverConfigError();
+  validateServiceRoleProject(serviceRoleKey, supabaseUrl, usedFallback);
   return { supabaseUrl, serviceRoleKey };
 }
 

@@ -12,8 +12,8 @@ const originalEnvironment = {
 const TEST_USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const TEST_TENANT_ID = '11111111-1111-1111-1111-111111111111';
 
-process.env.SUPABASE_URL = 'https://unit-test.supabase.co';
-process.env.SUPABASE_SERVICE_ROLE_KEY = 'unit-test-service-role';
+process.env.SUPABASE_URL = 'https://sxbhrgvizqylnfcqzhin.supabase.co';
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'sb_secret_unit_test';
 process.env.PUBLIC_SITE_URL = 'https://boeweb.netlify.app';
 
 function jsonResponse(body, status = 200) {
