@@ -1,3 +1,5 @@
+import { createClient } from '@supabase/supabase-js';
+
 const JSON_HEADERS = Object.freeze({
   'Content-Type': 'application/json; charset=utf-8',
   'Cache-Control': 'no-store',
@@ -5,6 +7,7 @@ const JSON_HEADERS = Object.freeze({
   'Referrer-Policy': 'no-referrer'
 });
 const PUBLIC_SUPABASE_FALLBACK_URL = 'https://sxbhrgvizqylnfcqzhin.supabase.co';
+const PUBLIC_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4YmhyZ3ZpenF5bG5mY3F6aGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMjM1MzEsImV4cCI6MjA5Njg5OTUzMX0.UUOwXsHXKNCjlJKdxMUlAuCtNAnNWgAroBwMlWAdTag';
 
 export function jsonResponse(status, payload, extraHeaders = {}) {
   const bodyless = status === 204 || status === 205 || status === 304;
@@ -147,6 +150,28 @@ export function requireServerConfig() {
   if (!serviceRoleKey) throw serverConfigError();
   validateServiceRoleProject(serviceRoleKey, supabaseUrl, usedFallback);
   return { supabaseUrl, serviceRoleKey };
+}
+
+export function createSupabaseAuthVerifier() {
+  const { supabaseUrl } = resolveSupabaseProjectUrl();
+  return createClient(supabaseUrl, PUBLIC_SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+  });
+}
+
+export function createUserScopedSupabaseClient(headers) {
+  const { supabaseUrl } = resolveSupabaseProjectUrl();
+  const token = getBearerToken(headers);
+  if (!token) {
+    const error = new Error('Se requiere una sesión autenticada.');
+    error.statusCode = 401;
+    throw error;
+  }
+  const options = {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    accessToken: async () => token
+  };
+  return createClient(supabaseUrl, PUBLIC_SUPABASE_ANON_KEY, options);
 }
 
 export async function authenticateBearer(supabaseAdmin, headers) {

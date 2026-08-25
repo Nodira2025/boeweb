@@ -1,5 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
-import { authenticateBearer, isAllowedRequestOrigin, requireServerConfig } from './_shared/http-auth.mjs';
+import {
+  authenticateBearer,
+  createSupabaseAuthVerifier,
+  createUserScopedSupabaseClient,
+  isAllowedRequestOrigin
+} from './_shared/http-auth.mjs';
 
 const OPEN_PRODUCTS_URL = 'https://world.openfoodfacts.org/api/v3/product';
 const UPCITEMDB_LOOKUP_URL = 'https://api.upcitemdb.com/prod/trial/lookup';
@@ -127,12 +131,10 @@ function jsonResponse(status, payload) {
 }
 
 async function authenticateLookupUser(request) {
-  const { supabaseUrl, serviceRoleKey } = requireServerConfig();
-  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false }
-  });
-  const user = await authenticateBearer(supabaseAdmin, request.headers);
-  const { data: membership, error } = await supabaseAdmin
+  const authVerifier = createSupabaseAuthVerifier();
+  const user = await authenticateBearer(authVerifier, request.headers);
+  const supabaseUser = createUserScopedSupabaseClient(request.headers);
+  const { data: membership, error } = await supabaseUser
     .from('tenant_users')
     .select('tenant_id,user_id,role,active')
     .eq('user_id', user.id)

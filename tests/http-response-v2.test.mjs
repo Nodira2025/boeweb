@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isAllowedRequestOrigin, jsonResponse, requireServerConfig } from '../netlify/functions/_shared/http-auth.mjs';
+import {
+  createUserScopedSupabaseClient,
+  isAllowedRequestOrigin,
+  jsonResponse,
+  requireServerConfig
+} from '../netlify/functions/_shared/http-auth.mjs';
 
 function encodeJwtPart(value) {
   return Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -29,6 +34,13 @@ test('jsonResponse conserva JSON y cabeceras seguras para respuestas con cuerpo'
   assert.equal(response.status, 422);
   assert.match(response.headers.get('content-type'), /^application\/json/);
   assert.deepEqual(await response.json(), { error: 'Dato inválido.' });
+});
+
+test('el cliente Supabase con RLS exige un bearer antes de crearse', () => {
+  assert.throws(
+    () => createUserScopedSupabaseClient(new Headers()),
+    error => error.statusCode === 401 && error.message === 'Se requiere una sesión autenticada.'
+  );
 });
 
 test('la validación de origen acepta el despliegue actual aunque una URL configurada haya quedado antigua', () => {

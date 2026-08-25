@@ -1,5 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
-import { authenticateBearer, isAllowedRequestOrigin, requireServerConfig } from './_shared/http-auth.mjs';
+import {
+  authenticateBearer,
+  createSupabaseAuthVerifier,
+  createUserScopedSupabaseClient,
+  isAllowedRequestOrigin
+} from './_shared/http-auth.mjs';
 
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 const OPENROUTER_RESPONSES_URL = 'https://openrouter.ai/api/v1/responses';
@@ -85,12 +89,10 @@ function validateImageDataUrl(value) {
 }
 
 async function authenticateProductAnalyst(request) {
-  const { supabaseUrl, serviceRoleKey } = requireServerConfig();
-  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false }
-  });
-  const user = await authenticateBearer(supabaseAdmin, request.headers);
-  const { data: membership, error } = await supabaseAdmin
+  const authVerifier = createSupabaseAuthVerifier();
+  const user = await authenticateBearer(authVerifier, request.headers);
+  const supabaseUser = createUserScopedSupabaseClient(request.headers);
+  const { data: membership, error } = await supabaseUser
     .from('tenant_users')
     .select('tenant_id,user_id,role,active')
     .eq('user_id', user.id)

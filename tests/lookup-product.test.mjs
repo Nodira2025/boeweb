@@ -6,14 +6,13 @@ import lookupProduct from '../netlify/functions/lookup-product.mjs';
 const originalFetch = globalThis.fetch;
 const originalEnvironment = {
   SUPABASE_URL: process.env.SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   PUBLIC_SITE_URL: process.env.PUBLIC_SITE_URL
 };
 const TEST_USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const TEST_TENANT_ID = '11111111-1111-1111-1111-111111111111';
+let capturedMembershipAuthorization = '';
 
 process.env.SUPABASE_URL = 'https://sxbhrgvizqylnfcqzhin.supabase.co';
-process.env.SUPABASE_SERVICE_ROLE_KEY = 'sb_secret_unit_test';
 process.env.PUBLIC_SITE_URL = 'https://boeweb.netlify.app';
 
 function jsonResponse(body, status = 200) {
@@ -40,11 +39,12 @@ function requestUrl(input) {
   return input?.url || String(input);
 }
 
-function supabaseAuthResponse(url) {
+function supabaseAuthResponse(url, options = {}) {
   if (url.includes('/auth/v1/user')) {
     return jsonResponse({ id: TEST_USER_ID, aud: 'authenticated', role: 'authenticated' });
   }
   if (url.includes('/rest/v1/tenant_users')) {
+    capturedMembershipAuthorization = new Headers(options.headers).get('authorization') || '';
     return jsonResponse({
       tenant_id: TEST_TENANT_ID,
       user_id: TEST_USER_ID,
@@ -56,9 +56,9 @@ function supabaseAuthResponse(url) {
 }
 
 function installFetchMock(searchHtml, yahooHtml = '', astroHtml = '', publicPages = {}) {
-  globalThis.fetch = async url => {
+  globalThis.fetch = async (url, options) => {
     const href = requestUrl(url);
-    const authResponse = supabaseAuthResponse(href);
+    const authResponse = supabaseAuthResponse(href, options);
     if (authResponse) return authResponse;
     if (href.includes('customsearch.googleapis.com')) return jsonResponse({}, 403);
     if (href.includes('search.yahoo.com/search')) return new Response(yahooHtml, { status: 200 });
@@ -74,6 +74,7 @@ function installFetchMock(searchHtml, yahooHtml = '', astroHtml = '', publicPage
 
 test.afterEach(() => {
   globalThis.fetch = originalFetch;
+  capturedMembershipAuthorization = '';
 });
 
 test.after(() => {
@@ -95,6 +96,7 @@ test('descarta la portada de un growshop cuando no contiene el código buscado',
   assert.equal(response.status, 200);
   assert.equal(result.found, false);
   assert.equal(result.product, null);
+  assert.equal(capturedMembershipAuthorization, 'Bearer unit-test-user-token');
 });
 
 test('acepta una ficha que coincide con el nombre y la presentación', async () => {
@@ -235,9 +237,9 @@ test('el catálogo interno queda separado de proveedores y permite editar produc
 
 test('lookup-product admite país dinámico pero resuelve el rubro desde el tenant autenticado', async () => {
   let capturedMlUrl = '';
-  globalThis.fetch = async url => {
+  globalThis.fetch = async (url, options) => {
     const href = requestUrl(url);
-    const authResponse = supabaseAuthResponse(href);
+    const authResponse = supabaseAuthResponse(href, options);
     if (authResponse) return authResponse;
     if (href.includes('api.mercadolibre.com')) {
       capturedMlUrl = href;

@@ -24,15 +24,6 @@ function recognitionRequest(origin) {
   };
 }
 
-function createTestServiceRoleJwt() {
-  const encodePart = value => Buffer.from(JSON.stringify(value)).toString('base64url');
-  return [
-    encodePart({ alg: 'HS256', typ: 'JWT' }),
-    encodePart({ role: 'service_role', ref: 'sxbhrgvizqylnfcqzhin' }),
-    'firma-de-prueba'
-  ].join('.');
-}
-
 test('búsqueda y análisis aceptan el sitio actual aunque PUBLIC_SITE_URL todavía apunte al dominio anterior', async () => {
   const originalEnvironment = Object.fromEntries(
     ENVIRONMENT_KEYS.map(key => [key, process.env[key]])
@@ -40,7 +31,7 @@ test('búsqueda y análisis aceptan el sitio actual aunque PUBLIC_SITE_URL todav
 
   try {
     process.env.SUPABASE_URL = 'https://sxbhrgvizqylnfcqzhin.supabase.co';
-    process.env.SUPABASE_SERVICE_ROLE_KEY = createTestServiceRoleJwt();
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     delete process.env.PRODUCT_ANALYSIS_ALLOWED_ORIGIN;
     process.env.PUBLIC_SITE_URL = 'https://boegrowclub.netlify.app';
     delete process.env.URL;
@@ -75,7 +66,7 @@ test('búsqueda y análisis avanzan a autenticación cuando SUPABASE_URL está m
 
   try {
     process.env.SUPABASE_URL = 'SUPABASE_URL';
-    process.env.SUPABASE_SERVICE_ROLE_KEY = createTestServiceRoleJwt();
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     process.env.PUBLIC_SITE_URL = 'https://boeweb.netlify.app';
 
     const [lookupResponse, analysisResponse] = await Promise.all([
