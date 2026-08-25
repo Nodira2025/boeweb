@@ -31,6 +31,47 @@ export function getBearerToken(headers) {
   return match ? match[1] : null;
 }
 
+function normalizeHttpOrigin(value) {
+  const candidate = String(value || '').trim();
+  if (!candidate) return '';
+  try {
+    const url = new URL(candidate);
+    return ['http:', 'https:'].includes(url.protocol) ? url.origin : '';
+  } catch (error) {
+    return '';
+  }
+}
+
+function splitConfiguredOrigins(value) {
+  return String(value || '')
+    .split(/[\n,]+/)
+    .map(normalizeHttpOrigin)
+    .filter(Boolean);
+}
+
+export function isAllowedRequestOrigin(request, extraOrigins = []) {
+  const rawOrigin = typeof request?.headers?.get === 'function'
+    ? request.headers.get('origin')
+    : request?.headers?.origin || request?.headers?.Origin || '';
+  if (!rawOrigin) return true;
+
+  const origin = normalizeHttpOrigin(rawOrigin);
+  if (!origin) return false;
+  if (/^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(origin)) return true;
+
+  const requestOrigin = normalizeHttpOrigin(request?.url);
+  const configuredOrigins = [
+    process.env.PRODUCT_ANALYSIS_ALLOWED_ORIGIN,
+    process.env.PUBLIC_SITE_URL,
+    process.env.URL,
+    process.env.DEPLOY_PRIME_URL,
+    process.env.DEPLOY_URL,
+    ...extraOrigins
+  ].flatMap(splitConfiguredOrigins);
+
+  return new Set([requestOrigin, ...configuredOrigins].filter(Boolean)).has(origin);
+}
+
 export function requireServerConfig() {
   const supabaseUrl = String(process.env.SUPABASE_URL || '').trim();
   const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();

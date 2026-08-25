@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { authenticateBearer, requireServerConfig } from './_shared/http-auth.mjs';
+import { authenticateBearer, isAllowedRequestOrigin, requireServerConfig } from './_shared/http-auth.mjs';
 
 const OPEN_PRODUCTS_URL = 'https://world.openfoodfacts.org/api/v3/product';
 const UPCITEMDB_LOOKUP_URL = 'https://api.upcitemdb.com/prod/trial/lookup';
@@ -124,14 +124,6 @@ function jsonResponse(status, payload) {
       'X-Content-Type-Options': 'nosniff'
     }
   });
-}
-
-function isAllowedOrigin(request) {
-  const configuredOrigin = process.env.PRODUCT_ANALYSIS_ALLOWED_ORIGIN || process.env.PUBLIC_SITE_URL;
-  const origin = request.headers.get('origin');
-  if (!origin) return true;
-  if (configuredOrigin && origin.replace(/\/$/, '') === configuredOrigin.replace(/\/$/, '')) return true;
-  return /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(origin);
 }
 
 async function authenticateLookupUser(request) {
@@ -1047,7 +1039,7 @@ function uniqueSources(items) {
 
 export default async function handler(request, context) {
   if (request.method !== 'POST') return jsonResponse(405, { message: 'Método no permitido.' });
-  if (!isAllowedOrigin(request)) return jsonResponse(403, { message: 'Origen no autorizado.' });
+  if (!isAllowedRequestOrigin(request)) return jsonResponse(403, { message: 'Origen no autorizado.' });
   if (isRateLimited(request, context)) {
     return jsonResponse(429, { message: 'Demasiadas búsquedas. Esperá un minuto y volvé a intentar.' });
   }

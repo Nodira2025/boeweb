@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { authenticateBearer, requireServerConfig } from './_shared/http-auth.mjs';
+import { authenticateBearer, isAllowedRequestOrigin, requireServerConfig } from './_shared/http-auth.mjs';
 
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 const OPENROUTER_RESPONSES_URL = 'https://openrouter.ai/api/v1/responses';
@@ -82,14 +82,6 @@ function jsonResponse(status, payload) {
 function validateImageDataUrl(value) {
   if (typeof value !== 'string' || value.length > 8_000_000) return false;
   return /^data:image\/(jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(value);
-}
-
-function isAllowedOrigin(request) {
-  const configuredOrigin = process.env.PRODUCT_ANALYSIS_ALLOWED_ORIGIN || process.env.PUBLIC_SITE_URL;
-  const origin = request.headers.get('origin');
-  if (!origin) return true;
-  if (configuredOrigin && origin.replace(/\/$/, '') === configuredOrigin.replace(/\/$/, '')) return true;
-  return /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(origin);
 }
 
 async function authenticateProductAnalyst(request) {
@@ -307,7 +299,7 @@ async function searchMercadoLibre(query, countryCode = 'AR') {
 
 export default async function handler(request, context) {
   if (request.method !== 'POST') return jsonResponse(405, { message: 'Método no permitido.' });
-  if (!isAllowedOrigin(request)) return jsonResponse(403, { message: 'Origen no autorizado.' });
+  if (!isAllowedRequestOrigin(request)) return jsonResponse(403, { message: 'Origen no autorizado.' });
   if (isRateLimited(request, context)) return jsonResponse(429, { message: 'Demasiados análisis. Esperá un minuto y volvé a intentar.' });
   try {
     await authenticateProductAnalyst(request);
