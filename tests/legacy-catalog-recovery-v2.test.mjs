@@ -132,7 +132,7 @@ test('la búsqueda externa está saneada y limitada para no congelar el POS', ()
 });
 
 test('el verificador de producción exige migración 015 y catálogos no vacíos', () => {
-  assert.match(verifier, /Array\.from\(\{ length: 17 \}/);
+  assert.match(verifier, /Array\.from\(\{ length: 18 \}/);
   assert.match(verifier, /canonicalCatalog\.count\) > 0/);
   assert.match(verifier, /externalSources\.count\) > 0/);
   assert.match(verifier, /externalOffers\.count\) > 0/);
