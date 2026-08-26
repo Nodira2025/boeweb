@@ -71,11 +71,15 @@ async function verifyDeployment() {
   assert(memberships.data.length >= 1, 'El tenant no tiene usuarios activos.');
 
   const publishedConfig = await selectOrThrow(
-    service.from('tenant_app_config').select('schema_version,revision').eq('tenant_id', TENANT_ID).eq('stage', 'published'),
+    service.from('tenant_app_config').select('schema_version,revision,config_json').eq('tenant_id', TENANT_ID).eq('stage', 'published'),
     'No se pudo verificar la configuración publicada'
   );
   assert(publishedConfig.data.length === 1, 'Debe existir exactamente una configuración publicada.');
   assert(Number(publishedConfig.data[0].schema_version) === 2, 'La configuración publicada no usa schema v2.');
+  assert(
+    publishedConfig.data[0].config_json?.catalog?.allowBackorders === true,
+    'La configuración publicada debe permitir ventas sin stock.'
+  );
 
   const locations = await selectOrThrow(
     service.from('inventory_locations_v2').select('id').eq('tenant_id', TENANT_ID).eq('active', true).eq('is_default', true).eq('is_sellable', true),
@@ -107,6 +111,7 @@ async function verifyDeployment() {
     flexiblePosTables: FLEXIBLE_POS_TABLES.length,
     activeUsers: memberships.data.length,
     publishedConfigRevision: publishedConfig.data[0].revision,
+    backorders: 'ENABLED',
     defaultLocations: locations.data.length,
     activeRegisters: registers.data.length,
     publicAccess: 'OK'
