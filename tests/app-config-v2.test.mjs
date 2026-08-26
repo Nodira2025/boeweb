@@ -40,11 +40,12 @@ const expectedShape = {
   payments: ['bankTransfer', 'mercadoPago'],
   mercadoPago: ['enabled', 'publicKey'],
   bankTransfer: ['accountHolder', 'alias', 'bankName', 'cbu', 'enabled'],
-  rules: ['cash', 'currentAccount', 'inventory', 'sales'],
+  rules: ['cash', 'currentAccount', 'inventory', 'pos', 'sales'],
   sales: ['allowVendorAdjustments', 'maxDiscountFixed', 'maxDiscountPercent', 'requireCustomerForCredit'],
   inventory: ['allowNegativeStock', 'requireLocationOnReceive'],
   cash: ['differenceTolerance', 'requireOpenShift', 'supervisorApprovalForDifference'],
-  currentAccount: ['blockOverdue', 'enabled', 'requireCreditLimit']
+  currentAccount: ['blockOverdue', 'enabled', 'requireCreditLimit'],
+  pos: ['barcodeDirectAdd', 'billDenominations', 'parkedTicketsEnabled', 'printDuplicateReceipts']
 };
 
 class MemoryStorage {
@@ -325,7 +326,7 @@ test('app-config.js no contiene credenciales reales embebidas en el bundle clien
   assert.doesNotMatch(source, /(?:service[_-]?role|client[_-]?secret|private[_-]?key)\s*[:=]\s*['"][^'"]{12,}['"]/i);
 });
 
-test('panel admin integra estilos/config/auth y expone Visuales, Textos, Catálogo, Reglas, draft y publicación', () => {
+test('panel admin integra estilos/config/auth y expone Visuales, Textos, Catálogo, Reglas, POS, draft y publicación', () => {
   const html = fs.readFileSync(path.resolve('admin-config.html'), 'utf8');
   const authScript = html.search(/<script\s+[^>]*src=["']saas-auth\.js/i);
   const configScript = html.search(/<script\s+[^>]*src=["']app-config\.js/i);
@@ -334,8 +335,11 @@ test('panel admin integra estilos/config/auth y expone Visuales, Textos, Catálo
   assert.match(html, /<link\s+[^>]*href=["']app-config\.css/i);
   assert.ok(authScript >= 0 && configScript > authScript && adminScript > configScript, 'auth y config deben cargar antes del controlador admin');
   assert.match(html, /id=["']admin-dashboard-content["'][^>]*style=["'][^"']*display\s*:\s*none/i);
-  for (const sectionId of ['app-config-visuals', 'app-config-texts', 'app-config-catalog', 'app-config-rules']) {
+  for (const sectionId of ['app-config-visuals', 'app-config-texts', 'app-config-catalog', 'app-config-rules', 'app-config-pos']) {
     assert.match(html, new RegExp(`id=["']${sectionId}["']`, 'i'));
+  }
+  for (const controlId of ['app-pos-barcode-direct', 'app-pos-bill-denominations', 'app-pos-parked-tickets', 'app-pos-print-duplicates']) {
+    assert.match(html, new RegExp(`id=["']${controlId}["']`, 'i'));
   }
   assert.match(html, /onclick=["']saveFutureAppConfigDraft\(\)["'][^>]*>\s*Guardar borrador/i);
   assert.match(html, /onclick=["']publishFutureAppConfig\(\)["'][^>]*>\s*Publicar configuración/i);

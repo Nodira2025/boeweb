@@ -37,12 +37,12 @@ function createRpcHarness() {
     review_inventory_count_v2: () => ({ count_id: IDS.count, status: 'APPROVED' }),
     upsert_customer_v2: () => ({ customer_id: IDS.customer, account_status: 'ACTIVE' }),
     open_cash_session_v2: () => ({ session_id: IDS.session, status: 'OPEN' }),
-    checkout_sale_v2: () => ({ sale_id: saleIds.shift(), status: 'CONFIRMED' }),
+    checkout_sale_v3: () => ({ sale_id: saleIds.shift(), status: 'CONFIRMED' }),
     record_customer_account_payment_v2: () => ({ customer_id: IDS.customer, balance: 0 }),
     record_cash_movement_v2: (parameters) => ({ session_id: IDS.session, type: parameters.p_type }),
     transition_public_order_v2: (parameters) => ({ order_id: IDS.order, status: parameters.p_new_status }),
     void_sale_v2: () => ({ sale_id: IDS.saleBank, status: 'VOIDED' }),
-    submit_cash_closure_v2: () => ({ closure_id: IDS.closure, status: 'PENDING_REVIEW' }),
+    submit_cash_closure_v3: () => ({ closure_id: IDS.closure, status: 'PENDING_REVIEW' }),
     review_cash_closure_v2: () => ({ closure_id: IDS.closure, status: 'APPROVED' })
   };
   return {
@@ -246,6 +246,7 @@ test('loop exhaustivo usa los comandos reales: producto, estantería, WMS, venta
     authContext: cashierContext,
     sessionId: IDS.session,
     countedAmount: 1145,
+    cashBreakdown: { 1000: 1, 100: 1, coins: 45 },
     notes: 'Cierre entregado a supervisión'
   });
   await OperationalApi.reviewCashClosure({
@@ -262,13 +263,13 @@ test('loop exhaustivo usa los comandos reales: producto, estantería, WMS, venta
     'submit_catalog_product_draft_v2', 'locate_catalog_product_draft_v2', 'approve_catalog_product_draft_v2',
     'receive_inventory_v2', 'transfer_inventory_v2', 'submit_inventory_count_v2', 'review_inventory_count_v2',
     'upsert_customer_v2', 'open_cash_session_v2',
-    'checkout_sale_v2', 'checkout_sale_v2', 'checkout_sale_v2', 'checkout_sale_v2',
+    'checkout_sale_v3', 'checkout_sale_v3', 'checkout_sale_v3', 'checkout_sale_v3',
     'record_customer_account_payment_v2', 'record_cash_movement_v2', 'record_cash_movement_v2',
     'transition_public_order_v2', 'transition_public_order_v2', 'transition_public_order_v2',
-    'void_sale_v2', 'submit_cash_closure_v2', 'review_cash_closure_v2'
+    'void_sale_v2', 'submit_cash_closure_v3', 'review_cash_closure_v2'
   ]);
 
-  const checkoutCalls = calls.filter(call => call.name === 'checkout_sale_v2');
+  const checkoutCalls = calls.filter(call => call.name === 'checkout_sale_v3');
   assert.equal(checkoutCalls[0].parameters.p_cashier_user_id, IDS.cashier, 'el cajero es quien confirma');
   assert.equal(checkoutCalls[0].parameters.p_salesperson_user_id, IDS.salesperson, 'la venta puede pertenecer a otro vendedor');
   assert.equal(checkoutCalls[0].parameters.p_items[0].location_id, IDS.shelfB, 'la venta conserva la estantería física');

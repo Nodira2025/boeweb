@@ -55,7 +55,7 @@
       source: 'unified',
       visibility: 'public',
       showOutOfStock: true,
-      allowBackorders: false,
+      allowBackorders: true,
       currency: 'ARS',
       lowStockThreshold: 3
     },
@@ -92,6 +92,12 @@
         enabled: true,
         requireCreditLimit: true,
         blockOverdue: true
+      },
+      pos: {
+        billDenominations: [20000, 10000, 2000, 1000, 500, 200, 100],
+        barcodeDirectAdd: true,
+        parkedTicketsEnabled: true,
+        printDuplicateReceipts: true
       }
     }
   };
@@ -107,6 +113,22 @@
   }
 
   const DEFAULT_CONFIG = deepFreeze(clone(DEFAULT_CONFIG_SOURCE));
+  let activeConfig = DEFAULT_CONFIG;
+
+  function get(path, fallback = undefined) {
+    if (!path) return activeConfig;
+    const segments = Array.isArray(path) ? path : String(path).split('.');
+    let value = activeConfig;
+    for (const segment of segments) {
+      if (!segment || ['__proto__', 'prototype', 'constructor'].includes(segment)
+          || value === null || value === undefined || typeof value !== 'object'
+          || !Object.prototype.hasOwnProperty.call(value, segment)) {
+        return fallback;
+      }
+      value = value[segment];
+    }
+    return value === undefined ? fallback : value;
+  }
 
   function sanitizeClientConfig(input) {
     if (Array.isArray(input)) return input.map(sanitizeClientConfig);
@@ -181,6 +203,12 @@
     }).filter(slide => slide.mediaUrl);
   }
 
+  function normalizeBillDenominations(input, fallback = [20000, 10000, 2000, 1000, 500, 200, 100]) {
+    if (!Array.isArray(input)) return [...fallback];
+    const cleaned = [...new Set(input.map(val => Math.trunc(Number(val))).filter(val => Number.isInteger(val) && val > 0 && val <= 1_000_000))].sort((a, b) => b - a);
+    return cleaned.length > 0 ? cleaned.slice(0, 12) : [...fallback];
+  }
+
   function cleanFont(value, fallback) {
     return SAFE_FONT_FAMILIES.has(value) ? value : fallback;
   }
@@ -216,6 +244,7 @@
     const inventoryRules = rules.inventory || {};
     const cashRules = rules.cash || {};
     const currentAccountRules = rules.currentAccount || {};
+    const posRules = rules.pos || {};
     const explicitTenant = options.tenantId || sanitized.tenantId || sanitized.tenant_id;
 
     return {
@@ -294,6 +323,12 @@
           enabled: cleanBoolean(currentAccountRules.enabled, defaults.rules.currentAccount.enabled),
           requireCreditLimit: true,
           blockOverdue: true
+        },
+        pos: {
+          barcodeDirectAdd: cleanBoolean(posRules.barcodeDirectAdd, defaults.rules.pos?.barcodeDirectAdd ?? true),
+          billDenominations: normalizeBillDenominations(posRules.billDenominations, defaults.rules.pos?.billDenominations || [20000, 10000, 2000, 1000, 500, 200, 100]),
+          parkedTicketsEnabled: cleanBoolean(posRules.parkedTicketsEnabled, defaults.rules.pos?.parkedTicketsEnabled ?? true),
+          printDuplicateReceipts: cleanBoolean(posRules.printDuplicateReceipts, defaults.rules.pos?.printDuplicateReceipts ?? true)
         }
       }
     };
@@ -547,6 +582,7 @@
 
   function applyCssVariables(config, rootElement) {
     const normalized = normalizeConfig(config);
+    activeConfig = deepFreeze(clone(normalized));
     const root = rootElement || globalScope.document?.documentElement;
     if (!root?.style?.setProperty) return normalized;
     const visuals = normalized.brand.visuals;
@@ -654,6 +690,7 @@
     applyBrandContent,
     resolveTenantId,
     getActiveTenantId: resolveTenantId,
+    get,
     bootstrap
   };
 

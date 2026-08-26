@@ -1,7 +1,9 @@
 /* ==========================================================================
-   BÔ GROW CLUB / PLATAFORMA SAAS — CART ENGINE UNIFICADO (FASE 11A)
+   BÔ GROW CLUB / PLATAFORMA SAAS — CART ENGINE UNIFICADO (FASE 12 POS FLEXIBLE)
    ==========================================================================
    Motor de carrito compartido con contexto aislado para POS, B2B y Tienda Pública.
+   Soporta tipos de línea: OWN_STOCK, OWN_BACKORDER, B2B_BACKORDER,
+   LOCAL_STORE_BACKORDER y QUICK_ENTRY.
    ========================================================================== */
 
 class PosCartEngine {
@@ -28,15 +30,19 @@ class PosCartEngine {
       const parsed = stored ? JSON.parse(stored) : [];
       if (!Array.isArray(parsed)) return [];
       if (this.mode !== 'POS') return parsed;
+
       return parsed.filter(item => {
         const quantity = Math.trunc(Number(item?.quantity));
-        const available = Number(item?.available_quantity);
-        return !item?.is_express
-          && item?.availability === 'EN_STOCK'
-          && Number(item?.price) > 0
-          && quantity > 0
-          && Number.isFinite(available)
-          && available >= quantity;
+        const price = Number(item?.price);
+        const lineType = String(item?.line_type || (item?.is_express ? 'QUICK_ENTRY' : 'OWN_STOCK')).toUpperCase();
+        if (quantity <= 0 || price <= 0 || !Number.isFinite(price)) return false;
+
+        if (lineType === 'OWN_STOCK') {
+          if (item?.track_stock === false) return true;
+          const available = Number(item?.available_quantity);
+          return Number.isFinite(available) && available >= quantity;
+        }
+        return true;
       });
     } catch (e) {
       console.error(`[CartEngine] Error cargando storage para modo ${this.mode}:`, e);
@@ -53,60 +59,91 @@ class PosCartEngine {
     }
   }
 
-  addItem(product) {
-    if (!product || (!product.id && !product.product_code)) return false;
-    if (this.mode === 'POS' && product.is_express) return false;
+  resolveLineType(product) {
+    if (product.line_type) return String(product.line_type).toUpperCase();
+    if (product.is_express || product.is_quick_entry) return 'QUICK_ENTRY';
+    if (product.source_type === 'B2B_SUPPLIER' || product.availability === 'A_PEDIDO') return 'B2B_BACKORDER';
+    if (product.source_type === 'LOCAL_STORE' || product.availability === 'LOCAL_2_DAYS') return 'LOCAL_STORE_BACKORDER';
+    if (product.is_backorder || product.availability === 'BACKORDER') return 'OWN_BACKORDER';
+    return 'OWN_STOCK';
+  }
 
-    const code = product.product_code || product.id;
+  addItem(product) {
+    if (!product) return false;
+    const lineType = this.resolveLineType(product);
+    const isQuickEntry = lineType === 'QUICK_ENTRY';
+
+    if (!isQuickEntry && !product.id && !product.product_code) return false;
+
+    const code = product.product_code || product.id || (isQuickEntry ? `QUICK-${Date.now()}` : null);
     const locationId = product.location_id || product.inventory_location_id || null;
     const cartKey = String(product.cart_key || (locationId ? `${code}::${locationId}` : code));
     const existingIndex = this.items.findIndex(item => String(item.cart_key || item.id) === cartKey);
     const qty = Math.max(1, Math.trunc(Number(product.quantity) || 1));
     const unitPrice = Number(product.price) || 0;
-    const rawAvailable = product.available_quantity ?? product.stock ?? product.own_stock;
-    const availableQuantity = Number.isFinite(Number(rawAvailable))
+    const tracksStock = product.track_stock !== false;
+    const rawAvailable = tracksStock ? (product.available_quantity ?? product.stock ?? product.own_stock) : null;
+    const availableQuantity = tracksStock && Number.isFinite(Number(rawAvailable))
       ? Math.max(0, Math.trunc(Number(rawAvailable)))
       : null;
 
-    let defaultAvail = 'A_PEDIDO';
-    if (product.availability) {
-      defaultAvail = product.availability;
-    } else if (product.is_express) {
+    let defaultAvail = 'EN_STOCK';
+    if (lineType === 'QUICK_ENTRY') {
       defaultAvail = 'EXPRESS_UNMAPPED';
-    } else if (product.own_stock > 0 || availableQuantity > 0) {
-      defaultAvail = 'EN_STOCK';
+    } else if (lineType === 'B2B_BACKORDER') {
+      defaultAvail = 'A_PEDIDO';
+    } else if (lineType === 'LOCAL_STORE_BACKORDER') {
+      defaultAvail = 'LOCAL_2_DAYS';
+    } else if (lineType === 'OWN_BACKORDER') {
+      defaultAvail = 'A_PEDIDO';
+    } else if (product.availability) {
+      defaultAvail = product.availability;
     }
 
-    if (this.mode === 'POS' && (unitPrice <= 0 || availableQuantity === 0 || defaultAvail !== 'EN_STOCK')) {
+    if (unitPrice <= 0) return false;
+
+    // Solo OWN_STOCK exige saldo físico positivo si se especifica availableQuantity
+    if (lineType === 'OWN_STOCK' && availableQuantity !== null && availableQuantity <= 0) {
       return false;
     }
 
     if (existingIndex >= 0) {
       const existingItem = this.items[existingIndex];
-      const limit = existingItem.available_quantity !== null
-        && existingItem.available_quantity !== undefined
-        && Number.isFinite(Number(existingItem.available_quantity))
-        ? Number(existingItem.available_quantity)
-        : availableQuantity;
-      if (limit !== null && existingItem.quantity + qty > limit) return false;
+      if (lineType === 'OWN_STOCK') {
+        const limit = existingItem.available_quantity !== null
+          && existingItem.available_quantity !== undefined
+          && Number.isFinite(Number(existingItem.available_quantity))
+          ? Number(existingItem.available_quantity)
+          : availableQuantity;
+        if (limit !== null && existingItem.quantity + qty > limit) return false;
+      }
       existingItem.quantity += qty;
     } else {
-      if (availableQuantity !== null && !product.is_express && qty > availableQuantity) return false;
+      if (lineType === 'OWN_STOCK' && availableQuantity !== null && qty > availableQuantity) return false;
+
       this.items.push({
         id: cartKey,
         cart_key: cartKey,
-        product_id: product.product_id || product.id || code,
+        line_type: lineType,
+        product_id: isQuickEntry ? null : (product.product_id || product.id || code),
         product_code: code,
         name: product.name || 'Producto Sin Nombre',
         price: unitPrice,
         quantity: qty,
         availability: defaultAvail,
-        is_express: !!(product.is_express || defaultAvail === 'EXPRESS_UNMAPPED'),
+        fulfillment_status: (lineType === 'OWN_STOCK' || isQuickEntry) ? 'DELIVERED' : 'PENDING',
+        expected_delivery_date: product.expected_delivery_date || null,
+        source_type: product.source_type || (lineType === 'B2B_BACKORDER' ? 'B2B_SUPPLIER' : (lineType === 'LOCAL_STORE_BACKORDER' ? 'LOCAL_STORE' : null)),
+        source_id: product.source_id || product.source_offer_id || null,
+        source_name: product.source_name || product.supplier_name || null,
+        is_express: isQuickEntry,
         supplier_code: product.supplier_code || 'own',
-        image_url: product.image_url || 'assets/logo.jpg',
-        available_quantity: availableQuantity,
-        location_id: locationId,
-        shelf_code: product.shelf_code || product.location_code || ''
+        image_url: product.image_url || product.image || 'assets/logo.jpg',
+        track_stock: tracksStock,
+        available_quantity: lineType === 'OWN_STOCK' ? availableQuantity : null,
+        location_id: lineType === 'OWN_STOCK' ? locationId : null,
+        shelf_code: product.shelf_code || product.location_code || '',
+        metadata: product.metadata || {}
       });
     }
 
@@ -129,7 +166,8 @@ class PosCartEngine {
 
     const item = this.items.find(i => String(i.cart_key || i.id) === String(productCode));
     if (item) {
-      if (item.available_quantity !== null
+      if (item.line_type === 'OWN_STOCK'
+        && item.available_quantity !== null
         && item.available_quantity !== undefined
         && Number.isFinite(Number(item.available_quantity))
         && qty > Number(item.available_quantity)) {
@@ -176,64 +214,61 @@ class PosCartEngine {
 
     const numVal = Math.max(0, Number(value) || 0);
     this.adjustment = { type: normType, value: numVal };
-    // Backward compatibility for this.discount
     if (normType === 'DISCOUNT_PERCENT') {
       this.discount = { type: 'PERCENT', value: numVal };
     } else if (normType === 'DISCOUNT_FIXED') {
       this.discount = { type: 'FIXED', value: numVal };
     } else {
-      this.discount = { type: 'PERCENT', value: 0 };
-    }
-  }
-
-  setDiscount(type = 'PERCENT', value = 0) {
-    const rawType = String(type).toUpperCase();
-    if (rawType === 'FIXED' || rawType === 'AMOUNT' || rawType === 'DISCOUNT_FIXED') {
-      this.setAdjustment('DISCOUNT_FIXED', value);
-    } else if (rawType === 'INCREASE_PERCENT') {
-      this.setAdjustment('INCREASE_PERCENT', value);
-    } else if (rawType === 'INCREASE_FIXED') {
-      this.setAdjustment('INCREASE_FIXED', value);
-    } else if (rawType === 'NONE') {
-      this.setAdjustment('NONE', 0);
-    } else {
-      this.setAdjustment('DISCOUNT_PERCENT', value);
+      this.discount = null;
     }
   }
 
   getAdjustment() {
-    return { ...(this.adjustment || { type: 'NONE', value: 0 }) };
-  }
-
-  getDiscount() {
-    return { ...(this.discount || { type: 'PERCENT', value: 0 }) };
+    return this.adjustment || { type: 'NONE', value: 0 };
   }
 
   getAdjustmentAmount() {
     const subtotal = this.getSubtotal();
-    const adj = this.adjustment || { type: 'NONE', value: 0 };
-    const val = Number(adj.value) || 0;
-
+    const adj = this.getAdjustment();
     if (adj.type === 'DISCOUNT_PERCENT') {
-      return -((subtotal * val) / 100);
+      return -Math.round(((subtotal * adj.value) / 100) * 100) / 100;
     }
     if (adj.type === 'DISCOUNT_FIXED') {
-      return -Math.min(subtotal, val);
+      return -Math.min(subtotal, Math.round(adj.value * 100) / 100);
     }
     if (adj.type === 'INCREASE_PERCENT') {
-      return (subtotal * val) / 100;
+      return Math.round(((subtotal * adj.value) / 100) * 100) / 100;
     }
     if (adj.type === 'INCREASE_FIXED') {
-      return val;
+      return Math.round(adj.value * 100) / 100;
     }
     return 0;
   }
 
-  getDiscountAmount(customDiscount = null) {
-    const subtotal = this.getSubtotal();
-    if (customDiscount !== null && typeof customDiscount === 'number') {
-      return (subtotal * customDiscount) / 100;
+  setDiscount(percentOrType, value) {
+    if (typeof percentOrType === 'number') {
+      this.setAdjustment('DISCOUNT_PERCENT', percentOrType);
+      this.discount = { type: 'PERCENT', value: Math.max(0, percentOrType) };
+    } else if (typeof percentOrType === 'string' && value !== undefined) {
+      const upper = percentOrType.toUpperCase();
+      const type = (upper === 'AMOUNT' || upper === 'FIXED' || upper === 'DISCOUNT_FIXED') ? 'DISCOUNT_FIXED' : 'DISCOUNT_PERCENT';
+      this.setAdjustment(type, value);
+      this.discount = { type: (upper === 'PERCENT' || upper === 'DISCOUNT_PERCENT') ? 'PERCENT' : (upper === 'AMOUNT' ? 'AMOUNT' : 'FIXED'), value: Math.max(0, Number(value) || 0) };
+    } else {
+      this.setAdjustment('NONE', 0);
+      this.discount = null;
     }
+  }
+
+  getDiscount() {
+    if (this.discount) return { ...this.discount };
+    const adj = this.getAdjustment();
+    if (adj.type === 'DISCOUNT_PERCENT') return { type: 'PERCENT', value: adj.value };
+    if (adj.type === 'DISCOUNT_FIXED') return { type: 'FIXED', value: adj.value };
+    return null;
+  }
+
+  getDiscountAmount() {
     const adjAmt = this.getAdjustmentAmount();
     return adjAmt < 0 ? Math.abs(adjAmt) : 0;
   }
@@ -280,14 +315,22 @@ class PosCartEngine {
       salesperson_user_id: salespersonUser.id || salespersonUser.user_id || 'anonymous',
       salesperson_name_snapshot: salespersonUser.name || salespersonUser.email || 'Vendedor Mostrador',
       items: this.items.map(i => ({
-        product_id: i.product_id || i.product_code || i.id,
-        ...(i.location_id ? { location_id: i.location_id } : {}),
+        line_type: i.line_type || 'OWN_STOCK',
+        product_id: i.line_type === 'QUICK_ENTRY' ? null : (i.product_id || i.product_code || i.id),
+        sku: i.product_code || i.sku || (i.line_type === 'QUICK_ENTRY' ? 'QUICK-ITEM' : 'ITEM'),
         name: i.name,
         quantity: i.quantity,
         unit_price: i.price,
         subtotal: i.price * i.quantity,
-        availability: i.availability || (i.is_express ? 'EXPRESS_UNMAPPED' : 'EN_STOCK'),
-        is_express: !!i.is_express
+        availability: i.availability || (i.line_type === 'QUICK_ENTRY' ? 'EXPRESS_UNMAPPED' : 'EN_STOCK'),
+        fulfillment_status: i.fulfillment_status || ((i.line_type === 'OWN_STOCK' || i.line_type === 'QUICK_ENTRY') ? 'DELIVERED' : 'PENDING'),
+        expected_delivery_date: i.expected_delivery_date || null,
+        source_type: i.source_type || null,
+        source_id: i.source_id || null,
+        source_name: i.source_name || null,
+        is_express: i.line_type === 'QUICK_ENTRY',
+        ...(i.location_id ? { location_id: i.location_id } : {}),
+        metadata: i.metadata || {}
       })),
       subtotal,
       adjustment_type: adj.type || 'NONE',

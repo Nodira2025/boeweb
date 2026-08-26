@@ -21,6 +21,9 @@
     OTHER: 'OTHER'
   });
   const NETWORK_ERROR_PATTERN = /fetch|network|failed to fetch|load failed|timeout|offline/i;
+  const SALE_LINE_TYPES = new Set([
+    'OWN_STOCK', 'OWN_BACKORDER', 'B2B_BACKORDER', 'LOCAL_STORE_BACKORDER', 'QUICK_ENTRY'
+  ]);
   let retryInProgress = false;
 
   class OperationalApiError extends Error {
@@ -47,6 +50,44 @@
     return amount;
   }
 
+  function normalizeCashBreakdown(value, countedAmount) {
+    if (value === null || value === undefined) return {};
+    if (typeof value !== 'object' || Array.isArray(value)) {
+      throw new OperationalApiError('El desglose de efectivo no es válido.', 'INVALID_CASH_BREAKDOWN');
+    }
+    const entries = Object.entries(value);
+    if (entries.length === 0) return {};
+    if (entries.length > 50) {
+      throw new OperationalApiError('El desglose contiene demasiadas denominaciones.', 'INVALID_CASH_BREAKDOWN');
+    }
+    const normalized = {};
+    let total = 0;
+    for (const [key, rawQuantity] of entries) {
+      const quantity = Number(rawQuantity);
+      if (key === 'coins') {
+        if (!Number.isFinite(quantity) || quantity < 0 || quantity > 1_000_000_000) {
+          throw new OperationalApiError('El importe de monedas no es válido.', 'INVALID_CASH_BREAKDOWN');
+        }
+        const coins = Math.round((quantity + Number.EPSILON) * 100) / 100;
+        if (Math.abs(coins - quantity) > Number.EPSILON) {
+          throw new OperationalApiError('El importe de monedas admite hasta dos decimales.', 'INVALID_CASH_BREAKDOWN');
+        }
+        if (coins > 0) normalized.coins = coins;
+        total += coins;
+        continue;
+      }
+      if (!/^[1-9][0-9]{0,8}$/.test(key) || !Number.isInteger(quantity) || quantity < 0 || quantity > 100_000) {
+        throw new OperationalApiError('El desglose contiene una denominación o cantidad no válida.', 'INVALID_CASH_BREAKDOWN');
+      }
+      if (quantity > 0) normalized[key] = quantity;
+      total += Number(key) * quantity;
+    }
+    if (Math.abs(normalizeMoney(total) - countedAmount) > 0.001) {
+      throw new OperationalApiError('El desglose de efectivo no coincide con el total contado.', 'CASH_BREAKDOWN_MISMATCH');
+    }
+    return normalized;
+  }
+
   function normalizePaymentMethod(method) {
     const key = String(method || '').trim().toUpperCase();
     const normalized = PAYMENT_METHODS[key];
@@ -59,7 +100,17 @@
   function buildPayments(draft) {
     const method = String(draft?.payment_method || 'EFECTIVO').toUpperCase();
     if (method !== 'MIXTO') {
-      return [{ method: normalizePaymentMethod(method), amount: normalizeMoney(draft.total), metadata: {} }];
+      const normalizedMethod = normalizePaymentMethod(method);
+      const amount = normalizeMoney(draft.total);
+      const metadata = {};
+      if (normalizedMethod === 'CASH' && draft?.cash_tendered !== null && draft?.cash_tendered !== undefined && draft?.cash_tendered !== '') {
+        const tendered = normalizeMoney(draft.cash_tendered);
+        if (tendered < amount) {
+          throw new OperationalApiError('El efectivo recibido no alcanza para cubrir la venta.', 'INSUFFICIENT_CASH_TENDERED');
+        }
+        metadata.cash_tendered = tendered;
+      }
+      return [{ method: normalizedMethod, amount, metadata }];
     }
 
     const breakdown = draft.payment_breakdown || {};
@@ -71,7 +122,17 @@
     }
 
     const payments = [];
-    if (cashAmount > 0) payments.push({ method: 'CASH', amount: cashAmount, metadata: {} });
+    if (cashAmount > 0) {
+      const metadata = {};
+      if (draft?.cash_tendered !== null && draft?.cash_tendered !== undefined && draft?.cash_tendered !== '') {
+        const tendered = normalizeMoney(draft.cash_tendered);
+        if (tendered < cashAmount) {
+          throw new OperationalApiError('El efectivo recibido no alcanza para cubrir la parte en efectivo.', 'INSUFFICIENT_CASH_TENDERED');
+        }
+        metadata.cash_tendered = tendered;
+      }
+      payments.push({ method: 'CASH', amount: cashAmount, metadata });
+    }
     if (secondaryAmount > 0) {
       payments.push({
         method: normalizePaymentMethod(breakdown.secondary_method),
@@ -91,22 +152,78 @@
       throw new OperationalApiError('La venta no contiene productos.', 'EMPTY_SALE');
     }
     return rawItems.map(item => {
-      const productId = String(item.product_id || item.product_code || item.id || '').trim();
+      const lineType = String(item.line_type || (item.is_express ? 'QUICK_ENTRY' : 'OWN_STOCK')).toUpperCase();
+      const rawProductId = String(item.product_id || item.product_code || item.id || '').trim();
+      const productId = normalizeUuid(rawProductId);
+      const sku = String(item.sku || item.product_code || '').trim().slice(0, 120);
+      const name = String(item.name || '').trim().slice(0, 255);
       const quantity = Number(item.quantity);
       const rawLocationId = String(item.location_id || '').trim();
       const locationId = rawLocationId ? normalizeUuid(rawLocationId) : null;
-      if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
-        throw new OperationalApiError('Hay un producto sin identificación o con cantidad inválida.', 'INVALID_SALE_ITEM');
+      const unitPrice = normalizeMoney(item.unit_price ?? item.price ?? 0);
+      const rawSourceId = String(item.source_id || item.source_offer_id || '').trim();
+      const sourceId = rawSourceId ? normalizeUuid(rawSourceId) : null;
+      const expectedDeliveryDate = String(item.expected_delivery_date || '').trim();
+      const metadata = item.metadata && typeof item.metadata === 'object' && !Array.isArray(item.metadata)
+        ? item.metadata
+        : {};
+
+      if (!SALE_LINE_TYPES.has(lineType)) {
+        throw new OperationalApiError('Hay un producto con tipo de venta no admitido.', 'INVALID_LINE_TYPE');
       }
-      if (rawLocationId && !locationId) {
-        throw new OperationalApiError('La ubicación de inventario del producto no es válida.', 'INVALID_LOCATION_ID');
+      if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 999 || Math.round(quantity * 1000) !== quantity * 1000) {
+        throw new OperationalApiError('Hay un producto con cantidad inválida.', 'INVALID_SALE_ITEM');
       }
+      if (lineType === 'OWN_STOCK' || lineType === 'OWN_BACKORDER') {
+        if (!productId && !sku) {
+          throw new OperationalApiError('El producto propio en stock requiere identificación válida.', 'INVALID_SALE_ITEM');
+        }
+        if (rawLocationId && !locationId) {
+          throw new OperationalApiError('La ubicación de inventario del producto no es válida.', 'INVALID_LOCATION_ID');
+        }
+      }
+      if (lineType === 'B2B_BACKORDER' || lineType === 'LOCAL_STORE_BACKORDER') {
+        if (!sourceId || !sku || !name) {
+          throw new OperationalApiError('La oferta externa requiere una identificación central válida.', 'INVALID_EXTERNAL_OFFER');
+        }
+      }
+      if (expectedDeliveryDate && !/^\d{4}-\d{2}-\d{2}$/.test(expectedDeliveryDate)) {
+        throw new OperationalApiError('La fecha estimada de entrega no es válida.', 'INVALID_DELIVERY_DATE');
+      }
+      if (lineType === 'OWN_BACKORDER' && !expectedDeliveryDate) {
+        throw new OperationalApiError('El encargo propio requiere una fecha estimada de entrega.', 'DELIVERY_DATE_REQUIRED');
+      }
+      let serializedMetadata;
+      try {
+        serializedMetadata = JSON.stringify(metadata);
+      } catch (error) {
+        throw new OperationalApiError('Los metadatos del producto no son serializables.', 'INVALID_ITEM_METADATA', error);
+      }
+      if (serializedMetadata.length > 4000) {
+        throw new OperationalApiError('Los metadatos del producto son demasiado extensos.', 'INVALID_ITEM_METADATA');
+      }
+      if (lineType === 'QUICK_ENTRY' && (name.length < 3 || unitPrice <= 0)) {
+        throw new OperationalApiError('El ítem de venta rápida requiere nombre y precio mayor a cero.', 'INVALID_SALE_ITEM');
+      }
+      const currency = String(item.currency || 'ARS').trim().toUpperCase();
+      if (lineType === 'QUICK_ENTRY' && !/^[A-Z]{3}$/.test(currency)) {
+        throw new OperationalApiError('La moneda del ítem rápido no es válida.', 'INVALID_CURRENCY');
+      }
+
       return {
-        product_id: productId,
-        sku: productId,
+        line_type: lineType,
+        product_id: lineType === 'OWN_STOCK' || lineType === 'OWN_BACKORDER' ? productId : null,
+        sku: sku || (lineType === 'QUICK_ENTRY' ? `QUICK-${Date.now()}` : null),
+        name,
         quantity,
         ...(locationId ? { location_id: locationId } : {}),
-        client_unit_price: normalizeMoney(item.unit_price ?? item.price ?? 0)
+        ...(lineType === 'QUICK_ENTRY' ? {
+          client_unit_price: unitPrice,
+          currency
+        } : {}),
+        source_id: sourceId,
+        expected_delivery_date: expectedDeliveryDate || null,
+        metadata: JSON.parse(serializedMetadata)
       };
     });
   }
@@ -150,9 +267,17 @@
   }
 
   async function buildCheckoutCommand(draft, options = {}) {
-    const tenantId = normalizeUuid(draft?.tenant_id || options.tenantId);
-    const cashierUserId = normalizeUuid(draft?.cashier_user_id || options.cashierUserId);
-    const salespersonUserId = normalizeUuid(draft?.salesperson_user_id || options.salespersonUserId);
+    const rawTenantId = draft?.tenant_id || options.tenantId;
+    const rawCashierId = draft?.cashier_user_id || options.cashierUserId;
+    const rawSalespersonId = draft?.salesperson_user_id || options.salespersonUserId;
+    const rawCustomerId = String(draft?.customer_id || '').trim();
+    const rawRegisterId = String(options.registerId || draft?.register_id || '').trim();
+    const rawParkedTicketId = String(draft?.parked_ticket_id || options.parkedTicketId || '').trim();
+
+    const tenantId = normalizeUuid(rawTenantId);
+    const cashierUserId = normalizeUuid(rawCashierId);
+    const salespersonUserId = normalizeUuid(rawSalespersonId);
+
     if (!tenantId || !cashierUserId || !salespersonUserId) {
       throw new OperationalApiError('La venta requiere tenant, cajero y vendedor autenticados.', 'UNVERIFIED_IDENTITY');
     }
@@ -165,11 +290,24 @@
       adjustment: normalizeAdjustment(draft),
       cashier_user_id: cashierUserId,
       salesperson_user_id: salespersonUserId,
-      customer_id: normalizeUuid(draft.customer_id),
-      register_id: normalizeUuid(options.registerId || draft.register_id),
+      customer_id: normalizeUuid(rawCustomerId),
+      register_id: normalizeUuid(rawRegisterId),
       notes: String(draft.notes || '').trim().slice(0, 1000) || null,
-      due_date: draft.customer_account_due || null
+      due_date: draft.customer_account_due || null,
+      parked_ticket_id: normalizeUuid(rawParkedTicketId) || null
     };
+    if (rawCustomerId && !command.customer_id) {
+      throw new OperationalApiError('El cliente seleccionado no tiene una identificación válida.', 'INVALID_CUSTOMER_ID');
+    }
+    if (rawRegisterId && !command.register_id) {
+      throw new OperationalApiError('La caja seleccionada no tiene una identificación válida.', 'INVALID_REGISTER_ID');
+    }
+    if (!command.register_id) {
+      throw new OperationalApiError('Toda venta POS requiere una caja con turno abierto.', 'REGISTER_REQUIRED');
+    }
+    if (rawParkedTicketId && !command.parked_ticket_id) {
+      throw new OperationalApiError('El ticket en espera no tiene una identificación válida.', 'INVALID_TICKET_ID');
+    }
     if (command.payments.some(payment => payment.method === 'ACCOUNT_CREDIT') && !command.customer_id) {
       throw new OperationalApiError(
         'La cuenta corriente requiere un cliente centralizado.',
@@ -226,7 +364,7 @@
   }
 
   async function invokeCheckout(supabaseClient, command) {
-    const { data, error } = await supabaseClient.rpc('checkout_sale_v2', {
+    const { data, error } = await supabaseClient.rpc('checkout_sale_v3', {
       p_tenant_id: command.tenant_id,
       p_idempotency_key: command.idempotency_key,
       p_payload_hash: command.payload_hash,
@@ -238,7 +376,8 @@
       p_customer_id: command.customer_id,
       p_register_id: command.register_id,
       p_notes: command.notes,
-      p_due_date: command.due_date
+      p_due_date: command.due_date,
+      p_parked_ticket_id: command.parked_ticket_id
     });
     if (error) {
       throw new OperationalApiError(error.message || 'El servidor rechazó la venta.', error.code || 'RPC_ERROR', error);
@@ -326,14 +465,16 @@
     });
   }
 
-  async function submitCashClosure({ supabaseClient, authContext, sessionId, countedAmount, notes = '' }) {
+  async function submitCashClosure({ supabaseClient, authContext, sessionId, countedAmount, cashBreakdown = {}, notes = '' }) {
     const { tenantId } = requireOperationalContext(supabaseClient, authContext);
     const safeSessionId = normalizeUuid(sessionId);
     if (!safeSessionId) throw new OperationalApiError('La sesión de caja no es válida.', 'INVALID_CASH_SESSION');
-    return invokeOperationalRpc(supabaseClient, 'submit_cash_closure_v2', {
+    const safeCountedAmount = normalizeMoney(countedAmount);
+    return invokeOperationalRpc(supabaseClient, 'submit_cash_closure_v3', {
       p_tenant_id: tenantId,
       p_session_id: safeSessionId,
-      p_counted: normalizeMoney(countedAmount),
+      p_counted: safeCountedAmount,
+      p_cash_breakdown: normalizeCashBreakdown(cashBreakdown, safeCountedAmount),
       p_notes: String(notes || '').trim().slice(0, 1000) || null
     });
   }
@@ -671,6 +812,145 @@
     }
   }
 
+  async function parkPosTicket({ supabaseClient, authContext, draft, idempotencyKey = null, customerName = null }) {
+    const { tenantId, userId } = requireOperationalContext(supabaseClient, authContext);
+    const key = requireIdempotencyKey(
+      idempotencyKey || draft?.idempotency_key || `parked-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      'INVALID_IDEMPOTENCY_KEY'
+    );
+    return invokeOperationalRpc(supabaseClient, 'park_pos_ticket_v2', {
+      p_tenant_id: tenantId,
+      p_cashier_user_id: userId,
+      p_salesperson_user_id: normalizeUuid(draft?.salesperson_user_id) || userId,
+      p_payload: draft,
+      p_idempotency_key: key,
+      p_customer_id: normalizeUuid(draft?.customer_id),
+      p_customer_name: customerName || draft?.customer_name || null
+    });
+  }
+
+  async function cancelParkedPosTicket({ supabaseClient, authContext, ticketId }) {
+    const { tenantId } = requireOperationalContext(supabaseClient, authContext);
+    const safeTicketId = normalizeUuid(ticketId);
+    if (!safeTicketId) throw new OperationalApiError('Identificador de ticket inválido.', 'INVALID_TICKET_ID');
+    return invokeOperationalRpc(supabaseClient, 'cancel_pos_ticket_v2', {
+      p_tenant_id: tenantId,
+      p_ticket_id: safeTicketId
+    });
+  }
+
+  async function fetchParkedPosTickets({ supabaseClient, authContext }) {
+    const { tenantId } = requireOperationalContext(supabaseClient, authContext);
+    return invokeOperationalRpc(supabaseClient, 'list_parked_pos_tickets_v2', {
+      p_tenant_id: tenantId
+    });
+  }
+
+  async function fetchCashSessionSheet({ supabaseClient, authContext, sessionId }) {
+    const { tenantId } = requireOperationalContext(supabaseClient, authContext);
+    const safeSessionId = normalizeUuid(sessionId);
+    if (!safeSessionId) throw new OperationalApiError('La sesión de caja no es válida.', 'INVALID_CASH_SESSION');
+    return invokeOperationalRpc(supabaseClient, 'get_cash_session_sheet_v2', {
+      p_tenant_id: tenantId,
+      p_session_id: safeSessionId
+    });
+  }
+
+  async function fetchSaleFulfillments({ supabaseClient, authContext, statusFilter = null, query = null, limit = 50, offset = 0 }) {
+    const { tenantId } = requireOperationalContext(supabaseClient, authContext);
+    return invokeOperationalRpc(supabaseClient, 'list_sale_fulfillments_v2', {
+      p_tenant_id: tenantId,
+      p_status_filter: statusFilter || null,
+      p_query: query || null,
+      p_limit: limit || 50,
+      p_offset: offset || 0
+    });
+  }
+
+  async function updateSaleFulfillment({ supabaseClient, authContext, fulfillmentId, status, notes = null, fulfilledBy = null }) {
+    const { tenantId, userId } = requireOperationalContext(supabaseClient, authContext);
+    const safeFulfillmentId = normalizeUuid(fulfillmentId);
+    if (!safeFulfillmentId) throw new OperationalApiError('Identificador de encargo/entrega inválido.', 'INVALID_FULFILLMENT_ID');
+    const validStatuses = new Set(['PENDING', 'ORDERED', 'IN_TRANSIT', 'READY_FOR_PICKUP', 'FULFILLED', 'CANCELLED']);
+    const upperStatus = String(status || '').trim().toUpperCase();
+    if (!validStatuses.has(upperStatus)) {
+      throw new OperationalApiError(`Estado de entrega no válido: ${status}`, 'INVALID_FULFILLMENT_STATUS');
+    }
+
+    return invokeOperationalRpc(supabaseClient, 'update_sale_fulfillment_v2', {
+      p_tenant_id: tenantId,
+      p_fulfillment_id: safeFulfillmentId,
+      p_new_status: upperStatus,
+      p_notes: String(notes || '').trim().slice(0, 1000) || null,
+      p_fulfilled_by: upperStatus === 'FULFILLED' ? (normalizeUuid(fulfilledBy) || userId) : null
+    });
+  }
+
+  async function upsertExternalCatalogSource({ supabaseClient, authContext, source }) {
+    const { tenantId } = requireOperationalContext(supabaseClient, authContext);
+    const sourceId = source?.id ? normalizeUuid(source.id) : null;
+    const sourceType = String(source?.source_type || '').trim().toUpperCase();
+    const name = String(source?.name || '').trim();
+    const estimatedDays = Number(source?.estimated_days ?? 2);
+    if (!['B2B_SUPPLIER', 'LOCAL_STORE'].includes(sourceType) || !name || name.length > 255) {
+      throw new OperationalApiError('Tipo o nombre de proveedor externo inválido.', 'INVALID_EXTERNAL_SOURCE');
+    }
+    if (!Number.isInteger(estimatedDays) || estimatedDays < 0 || estimatedDays > 365) {
+      throw new OperationalApiError('Los días estimados del proveedor no son válidos.', 'INVALID_ESTIMATED_DAYS');
+    }
+    return invokeOperationalRpc(supabaseClient, 'upsert_external_catalog_source_v2', {
+      p_tenant_id: tenantId,
+      p_source_type: sourceType,
+      p_name: name,
+      p_contact_info: String(source?.contact_info || '').trim() || null,
+      p_estimated_days: estimatedDays,
+      p_active: source?.active !== false,
+      p_metadata: source?.metadata && typeof source.metadata === 'object' ? source.metadata : {},
+      p_source_id: sourceId
+    });
+  }
+
+  async function upsertExternalCatalogOffer({ supabaseClient, authContext, offer }) {
+    const { tenantId } = requireOperationalContext(supabaseClient, authContext);
+    const sourceId = normalizeUuid(offer?.source_id);
+    if (!sourceId) throw new OperationalApiError('Identificador de proveedor/fuente inválido.', 'INVALID_SOURCE_ID');
+    const offerId = offer?.id ? normalizeUuid(offer.id) : null;
+    const sku = String(offer?.external_sku || offer?.sku || '').trim();
+    const name = String(offer?.name || '').trim();
+    const availableUnits = Number(offer?.available_units ?? 0);
+    const retailPrice = normalizeMoney(offer?.retail_price ?? 0);
+    if (!sku || sku.length > 120 || !name || name.length > 255 || retailPrice <= 0) {
+      throw new OperationalApiError('SKU, nombre o precio de la oferta no son válidos.', 'INVALID_EXTERNAL_OFFER');
+    }
+    if (!Number.isFinite(availableUnits) || availableUnits < 0) {
+      throw new OperationalApiError('La disponibilidad externa no es válida.', 'INVALID_EXTERNAL_AVAILABILITY');
+    }
+
+    return invokeOperationalRpc(supabaseClient, 'upsert_external_catalog_offer_v2', {
+      p_tenant_id: tenantId,
+      p_source_id: sourceId,
+      p_external_sku: sku,
+      p_name: name,
+      p_category: String(offer?.category || 'General').trim(),
+      p_cost_price: normalizeMoney(offer?.cost_price || 0),
+      p_retail_price: retailPrice,
+      p_available_units: availableUnits,
+      p_active: offer?.active !== false,
+      p_metadata: offer?.metadata && typeof offer.metadata === 'object' ? offer.metadata : {},
+      p_offer_id: offerId
+    });
+  }
+
+  async function fetchExternalCatalogOffers({ supabaseClient, authContext, sourceId = null, query = null, activeOnly = true }) {
+    const { tenantId } = requireOperationalContext(supabaseClient, authContext);
+    return invokeOperationalRpc(supabaseClient, 'list_external_catalog_offers_v2', {
+      p_tenant_id: tenantId,
+      p_source_id: sourceId ? normalizeUuid(sourceId) : null,
+      p_query: query || null,
+      p_active_only: activeOnly !== false
+    });
+  }
+
   const api = Object.freeze({
     OperationalApiError,
     adjustInventory,
@@ -678,10 +958,16 @@
     archiveCatalogProduct,
     buildCheckoutCommand,
     buildPayments,
+    cancelParkedPosTicket,
     checkoutSale,
+    fetchCashSessionSheet,
+    fetchExternalCatalogOffers,
+    fetchParkedPosTickets,
+    fetchSaleFulfillments,
     locateCatalogProductDraft,
     normalizePaymentMethod,
     openCashSession,
+    parkPosTicket,
     readOutbox,
     recordCashMovement,
     recordCustomerAccountPayment,
@@ -695,8 +981,11 @@
     reviewInventoryCount,
     submitInventoryCount,
     transferInventory,
+    updateSaleFulfillment,
     upsertCatalogProduct,
     upsertCustomer,
+    upsertExternalCatalogOffer,
+    upsertExternalCatalogSource,
     upsertInventoryLocation,
     voidSale
   });

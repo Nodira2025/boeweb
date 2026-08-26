@@ -66,7 +66,6 @@ test('2. Netlify Functions: health-check-cron falla cerrado sin secreto ni backe
 });
 
 test('3. Dr. BÔ Diagnosis Engine Catalog Integration', async () => {
-  // Check Dr. BÔ diagnoses structures
   const mockDiagnoses = {
     nitrogen: {
       title: 'Deficiencia de Nitrógeno (N)',
@@ -83,20 +82,15 @@ test('3. Dr. BÔ Diagnosis Engine Catalog Integration', async () => {
 });
 
 test('4. VPD Calculation Agronomic Formula Verification', () => {
-  // SVP = 0.61078 * exp((17.27 * T) / (T + 237.3))
-  // VP = SVP * (RH / 100)
-  // VPD = SVP - VP
   function calcVPD(T, RH) {
     const svp = 0.61078 * Math.exp((17.27 * T) / (T + 237.3));
     const vp = svp * (RH / 100);
     return svp - vp;
   }
 
-  // T=25C, RH=60% -> Standard veg environment
   const vpdVeg = calcVPD(25, 60);
   assert.ok(vpdVeg > 1.0 && vpdVeg < 1.4, `VPD at 25C/60% should be ~1.27 kPa, got ${vpdVeg}`);
 
-  // T=28C, RH=45% -> Intense flower
   const vpdFlower = calcVPD(28, 45);
   assert.ok(vpdFlower > 1.8 && vpdFlower < 2.3, `VPD at 28C/45% should be ~2.08 kPa, got ${vpdFlower}`);
 });
@@ -114,9 +108,12 @@ test('5. Public Catalog and POS Cart Engine Consistency', async () => {
   const cart = new PosCartEngine('POS');
   cart.clear();
   assert.equal(cart.addItem(unified[0]), true);
-  assert.equal(cart.addItem(unified[1]), false, 'POS no debe vender stock perteneciente a un proveedor');
+  assert.equal(cart.addItem(unified[1]), true, 'POS admite vender B2B como backorder/encargo');
 
-  assert.equal(cart.getItemCount(), 1);
-  assert.equal(cart.getSubtotal(), 4500);
-  assert.equal(cart.getTotal(10), 4500 * 0.9);
+  assert.equal(cart.getItemCount(), 2);
+  const items = cart.getItems();
+  assert.equal(items[0].line_type, 'OWN_STOCK');
+  assert.equal(items[1].line_type, 'B2B_BACKORDER');
+  assert.equal(cart.getSubtotal(), 10700);
+  assert.equal(cart.getTotal(10), 10700 * 0.9);
 });

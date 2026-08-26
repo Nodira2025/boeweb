@@ -47,6 +47,10 @@ let currentWmsModuleCode = 'PI-M04';
 // POS state (hoisted to avoid TDZ)
 let globalPosCart = null;
 let posScanPendingProduct = null;
+let externalCatalogOffers = [];
+let externalCatalogLoadError = '';
+let parkedPosTickets = [];
+let activeParkedTicketId = null;
 
 // Expirations, Nearby Stores & CC state (hoisted to avoid TDZ)
 let currentExpirationsFilter = 'all';
@@ -1366,6 +1370,8 @@ function switchVendorTab(tab) {
   if (webOrdersSection) webOrdersSection.style.display = 'none';
   const expirationsSection = document.getElementById('vendor-expirations-section');
   if (expirationsSection) expirationsSection.style.display = 'none';
+  const fulfillmentsSection = document.getElementById('vendor-fulfillments-section');
+  if (fulfillmentsSection) fulfillmentsSection.style.display = 'none';
   const nearbyStoresSection = document.getElementById('vendor-nearby-stores-section');
   if (nearbyStoresSection) nearbyStoresSection.style.display = 'none';
   const retiredSection = document.getElementById('vendor-retired-products-section');
@@ -1512,6 +1518,13 @@ function switchVendorTab(tab) {
       vcardWebOrders.style.transform = 'scale(1.02)';
     }
     loadWebOrders();
+  } else if (tab === 'fulfillments' || tab === 'entregas' || tab === 'encargos') {
+    const fulSection = document.getElementById('vendor-fulfillments-section');
+    if (fulSection) {
+      fulSection.style.display = 'block';
+      targetSection = fulSection;
+    }
+    if (typeof initFulfillmentsWorkspace === 'function') initFulfillmentsWorkspace();
   } else if (tab === 'expirations' || tab === 'vencimientos') {
     const expSection = document.getElementById('vendor-expirations-section');
     if (expSection) {
@@ -2998,6 +3011,35 @@ function formatCashCurrency(value) {
 }
 
 function calculateCashTotals(cashData) {
+  if (cashData?.summary) {
+    const summary = cashData.summary;
+    const openingCash = Number(summary.opening_cash || 0);
+    const cashSales = Number(summary.cash_sales || 0);
+    const otherCashIncome = Number(summary.other_cash_income || 0);
+    const expenses = Number(summary.expenses || 0);
+    const withdrawals = Number(summary.withdrawals || 0);
+    const transferIncome = Number(summary.transfer_income || 0);
+    const cardIncome = Number(summary.card_income || 0);
+    const mpIncome = Number(summary.mp_income || 0);
+    const accountCreditIncome = Number(summary.account_credit_income || 0);
+    return {
+      openingCash,
+      cashSales,
+      cashIncome: cashSales,
+      otherCashIncome,
+      expenses,
+      withdrawals,
+      expectedCash: Number(summary.expected_cash || 0),
+      transferIncome,
+      cardIncome,
+      mpIncome,
+      accountCreditIncome,
+      recordedIncome: cashSales + otherCashIncome + transferIncome + cardIncome + mpIncome + accountCreditIncome,
+      cashEntries: openingCash + cashSales + otherCashIncome,
+      transfers: transferIncome + cardIncome + mpIncome,
+      activeCount: Array.isArray(cashData.movements) ? cashData.movements.length : 0
+    };
+  }
   const totals = {
     recordedIncome: 0,
     cashEntries: 0,
@@ -3173,16 +3215,92 @@ function renderCashMovements(cashData) {
           <span class="cash-movement-meta">${escapeCashHtml(movement.time || '--:--')} · ${escapeCashHtml(movement.vendor || 'Vendedor')}</span>
         </div>
         <strong class="cash-movement-amount">${sign}${formatCashCurrency(movement.amount)}</strong>
-        <button type="button" class="cash-void-btn" data-movement-id="${escapeCashHtml(String(movement.id))}" ${cashData.closed || cashData.authority === 'server' ? 'disabled' : ''}>
-          ${cashData.authority === 'server' ? 'Inmutable' : (movement.voided ? 'Restaurar' : 'Anular')}
-        </button>
+        <div style="display: flex; gap: 4px; align-items: center;">
+          ${movement.documentNumber ? `<button type="button" class="cash-void-btn" onclick="printCashMovementVoucher('${escapeCashHtml(String(movement.id))}')" style="background: rgba(21,45,36,0.06); border-color: var(--color-border-accent); color: var(--color-text-main);" title="Imprimir ${escapeCashHtml(movement.documentNumber)} con duplicado">
+            🖨️ ${escapeCashHtml(movement.documentType === 'CASH_VOUCHER_EXPENSE' ? 'Vale' : 'Recibo')}
+          </button>` : ''}
+          <button type="button" class="cash-void-btn" data-movement-id="${escapeCashHtml(String(movement.id))}" ${cashData.closed || cashData.authority === 'server' ? 'disabled' : ''}>
+            ${cashData.authority === 'server' ? 'Inmutable' : (movement.voided ? 'Restaurar' : 'Anular')}
+          </button>
+        </div>
       </article>`;
   }).join('');
 
-  listEl.querySelectorAll('.cash-void-btn').forEach(button => {
+  listEl.querySelectorAll('.cash-void-btn[data-movement-id]').forEach(button => {
     button.addEventListener('click', () => toggleCashMovementVoid(button.dataset.movementId));
   });
 }
+
+function printCashMovementVoucher(movementId) {
+  const dateKey = getTodayDateKey();
+  const cashData = getVendorCashData(dateKey);
+  const movement = (cashData.movements || []).find(m => String(m.id) === String(movementId));
+  if (!movement) {
+    alert('Movimiento no encontrado.');
+    return;
+  }
+  if (!movement.documentNumber) {
+    alert('Este movimiento no posee numeración documental central. No se generará un comprobante informal.');
+    return;
+  }
+
+  const config = CASH_TYPE_CONFIG[movement.type] || CASH_TYPE_CONFIG.venta_efectivo;
+  const isOutflow = config.flow === 'out';
+  const flowLabel = isOutflow ? 'EGRESO DE CAJA / VALE DE RETIRO' : 'INGRESO DE CAJA / VALE DE DEPÓSITO';
+  const amountStr = `$${Number(movement.amount || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+  const dateStr = new Date(movement.createdAt || Date.now()).toLocaleString('es-AR');
+  const responsible = getVerifiedOperatorName(movement.vendor);
+  const brandName = window.AppConfig?.get('brand.texts.name', 'BÔ Grow Club') || 'BÔ Grow Club';
+
+  const printWindow = window.open('', '_blank', 'width=420,height=680');
+  if (!printWindow) return;
+
+  const voucherTemplate = (copyType) => `
+    <div style="border: 1.5px solid #152d24; border-radius: 8px; padding: 12px; margin-bottom: 16px; page-break-inside: avoid;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #152d24; padding-bottom: 6px; margin-bottom: 8px;">
+        <strong style="font-size: 13px; color: #152d24;">${escapeCashHtml(brandName)} · CAJA</strong>
+        <span style="font-size: 10px; font-weight: 800; text-transform: uppercase; background: #eee; padding: 2px 6px; border-radius: 4px;">${copyType}</span>
+      </div>
+      <div style="font-size: 11px; font-weight: 800; color: ${isOutflow ? '#c62828' : '#2e7d32'}; margin-bottom: 6px;">${flowLabel}</div>
+      <div style="font-size: 11px; margin-bottom: 4px;"><strong>N.º Comprobante:</strong> ${escapeCashHtml(movement.documentNumber)}</div>
+      <div style="font-size: 11px; margin-bottom: 4px;"><strong>Fecha / Hora:</strong> ${dateStr}</div>
+      <div style="font-size: 11px; margin-bottom: 4px;"><strong>Concepto:</strong> ${escapeCashHtml(movement.desc || config.label)}</div>
+      <div style="font-size: 11px; margin-bottom: 6px;"><strong>Responsable:</strong> ${escapeCashHtml(responsible)}</div>
+      <div style="font-size: 15px; font-weight: 900; color: ${isOutflow ? '#c62828' : '#2e7d32'}; text-align: right; margin: 8px 0; border-top: 1px dashed #ccc; padding-top: 6px;">
+        ${isOutflow ? '−' : '+'}${amountStr}
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; font-size: 9px; text-align: center;">
+        <div style="border-top: 1px solid #666; padding-top: 4px;">Firma Responsable</div>
+        <div style="border-top: 1px solid #666; padding-top: 4px;">Firma Control / Caja</div>
+      </div>
+    </div>
+  `;
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Comprobante de Caja ${escapeCashHtml(movement.documentNumber)}</title>
+      <style>
+        @page { margin: 10mm; }
+        body { font-family: sans-serif; font-size: 11px; margin: 0; padding: 10px; color: #000; }
+        .cut-line { border-top: 1px dashed #999; margin: 16px 0; position: relative; text-align: center; }
+        .cut-line span { background: #fff; padding: 0 8px; font-size: 9px; color: #666; position: relative; top: -7px; }
+      </style>
+    </head>
+    <body>
+      ${voucherTemplate('ORIGINAL · RENDICIÓN DE CAJA')}
+      ${shouldPrintDuplicateReceipts() ? `<div class="cut-line"><span>✂ Línea de corte</span></div>${voucherTemplate('DUPLICADO · INTERESADO / CONTROL')}` : ''}
+      <script>
+        window.onload = function() { window.print(); window.close(); };
+      </script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+window.printCashMovementVoucher = printCashMovementVoucher;
 
 function updateCashDifferencePreview() {
   const cashData = getVendorCashData();
@@ -3249,6 +3367,13 @@ function renderCashSectionUI() {
   entryForm?.querySelectorAll('input, select, button').forEach(control => {
     control.disabled = cashData.closed || cashData.authorityUnavailable;
   });
+  const printSheetButton = document.getElementById('btn-print-cash-sheet');
+  if (printSheetButton) {
+    printSheetButton.disabled = !cashData.closed || !cashData.closureId || !cashData.closureDocumentNumber;
+    printSheetButton.title = printSheetButton.disabled
+      ? 'La planilla se habilita después del cierre central numerado.'
+      : 'Imprimir planilla de cierre con duplicado.';
+  }
 
   const closeButton = document.getElementById('btn-close-shift');
   if (closeButton) {
@@ -3295,11 +3420,17 @@ async function performShiftClosure() {
   const closeButton = document.getElementById('btn-close-shift');
   if (closeButton) closeButton.disabled = true;
   try {
+    const cashBreakdownResult = calculateBillsBreakdownTotal();
+    const hasCashBreakdown = Object.keys(cashBreakdownResult.breakdown).length > 0;
+    if (hasCashBreakdown && Math.abs(cashBreakdownResult.total - countedCash) > 0.009) {
+      throw new Error('El desglose de billetes no coincide con el efectivo contado. Corregí el conteo antes de cerrar.');
+    }
     const closure = await window.OperationalApi.submitCashClosure({
       supabaseClient,
       authContext,
       sessionId: cashData.sessionId,
       countedAmount: countedCash,
+      cashBreakdown: hasCashBreakdown ? cashBreakdownResult.breakdown : {},
       notes: notesEl?.value.trim() || ''
     });
     await Promise.all([refreshCanonicalCashSection(), loadPosRegisters()]);
@@ -3364,8 +3495,9 @@ function downloadCashBackup(format = 'json') {
   const dateKey = getTodayDateKey();
   const cashData = getVendorCashData(dateKey);
   const totals = calculateCashTotals(cashData);
+  const brandName = window.AppConfig?.get('brand.texts.name', 'BÔ Grow Club') || 'BÔ Grow Club';
   const exportData = {
-    brand: 'BÔ Grow Club',
+    brand: brandName,
     module: 'Caja y arqueo diario',
     exportedAt: new Date().toISOString(),
     date: dateKey,
@@ -6556,6 +6688,21 @@ function normalizeInternalCatalogProduct(supplier, product, draft, location) {
   };
 }
 
+function getVerifiedOperatorName(userId = null) {
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  const targetId = String(userId || context?.userId || '').trim();
+  const users = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantUsers() : [];
+  const user = users.find(item => String(item.id || item.user_id) === targetId);
+  if (user) return user.name || user.display_name || user.email || 'Usuario autenticado';
+  if (targetId && targetId === String(context?.userId || '')) return context.userName || 'Usuario autenticado';
+  if (targetId && !/^[0-9a-f-]{36}$/i.test(targetId)) return targetId;
+  return 'Usuario autenticado';
+}
+
+function shouldPrintDuplicateReceipts() {
+  return window.AppConfig?.get('rules.pos.printDuplicateReceipts', true) !== false;
+}
+
 function mapCanonicalCashMovement(movement) {
   const typeMap = {
     SALE: 'venta_efectivo',
@@ -6575,7 +6722,9 @@ function mapCanonicalCashMovement(movement) {
     type: typeMap[movement.movement_type] || (movement.direction === 'OUT' ? 'gasto' : 'membresia_efectivo'),
     amount: Number(movement.amount) || 0,
     desc: movement.description || movement.category || movement.movement_type,
-    vendor: movement.actor_user_id || 'Usuario autenticado',
+    vendor: getVerifiedOperatorName(movement.actor_user_id),
+    documentNumber: movement.document_number || null,
+    documentType: movement.document_type || null,
     voided: false
   };
 }
@@ -6593,7 +6742,7 @@ async function loadCanonicalCashClosureHistory() {
   try {
     const { data, error } = await supabaseClient
       .from('cash_closures')
-      .select('id,session_id,expected_amount,counted_amount,difference,review_status,closed_by,closed_at,reviewed_by,reviewed_at,notes')
+      .select('id,session_id,document_number,expected_amount,counted_amount,difference,review_status,closed_by,closed_at,reviewed_by,reviewed_at,notes')
       .eq('tenant_id', context.tenantId)
       .order('closed_at', { ascending: false })
       .limit(50);
@@ -6616,7 +6765,7 @@ async function loadCanonicalCashClosureHistory() {
       return `
         <article class="cash-movement" data-flow="${difference === 0 ? 'in' : 'out'}">
           <div class="cash-movement-copy">
-            <span class="cash-movement-type">${escapeCashHtml(status)} · ${escapeCashHtml(closedAt)}</span>
+            <span class="cash-movement-type">${escapeCashHtml(closure.document_number || closure.id)} · ${escapeCashHtml(status)} · ${escapeCashHtml(closedAt)}</span>
             <p class="cash-movement-desc">Esperado ${formatCashCurrency(closure.expected_amount)} · Contado ${formatCashCurrency(closure.counted_amount)}</p>
             <span class="cash-movement-meta">Cerró: ${escapeCashHtml(closure.closed_by || 'usuario')} · Revisó: ${escapeCashHtml(closure.reviewed_by || 'pendiente')}</span>
             ${closure.notes ? `<small>${escapeCashHtml(closure.notes)}</small>` : ''}
@@ -6686,22 +6835,20 @@ async function refreshCanonicalCashSection() {
       return canonicalCashView;
     }
 
-    const [movementsResult, closureResult] = await Promise.all([
+    const [movementsResult, sheet] = await Promise.all([
       supabaseClient
         .from('cash_movements_v2')
-        .select('id,movement_type,direction,amount,currency,category,description,actor_user_id,created_at')
+        .select('id,document_number,document_type,movement_type,direction,amount,currency,category,description,actor_user_id,created_at')
         .eq('tenant_id', context.tenantId)
         .eq('session_id', session.id)
         .order('created_at', { ascending: false }),
-      supabaseClient
-        .from('cash_closures')
-        .select('id,expected_amount,counted_amount,difference,review_status,closed_by,closed_at,reviewed_by,reviewed_at,notes')
-        .eq('tenant_id', context.tenantId)
-        .eq('session_id', session.id)
-        .maybeSingle()
+      window.OperationalApi.fetchCashSessionSheet({
+        supabaseClient,
+        authContext: context,
+        sessionId: session.id
+      })
     ]);
     if (movementsResult.error) throw movementsResult.error;
-    if (closureResult.error) throw closureResult.error;
 
     const openingMovement = Number(session.opening_amount) > 0 ? [{
       id: `${session.id}:opening`,
@@ -6714,7 +6861,6 @@ async function refreshCanonicalCashSection() {
       voided: false
     }] : [];
     const movements = openingMovement.concat((movementsResult.data || []).map(mapCanonicalCashMovement));
-    const closure = closureResult.data || null;
     canonicalCashView = {
       ...getEmptyCashData(),
       authority: 'server',
@@ -6722,17 +6868,20 @@ async function refreshCanonicalCashSection() {
       registerId: session.register_id,
       movements,
       sales: movements.filter(movement => movement.type === 'venta_efectivo'),
+      summary: sheet,
       closed: session.status !== 'OPEN',
-      validated: closure?.review_status === 'APPROVED',
-      closureId: closure?.id || null,
-      reviewStatus: closure?.review_status || null,
-      closedBy: closure?.closed_by || session.closed_by,
-      validatedBy: closure?.reviewed_by || null,
-      closedAt: closure?.closed_at || session.closed_at,
-      countedCash: closure ? Number(closure.counted_amount) : null,
-      expectedCash: closure ? Number(closure.expected_amount) : null,
-      difference: closure ? Number(closure.difference) : null,
-      closureNotes: closure?.notes || '',
+      validated: sheet?.review_status === 'APPROVED',
+      closureId: sheet?.closure_id || null,
+      closureDocumentNumber: sheet?.closure_document_number || null,
+      reviewStatus: sheet?.review_status || null,
+      closedBy: session.closed_by,
+      validatedBy: null,
+      closedAt: sheet?.closed_at || session.closed_at,
+      countedCash: sheet?.counted_cash === null ? null : Number(sheet.counted_cash),
+      expectedCash: Number(sheet?.expected_cash || 0),
+      difference: sheet?.difference === null ? null : Number(sheet.difference),
+      closureNotes: sheet?.closure_notes || '',
+      cashBreakdown: sheet?.cash_breakdown || {},
       updatedAt: session.updated_at || session.opened_at
     };
     renderCashSectionUI();
@@ -9625,13 +9774,18 @@ async function loadPosRegisters() {
 
 async function initPosWorkspace() {
   populatePosSalespeople();
-  await Promise.all([loadPosRegisters(), loadCanonicalCurrentAccounts()]);
+  await Promise.all([loadPosRegisters(), loadCanonicalCurrentAccounts(), loadExternalCatalogOffers()]);
   populatePosCurrentAccountDropdown();
+  const parkedTicketsEnabled = window.AppConfig?.get('rules.pos.parkedTicketsEnabled', true) !== false;
+  const parkSaleButton = document.getElementById('pos-park-sale-btn');
+  if (parkSaleButton) parkSaleButton.hidden = !parkedTicketsEnabled;
 
   const cashierDisplay = document.getElementById('pos-cashier-display');
   if (cashierDisplay && typeof SaasAuth !== 'undefined') {
     const ctx = SaasAuth.getTenantContext();
     cashierDisplay.textContent = `${ctx.userName} (${ctx.roleName})`;
+    const syncB2BButton = document.getElementById('pos-sync-b2b-btn');
+    if (syncB2BButton) syncB2BButton.hidden = !['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(String(ctx.role || '').toUpperCase());
   }
 
   // Carga previa o reactiva del catálogo interno
@@ -9674,6 +9828,11 @@ async function initPosWorkspace() {
 
   renderPosCartItems();
   renderPosSearchResults('');
+  if (typeof renderPosCashDenominations === 'function') renderPosCashDenominations();
+  if (parkedTicketsEnabled && typeof loadParkedPosTickets === 'function') await loadParkedPosTickets();
+  if (typeof setPosOriginFilter === 'function') setPosOriginFilter('ALL');
+  if (typeof updatePosCashChangeDisplay === 'function') updatePosCashChangeDisplay();
+
   if (window.innerWidth <= 991) {
     switchPosWorkspaceMode('assistant');
   } else {
@@ -9759,13 +9918,16 @@ function setMobilePosAssistantStep(step) {
 window.setMobilePosAssistantStep = setMobilePosAssistantStep;
 
 function getAllSearchableProducts() {
-  // El POS sólo busca productos del catálogo operativo confirmado. Borradores,
-  // proveedores y cachés locales nunca se convierten en artículos vendibles.
   const canonicalProducts = Array.isArray(internalCatalogProducts)
     ? internalCatalogProducts.filter(product => product?.source === 'catalog_products')
     : [];
   const rawList = canonicalProducts.flatMap(product => {
-    if (product.track_stock === false) return [product];
+    if (product.track_stock === false) return [{
+      ...product,
+      product_id: product.id,
+      line_type: 'OWN_STOCK',
+      available_quantity: null
+    }];
     const options = Array.isArray(product.inventory_options) ? product.inventory_options : [];
     if (options.length === 0) return [{ ...product, stock: 0, available_quantity: 0 }];
     return options.map(option => ({
@@ -9775,8 +9937,34 @@ function getAllSearchableProducts() {
       shelf_code: option.code,
       location_name: option.name,
       stock: option.available,
-      available_quantity: option.available
+      available_quantity: option.available,
+      product_id: product.id,
+      line_type: 'OWN_STOCK'
     }));
+  });
+
+  externalCatalogOffers.forEach(offer => {
+    const lineType = offer.source_type === 'LOCAL_STORE' ? 'LOCAL_STORE_BACKORDER' : 'B2B_BACKORDER';
+    rawList.push({
+      id: offer.id,
+      cart_key: `external::${offer.id}`,
+      product_id: null,
+      name: offer.name,
+      price: Number(offer.retail_price || 0),
+      stock: Number(offer.available_units || 0),
+      available_quantity: null,
+      category: offer.category || 'Catálogo Externo',
+      image: offer.metadata?.image_url || 'assets/logo.jpg',
+      barcode: offer.metadata?.barcode || offer.external_sku || '',
+      product_code: offer.external_sku,
+      line_type: lineType,
+      source_type: offer.source_type,
+      source_id: offer.id,
+      catalog_source_id: offer.source_id,
+      source_name: offer.source_name,
+      estimated_days: Number(offer.estimated_days || 2),
+      metadata: offer.metadata || {}
+    });
   });
 
   const unique = new Map();
@@ -9819,6 +10007,107 @@ function getAllSearchableProducts() {
 }
 window.getAllSearchableProducts = getAllSearchableProducts;
 
+async function loadExternalCatalogOffers() {
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!window.OperationalApi?.fetchExternalCatalogOffers || !supabaseClient || !authContext?.isVerified) {
+    externalCatalogOffers = [];
+    externalCatalogLoadError = 'Iniciá sesión para consultar el catálogo B2B y las tiendas locales.';
+    return externalCatalogOffers;
+  }
+  try {
+    const response = await window.OperationalApi.fetchExternalCatalogOffers({
+      supabaseClient,
+      authContext,
+      activeOnly: true
+    });
+    externalCatalogOffers = Array.isArray(response) ? response : [];
+    externalCatalogLoadError = '';
+    return externalCatalogOffers;
+  } catch (error) {
+    externalCatalogOffers = [];
+    externalCatalogLoadError = error.message || 'No se pudo cargar el catálogo externo.';
+    console.error('No se pudo cargar el catálogo externo central:', error);
+    return externalCatalogOffers;
+  }
+}
+window.loadExternalCatalogOffers = loadExternalCatalogOffers;
+
+async function syncLegacyB2BCatalogToPos() {
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+    alert('Iniciá sesión para sincronizar el catálogo B2B central.');
+    return;
+  }
+  if (!['ADMIN', 'SUPERVISOR'].includes(String(authContext.role || '').toUpperCase())) {
+    alert('Sólo administración o supervisión puede sincronizar precios y proveedores B2B.');
+    return;
+  }
+  const button = document.getElementById('pos-sync-b2b-btn');
+  const originalLabel = button?.textContent || '↻ Sincronizar B2B';
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Sincronizando…';
+  }
+  try {
+    if (!Array.isArray(baseProducts) || baseProducts.length === 0) await fetchB2BProducts(true);
+    const bySupplier = new Map();
+    baseProducts.forEach(product => {
+      (product.supplier_products || []).forEach(supplierProduct => {
+        const retailPrice = Number(supplierProduct.price || 0);
+        if (!supplierProduct.supplier_id || retailPrice <= 0) return;
+        if (!bySupplier.has(supplierProduct.supplier_id)) bySupplier.set(supplierProduct.supplier_id, []);
+        bySupplier.get(supplierProduct.supplier_id).push({ product, supplierProduct, retailPrice });
+      });
+    });
+    if (bySupplier.size === 0) throw new Error('El catálogo B2B no contiene ofertas con precio válido.');
+
+    let importedCount = 0;
+    for (const [supplierId, offers] of bySupplier.entries()) {
+      const source = await window.OperationalApi.upsertExternalCatalogSource({
+        supabaseClient,
+        authContext,
+        source: {
+          source_type: 'B2B_SUPPLIER',
+          name: supplierNames[supplierId] || supplierId,
+          estimated_days: 2,
+          active: true,
+          metadata: { legacy_supplier_id: supplierId }
+        }
+      });
+      await Promise.all(offers.map(({ product, supplierProduct, retailPrice }) =>
+        window.OperationalApi.upsertExternalCatalogOffer({
+          supabaseClient,
+          authContext,
+          offer: {
+            source_id: source.id,
+            external_sku: String(supplierProduct.id || product.id),
+            name: product.name,
+            category: product.category || 'General',
+            cost_price: retailPrice,
+            retail_price: retailPrice,
+            available_units: supplierProduct.available === false ? 0 : Math.max(0, Number(supplierProduct.stock || 0)),
+            active: supplierProduct.available !== false,
+            metadata: { image_url: product.image || '', source_link: supplierProduct.link || '' }
+          }
+        })
+      ));
+      importedCount += offers.length;
+    }
+    await loadExternalCatalogOffers();
+    renderPosSearchResults(document.getElementById('pos-unified-search')?.value || '');
+    if (window.showToast) window.showToast(`✓ ${importedCount} ofertas B2B listas para seleccionar en el POS.`);
+  } catch (error) {
+    console.error('No se sincronizó el catálogo B2B:', error);
+    alert(`No se sincronizó el catálogo B2B.\n\n${error.message || 'Error desconocido'}`);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
+  }
+}
+window.syncLegacyB2BCatalogToPos = syncLegacyB2BCatalogToPos;
+
 function renderMobilePosAssistantSearchResults(query = '') {
   const container = document.getElementById('pos-assistant-results-container');
   if (!container) return;
@@ -9828,6 +10117,9 @@ function renderMobilePosAssistantSearchResults(query = '') {
   const isNoStockMode = mobilePosAssistantState.mode === 'nostock';
 
   const filtered = prods.filter(p => {
+    const lineType = String(p.line_type || 'OWN_STOCK').toUpperCase();
+    const isExternal = lineType === 'B2B_BACKORDER' || lineType === 'LOCAL_STORE_BACKORDER';
+    if (!isNoStockMode && (isExternal || (p.track_stock !== false && Number(p.stock || 0) <= 0))) return false;
     if (!q) return true;
     const nameMatch = p.name && p.name.toLowerCase().includes(q);
     const barcodeMatch = p.barcode && p.barcode.toLowerCase() === q;
@@ -9924,7 +10216,10 @@ window.updateMobilePosQty = updateMobilePosQty;
 
 function setMobilePosQtyValue(val) {
   const available = Math.max(0, Number(mobilePosAssistantState.selectedProduct?.stock || 0));
-  const parsed = Math.min(Math.max(1, parseInt(val, 10) || 1), Math.max(1, available));
+  const requested = Math.min(Math.max(1, parseInt(val, 10) || 1), 999);
+  const parsed = mobilePosAssistantState.mode === 'stock'
+    ? Math.min(requested, Math.max(1, available))
+    : requested;
   mobilePosAssistantState.quantity = parsed;
 
   const input = document.getElementById('mobile-pos-qty-input');
@@ -9957,15 +10252,33 @@ function confirmMobilePosItem() {
 
   const qty = mobilePosAssistantState.quantity || 1;
   const available = Math.max(0, Number(prod.stock || 0));
-  if (available <= 0 || qty > available) {
+  const isNoStock = mobilePosAssistantState.mode === 'nostock';
+  const isExpress = mobilePosAssistantState.mode === 'express';
+  if (!isNoStock && !isExpress && prod.track_stock !== false && (available <= 0 || qty > available)) {
     alert(`Stock insuficiente. Disponibilidad central: ${available} u.`);
     return;
   }
+  const originalLineType = String(prod.line_type || 'OWN_STOCK').toUpperCase();
+  const lineType = isExpress
+    ? 'QUICK_ENTRY'
+    : (isNoStock
+      ? (['B2B_BACKORDER', 'LOCAL_STORE_BACKORDER'].includes(originalLineType) ? originalLineType : 'OWN_BACKORDER')
+      : 'OWN_STOCK');
+  const expectedDate = isNoStock
+    ? (mobilePosAssistantState.nostockData.customDate || (() => {
+      const date = new Date();
+      date.setDate(date.getDate() + Number(prod.estimated_days || 2));
+      return date.toISOString().slice(0, 10);
+    })())
+    : null;
   const cart = getPosCartEngine();
   if (cart) {
     const added = cart.addItem({
       ...prod,
-      quantity: qty
+      quantity: qty,
+      line_type: lineType,
+      expected_delivery_date: expectedDate,
+      available_quantity: isNoStock ? null : prod.available_quantity
     });
     if (!added) {
       alert('No se agregó el producto: la cantidad acumulada supera el stock disponible en esa ubicación.');
@@ -9984,18 +10297,39 @@ function confirmMobilePosItem() {
 window.confirmMobilePosItem = confirmMobilePosItem;
 
 function confirmMobilePosExpressItem() {
-  alert('La venta libre está deshabilitada. Ingresá y aprobá el producto en el catálogo central.');
+  const name = document.getElementById('mobile-pos-express-name')?.value.trim() || '';
+  const category = document.getElementById('mobile-pos-express-category')?.value || 'Otros';
+  const price = Number(document.getElementById('mobile-pos-express-price')?.value || 0);
+  if (name.length < 3 || !Number.isFinite(price) || price <= 0) {
+    alert('Ingresá un nombre de al menos 3 caracteres y un precio mayor a cero.');
+    return;
+  }
+  mobilePosAssistantState.expressData = { name, category, price };
+  mobilePosAssistantState.selectedProduct = {
+    id: `quick-${Date.now()}`,
+    product_code: `QUICK-${Date.now()}`,
+    name,
+    category,
+    price,
+    stock: 0,
+    line_type: 'QUICK_ENTRY',
+    is_express: true,
+    image: 'assets/logo.jpg'
+  };
+  mobilePosAssistantState.quantity = 1;
+  setMobilePosAssistantStep('quantity');
 }
 window.confirmMobilePosExpressItem = confirmMobilePosExpressItem;
 
 function chooseMobilePosMode(mode) {
-  if (mode !== 'stock') {
-    alert(mode === 'express'
-      ? 'Para vender un artículo primero ingresalo y aprobalo en el catálogo central. Así la venta conserva producto, precio, stock y auditoría.'
-      : 'Los encargos sin stock necesitan una reserva/preorden propia y no pueden cerrarse como venta POS. Usá por ahora productos con disponibilidad central.');
+  if (!['stock', 'nostock', 'express'].includes(mode)) return;
+  if (mode === 'nostock' && window.AppConfig?.get('catalog.allowBackorders', true) === false) {
+    alert('La venta por encargo está deshabilitada en la configuración publicada del negocio.');
     return;
   }
   mobilePosAssistantState.mode = mode;
+  mobilePosAssistantState.selectedProduct = null;
+  mobilePosAssistantState.quantity = 1;
   setMobilePosAssistantStep('search');
 }
 window.chooseMobilePosMode = chooseMobilePosMode;
@@ -10025,7 +10359,7 @@ function renderMobilePosAssistant() {
     }
     container.innerHTML = `
       <p class="assistant-question">Elegí la modalidad de la venta:</p>
-      <p class="assistant-help">El POS confirma únicamente productos aprobados con stock y ubicación central.</p>
+      <p class="assistant-help">Podés entregar ahora, registrar un encargo o cobrar un artículo recién llegado.</p>
       <div class="pos-assistant-mode-grid">
         <button type="button" class="pos-assistant-mode-card featured" onclick="chooseMobilePosMode('stock')">
           <span class="pos-mode-icon">🌿</span>
@@ -10034,10 +10368,21 @@ function renderMobilePosAssistant() {
             <small>Stock disponible en el local · Entrega y cobro en el acto</small>
           </div>
         </button>
+        <button type="button" class="pos-assistant-mode-card" onclick="chooseMobilePosMode('nostock')">
+          <span class="pos-mode-icon">📦</span>
+          <div class="pos-mode-info">
+            <strong>2. Venta sin stock</strong>
+            <small>Producto propio, catálogo B2B o tienda local · queda como encargo</small>
+          </div>
+        </button>
+        <button type="button" class="pos-assistant-mode-card" onclick="chooseMobilePosMode('express')">
+          <span class="pos-mode-icon">⚡</span>
+          <div class="pos-mode-info">
+            <strong>3. Venta rápida</strong>
+            <small>Nombre y precio en el momento · genera un borrador para catalogar después</small>
+          </div>
+        </button>
       </div>
-      <button type="button" class="stock-entry-secondary-btn" onclick="switchVendorTab('fast-upload')" style="width: 100%; margin-top: 10px;">
-        ＋ Ingresar primero un producto nuevo
-      </button>
     `;
     return;
   }
@@ -10054,13 +10399,13 @@ function renderMobilePosAssistant() {
           <div>
             <label style="display: block; font-size: 0.8rem; font-weight: 800; color: var(--color-text-main); margin-bottom: 4px;">Nombre del producto *</label>
             <div style="display: flex; gap: 8px;">
-              <input type="text" id="pos-express-name" class="b2b-form-input" placeholder="Ej: Sustrato Profesional 50L" value="${escapeStockHtml(mobilePosAssistantState.expressData.name)}" style="flex: 1;">
-              <button type="button" class="stock-entry-secondary-btn" onclick="dictatePosExpressField('pos-express-name')" title="Dictar por voz" style="font-size: 1.1rem; padding: 0 12px;">🎙️</button>
+              <input type="text" id="mobile-pos-express-name" class="b2b-form-input" placeholder="Ej: Sustrato Profesional 50L" value="${escapeStockHtml(mobilePosAssistantState.expressData.name)}" style="flex: 1;">
+              <button type="button" class="stock-entry-secondary-btn" onclick="dictatePosExpressField('mobile-pos-express-name')" title="Dictar por voz" style="font-size: 1.1rem; padding: 0 12px; min-height: 44px;">🎙️</button>
             </div>
           </div>
           <div>
             <label style="display: block; font-size: 0.8rem; font-weight: 800; color: var(--color-text-main); margin-bottom: 4px;">Categoría</label>
-            <select id="pos-express-category" class="b2b-form-input">
+            <select id="mobile-pos-express-category" class="b2b-form-input">
               <option value="Sustratos">Sustratos</option>
               <option value="Fertilizantes">Fertilizantes</option>
               <option value="Semillas">Semillas</option>
@@ -10072,7 +10417,7 @@ function renderMobilePosAssistant() {
           </div>
           <div>
             <label style="display: block; font-size: 0.8rem; font-weight: 800; color: var(--color-text-main); margin-bottom: 4px;">Precio de venta ($) *</label>
-            <input type="number" id="pos-express-price" class="b2b-form-input" placeholder="0.00" step="0.01" min="1" value="${mobilePosAssistantState.expressData.price || ''}">
+            <input type="number" id="mobile-pos-express-price" class="b2b-form-input" placeholder="0.00" step="0.01" min="1" value="${mobilePosAssistantState.expressData.price || ''}">
           </div>
         </div>
         <div style="margin-top: 18px;">
@@ -11065,57 +11410,153 @@ function clearPosUnifiedSearch() {
   renderPosSearchResults('');
 }
 
+function parsePosScanCommand(rawQuery) {
+  return window.PosDeskUtils?.parsePosScanCommand(rawQuery)
+    || { quantity: 1, code: String(rawQuery || '').trim() };
+}
+window.parsePosScanCommand = parsePosScanCommand;
+
+let posActiveOriginFilter = 'ALL';
+
+function setPosOriginFilter(filter) {
+  const normalizedFilters = {
+    all: 'ALL',
+    own_stock: 'OWN_STOCK',
+    backorder: 'BACKORDER',
+    b2b: 'B2B',
+    local_store: 'LOCAL_STORE'
+  };
+  posActiveOriginFilter = normalizedFilters[String(filter || 'all').toLowerCase()] || 'ALL';
+  const tabs = [
+    { id: 'pos-origin-all', key: 'ALL' },
+    { id: 'pos-origin-own', key: 'OWN_STOCK' },
+    { id: 'pos-origin-backorder', key: 'BACKORDER' },
+    { id: 'pos-origin-b2b', key: 'B2B' },
+    { id: 'pos-origin-local', key: 'LOCAL_STORE' }
+  ];
+
+  tabs.forEach(t => {
+    const tabEl = document.getElementById(t.id);
+    if (tabEl) {
+      const isActive = t.key === posActiveOriginFilter;
+      tabEl.classList.toggle('active', isActive);
+      tabEl.style.borderBottomColor = isActive ? 'var(--color-accent-gold)' : 'transparent';
+      tabEl.style.color = isActive ? 'var(--color-accent-gold)' : 'var(--color-text-muted)';
+    }
+  });
+
+  const query = document.getElementById('pos-unified-search')?.value || '';
+  renderPosSearchResults(query);
+}
+window.setPosOriginFilter = setPosOriginFilter;
+
 function handlePosBarcodeOrDirectSearch(rawQuery) {
   if (!rawQuery) return;
-  const clean = String(rawQuery).trim().toLowerCase();
+  const parsed = parsePosScanCommand(rawQuery);
+  const cleanCode = parsed.code.toLowerCase().trim();
+  const quantity = parsed.quantity;
 
   const prods = getAllSearchableProducts();
 
-  // 1. Coincidencia exacta por código de barras, SKU o ID
+  // 1. Coincidencia exacta por código de barras, SKU, product_code o ID
   const exactMatch = prods.find(p =>
-    (p.barcode && String(p.barcode).trim().toLowerCase() === clean) ||
-    (p.product_code && String(p.product_code).trim().toLowerCase() === clean) ||
-    (p.id && String(p.id).trim().toLowerCase() === clean)
+    (p.barcode && String(p.barcode).trim().toLowerCase() === cleanCode) ||
+    (p.product_code && String(p.product_code).trim().toLowerCase() === cleanCode) ||
+    (p.id && String(p.id).trim().toLowerCase() === cleanCode) ||
+    (p.cart_key && String(p.cart_key).trim().toLowerCase() === cleanCode)
   );
 
   if (exactMatch) {
-    if (Number(exactMatch.stock || 0) <= 0) {
-      alert(`⚠️ El producto "${exactMatch.name}" está AGOTADO (Stock: 0). No se puede vender.`);
-      return;
+    const directAdd = typeof AppConfig !== 'undefined' ? AppConfig.get('rules.pos.barcodeDirectAdd', true) : true;
+    const stockVal = Number(exactMatch.stock !== undefined ? exactMatch.stock : (exactMatch.own_stock || 0));
+    const canonicalLineType = String(exactMatch.line_type || 'OWN_STOCK').toUpperCase();
+    const lineType = ['B2B_BACKORDER', 'LOCAL_STORE_BACKORDER'].includes(canonicalLineType)
+      ? canonicalLineType
+      : (stockVal >= quantity || exactMatch.track_stock === false ? 'OWN_STOCK' : 'OWN_BACKORDER');
+
+    if (directAdd && lineType === 'OWN_STOCK') {
+      const cart = getPosCartEngine();
+      if (cart) {
+        const added = cart.addItem({
+          ...exactMatch,
+          quantity: quantity,
+          line_type: lineType
+        });
+        if (!added) {
+          alert('No se agregó el producto: la cantidad acumulada supera el stock disponible.');
+          return;
+        }
+        renderPosCartItems();
+        if (typeof playScannerBeep === 'function') playScannerBeep();
+        if (typeof showToast === 'function') {
+          showToast(`✓ Agregado: ${quantity}x ${exactMatch.name}${lineType === 'OWN_BACKORDER' ? ' (Por Encargo)' : ''}`);
+        }
+      }
+    } else {
+      showPosProductConfirmModal({ ...exactMatch, initial_qty: quantity, line_type: lineType });
     }
-    showPosProductConfirmModal(exactMatch);
+
     const unifiedInput = document.getElementById('pos-unified-search');
     if (unifiedInput) {
       unifiedInput.value = '';
       const clearBtn = document.getElementById('pos-search-clear-btn');
       if (clearBtn) clearBtn.style.display = 'none';
       renderPosSearchResults('');
+      unifiedInput.focus();
     }
     return;
   }
 
-  // 2. Si no hay coincidencia exacta de código pero hay una sola coincidencia en la búsqueda activa
+  // 2. Búsqueda en catálogo activo
   const matches = prods.filter(p => {
     const text = [p.name, p.brand, p.presentation, p.category, p.id, p.barcode, p.product_code].filter(Boolean).join(' ').toLowerCase();
-    return text.includes(clean);
+    return text.includes(cleanCode);
   });
 
   if (matches.length === 1) {
     const singleMatch = matches[0];
-    if (Number(singleMatch.stock || 0) <= 0) {
-      alert(`⚠️ El producto "${singleMatch.name}" está AGOTADO (Stock: 0). No se puede vender.`);
-      return;
+    const stockVal = Number(singleMatch.stock !== undefined ? singleMatch.stock : (singleMatch.own_stock || 0));
+    const canonicalLineType = String(singleMatch.line_type || 'OWN_STOCK').toUpperCase();
+    const lineType = ['B2B_BACKORDER', 'LOCAL_STORE_BACKORDER'].includes(canonicalLineType)
+      ? canonicalLineType
+      : (stockVal >= quantity || singleMatch.track_stock === false ? 'OWN_STOCK' : 'OWN_BACKORDER');
+
+    const directAdd = typeof AppConfig !== 'undefined' ? AppConfig.get('rules.pos.barcodeDirectAdd', true) : true;
+    if (directAdd && lineType === 'OWN_STOCK') {
+      const cart = getPosCartEngine();
+      if (cart) {
+        const added = cart.addItem({
+          ...singleMatch,
+          quantity: quantity,
+          line_type: lineType
+        });
+        if (!added) {
+          alert('No se agregó el producto: la cantidad acumulada supera el stock disponible.');
+          return;
+        }
+        renderPosCartItems();
+        if (typeof playScannerBeep === 'function') playScannerBeep();
+        if (typeof showToast === 'function') {
+          showToast(`✓ Agregado: ${quantity}x ${singleMatch.name}${lineType === 'OWN_BACKORDER' ? ' (Por Encargo)' : ''}`);
+        }
+      }
+    } else {
+      showPosProductConfirmModal({ ...singleMatch, initial_qty: quantity, line_type: lineType });
     }
-    showPosProductConfirmModal(singleMatch);
+
     const unifiedInput = document.getElementById('pos-unified-search');
     if (unifiedInput) {
       unifiedInput.value = '';
       const clearBtn = document.getElementById('pos-search-clear-btn');
       if (clearBtn) clearBtn.style.display = 'none';
       renderPosSearchResults('');
+      unifiedInput.focus();
     }
   } else if (matches.length === 0) {
-    alert(`Producto no encontrado en el catálogo interno para el código o búsqueda "${rawQuery}".`);
+    if (typeof showToast === 'function') {
+      showToast(`🔍 Sin coincidencias para "${rawQuery}". Podés agregarlo como Ítem Libre ⚡`, true);
+    }
+    renderPosSearchResults(rawQuery);
   } else {
     renderPosSearchResults(rawQuery);
   }
@@ -11173,9 +11614,24 @@ function renderPosSearchResults(query = '') {
   const countBadge = document.getElementById('pos-search-count-badge');
   if (!grid) return;
 
-  const prods = (typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) && internalCatalogProducts.length > 0)
-    ? internalCatalogProducts
-    : JSON.parse(localStorage.getItem('boeweb_internal_catalog') || '[]');
+  let prods = getAllSearchableProducts();
+  if (window.AppConfig?.get('catalog.allowBackorders', true) === false) {
+    prods = prods.filter(product => {
+      const lineType = String(product.line_type || 'OWN_STOCK').toUpperCase();
+      return lineType === 'OWN_STOCK' && (product.track_stock === false || Number(product.stock || 0) > 0);
+    });
+  }
+
+  // Filtro por pestaña de origen
+  if (posActiveOriginFilter === 'OWN_STOCK') {
+    prods = prods.filter(p => !p.source_type && (p.track_stock === false || Number(p.stock || 0) > 0));
+  } else if (posActiveOriginFilter === 'BACKORDER') {
+    prods = prods.filter(p => !p.source_type && p.track_stock !== false && Number(p.stock || 0) <= 0);
+  } else if (posActiveOriginFilter === 'B2B') {
+    prods = prods.filter(p => p.source_type === 'B2B_SUPPLIER' || p.line_type === 'B2B_BACKORDER');
+  } else if (posActiveOriginFilter === 'LOCAL_STORE') {
+    prods = prods.filter(p => p.source_type === 'LOCAL_STORE' || p.line_type === 'LOCAL_STORE_BACKORDER');
+  }
 
   const cleanQuery = (query || '').toLowerCase().trim();
 
@@ -11187,16 +11643,17 @@ function renderPosSearchResults(query = '') {
 
   if (countBadge) {
     countBadge.textContent = cleanQuery
-      ? `${filtered.length} coincidencias (Catálogo interno)`
-      : `${prods.length} productos en catálogo interno`;
+      ? `${filtered.length} coincidencias`
+      : `${prods.length} productos disponibles para venta`;
   }
 
   if (filtered.length === 0) {
     grid.innerHTML = `
       <div style="grid-column: 1 / -1; text-align: center; padding: 30px 15px; color: var(--color-text-muted); background: rgba(21,45,36,0.02); border-radius: 12px; border: 1px dashed var(--color-border-subtle);">
         <span style="font-size: 2rem; display: block; margin-bottom: 6px;">🔍</span>
-        <strong style="display: block; font-size: 0.95rem; margin-bottom: 4px; color: var(--color-text-main);">Sin coincidencias en el catálogo interno</strong>
-        <p style="margin: 0; font-size: 0.8rem;">Verificá el código o nombre. Recordá que sólo podés vender productos propios registrados en la tienda.</p>
+        <strong style="display: block; font-size: 0.95rem; margin-bottom: 4px; color: var(--color-text-main);">Sin coincidencias en este catálogo</strong>
+        <p style="margin: 0 0 10px 0; font-size: 0.8rem;">¿Es un producto recién llegado? Podés agregarlo inmediatamente como Ítem Libre / Venta Rápida.</p>
+        <button type="button" class="stock-entry-secondary-btn" onclick="openPosExpressItemModal()" style="padding: 6px 14px; font-weight: 700;">⚡ Venta Rápida / Ítem Libre</button>
       </div>
     `;
     return;
@@ -11204,17 +11661,26 @@ function renderPosSearchResults(query = '') {
 
   grid.innerHTML = filtered.map(p => {
     const stockVal = Number(p.stock !== undefined ? p.stock : (p.own_stock || 0));
-    const isOutOfStock = stockVal <= 0;
+    const lineType = String(p.line_type || 'OWN_STOCK').toUpperCase();
+    const isDeferred = lineType !== 'OWN_STOCK' || (p.track_stock !== false && stockVal <= 0);
     const prodImg = p.image || p.image_url || 'assets/logo.jpg';
     const prodPrice = Number(p.price || 0);
     const prodId = escapeStockHtml(String(p.cart_key || p.id || p.product_code));
     const safeName = escapeStockHtml(p.name || 'Producto');
     const safeCat = escapeStockHtml(p.category || 'Venta mostrador');
 
+    let originBadge = '';
+    if (p.source_type === 'B2B_SUPPLIER' || p.line_type === 'B2B_BACKORDER') {
+      originBadge = '<span style="font-size: 0.68rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: #e3f2fd; color: #1565c0; margin-bottom: 2px; display: inline-block;">🏭 Catálogo B2B</span>';
+    } else if (p.source_type === 'LOCAL_STORE' || p.line_type === 'LOCAL_STORE_BACKORDER') {
+      originBadge = '<span style="font-size: 0.68rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: #f3e5f5; color: #7b1fa2; margin-bottom: 2px; display: inline-block;">🏪 Tienda Vecina</span>';
+    }
+
     return `
-      <div class="pos-product-card ${isOutOfStock ? 'pos-product-card-out' : ''}">
+      <div class="pos-product-card ${isDeferred ? 'pos-product-card-backorder' : ''}">
         <div>
           <img src="${prodImg}" alt="${safeName}" class="pos-product-img" loading="lazy" onerror="this.src='assets/logo.jpg'">
+          ${originBadge}
           <span class="pos-product-category">${safeCat}</span>
           <strong class="pos-product-name" title="${safeName}">${safeName}</strong>
           <div class="pos-product-meta">
@@ -11224,15 +11690,15 @@ function renderPosSearchResults(query = '') {
 
         <div>
           <div class="pos-product-price">$${prodPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
-          <div class="pos-stock-badge ${isOutOfStock ? 'pos-stock-badge-out' : 'pos-stock-badge-available'}">
-            ${isOutOfStock ? '🔴 Agotado / Sin stock' : `🟢 ${stockVal} u. disponibles`}
+          <div class="pos-stock-badge ${isDeferred ? 'pos-stock-badge-backorder' : 'pos-stock-badge-available'}" style="${isDeferred ? 'background: rgba(255,152,0,0.12); color: #e65100; border: 1px solid #ffb74d;' : ''}">
+            ${isDeferred ? `📦 Por encargo${p.source_name ? ` · ${escapeStockHtml(p.source_name)}` : ''}` : `🟢 ${stockVal} u. disponibles`}
           </div>
 
           <button type="button" 
                   class="pos-add-btn" 
-                  ${isOutOfStock ? 'disabled' : ''} 
-                  onclick="openPosProductModalById('${prodId}')">
-            ${isOutOfStock ? '✕ Sin Stock' : '+ Seleccionar'}
+                  onclick="openPosProductModalById('${prodId}')"
+                  style="${isDeferred ? 'background: #fff; border: 1.5px solid #ff9800; color: #e65100;' : ''}">
+            ${isDeferred ? '＋ Vender Por Encargo' : '+ Seleccionar'}
           </button>
         </div>
       </div>
@@ -11256,10 +11722,8 @@ function showPosProductConfirmModal(product) {
   posScanPendingProduct = product;
 
   const stockVal = Number(product.stock !== undefined ? product.stock : (product.own_stock || 0));
-  if (stockVal <= 0) {
-    alert(`⚠️ El producto "${product.name}" está agotado en el stock interno.`);
-    return;
-  }
+  const lineType = String(product.line_type || 'OWN_STOCK').toUpperCase();
+  const isDeferred = lineType !== 'OWN_STOCK' || (product.track_stock !== false && stockVal <= 0);
 
   const modal = document.getElementById('pos-scan-confirm-modal');
   if (!modal) {
@@ -11276,23 +11740,44 @@ function showPosProductConfirmModal(product) {
   const priceEl = document.getElementById('pos-scan-confirm-price');
   const qtyInput = document.getElementById('pos-scan-confirm-qty');
   const qtyError = document.getElementById('pos-modal-qty-error');
+  const deliveryContainer = document.getElementById('pos-scan-delivery-container');
+  const deliveryDateInput = document.getElementById('pos-scan-delivery-date');
 
   if (imgEl) imgEl.src = product.image || product.image_url || 'assets/logo.jpg';
-  if (catEl) catEl.textContent = product.category || 'Catálogo Interno';
+  if (catEl) catEl.textContent = product.category || 'Catálogo';
   if (nameEl) nameEl.textContent = product.name || 'Producto';
   if (codeEl) codeEl.textContent = product.barcode || product.product_code || product.id || 'N/A';
+
   if (stockEl) {
-    stockEl.textContent = `${stockVal} u. disponibles`;
-    stockEl.className = 'pos-stock-badge pos-stock-badge-available';
+    if (isDeferred) {
+      stockEl.textContent = `📦 Venta por encargo${product.source_name ? ` · ${product.source_name}` : ''}`;
+      stockEl.className = 'pos-stock-badge pos-stock-badge-backorder';
+      stockEl.style.background = 'rgba(255,152,0,0.12)';
+      stockEl.style.color = '#e65100';
+    } else {
+      stockEl.textContent = `${stockVal} u. disponibles`;
+      stockEl.className = 'pos-stock-badge pos-stock-badge-available';
+      stockEl.style.background = '';
+      stockEl.style.color = '';
+    }
   }
+
   if (priceEl) priceEl.textContent = `$${Number(product.price || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
   if (qtyInput) {
-    qtyInput.value = '1';
-    qtyInput.max = stockVal;
+    qtyInput.value = String(product.initial_qty || 1);
+    qtyInput.max = 999;
   }
   if (qtyError) {
     qtyError.style.display = 'none';
     qtyError.textContent = '';
+  }
+  if (deliveryContainer && deliveryDateInput) {
+    deliveryContainer.style.display = isDeferred ? 'block' : 'none';
+    const defaultDate = new Date();
+    defaultDate.setDate(defaultDate.getDate() + Math.max(1, Number(product.estimated_days || 7)));
+    deliveryDateInput.min = new Date().toISOString().slice(0, 10);
+    deliveryDateInput.value = product.expected_delivery_date || defaultDate.toISOString().slice(0, 10);
+    deliveryDateInput.required = isDeferred;
   }
 
   const locLabel = product.shelf_code
@@ -11315,8 +11800,8 @@ function stepPosModalQty(delta) {
   if (!qtyInput) return;
 
   const current = parseInt(qtyInput.value, 10) || 1;
-  const maxStock = Number(posScanPendingProduct.stock !== undefined ? posScanPendingProduct.stock : (posScanPendingProduct.own_stock || 1));
-  const nextVal = Math.min(maxStock, Math.max(1, current + delta));
+  const stockVal = Number(posScanPendingProduct.stock !== undefined ? posScanPendingProduct.stock : (posScanPendingProduct.own_stock || 0));
+  const nextVal = Math.min(999, Math.max(1, current + delta));
 
   qtyInput.value = nextVal;
   validatePosModalQty(qtyInput);
@@ -11324,7 +11809,7 @@ function stepPosModalQty(delta) {
 
 function validatePosModalQty(input) {
   if (!posScanPendingProduct || !input) return;
-  const maxStock = Number(posScanPendingProduct.stock !== undefined ? posScanPendingProduct.stock : (posScanPendingProduct.own_stock || 1));
+  const stockVal = Number(posScanPendingProduct.stock !== undefined ? posScanPendingProduct.stock : (posScanPendingProduct.own_stock || 0));
   const qtyError = document.getElementById('pos-modal-qty-error');
   const confirmBtn = document.getElementById('pos-confirm-add-btn');
   const current = parseInt(input.value, 10);
@@ -11338,12 +11823,13 @@ function validatePosModalQty(input) {
     return;
   }
 
-  if (current > maxStock) {
+  if (stockVal > 0 && current > stockVal) {
     if (qtyError) {
-      qtyError.textContent = `Stock insuficiente. Máximo disponible: ${maxStock} u.`;
+      qtyError.textContent = `Aviso: Supera el stock local (${stockVal} u.). Se registrará el excedente por encargo.`;
       qtyError.style.display = 'block';
+      qtyError.style.color = '#e65100';
     }
-    if (confirmBtn) confirmBtn.disabled = true;
+    if (confirmBtn) confirmBtn.disabled = false;
     return;
   }
 
@@ -11366,22 +11852,37 @@ function closePosScanConfirmModal() {
 function confirmAddPosProductToCart() {
   if (!posScanPendingProduct) return;
   const qtyInput = document.getElementById('pos-scan-confirm-qty');
-  const maxStock = Number(posScanPendingProduct.stock !== undefined ? posScanPendingProduct.stock : (posScanPendingProduct.own_stock || 1));
-  const qty = Math.min(maxStock, Math.max(1, parseInt(qtyInput?.value, 10) || 1));
+  const qty = Math.max(1, parseInt(qtyInput?.value, 10) || 1);
+  const stockVal = Number(posScanPendingProduct.stock !== undefined ? posScanPendingProduct.stock : (posScanPendingProduct.own_stock || 0));
+
+  const originalLineType = String(posScanPendingProduct.line_type || 'OWN_STOCK').toUpperCase();
+  let lineType;
+  if (originalLineType === 'B2B_BACKORDER' || posScanPendingProduct.source_type === 'B2B_SUPPLIER') lineType = 'B2B_BACKORDER';
+  else if (originalLineType === 'LOCAL_STORE_BACKORDER' || posScanPendingProduct.source_type === 'LOCAL_STORE') lineType = 'LOCAL_STORE_BACKORDER';
+  else lineType = posScanPendingProduct.track_stock === false || stockVal >= qty ? 'OWN_STOCK' : 'OWN_BACKORDER';
+  const isDeferred = lineType !== 'OWN_STOCK';
+  const expectedDeliveryDate = document.getElementById('pos-scan-delivery-date')?.value || null;
+  if (isDeferred && !expectedDeliveryDate) {
+    alert('Indicá la fecha estimada de entrega antes de agregar el encargo.');
+    document.getElementById('pos-scan-delivery-date')?.focus();
+    return;
+  }
 
   const cart = getPosCartEngine();
   if (cart) {
     const added = cart.addItem({
       ...posScanPendingProduct,
-      quantity: qty
+      quantity: qty,
+      line_type: lineType,
+      expected_delivery_date: isDeferred ? expectedDeliveryDate : null
     });
     if (!added) {
-      alert('No se agregó el producto: el stock central disponible no alcanza para la cantidad acumulada.');
+      alert('No se agregó el producto. Revisá la cantidad y la disponibilidad central.');
       return;
     }
     renderPosCartItems();
     if (typeof showToast === 'function') {
-      showToast(`✓ Agregado al ticket: ${qty}x ${posScanPendingProduct.name}`);
+      showToast(`✓ Agregado al ticket: ${qty}x ${posScanPendingProduct.name}${lineType !== 'OWN_STOCK' ? ' (Por Encargo)' : ''}`);
     }
   }
 
@@ -11937,6 +12438,7 @@ const submitPosSaleDraftLegacyUnsafe = false ? async function legacyUnsafeSaleRe
   }
 
   cart.clear();
+  activeParkedTicketId = null;
   clearPosDiscount();
   renderPosCartItems();
   renderPosSearchResults('');
@@ -12031,10 +12533,8 @@ async function submitPosSaleDraft() {
   const registerSelect = document.getElementById('pos-register-select');
   const selectedRegisterId = registerSelect?.value || null;
   const selectedRegisterOption = registerSelect?.selectedOptions?.[0];
-  const requiresOpenCashSession = paymentMethod === 'EFECTIVO'
-    || (paymentMethod === 'MIXTO' && Number(paymentBreakdown?.cash_amount || 0) > 0);
-  if (requiresOpenCashSession && (!selectedRegisterId || !selectedRegisterOption?.dataset.sessionId)) {
-    alert('Para cobrar efectivo seleccioná una caja con turno abierto. Podés abrirla desde Caja & Arqueo.');
+  if (!selectedRegisterId || !selectedRegisterOption?.dataset.sessionId) {
+    alert('Toda venta debe quedar asociada a una caja con turno abierto. Podés abrirla desde Caja & Arqueo.');
     return false;
   }
 
@@ -12049,6 +12549,20 @@ async function submitPosSaleDraft() {
     paymentBreakdown,
     notes: document.getElementById('pos-notes-input')?.value || ''
   });
+  if (paymentMethod === 'EFECTIVO') {
+    const cashTenderedInput = document.getElementById('pos-cash-tendered-input');
+    const rawTendered = String(cashTenderedInput?.value || '').trim();
+    if (rawTendered) {
+      const cashResult = window.PosDeskUtils?.calculateCashChange(draft.total, rawTendered);
+      if (!cashResult || !cashResult.sufficient) {
+        alert('El efectivo recibido es insuficiente para cubrir el total de la venta.');
+        cashTenderedInput?.focus();
+        return false;
+      }
+      draft.cash_tendered = cashResult.tendered;
+    }
+  }
+  if (activeParkedTicketId) draft.parked_ticket_id = activeParkedTicketId;
 
   const usesCurrentAccount = paymentMethod === 'CUENTA_CORRIENTE'
     || (paymentMethod === 'MIXTO' && paymentBreakdown?.secondary_method === 'CUENTA_CORRIENTE');
@@ -12084,6 +12598,8 @@ async function submitPosSaleDraft() {
     }
 
     const receipt = result.receipt || {};
+    activeParkedTicketId = null;
+    await loadParkedPosTickets();
     try {
       localStorage.setItem(
         `boeweb:last-sale-receipt:v2:${authContext.tenantId}:${authContext.userId}`,
@@ -12105,8 +12621,7 @@ async function submitPosSaleDraft() {
 
     const saleNumber = receipt.sale_number || receipt.sale_id || draft.draft_id;
     const confirmedTotal = Number(receipt.total ?? draft.total);
-    alert(`✅ Venta confirmada\n\nN.º: ${saleNumber}\nTotal: $${confirmedTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}\n\nStock, pagos, caja y cuenta corriente se confirmaron en una única transacción.`);
-    switchVendorTab('home');
+    showPosPostSaleModal(receipt, draft);
     return true;
   } catch (error) {
     console.error('La venta fue rechazada sin modificar el estado operativo:', error);
@@ -12119,6 +12634,1280 @@ async function submitPosSaleDraft() {
     }
   }
 }
+
+
+// ==========================================
+// 💵 CÁLCULO DE VUELTO & BILLETES ARS
+// ==========================================
+
+function renderPosCashDenominations() {
+  const container = document.getElementById('pos-cash-denominations-chips');
+  if (!container) return;
+  const denominations = typeof AppConfig !== 'undefined'
+    ? AppConfig.get('rules.pos.billDenominations', [20000, 10000, 2000, 1000, 500, 200, 100])
+    : [20000, 10000, 2000, 1000, 500, 200, 100];
+
+  container.innerHTML = denominations.map(denom => `
+    <button type="button" class="btn btn-secondary" onclick="addPosCashTenderedDenomination(${denom})" style="padding: 3px 8px; font-size: 0.72rem; font-weight: 800; border-radius: 6px; border-color: #81c784; background: #fff; color: #2e7d32; cursor: pointer;">
+      +${denom.toLocaleString('es-AR')}
+    </button>
+  `).join('');
+}
+window.renderPosCashDenominations = renderPosCashDenominations;
+
+function setPosExactCashTendered() {
+  const cart = getPosCartEngine();
+  const total = cart ? cart.calculateTotal() : 0;
+  const input = document.getElementById('pos-cash-tendered-input');
+  if (input) {
+    input.value = total;
+    updatePosCashChangeDisplay();
+  }
+}
+window.setPosExactCashTendered = setPosExactCashTendered;
+
+function addPosCashTenderedDenomination(amount) {
+  const input = document.getElementById('pos-cash-tendered-input');
+  if (!input) return;
+  const current = Number(input.value || 0);
+  input.value = current + Number(amount);
+  updatePosCashChangeDisplay();
+}
+window.addPosCashTenderedDenomination = addPosCashTenderedDenomination;
+
+function updatePosCashChangeDisplay() {
+  const cart = getPosCartEngine();
+  const total = cart ? cart.calculateTotal() : 0;
+  const input = document.getElementById('pos-cash-tendered-input');
+  const display = document.getElementById('pos-cash-change-display');
+  if (!display) return;
+
+  const tendered = Number(input?.value || 0);
+  if (tendered <= 0) {
+    display.textContent = 'Vuelto al cliente: $0,00';
+    display.style.background = '#fff';
+    display.style.color = '#2e7d32';
+    display.style.borderColor = '#c8e6c9';
+    return;
+  }
+
+  const cashResult = window.PosDeskUtils?.calculateCashChange(total, tendered);
+  if (!cashResult) {
+    display.textContent = 'Ingresá un importe de efectivo válido.';
+    display.style.background = 'rgba(211,47,47,0.08)';
+    display.style.color = '#d32f2f';
+    display.style.borderColor = '#ef9a9a';
+    return;
+  }
+  if (cashResult.sufficient) {
+    display.textContent = `✓ Vuelto al cliente: $${cashResult.change.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+    display.style.background = 'rgba(46,125,50,0.1)';
+    display.style.color = '#2e7d32';
+    display.style.borderColor = '#81c784';
+  } else {
+    display.textContent = `⚠️ Falta abonar: $${Math.abs(cashResult.change).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+    display.style.background = 'rgba(211,47,47,0.08)';
+    display.style.color = '#d32f2f';
+    display.style.borderColor = '#ef9a9a';
+  }
+}
+window.updatePosCashChangeDisplay = updatePosCashChangeDisplay;
+
+// ==========================================
+// ⏸️ VENTAS EN ESPERA (PARKED TICKETS)
+// ==========================================
+
+function getParkedPosTickets() {
+  return parkedPosTickets;
+}
+
+async function loadParkedPosTickets() {
+  if (window.AppConfig?.get('rules.pos.parkedTicketsEnabled', true) === false) {
+    parkedPosTickets = [];
+    renderPosParkedTicketsBar();
+    return parkedPosTickets;
+  }
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!window.OperationalApi?.fetchParkedPosTickets || !supabaseClient || !authContext?.isVerified) {
+    parkedPosTickets = [];
+    renderPosParkedTicketsBar();
+    return parkedPosTickets;
+  }
+  try {
+    const response = await window.OperationalApi.fetchParkedPosTickets({ supabaseClient, authContext });
+    parkedPosTickets = Array.isArray(response) ? response : [];
+  } catch (error) {
+    parkedPosTickets = [];
+    console.error('No se cargaron los tickets en espera:', error);
+  }
+  renderPosParkedTicketsBar();
+  return parkedPosTickets;
+}
+window.loadParkedPosTickets = loadParkedPosTickets;
+
+function renderPosParkedTicketsBar() {
+  const tickets = getParkedPosTickets();
+  const bar = document.getElementById('pos-parked-tickets-bar');
+  const count = document.getElementById('pos-parked-count-text');
+  if (count) count.textContent = `${tickets.length} venta${tickets.length === 1 ? '' : 's'} en espera`;
+  const enabled = window.AppConfig?.get('rules.pos.parkedTicketsEnabled', true) !== false;
+  if (bar) bar.style.display = enabled && tickets.length > 0 ? 'block' : 'none';
+}
+window.renderPosParkedTicketsBar = renderPosParkedTicketsBar;
+
+async function parkCurrentPosSale() {
+  if (window.AppConfig?.get('rules.pos.parkedTicketsEnabled', true) === false) {
+    alert('Las ventas en espera están deshabilitadas en la configuración publicada.');
+    return;
+  }
+  const cart = getPosCartEngine();
+  if (!cart || cart.getItemCount() === 0) {
+    alert('No hay productos en el ticket para poner en espera.');
+    return;
+  }
+
+  const notes = document.getElementById('pos-notes-input')?.value || '';
+  const customerAccount = document.getElementById('pos-current-account-select')?.value || '';
+  const salespersonSelect = document.getElementById('pos-salesperson-select');
+  const salespersonId = salespersonSelect?.value || '';
+  const salesperson = salespersonSelect?.options[salespersonSelect.selectedIndex]?.text || 'Vendedor';
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!window.OperationalApi?.parkPosTicket || !supabaseClient || !authContext?.isVerified || !salespersonId) {
+    alert('Iniciá sesión y seleccioná un vendedor para poner la venta en espera.');
+    return;
+  }
+
+  const payload = {
+    items: cart.getItems(),
+    adjustment: cart.getAdjustment ? cart.getAdjustment() : { type: 'NONE', value: 0 },
+    notes,
+    customer_id: customerAccount || null,
+    salesperson_user_id: salespersonId,
+    salesperson_name: salesperson,
+    total: cart.calculateTotal()
+  };
+  try {
+    const parkedTicket = await window.OperationalApi.parkPosTicket({ supabaseClient, authContext, draft: payload });
+    await loadParkedPosTickets();
+    activeParkedTicketId = null;
+    cart.clear();
+    const cashTenderedInput = document.getElementById('pos-cash-tendered-input');
+    if (cashTenderedInput) cashTenderedInput.value = '';
+    updatePosCashChangeDisplay();
+    clearPosDiscount();
+    renderPosCartItems();
+    if (document.getElementById('pos-notes-input')) document.getElementById('pos-notes-input').value = '';
+    if (typeof showToast === 'function') {
+      const parkedNumber = parkedTicket?.document_number || `#${parkedTicket?.ticket_number || ''}`;
+      showToast(`⏸️ Venta ${parkedNumber} por $${payload.total.toLocaleString('es-AR')} puesta en espera.`);
+    }
+  } catch (error) {
+    console.error('No se pausó la venta:', error);
+    alert(`No se puso la venta en espera.\n\n${error.message || 'Error desconocido'}`);
+  }
+}
+window.parkCurrentPosSale = parkCurrentPosSale;
+
+function clearPosCartItems() {
+  const cart = getPosCartEngine();
+  if (!cart || cart.getItemCount() === 0) return;
+  if (!confirm('¿Deseás vaciar todos los productos del ticket actual?')) return;
+  cart.clear();
+  activeParkedTicketId = null;
+  clearPosDiscount();
+  renderPosCartItems();
+  if (document.getElementById('pos-notes-input')) document.getElementById('pos-notes-input').value = '';
+}
+window.clearPosCartItems = clearPosCartItems;
+
+async function openPosParkedTicketsModal() {
+  if (window.AppConfig?.get('rules.pos.parkedTicketsEnabled', true) === false) return;
+  const modal = document.getElementById('pos-parked-tickets-modal');
+  const list = document.getElementById('pos-parked-tickets-list');
+  if (!modal || !list) return;
+
+  await loadParkedPosTickets();
+  const tickets = getParkedPosTickets();
+  if (tickets.length === 0) {
+    list.innerHTML = `
+      <div style="text-align: center; padding: 24px; color: var(--color-text-muted);">
+        No hay ventas en espera actualmente.
+      </div>
+    `;
+  } else {
+    list.innerHTML = tickets.map(t => {
+      const timeStr = new Date(t.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+      const payload = t.payload || {};
+      const items = Array.isArray(payload.items) ? payload.items : [];
+      const itemsSummary = items.map(i => `${i.quantity}x ${i.name}`).join(', ');
+      return `
+        <div style="background: rgba(255,152,0,0.06); border: 1.5px solid #ffe082; border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center;">
+          <div style="flex: 1; min-width: 0; padding-right: 8px;">
+            <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 2px;">
+              <span style="font-size: 0.75rem; font-weight: 800; color: #e65100;">🕒 ${timeStr}</span>
+              <span style="font-size: 0.75rem; font-weight: 800; color: var(--color-accent-gold);">· ${escapeStockHtml(t.document_number || `Ticket #${t.ticket_number}`)}</span>
+              <span style="font-size: 0.75rem; color: var(--color-text-muted);">· ${escapeStockHtml(payload.salesperson_name || 'Vendedor')}</span>
+            </div>
+            <p style="margin: 0 0 2px 0; font-size: 0.82rem; font-weight: 600; color: var(--color-text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${escapeStockHtml(itemsSummary)}
+            </p>
+            <strong style="font-size: 0.95rem; color: var(--color-accent-gold);">${Number(payload.total || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</strong>
+          </div>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <button type="button" class="btn btn-primary" onclick="resumeParkedPosSale('${t.id}')" style="padding: 6px 10px; font-size: 0.78rem; font-weight: 800; background: #2e7d32; border-radius: 6px; color: #fff; border: none; cursor: pointer;">
+              ▶ Recuperar
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="cancelParkedPosSale('${t.id}')" style="padding: 6px 8px; font-size: 0.78rem; color: #c62828; border-color: #ef9a9a; border-radius: 6px; cursor: pointer;" title="Cancelar ticket">
+              ✕
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  modal.style.display = 'flex';
+}
+window.openPosParkedTicketsModal = openPosParkedTicketsModal;
+
+function closePosParkedTicketsModal() {
+  const modal = document.getElementById('pos-parked-tickets-modal');
+  if (modal) modal.style.display = 'none';
+}
+window.closePosParkedTicketsModal = closePosParkedTicketsModal;
+
+function resumeParkedPosSale(ticketId) {
+  const tickets = getParkedPosTickets();
+  const index = tickets.findIndex(t => t.id === ticketId);
+  if (index === -1) return;
+
+  const ticket = tickets[index];
+  const payload = ticket.payload || {};
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  const cart = getPosCartEngine();
+  if (cart) {
+    if (cart.getItemCount() > 0) {
+      if (!confirm('El ticket actual tiene ítems. ¿Deseás reemplazarlos con la venta recuperada?')) {
+        return;
+      }
+    }
+    cart.clear();
+    const restored = items.every(item => cart.addItem(item));
+    if (!restored) {
+      cart.clear();
+      renderPosCartItems();
+      alert('No se pudo reconstruir el ticket completo. La venta sigue guardada en espera y no fue modificada.');
+      return;
+    }
+    if (payload.adjustment && typeof cart.setAdjustment === 'function') {
+      cart.setAdjustment(payload.adjustment.type, payload.adjustment.value);
+    }
+    renderPosCartItems();
+  }
+
+  if (payload.notes && document.getElementById('pos-notes-input')) {
+    document.getElementById('pos-notes-input').value = payload.notes;
+  }
+  const salespersonSelect = document.getElementById('pos-salesperson-select');
+  if (salespersonSelect && payload.salesperson_user_id) salespersonSelect.value = payload.salesperson_user_id;
+  const accountSelect = document.getElementById('pos-current-account-select');
+  if (accountSelect && payload.customer_id) accountSelect.value = payload.customer_id;
+  activeParkedTicketId = ticket.id;
+  closePosParkedTicketsModal();
+
+  if (typeof showToast === 'function') {
+    showToast('✓ Venta recuperada al ticket.');
+  }
+}
+window.resumeParkedPosSale = resumeParkedPosSale;
+
+async function cancelParkedPosSale(ticketId) {
+  if (!confirm('¿Seguro que deseás descartar esta venta en espera?')) return;
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  try {
+    await window.OperationalApi.cancelParkedPosTicket({ supabaseClient, authContext, ticketId });
+    if (activeParkedTicketId === ticketId) activeParkedTicketId = null;
+    await openPosParkedTicketsModal();
+  } catch (error) {
+    console.error('No se canceló el ticket en espera:', error);
+    alert(`No se canceló el ticket.\n\n${error.message || 'Error desconocido'}`);
+  }
+}
+window.cancelParkedPosSale = cancelParkedPosSale;
+
+// ==========================================
+// 📲 MODAL POST-VENTA MULTICANAL & COMPROBANTES
+// ==========================================
+
+let posLastCompletedReceipt = null;
+
+function getCompletedSalePresentation() {
+  if (!posLastCompletedReceipt) return null;
+  const { receipt = {}, draft = {} } = posLastCompletedReceipt;
+  const authoritativeItems = Array.isArray(receipt.items) && receipt.items.length > 0
+    ? receipt.items.map(item => ({
+      name: item.name,
+      quantity: Number(item.quantity || 0),
+      unitPrice: Number(item.unit_price || 0),
+      lineTotal: Number(item.line_total || 0),
+      lineType: item.line_type || 'OWN_STOCK'
+    }))
+    : (draft.items || []).map(item => ({
+      name: item.name,
+      quantity: Number(item.quantity || 0),
+      unitPrice: Number(item.unit_price ?? item.price ?? 0),
+      lineTotal: Number(item.subtotal ?? ((item.unit_price ?? item.price ?? 0) * item.quantity)),
+      lineType: item.line_type || 'OWN_STOCK'
+    }));
+  return {
+    receipt,
+    draft,
+    saleNumber: receipt.document_number || receipt.sale_number || receipt.sale_id || draft.draft_id || 'TICKET',
+    total: Number(receipt.total ?? draft.total ?? 0),
+    items: authoritativeItems,
+    payments: Array.isArray(receipt.payments) ? receipt.payments : [],
+    brandName: window.AppConfig?.get('brand.texts.name', 'BÔ Grow Club') || 'BÔ Grow Club',
+    brandAddress: window.AppConfig?.get('brand.texts.address', '') || '',
+    salesperson: draft.salesperson_name_snapshot || 'Vendedor'
+  };
+}
+
+function showPosPostSaleModal(receipt, draft) {
+  posLastCompletedReceipt = { receipt, draft };
+  const modal = document.getElementById('pos-post-sale-modal');
+  const docNumEl = document.getElementById('pos-post-sale-doc-num');
+  const summaryEl = document.getElementById('pos-post-sale-summary-card');
+  if (!modal) return;
+
+  const presentation = getCompletedSalePresentation();
+  const saleNumber = presentation.saleNumber;
+  const total = presentation.total;
+  const items = presentation.items;
+  const paymentMethod = draft?.payment_method || 'EFECTIVO';
+
+  if (docNumEl) docNumEl.textContent = `Comprobante #${saleNumber}`;
+  if (summaryEl) {
+    summaryEl.innerHTML = `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+        <span>Medio de cobro:</span>
+        <strong>${escapeStockHtml(paymentMethod)}</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+        <span>Ítems vendidos:</span>
+        <strong>${items.length} (${items.reduce((s, i) => s + Number(i.quantity || 0), 0)} u.)</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+        <span>Atendido por:</span>
+        <strong>${escapeStockHtml(draft?.salesperson_name_snapshot || 'Vendedor')}</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 1.15rem; font-weight: 900; color: #152d24; border-top: 1px dashed rgba(0,0,0,0.1); padding-top: 6px; margin-top: 6px;">
+        <span>Total abonado:</span>
+        <strong style="color: #2e7d32;">${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</strong>
+      </div>
+    `;
+  }
+
+  modal.style.display = 'flex';
+}
+window.showPosPostSaleModal = showPosPostSaleModal;
+
+function closePosPostSaleModalAndNewSale() {
+  const modal = document.getElementById('pos-post-sale-modal');
+  if (modal) modal.style.display = 'none';
+  const unifiedInput = document.getElementById('pos-unified-search');
+  if (unifiedInput) {
+    unifiedInput.value = '';
+    unifiedInput.focus();
+  }
+}
+window.closePosPostSaleModalAndNewSale = closePosPostSaleModalAndNewSale;
+
+function printCurrentSaleThermalTicket() {
+  const data = getCompletedSalePresentation();
+  if (!data) return;
+  const { saleNumber, total, items, brandName, brandAddress, salesperson, draft } = data;
+  const dateStr = new Date().toLocaleString('es-AR');
+  const printWindow = window.open('', '_blank', 'width=380,height=600');
+  if (!printWindow) return;
+  const ticketCopy = copyType => `
+    <section class="ticket-copy">
+      <div class="center bold brand">${escapeStockHtml(brandName)}</div>
+      ${brandAddress ? `<div class="center">${escapeStockHtml(brandAddress)}</div>` : ''}
+      <div class="center copy-type">${copyType}</div>
+      <div class="divider"></div>
+      <div><strong>COMPROBANTE NO FISCAL</strong></div>
+      <div>N.º: ${escapeStockHtml(String(saleNumber))}</div>
+      <div>Fecha: ${dateStr}</div>
+      <div>Vendedor: ${escapeStockHtml(salesperson)}</div>
+      <div class="divider"></div>
+      <table>
+        <thead><tr><th align="left">Cant.</th><th align="left">Desc.</th><th align="right">Total</th></tr></thead>
+        <tbody>${items.map(item => `
+          <tr><td>${item.quantity}x</td><td>${escapeStockHtml(item.name)}</td><td class="right">$${item.lineTotal.toLocaleString('es-AR')}</td></tr>
+        `).join('')}</tbody>
+      </table>
+      <div class="divider"></div>
+      <div class="total"><span>TOTAL:</span><span>$${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></div>
+      <div>Forma de pago: ${escapeStockHtml(draft.payment_method || 'EFECTIVO')}</div>
+      <div class="divider"></div>
+      <div class="center thanks">¡Gracias por tu compra!</div>
+    </section>`;
+  printWindow.document.write(`
+    <!DOCTYPE html><html lang="es">
+    <head>
+      <meta charset="utf-8">
+      <title>Ticket ${escapeStockHtml(String(saleNumber))}</title>
+      <style>
+        @page { margin: 0; size: 80mm auto; }
+        body { font-family: monospace; font-size: 12px; margin: 0; padding: 10px; width: 72mm; color: #000; }
+        .center { text-align: center; }
+        .bold { font-weight: bold; }
+        .divider { border-top: 1px dashed #000; margin: 6px 0; }
+        table { width: 100%; font-size: 11px; border-collapse: collapse; }
+        td { padding: 2px 0; }
+        .right { text-align: right; }
+        .brand { font-size: 14px; }
+        .copy-type { margin-top: 5px; font-weight: bold; }
+        .total { display:flex; justify-content:space-between; font-size:14px; font-weight:bold; }
+        .thanks { font-size:10px; }
+        .ticket-copy { page-break-inside: avoid; }
+        .cut-line { border-top: 1px dashed #000; margin: 16px 0; text-align:center; font-size:9px; padding-top:3px; }
+      </style>
+    </head>
+    <body>
+      ${ticketCopy('ORIGINAL · CLIENTE')}
+      ${shouldPrintDuplicateReceipts() ? `<div class="cut-line">✂ CORTE</div>${ticketCopy('DUPLICADO · LOCAL')}` : ''}
+      <script>
+        window.onload = function() { window.print(); window.close(); };
+      </script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+window.printCurrentSaleThermalTicket = printCurrentSaleThermalTicket;
+
+function sendCurrentSaleWhatsApp() {
+  const data = getCompletedSalePresentation();
+  if (!data) return;
+  const { saleNumber, total, items, brandName, draft } = data;
+
+  const text = encodeURIComponent(
+    `🌱 *${brandName} - Comprobante de Compra*\n` +
+    `📄 *Ticket:* #${saleNumber}\n` +
+    `📅 *Fecha:* ${new Date().toLocaleDateString('es-AR')}\n\n` +
+    `*Detalle:*\n` +
+    items.map(item => `• ${item.quantity}x ${item.name} ($${item.lineTotal.toLocaleString('es-AR')})`).join('\n') +
+    `\n\n*TOTAL ABONADO:* ${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}\n` +
+    `💳 *Medio de Pago:* ${draft?.payment_method || 'Efectivo'}\n\n` +
+    `¡Muchas gracias por elegirnos! 🌱`
+  );
+
+  window.open(`https://wa.me/?text=${text}`, '_blank');
+}
+window.sendCurrentSaleWhatsApp = sendCurrentSaleWhatsApp;
+
+function printCurrentSaleA4Pdf() {
+  const data = getCompletedSalePresentation();
+  if (!data) return;
+  const { saleNumber, total, items, brandName, brandAddress, salesperson, draft } = data;
+  const printWindow = window.open('', '_blank', 'width=900,height=900');
+  if (!printWindow) return;
+  const copy = copyType => `
+    <section class="copy">
+      <header><div><h1>${escapeStockHtml(brandName)}</h1>${brandAddress ? `<p>${escapeStockHtml(brandAddress)}</p>` : ''}</div><strong>${copyType}</strong></header>
+      <div class="meta"><span>Comprobante no fiscal: ${escapeStockHtml(String(saleNumber))}</span><span>${new Date().toLocaleString('es-AR')}</span><span>Vendedor: ${escapeStockHtml(salesperson)}</span></div>
+      <table><thead><tr><th>Producto</th><th>Cantidad</th><th>Precio unitario</th><th>Total</th></tr></thead><tbody>
+        ${items.map(item => `<tr><td>${escapeStockHtml(item.name)}</td><td>${item.quantity}</td><td>$${item.unitPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td><td>$${item.lineTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td></tr>`).join('')}
+      </tbody></table>
+      <div class="footer"><span>Medio de cobro: ${escapeStockHtml(draft.payment_method || 'EFECTIVO')}</span><strong>TOTAL: $${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</strong></div>
+    </section>`;
+  printWindow.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Comprobante ${escapeStockHtml(String(saleNumber))}</title><style>
+    @page{size:A4 portrait;margin:10mm}body{font-family:Arial,sans-serif;color:#152d24;margin:0}.copy{border:1.5px solid #152d24;border-radius:10px;padding:15px;margin-bottom:16px;page-break-inside:avoid}.copy header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #c2a246;padding-bottom:8px}.copy h1{font-size:20px;margin:0}.copy p{font-size:10px;color:#555;margin:3px 0 0}.copy header>strong{font-size:11px;background:#152d24;color:#fff;padding:5px 8px;border-radius:5px}.meta{display:flex;justify-content:space-between;gap:10px;font-size:10px;padding:8px 0}.copy table{width:100%;border-collapse:collapse;font-size:11px}.copy th,.copy td{padding:6px;border-bottom:1px solid #ddd;text-align:right}.copy th:first-child,.copy td:first-child{text-align:left}.footer{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:11px}.footer strong{font-size:15px}.cut{border-top:1px dashed #777;text-align:center;font-size:9px;padding-top:3px;margin:4px 0 12px}
+  </style></head><body>${copy('ORIGINAL · CLIENTE')}${shouldPrintDuplicateReceipts() ? `<div class="cut">✂ LÍNEA DE CORTE</div>${copy('DUPLICADO · LOCAL')}` : ''}<script>window.onload=()=>{window.print();window.close()}<\/script></body></html>`);
+  printWindow.document.close();
+}
+window.printCurrentSaleA4Pdf = printCurrentSaleA4Pdf;
+
+function sendCurrentSaleEmail() {
+  const data = getCompletedSalePresentation();
+  if (!data) return;
+  const { saleNumber, total, brandName } = data;
+  const formattedTotal = total.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
+  const subject = encodeURIComponent(`Comprobante de compra ${brandName} #${saleNumber}`);
+  const body = encodeURIComponent(`Hola:\n\nTe compartimos los datos de tu compra #${saleNumber}, por un total de ${formattedTotal}.\n\nEste correo se preparó desde el sistema; podés adjuntar el comprobante guardado en PDF antes de enviarlo.\n\n¡Gracias por elegir ${brandName}!`);
+  window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+}
+window.sendCurrentSaleEmail = sendCurrentSaleEmail;
+
+
+// ============================================================================
+// 🚚 HUB DE ENTREGAS Y SEGUIMIENTO DE ENCARGOS (FULFILLMENT HUB)
+// ============================================================================
+
+let fulfillmentsHubData = [];
+let fulfillmentsStatusFilter = 'ALL';
+let fulfillmentsSearchQuery = '';
+let activeFulfillmentForModal = null;
+
+async function initFulfillmentsWorkspace() {
+  await loadFulfillmentsData(true);
+}
+window.initFulfillmentsWorkspace = initFulfillmentsWorkspace;
+
+async function loadFulfillmentsData(forceRefresh = false) {
+  const tbody = document.getElementById('vendor-fulfillments-table-body');
+  if (tbody && fulfillmentsHubData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--color-text-muted);">Cargando seguimiento de encargos y entregas...</td></tr>';
+  }
+
+  try {
+    const authContext = (typeof SaasAuth !== 'undefined' && SaasAuth.getTenantContext) ? SaasAuth.getTenantContext() : null;
+    const client = (typeof supabaseClient !== 'undefined') ? supabaseClient : null;
+
+    if (!client || !authContext?.isVerified || typeof OperationalApi === 'undefined' || !OperationalApi.fetchSaleFulfillments) {
+      throw new Error('Iniciá sesión para consultar el seguimiento central de encargos.');
+    }
+    const response = await OperationalApi.fetchSaleFulfillments({
+      supabaseClient: client,
+      authContext,
+      statusFilter: fulfillmentsStatusFilter === 'ALL' ? null : fulfillmentsStatusFilter,
+      query: fulfillmentsSearchQuery || null
+    });
+    const items = response?.items || [];
+
+    fulfillmentsHubData = items;
+    renderFulfillmentsKPIs();
+    renderFulfillmentsTable();
+  } catch (error) {
+    console.error('Error al cargar entregas y encargos:', error);
+    fulfillmentsHubData = [];
+    renderFulfillmentsKPIs();
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:28px;color:#c62828;">${escapeStockHtml(error.message || 'No se pudo cargar el seguimiento central.')}</td></tr>`;
+    }
+  }
+}
+window.loadFulfillmentsData = loadFulfillmentsData;
+
+function renderFulfillmentsKPIs() {
+  const pending = fulfillmentsHubData.filter(i => i.status === 'PENDING' || i.status === 'ORDERED').length;
+  const inTransit = fulfillmentsHubData.filter(i => i.status === 'IN_TRANSIT').length;
+  const ready = fulfillmentsHubData.filter(i => i.status === 'READY_FOR_PICKUP').length;
+  const fulfilled = fulfillmentsHubData.filter(i => i.status === 'FULFILLED').length;
+
+  const pendingEl = document.getElementById('fulfillments-kpi-pending');
+  const transitEl = document.getElementById('fulfillments-kpi-in-transit');
+  const readyEl = document.getElementById('fulfillments-kpi-ready');
+  const fulfilledEl = document.getElementById('fulfillments-kpi-fulfilled');
+  const sidebarBadge = document.getElementById('vendor-sidebar-fulfillments-badge');
+
+  if (pendingEl) pendingEl.textContent = `${pending} u.`;
+  if (transitEl) transitEl.textContent = `${inTransit} u.`;
+  if (readyEl) readyEl.textContent = `${ready} u.`;
+  if (fulfilledEl) fulfilledEl.textContent = `${fulfilled} u.`;
+
+  const activeAlerts = pending + ready;
+  if (sidebarBadge) {
+    sidebarBadge.textContent = String(activeAlerts);
+    sidebarBadge.hidden = activeAlerts === 0;
+  }
+}
+
+function setFulfillmentsStatusFilter(status) {
+  fulfillmentsStatusFilter = status || 'ALL';
+  const filterMap = {
+    ALL: 'ful-filter-all',
+    PENDING: 'ful-filter-pending',
+    ORDERED: 'ful-filter-ordered',
+    IN_TRANSIT: 'ful-filter-transit',
+    READY_FOR_PICKUP: 'ful-filter-ready',
+    FULFILLED: 'ful-filter-fulfilled'
+  };
+
+  Object.entries(filterMap).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', key === fulfillmentsStatusFilter);
+  });
+
+  renderFulfillmentsTable();
+}
+window.setFulfillmentsStatusFilter = setFulfillmentsStatusFilter;
+
+function handleFulfillmentsSearchInput(query) {
+  fulfillmentsSearchQuery = (query || '').toLowerCase().trim();
+  renderFulfillmentsTable();
+}
+window.handleFulfillmentsSearchInput = handleFulfillmentsSearchInput;
+
+function renderFulfillmentsTable() {
+  const tbody = document.getElementById('vendor-fulfillments-table-body');
+  if (!tbody) return;
+
+  let filtered = [...fulfillmentsHubData];
+
+  if (fulfillmentsStatusFilter !== 'ALL') {
+    filtered = filtered.filter(i => i.status === fulfillmentsStatusFilter);
+  }
+
+  if (fulfillmentsSearchQuery) {
+    filtered = filtered.filter(i => {
+      const matchText = [
+        i.customer_name,
+        i.customer_phone,
+        i.product_name,
+        i.product_sku,
+        i.sale_number,
+        i.source_name,
+        i.notes
+      ].filter(Boolean).join(' ').toLowerCase();
+      return matchText.includes(fulfillmentsSearchQuery);
+    });
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align: center; padding: 32px; color: var(--color-text-muted);">
+          <span style="font-size: 2rem; display: block; margin-bottom: 6px;">🚚</span>
+          <strong>No hay encargos o entregas en esta sección</strong>
+          <p style="margin: 4px 0 0 0; font-size: 0.82rem;">Cuando vendas un producto sin stock físico o del catálogo B2B, aparecerá automáticamente aquí.</p>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  const statusConfig = {
+    PENDING: { label: '🕒 Pendiente Compra', bg: 'rgba(255,152,0,0.12)', color: '#e65100', border: '#ffb74d' },
+    ORDERED: { label: '🛒 Pedido Proveedor', bg: 'rgba(33,150,243,0.12)', color: '#1565c0', border: '#90caf9' },
+    IN_TRANSIT: { label: '🚚 En Camino', bg: 'rgba(0,150,136,0.12)', color: '#00695c', border: '#80cbc4' },
+    READY_FOR_PICKUP: { label: '📦 Listo en Local', bg: 'rgba(76,175,80,0.14)', color: '#2e7d32', border: '#81c784' },
+    FULFILLED: { label: '✅ Entregado', bg: 'rgba(0,0,0,0.06)', color: 'var(--color-text-muted)', border: 'var(--color-border-subtle)' },
+    CANCELLED: { label: '✕ Cancelado', bg: 'rgba(211,47,47,0.1)', color: '#c62828', border: '#ef9a9a' }
+  };
+
+  const lineTypeConfig = {
+    OWN_BACKORDER: { label: 'Propio (Por Encargo)', bg: 'rgba(194,162,70,0.15)', color: '#8d701f' },
+    B2B_BACKORDER: { label: '🏭 Catálogo B2B', bg: 'rgba(33,150,243,0.12)', color: '#1565c0' },
+    LOCAL_STORE_BACKORDER: { label: '🏪 Tienda Vecina', bg: 'rgba(156,39,176,0.12)', color: '#7b1fa2' },
+    QUICK_ENTRY: { label: '⚡ Venta Rápida', bg: 'rgba(76,175,80,0.12)', color: '#2e7d32' }
+  };
+
+  tbody.innerHTML = filtered.map(item => {
+    const st = statusConfig[item.status] || statusConfig.PENDING;
+    const lt = lineTypeConfig[item.line_type] || lineTypeConfig.OWN_BACKORDER;
+    const dateStr = item.sale_created_at ? new Date(item.sale_created_at).toLocaleDateString('es-AR') : '--/--';
+    const expDateStr = item.expected_delivery_date || 'A coordinar';
+
+    return `
+      <tr style="border-bottom: 1px solid var(--color-border-subtle); vertical-align: middle;">
+        <td style="padding: 10px;">
+          <strong style="display: block; color: var(--color-accent-gold);">#${escapeStockHtml(String(item.sale_number || 'TICKET'))}</strong>
+          <small style="color: var(--color-text-muted);">${dateStr}</small>
+        </td>
+        <td style="padding: 10px;">
+          <strong style="display: block; color: var(--color-text-main);">${escapeStockHtml(item.customer_name || 'Consumidor Final')}</strong>
+          ${item.customer_phone ? `<small style="color: var(--color-text-muted);">📞 ${escapeStockHtml(item.customer_phone)}</small>` : '<small style="color: var(--color-text-muted);">Sin teléfono</small>'}
+        </td>
+        <td style="padding: 10px;">
+          <div style="font-weight: 700; color: var(--color-text-main);">${escapeStockHtml(item.product_name)}</div>
+          <span style="font-size: 0.78rem; font-weight: 800; color: var(--color-accent-gold);">${item.quantity} u.</span> · <small style="color: var(--color-text-muted);">${Number(item.line_total || 0).toLocaleString('es-AR')}</small>
+        </td>
+        <td style="padding: 10px;">
+          <span style="display: inline-block; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 6px; background: ${lt.bg}; color: ${lt.color}; margin-bottom: 2px;">
+            ${lt.label}
+          </span>
+          ${item.source_name ? `<div style="font-size: 0.75rem; color: var(--color-text-muted);">${escapeStockHtml(item.source_name)}</div>` : ''}
+        </td>
+        <td style="padding: 10px;">
+          <strong style="color: var(--color-text-main); font-size: 0.85rem;">${expDateStr}</strong>
+        </td>
+        <td style="padding: 10px;">
+          <span style="display: inline-block; font-size: 0.76rem; font-weight: 800; padding: 3px 10px; border-radius: 8px; background: ${st.bg}; color: ${st.color}; border: 1px solid ${st.border};">
+            ${st.label}
+          </span>
+        </td>
+        <td style="padding: 10px; text-align: right;">
+          <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
+            <button type="button" class="btn btn-secondary" onclick="openFulfillmentStatusModal('${item.id}')" style="padding: 5px 10px; font-size: 0.78rem; font-weight: 700; border-radius: 6px; cursor: pointer;" title="Cambiar Estado">
+              🔄 Estado
+            </button>
+            <button type="button" class="btn btn-primary" onclick="sendFulfillmentWhatsApp('${item.id}')" style="padding: 5px 10px; font-size: 0.78rem; font-weight: 800; background: #25d366; border-color: #25d366; color: #fff; border-radius: 6px; cursor: pointer;" title="Enviar WhatsApp al cliente">
+              📲 WhatsApp
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openFulfillmentStatusModal(fulfillmentId) {
+  const item = fulfillmentsHubData.find(i => String(i.id) === String(fulfillmentId));
+  if (!item) return;
+
+  activeFulfillmentForModal = item;
+  const modal = document.getElementById('fulfillments-status-modal');
+  const summaryEl = document.getElementById('fulfillments-modal-product-summary');
+  const selectEl = document.getElementById('fulfillments-modal-status-select');
+  const notesEl = document.getElementById('fulfillments-modal-notes-input');
+
+  if (summaryEl) {
+    summaryEl.innerHTML = `
+      <div style="font-size: 0.85rem; margin-bottom: 2px;"><strong>Ticket:</strong> #${escapeStockHtml(String(item.sale_number || 'N/A'))} · <strong>Cliente:</strong> ${escapeStockHtml(item.customer_name)}</div>
+      <div style="font-size: 0.85rem; margin-bottom: 2px;"><strong>Producto:</strong> ${escapeStockHtml(item.product_name)} (${item.quantity} u.)</div>
+      <div style="font-size: 0.8rem; color: var(--color-text-muted);"><strong>Proveedor / Origen:</strong> ${escapeStockHtml(item.source_name || 'Propio')}</div>
+    `;
+  }
+
+  const allowedTransitions = {
+    PENDING: ['ORDERED', 'CANCELLED'],
+    ORDERED: ['IN_TRANSIT', 'CANCELLED'],
+    IN_TRANSIT: ['READY_FOR_PICKUP', 'CANCELLED'],
+    READY_FOR_PICKUP: ['FULFILLED', 'CANCELLED'],
+    FULFILLED: [],
+    CANCELLED: []
+  };
+  if (selectEl) {
+    const nextStatuses = allowedTransitions[item.status] || [];
+    selectEl.innerHTML = nextStatuses.length > 0
+      ? nextStatuses.map(status => `<option value="${status}">${status}</option>`).join('')
+      : `<option value="${item.status}">${item.status} · Estado final</option>`;
+    selectEl.disabled = nextStatuses.length === 0;
+  }
+  if (notesEl) notesEl.value = item.notes || '';
+
+  if (modal) modal.style.display = 'flex';
+}
+window.openFulfillmentStatusModal = openFulfillmentStatusModal;
+
+function closeFulfillmentStatusModal() {
+  const modal = document.getElementById('fulfillments-status-modal');
+  if (modal) modal.style.display = 'none';
+  activeFulfillmentForModal = null;
+}
+window.closeFulfillmentStatusModal = closeFulfillmentStatusModal;
+
+async function handleFulfillmentStatusSubmit(event) {
+  if (event) event.preventDefault();
+  if (!activeFulfillmentForModal) return;
+
+  const selectEl = document.getElementById('fulfillments-modal-status-select');
+  const notesEl = document.getElementById('fulfillments-modal-notes-input');
+  const newStatus = selectEl?.value || 'PENDING';
+  const notes = (notesEl?.value || '').trim();
+  const updatedItem = { ...activeFulfillmentForModal };
+
+  try {
+    const authContext = (typeof SaasAuth !== 'undefined' && SaasAuth.getTenantContext) ? SaasAuth.getTenantContext() : null;
+    const client = (typeof supabaseClient !== 'undefined') ? supabaseClient : null;
+
+    if (!client || !authContext?.isVerified || typeof OperationalApi === 'undefined' || !OperationalApi.updateSaleFulfillment) {
+      throw new Error('Iniciá sesión para actualizar el encargo central.');
+    }
+    await OperationalApi.updateSaleFulfillment({
+      supabaseClient: client,
+      authContext,
+      fulfillmentId: updatedItem.id,
+      status: newStatus,
+      notes: notes || null
+    });
+
+    closeFulfillmentStatusModal();
+    await loadFulfillmentsData(true);
+
+    if (typeof showToast === 'function') {
+      showToast(`✓ Estado de encargo actualizado a ${newStatus}.`);
+    }
+
+    // Si pasó a listo para retirar, preguntar si desea enviar WhatsApp
+    if (newStatus === 'READY_FOR_PICKUP') {
+      setTimeout(() => {
+        if (confirm(`¿Deseás avisar a ${updatedItem.customer_name} por WhatsApp que su pedido está listo para retirar en el local?`)) {
+          sendFulfillmentWhatsApp(updatedItem.id, { ...updatedItem, status: newStatus });
+        }
+      }, 300);
+    }
+  } catch (error) {
+    console.error('Error al actualizar estado:', error);
+    alert(`No se pudo actualizar el estado: ${error.message || 'Error de conexión'}`);
+  }
+}
+window.handleFulfillmentStatusSubmit = handleFulfillmentStatusSubmit;
+
+function sendFulfillmentWhatsApp(fulfillmentId, itemOverride = null) {
+  const item = itemOverride || fulfillmentsHubData.find(i => String(i.id) === String(fulfillmentId));
+  if (!item) return;
+
+  const phone = (item.customer_phone || '').replace(/[^0-9]/g, '');
+  const customerName = item.customer_name || 'Cliente';
+  const saleNum = item.sale_number || 'N/A';
+  const productName = item.product_name || 'tu producto';
+  const qty = item.quantity || 1;
+  const brandName = window.AppConfig?.get('brand.texts.name', 'BÔ Grow Club') || 'BÔ Grow Club';
+
+  let msgText = '';
+
+  if (item.status === 'READY_FOR_PICKUP') {
+    msgText = `¡Hola ${customerName}! 🌱 Te escribimos de *${brandName}*.\n\n¡Tu encargo ya está *LISTO PARA RETIRAR* en nuestro local! 📦✨\n\n📄 *Ticket:* #${saleNum}\n🛍️ *Detalle:* ${qty}x ${productName}\n\n📍 Podés pasar a retirarlo en nuestro horario habitual.\n¡Muchas gracias por elegirnos!`;
+  } else if (item.status === 'IN_TRANSIT') {
+    msgText = `¡Hola ${customerName}! 🌱 Te escribimos de *${brandName}*.\n\nTe contamos que tu encargo de *${qty}x ${productName}* (Ticket #${saleNum}) ya fue despachado por el proveedor y está en camino al local 🚚.\nTe avisamos apenas ingrese. ¡Gracias!`;
+  } else {
+    msgText = `¡Hola ${customerName}! 🌱 Te escribimos de *${brandName}* para comentarte sobre tu encargo (Ticket #${saleNum}): *${qty}x ${productName}*.\n\nEstado actual: *${item.status}*.\nCualquier consulta estamos a tu disposición.`;
+  }
+
+  const encoded = encodeURIComponent(msgText);
+  const waUrl = phone ? `https://wa.me/${phone}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
+  window.open(waUrl, '_blank');
+}
+window.sendFulfillmentWhatsApp = sendFulfillmentWhatsApp;
+
+
+// ============================================================================
+// 🧮 CALCULADORA DE BILLETES ARS & PLANILLA FORMAL DE ARQUEO CON DUPLICADO
+// ============================================================================
+
+function openCashBillsCalculatorModal() {
+  const modal = document.getElementById('cash-bills-calculator-modal');
+  if (!modal) return;
+
+  const savedBreakdown = cashData.cashBreakdown && typeof cashData.cashBreakdown === 'object'
+    ? cashData.cashBreakdown
+    : {};
+  const denoms = [20000, 10000, 2000, 1000, 500, 200, 100];
+  denoms.forEach(d => {
+    const input = document.getElementById(`bill-qty-${d}`);
+    if (input) input.value = savedBreakdown[d] !== undefined ? savedBreakdown[d] : '';
+  });
+  const coinsInput = document.getElementById('bill-qty-coins');
+  if (coinsInput) coinsInput.value = savedBreakdown.coins !== undefined ? savedBreakdown.coins : '';
+
+  updateBillsCalculatorTotal();
+  modal.style.display = 'block';
+  modal.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const firstInput = document.getElementById('bill-qty-20000');
+  if (firstInput) setTimeout(() => firstInput.focus(), 60);
+}
+window.openCashBillsCalculatorModal = openCashBillsCalculatorModal;
+
+function closeCashBillsCalculatorModal() {
+  const modal = document.getElementById('cash-bills-calculator-modal');
+  if (modal) modal.style.display = 'none';
+}
+window.closeCashBillsCalculatorModal = closeCashBillsCalculatorModal;
+
+function getCashBillsStorageKey() {
+  return `boeweb:cash-bills:v2:${canonicalCashView?.sessionId || 'no-session'}`;
+}
+
+function calculateBillsBreakdownTotal() {
+  const denoms = [20000, 10000, 2000, 1000, 500, 200, 100];
+  let total = 0;
+  const breakdown = {};
+
+  denoms.forEach(d => {
+    const input = document.getElementById(`bill-qty-${d}`);
+    const qty = parseInt(input?.value, 10) || 0;
+    if (qty > 0) {
+      breakdown[d] = qty;
+      total += qty * d;
+    }
+  });
+
+  const coinsInput = document.getElementById('bill-qty-coins');
+  const coins = parseFloat(coinsInput?.value) || 0;
+  if (coins > 0) {
+    breakdown.coins = coins;
+    total += coins;
+  }
+
+  return { total, breakdown };
+}
+
+function updateBillsCalculatorTotal() {
+  const { total } = calculateBillsBreakdownTotal();
+  const display = document.getElementById('bills-calculator-total-display');
+  if (display) {
+    display.textContent = `${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+  }
+}
+window.updateBillsCalculatorTotal = updateBillsCalculatorTotal;
+
+function applyBillsCalculatorTotal() {
+  const { total, breakdown } = calculateBillsBreakdownTotal();
+  const countedEl = document.getElementById('cash-counted-amount');
+  if (countedEl) {
+    countedEl.value = total;
+    updateCashDifferencePreview();
+  }
+  localStorage.setItem(getCashBillsStorageKey(), JSON.stringify(breakdown));
+  closeCashBillsCalculatorModal();
+  if (typeof showToast === 'function') {
+    showToast(`✓ Conteo de billetes aplicado: ${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`);
+  }
+}
+window.applyBillsCalculatorTotal = applyBillsCalculatorTotal;
+
+function printCashClosureSheet(dateKey = null) {
+  const targetDateKey = dateKey || getTodayDateKey();
+  const cashData = getVendorCashData(targetDateKey);
+  if (!cashData.closed || !cashData.closureId || !cashData.closureDocumentNumber) {
+    alert('La planilla se imprime únicamente después de un cierre central con numeración documental.');
+    return;
+  }
+  const totals = calculateCashTotals(cashData);
+  const dateStr = new Date().toLocaleString('es-AR');
+  const vendorName = getVerifiedOperatorName(cashData.closedBy);
+  const savedBreakdown = JSON.parse(localStorage.getItem(getCashBillsStorageKey()) || '{}');
+  const brandName = window.AppConfig?.get('brand.texts.name', 'BÔ Grow Club') || 'BÔ Grow Club';
+  const brandAddress = window.AppConfig?.get('brand.texts.address', '') || '';
+  const breakdownRows = Object.entries(savedBreakdown)
+    .filter(([, quantity]) => Number(quantity) > 0)
+    .map(([denomination, quantity]) => denomination === 'coins'
+      ? `<span>Monedas: <strong>$${Number(quantity).toLocaleString('es-AR')}</strong></span>`
+      : `<span>$${Number(denomination).toLocaleString('es-AR')} × <strong>${Number(quantity)}</strong></span>`)
+    .join(' · ');
+
+  const countedAmount = Number(cashData.countedCash || 0);
+  const difference = Number(cashData.difference ?? (countedAmount - totals.expectedCash));
+  const notes = cashData.closureNotes || 'Cierre de turno habitual';
+
+  const diffLabel = Math.abs(difference) < 0.01
+    ? '✓ CAJA CUADRADA EXACTA ($0,00)'
+    : (difference > 0
+      ? `▲ SOBRANTE DE CAJA: +${difference.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+      : `▼ FALTANTE DE CAJA: -${Math.abs(difference).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`);
+
+  const diffColor = Math.abs(difference) < 0.01 ? '#2e7d32' : (difference > 0 ? '#1565c0' : '#c62828');
+
+  const printWindow = window.open('', '_blank', 'width=800,height=900');
+  if (!printWindow) return;
+
+  const closureTemplate = (copyType) => `
+    <div style="border: 2px solid #152d24; border-radius: 10px; padding: 16px; margin-bottom: 20px; page-break-inside: avoid; font-family: sans-serif; font-size: 11px;">
+
+      <!-- Encabezado Institucional -->
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #152d24; padding-bottom: 8px; margin-bottom: 10px;">
+        <div>
+          <strong style="font-size: 16px; color: #152d24; display: block;">${escapeCashHtml(brandName)}</strong>
+          ${brandAddress ? `<small style="color: #666; font-size: 9px;">${escapeCashHtml(brandAddress)}</small>` : ''}
+        </div>
+        <div style="text-align: right;">
+          <span style="font-size: 10px; font-weight: 800; background: #152d24; color: #fff; padding: 3px 8px; border-radius: 4px; text-transform: uppercase;">${copyType}</span>
+          <div style="font-size: 9px; color: #666; margin-top: 3px;">Fecha: ${dateStr}</div>
+        </div>
+      </div>
+
+      <div style="text-align: center; font-size: 13px; font-weight: 900; color: #152d24; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;">
+        Planilla de Arqueo y Cierre de Turno · ${escapeCashHtml(cashData.closureDocumentNumber)}
+      </div>
+
+      <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 10px; background: #f5f5f5; padding: 6px 10px; border-radius: 6px;">
+        <span><strong>Cajero / Turno:</strong> ${escapeCashHtml(vendorName)}</span>
+        <span><strong>Estado:</strong> ${cashData.closed ? 'CERRADA' : 'EN CURSO'}</span>
+        <span><strong>ID Sesión:</strong> ${escapeCashHtml(String(cashData.sessionId || 'SESS-LOCAL'))}</span>
+      </div>
+
+      <!-- Cuadro de Conciliación Contable -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 11px;">
+        <thead>
+          <tr style="background: #e8f5e9; border-bottom: 1.5px solid #2e7d32;">
+            <th align="left" style="padding: 5px;">Concepto Financiero</th>
+            <th align="right" style="padding: 5px;">Subtotal</th>
+            <th align="right" style="padding: 5px;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding: 4px;">(+) Fondo Inicial de Apertura</td>
+            <td align="right" style="padding: 4px;">${Number(totals.openingCash || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+            <td align="right" style="padding: 4px;"></td>
+          </tr>
+          <tr>
+            <td style="padding: 4px;">(+) Ventas en Efectivo del Turno</td>
+            <td align="right" style="padding: 4px;">${Number(totals.cashSales || totals.cashIncome || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+            <td align="right" style="padding: 4px;"></td>
+          </tr>
+          <tr>
+            <td style="padding: 4px;">(+) Otros Ingresos / Cobranzas Efectivo</td>
+            <td align="right" style="padding: 4px;">${Number(totals.otherCashIncome || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+            <td align="right" style="padding: 4px;"><strong>${Number((totals.openingCash || 0) + (totals.cashSales || totals.cashIncome || 0) + (totals.otherCashIncome || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</strong></td>
+          </tr>
+          <tr style="color: #c62828;">
+            <td style="padding: 4px;">(−) Gastos Operativos de Caja</td>
+            <td align="right" style="padding: 4px;">−${Number(totals.expenses || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+            <td align="right" style="padding: 4px;"></td>
+          </tr>
+          <tr style="color: #c62828;">
+            <td style="padding: 4px;">(−) Retiros de Propietario / Tesorería</td>
+            <td align="right" style="padding: 4px;">−${Number(totals.withdrawals || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+            <td align="right" style="padding: 4px;"><strong>−${Number((totals.expenses || 0) + (totals.withdrawals || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</strong></td>
+          </tr>
+          <tr style="border-top: 1.5px solid #152d24; font-weight: bold; background: #fafafa;">
+            <td style="padding: 6px;">(=) EFECTIVO TEÓRICO ESPERADO EN CAJA</td>
+            <td></td>
+            <td align="right" style="padding: 6px; font-size: 12px; color: #152d24;">${totals.expectedCash.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+          </tr>
+          <tr style="font-weight: bold; background: #e8f5e9;">
+            <td style="padding: 6px;">(•) EFECTIVO FÍSICO CONTADO (DECLARADO)</td>
+            <td></td>
+            <td align="right" style="padding: 6px; font-size: 12px; color: #2e7d32;">${countedAmount.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+          </tr>
+          <tr style="border-top: 1px dashed #ccc; font-weight: 900; background: #fff;">
+            <td style="padding: 6px; color: ${diffColor};">${diffLabel}</td>
+            <td></td>
+            <td align="right" style="padding: 6px; font-size: 12px; color: ${diffColor};">
+              ${difference > 0 ? '+' : ''}${difference.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="font-size:10px;background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:7px 9px;margin-bottom:10px;">
+        <strong>Desglose físico declarado:</strong> ${breakdownRows || 'Sin desglose por denominación'}
+      </div>
+
+      <!-- Desglose de Medios Digitales / No Físicos -->
+      <div style="background: #f9fbe7; border: 1px solid #c0ca33; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px;">
+        <strong style="font-size: 10px; color: #827717; text-transform: uppercase;">Resumen de Medios Digitales & Externos (No afectan efectivo en gaveta):</strong>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 4px; font-size: 10px;">
+          <div>📱 <strong>MercadoPago:</strong> ${Number(totals.mpIncome || 0).toLocaleString('es-AR')}</div>
+          <div>🏦 <strong>Transferencia:</strong> ${Number(totals.transferIncome || 0).toLocaleString('es-AR')}</div>
+          <div>💳 <strong>Tarjetas:</strong> ${Number(totals.cardIncome || 0).toLocaleString('es-AR')}</div>
+          <div>📝 <strong>Cuenta Cte:</strong> ${Number(totals.accountCreditIncome || 0).toLocaleString('es-AR')}</div>
+        </div>
+      </div>
+
+      <!-- Observaciones -->
+      <div style="font-size: 10px; margin-bottom: 12px; border-top: 1px dashed #ccc; padding-top: 6px;">
+        <strong>Observaciones del Cierre:</strong> ${escapeCashHtml(notes)}
+      </div>
+
+      <!-- Firmas de Responsabilidad -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 30px; text-align: center; font-size: 10px;">
+        <div style="border-top: 1px solid #152d24; padding-top: 4px;">
+          <strong>Firma y Aclaración del Cajero</strong><br>
+          <small style="color: #666;">Declaración jurada de valores contados</small>
+        </div>
+        <div style="border-top: 1px solid #152d24; padding-top: 4px;">
+          <strong>Firma y Aclaración de Supervisor</strong><br>
+          <small style="color: #666;">Conformidad de arqueo y control central</small>
+        </div>
+      </div>
+
+    </div>
+  `;
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Planilla de Arqueo ${escapeCashHtml(brandName)} - ${targetDateKey}</title>
+      <style>
+        @page { margin: 8mm; size: A4 portrait; }
+        body { font-family: sans-serif; margin: 0; padding: 10px; color: #000; background: #fff; }
+        .cut-line { border-top: 1.5px dashed #888; margin: 20px 0; position: relative; text-align: center; }
+        .cut-line span { background: #fff; padding: 0 10px; font-size: 9px; color: #666; position: relative; top: -8px; }
+      </style>
+    </head>
+    <body>
+      ${closureTemplate('ORIGINAL · ADMINISTRACIÓN / TESORERÍA')}
+      ${shouldPrintDuplicateReceipts() ? `<div class="cut-line"><span>✂ Línea de corte · Segundo ejemplar</span></div>${closureTemplate('DUPLICADO · CAJERO / CONSTANCIA DE TURNO')}` : ''}
+      <script>
+        window.onload = function() { window.print(); window.close(); };
+      </script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+window.printCashClosureSheet = printCashClosureSheet;
+
+
+// ============================================================================
+// 🧾 RECIBOS OFICIALES DE COBRANZA EN CUENTA CORRIENTE CON DUPLICADO
+// ============================================================================
+
+function printCustomerPaymentReceipt(paymentData) {
+  if (!paymentData || !paymentData.account) return;
+  const { account, amount, method, notes, previousBalance, balance, receiptId, date } = paymentData;
+  if (!receiptId) {
+    alert('Esta cobranza no posee numeración documental central. No se generará un recibo informal.');
+    return;
+  }
+  const vendorName = getVerifiedOperatorName();
+  const brandName = window.AppConfig?.get('brand.texts.name', 'BÔ Grow Club') || 'BÔ Grow Club';
+  const brandAddress = window.AppConfig?.get('brand.texts.address', '') || '';
+  const dateStr = new Date(date || Date.now()).toLocaleString('es-AR');
+
+  const printWindow = window.open('', '_blank', 'width=420,height=720');
+  if (!printWindow) return;
+
+  const receiptTemplate = (copyType) => `
+    <div style="border: 1.5px solid #152d24; border-radius: 8px; padding: 12px; margin-bottom: 16px; page-break-inside: avoid; font-family: sans-serif; font-size: 11px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #152d24; padding-bottom: 6px; margin-bottom: 8px;">
+        <div>
+          <strong style="font-size: 13px; color: #152d24; display: block;">${escapeStockHtml(brandName)}</strong>
+          ${brandAddress ? `<small style="font-size: 9px; color: #666;">${escapeStockHtml(brandAddress)}</small>` : ''}
+        </div>
+        <span style="font-size: 9px; font-weight: 800; text-transform: uppercase; background: #eee; padding: 2px 6px; border-radius: 4px;">${copyType}</span>
+      </div>
+
+      <div style="font-size: 11px; font-weight: 800; color: #2e7d32; text-align: center; margin-bottom: 8px; text-transform: uppercase;">
+        Recibo de Cobranza en Cuenta Corriente · Comprobante interno no fiscal
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 10px; margin-bottom: 8px; background: #f9f9f9; padding: 6px; border-radius: 4px;">
+        <div><strong>Recibo N.º:</strong> ${escapeStockHtml(String(receiptId))}</div>
+        <div><strong>Fecha:</strong> ${dateStr}</div>
+        <div><strong>Cliente:</strong> ${escapeStockHtml(account.customer_name)}</div>
+        <div><strong>DNI / CUIT:</strong> ${escapeStockHtml(account.dni || 'S/D')}</div>
+        <div><strong>Medio de Pago:</strong> ${escapeStockHtml(method || 'EFECTIVO')}</div>
+        <div><strong>Cobrador:</strong> ${escapeStockHtml(vendorName)}</div>
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 11px;">
+        <tr style="border-bottom: 1px solid #eee;">
+          <td style="padding: 4px 0;">Saldo Anterior:</td>
+          <td align="right" style="padding: 4px 0;">${Number(previousBalance || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #152d24; font-weight: bold; color: #2e7d32;">
+          <td style="padding: 4px 0;">Importe Abonado:</td>
+          <td align="right" style="padding: 4px 0;">-${Number(amount || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+        </tr>
+        <tr style="font-weight: 900; font-size: 12px; background: #e8f5e9;">
+          <td style="padding: 6px 4px; color: #152d24;">SALDO REMANENTE:</td>
+          <td align="right" style="padding: 6px 4px; color: ${balance > 0 ? '#c62828' : '#2e7d32'};">${Number(balance || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+        </tr>
+      </table>
+
+      ${notes ? `<div style="font-size: 9px; color: #666; margin-bottom: 8px;"><strong>Concepto:</strong> ${escapeStockHtml(notes)}</div>` : ''}
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; font-size: 9px; text-align: center;">
+        <div style="border-top: 1px solid #666; padding-top: 4px;">Firma y Aclaración Cliente</div>
+        <div style="border-top: 1px solid #666; padding-top: 4px;">Firma y Sello ${escapeStockHtml(brandName)}</div>
+      </div>
+    </div>
+  `;
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Recibo de Cobranza #${receiptId}</title>
+      <style>
+        @page { margin: 10mm; }
+        body { font-family: sans-serif; font-size: 11px; margin: 0; padding: 10px; color: #000; }
+        .cut-line { border-top: 1px dashed #999; margin: 16px 0; position: relative; text-align: center; }
+        .cut-line span { background: #fff; padding: 0 8px; font-size: 9px; color: #666; position: relative; top: -7px; }
+      </style>
+    </head>
+    <body>
+      ${receiptTemplate('ORIGINAL · CLIENTE / CONSTANCIA DE PAGO')}
+      ${shouldPrintDuplicateReceipts() ? `<div class="cut-line"><span>✂ Línea de corte</span></div>${receiptTemplate('DUPLICADO · ADMINISTRACIÓN / CONTROL')}` : ''}
+      <script>
+        window.onload = function() { window.print(); window.close(); };
+      </script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+window.printCustomerPaymentReceipt = printCustomerPaymentReceipt;
+
+function sendCustomerPaymentWhatsApp(paymentData) {
+  if (!paymentData || !paymentData.account) return;
+  const { account, amount, method, receiptId, balance } = paymentData;
+  const phone = (account.phone || '').replace(/\D/g, '');
+  if (!phone) {
+    alert('Esta cuenta corriente no tiene un teléfono celular registrado.');
+    return;
+  }
+
+  if (!receiptId) {
+    alert('Esta cobranza no posee numeración documental central para compartir.');
+    return;
+  }
+  const vendorName = getVerifiedOperatorName();
+  const brandName = window.AppConfig?.get('brand.texts.name', 'BÔ Grow Club') || 'BÔ Grow Club';
+  const amountStr = Number(amount || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 });
+  const balanceStr = Number(balance || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 });
+  const receiptNum = receiptId;
+
+  const msg =
+    `🌱 *${brandName} — Constancia de Pago*
+
+` +
+    `¡Hola ${account.customer_name}! 👋 Te saluda ${vendorName} de *${brandName}*.
+
+` +
+    `Te confirmamos la correcta recepción de tu pago:
+
+` +
+    `📄 *Recibo N.º:* #${receiptNum}
+` +
+    `💵 *Importe Abonado:* *${amountStr}* (${method || 'Efectivo'})
+` +
+    `💰 *Saldo Remanente en Cuenta Corriente:* *${balanceStr}*
+
+` +
+    `¡Muchas gracias por tu compromiso y por elegirnos! 🌱✨`;
+
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+window.sendCustomerPaymentWhatsApp = sendCustomerPaymentWhatsApp;
+
+function printSingleMovementPaymentReceipt(accountId, movIdentifier) {
+  const accounts = getCurrentAccounts();
+  const account = accounts.find(a => a.id === accountId);
+  if (!account) return;
+
+  const mov = (account.ledger || []).find(m => String(m.id || m.date) === String(movIdentifier) && m.type === 'CREDIT');
+  if (!mov) {
+    alert('Movimiento de pago no encontrado.');
+    return;
+  }
+
+  const paymentData = {
+    account,
+    amount: Number(mov.amount || 0),
+    method: mov.method || 'EFECTIVO',
+    notes: mov.concept || 'Pago a cuenta',
+    previousBalance: Number(mov.balance_after || 0) + Number(mov.amount || 0),
+    balance: Number(mov.balance_after || 0),
+    receiptId: mov.documentNumber || null,
+    date: mov.date || new Date().toISOString()
+  };
+
+  printCustomerPaymentReceipt(paymentData);
+}
+window.printSingleMovementPaymentReceipt = printSingleMovementPaymentReceipt;
+
+function sendSingleMovementPaymentWhatsApp(accountId, movIdentifier) {
+  const accounts = getCurrentAccounts();
+  const account = accounts.find(a => a.id === accountId);
+  if (!account) return;
+
+  const mov = (account.ledger || []).find(m => String(m.id || m.date) === String(movIdentifier) && m.type === 'CREDIT');
+  if (!mov) {
+    alert('Movimiento de pago no encontrado.');
+    return;
+  }
+
+  const paymentData = {
+    account,
+    amount: Number(mov.amount || 0),
+    method: mov.method || 'EFECTIVO',
+    receiptId: mov.documentNumber || null,
+    balance: Number(mov.balance_after || 0)
+  };
+
+  sendCustomerPaymentWhatsApp(paymentData);
+}
+window.sendSingleMovementPaymentWhatsApp = sendSingleMovementPaymentWhatsApp;
 
 window.initPosWorkspace = initPosWorkspace;
 window.clearPosUnifiedSearch = clearPosUnifiedSearch;
@@ -13072,49 +14861,35 @@ async function applyPromoForExpiringProduct(productId) {
    ========================================================================== */
 
 function getNearbyStores() {
-  try {
-    const stored = localStorage.getItem('boeweb_nearby_stores');
-    if (stored) return JSON.parse(stored);
-  } catch (_) {}
-  return [
-    {
-      id: 'store_local_1',
-      name: 'Growshop Paraná Centro',
-      phone: '5493434675428',
-      address: 'Urquiza y San Martín, Paraná',
-      markup: 30,
-      catalog: [
-        { id: 'loc_1', product_code: 'LOC-BIO-01', name: 'BioBizz Bio Bloom 500 ml', price: 16000, public_price: 20800, stock: 4, category: 'Fertilizantes' },
-        { id: 'loc_2', product_code: 'LOC-SUS-50', name: 'Sustrato Growers Original 50 L', price: 12500, public_price: 16250, stock: 12, category: 'Sustratos' }
-      ]
-    }
-  ];
+  const grouped = new Map();
+  externalCatalogOffers
+    .filter(offer => offer.source_type === 'LOCAL_STORE')
+    .forEach(offer => {
+      if (!grouped.has(offer.source_id)) {
+        grouped.set(offer.source_id, {
+          id: offer.source_id,
+          name: offer.source_name,
+          phone: offer.source_contact_info || '',
+          estimated_days: Number(offer.estimated_days || 2),
+          catalog: []
+        });
+      }
+      grouped.get(offer.source_id).catalog.push({
+        id: offer.id,
+        product_code: offer.external_sku,
+        name: offer.name,
+        price: Number(offer.retail_price || 0),
+        public_price: Number(offer.retail_price || 0),
+        stock: Number(offer.available_units || 0),
+        category: offer.category || 'Otros'
+      });
+    });
+  return Array.from(grouped.values());
 }
 
 function saveNearbyStore(store) {
-  const stores = getNearbyStores();
-  const existingIdx = stores.findIndex(s => s.id === store.id);
-  if (existingIdx >= 0) {
-    stores[existingIdx] = store;
-  } else {
-    stores.push(store);
-  }
-  localStorage.setItem('boeweb_nearby_stores', JSON.stringify(stores));
-
-  // Sync unified nearby products
-  const flatCatalog = [];
-  stores.forEach(s => {
-    (s.catalog || []).forEach(item => {
-      flatCatalog.push({
-        ...item,
-        store_id: s.id,
-        store_name: s.name,
-        phone: s.phone,
-        delivery_days: 2
-      });
-    });
-  });
-  localStorage.setItem('boeweb_nearby_stores_catalog', JSON.stringify(flatCatalog));
+  console.warn('Las tiendas locales se guardan únicamente mediante el catálogo externo central.', store);
+  return false;
 }
 
 // activeNearbyStoreFilter — declared at top of file
@@ -13152,7 +14927,7 @@ function renderNearbyStoresSection() {
     grid.innerHTML = `
       <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--color-text-muted);">
         <span style="font-size: 2.5rem; display: block; margin-bottom: 8px;">🏪</span>
-        <p>No hay productos cargados en esta tienda cercana aún.</p>
+        <p>${escapeStockHtml(externalCatalogLoadError || 'No hay productos cargados en tiendas locales aún.')}</p>
         <button type="button" class="btn btn-secondary" onclick="openAddNearbyStoreModal()" style="margin-top: 10px;">
           ＋ Cargar Lista con Ingesta IA
         </button>
@@ -13171,8 +14946,7 @@ function renderNearbyStoresSection() {
       </div>
       <h4 style="margin: 0 0 6px 0; font-size: 1rem; color: var(--color-text-main); line-height: 1.3;">${escapeStockHtml(p.name)}</h4>
       <div style="font-size: 0.82rem; color: var(--color-text-muted); margin-bottom: 12px;">
-        <span>Costo Tienda: <strong>$${Number(p.price || 0).toLocaleString('es-AR')}</strong></span> · 
-        <span>Público Web: <strong style="color: var(--color-accent-gold);">$${Number(p.public_price || 0).toLocaleString('es-AR')}</strong></span>
+        <span>Precio de venta: <strong style="color: var(--color-accent-gold);">$${Number(p.public_price || p.price || 0).toLocaleString('es-AR')}</strong></span>
       </div>
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <span style="font-size: 0.8rem; color: #2e7d32; font-weight: 700;">Stock: ${p.stock || 0} u.</span>
@@ -13199,7 +14973,7 @@ function closeAddNearbyStoreModal() {
   if (modal) modal.style.display = 'none';
 }
 
-function handleSaveNearbyStore(event) {
+async function handleSaveNearbyStore(event) {
   event.preventDefault();
   const name = document.getElementById('nearby-store-name').value.trim();
   const phone = document.getElementById('nearby-store-phone').value.replace(/\D/g, '');
@@ -13207,22 +14981,56 @@ function handleSaveNearbyStore(event) {
   const markup = Number(document.getElementById('nearby-store-markup').value) || 30;
   const rawText = document.getElementById('nearby-store-raw-catalog').value.trim();
 
-  const storeId = 'store_' + Date.now();
-  const parsedCatalog = parseNearbyStoreCatalogWithAi(rawText, markup, storeId, name, phone);
-
-  const newStore = {
-    id: storeId,
-    name,
-    phone,
-    address,
-    markup,
-    catalog: parsedCatalog
-  };
-
-  saveNearbyStore(newStore);
-  closeAddNearbyStoreModal();
-  renderNearbyStoresSection();
-  if (window.showToast) window.showToast(`✓ Tienda "${name}" agregada con ${parsedCatalog.length} productos`);
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+    alert('Iniciá sesión para guardar la tienda y sus ofertas en el catálogo central.');
+    return;
+  }
+  const parsedCatalog = parseNearbyStoreCatalogWithAi(rawText, markup, 'central', name, phone);
+  if (!name || parsedCatalog.length === 0) {
+    alert('Ingresá el nombre de la tienda y al menos una línea de producto con precio.');
+    return;
+  }
+  const submitButton = event.submitter;
+  if (submitButton) submitButton.disabled = true;
+  try {
+    const source = await window.OperationalApi.upsertExternalCatalogSource({
+      supabaseClient,
+      authContext,
+      source: {
+        source_type: 'LOCAL_STORE',
+        name,
+        contact_info: [phone, address].filter(Boolean).join(' · '),
+        estimated_days: 2,
+        active: true
+      }
+    });
+    await Promise.all(parsedCatalog.map((product, index) => window.OperationalApi.upsertExternalCatalogOffer({
+      supabaseClient,
+      authContext,
+      offer: {
+        source_id: source.id,
+        external_sku: product.product_code || `LOCAL-${index + 1}`,
+        name: product.name,
+        category: product.category || 'Otros',
+        cost_price: product.price,
+        retail_price: product.public_price,
+        available_units: product.stock,
+        active: true,
+        metadata: { imported_from: 'nearby-store-text' }
+      }
+    })));
+    await loadExternalCatalogOffers();
+    closeAddNearbyStoreModal();
+    renderNearbyStoresSection();
+    renderPosSearchResults(document.getElementById('pos-unified-search')?.value || '');
+    if (window.showToast) window.showToast(`✓ Tienda "${name}" sincronizada con ${parsedCatalog.length} productos`);
+  } catch (error) {
+    console.error('No se sincronizó la tienda local:', error);
+    alert(`No se guardó la tienda.\n\n${error.message || 'Error desconocido'}`);
+  } finally {
+    if (submitButton) submitButton.disabled = false;
+  }
 }
 
 function parseNearbyStoreCatalogWithAi(rawText, markupPercent, storeId, storeName, phone) {
@@ -13233,11 +15041,10 @@ function parseNearbyStoreCatalogWithAi(rawText, markupPercent, storeId, storeNam
   lines.forEach((line, idx) => {
     // Parser inteligente: busca nombre, precio ($123 o 12300) y stock opcional (Stock: 5 o 5 u)
     const priceMatch = line.match(/\$?(\d{1,3}(?:\.\d{3})*(?:,\d+)?|\d+)/g);
-    let price = 10000;
-    if (priceMatch && priceMatch.length > 0) {
-      const cleanPrice = priceMatch[priceMatch.length - 1].replace(/\./g, '').replace(/,/g, '.');
-      price = parseFloat(cleanPrice) || 10000;
-    }
+    if (!priceMatch || priceMatch.length === 0) return;
+    const cleanPrice = priceMatch[priceMatch.length - 1].replace(/\./g, '').replace(/,/g, '.');
+    const price = Number.parseFloat(cleanPrice);
+    if (!Number.isFinite(price) || price <= 0) return;
 
     const stockMatch = line.match(/stock[:\s]+(\d+)/i) || line.match(/(\d+)\s*(?:u|unidades|disp)/i);
     const stock = stockMatch ? Number.parseInt(stockMatch[1], 10) : 5;
@@ -13272,10 +15079,12 @@ function parseNearbyStoreCatalogWithAi(rawText, markupPercent, storeId, storeNam
 }
 
 function orderNearbyProductViaWa(productId, storePhone, productName) {
-  const cleanPhone = (storePhone || '5493434675428').replace(/\D/g, '');
+  const cleanPhone = (storePhone || '').replace(/\D/g, '');
   const activeVendor = localStorage.getItem('boeweb_vendor_name') || 'BÔ Grow Club';
   const msg = `¡Hola! 👋 Te escribo de *BÔ Grow Club* (${activeVendor}). Queremos hacer un pedido rápido del producto: *${productName}* para coordinar entrega en 2 días. ¿Tienen disponibilidad confirmada? ¡Muchas gracias! 🌿`;
-  window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+  window.open(cleanPhone
+    ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
+    : `https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 /* ==========================================================================
@@ -13349,7 +15158,7 @@ async function loadCanonicalCurrentAccounts() {
         .neq('status', 'ARCHIVED'),
       supabaseClient
         .from('accounts_receivable_ledger')
-        .select('id,account_id,customer_id,entry_type,direction,amount,balance_after,currency,sale_id,due_date,description,created_at')
+        .select('id,document_number,account_id,customer_id,entry_type,direction,amount,balance_after,currency,sale_id,due_date,description,metadata,created_at')
         .eq('tenant_id', context.tenantId)
         .order('created_at', { ascending: false })
         .limit(500)
@@ -13364,6 +15173,7 @@ async function loadCanonicalCurrentAccounts() {
       const entries = ledgerByAccount.get(entry.account_id) || [];
       entries.push({
         id: entry.id,
+        documentNumber: entry.document_number || null,
         date: entry.created_at,
         concept: entry.description || entry.entry_type,
         amount: Number(entry.amount) || 0,
@@ -13371,6 +15181,7 @@ async function loadCanonicalCurrentAccounts() {
         balance_after: Number(entry.balance_after) || 0,
         sale_id: entry.sale_id,
         due_date: entry.due_date,
+        method: entry.metadata?.method || '',
         items: []
       });
       ledgerByAccount.set(entry.account_id, entries);
@@ -13638,16 +15449,26 @@ function renderCcDetailsMovements(account) {
       // CREDIT / PAYMENT
       return `
         <div style="border: 1px solid rgba(76,175,80,0.3); border-radius: 12px; padding: 14px; background: rgba(76,175,80,0.04);">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
             <div>
               <span style="background: rgba(76,175,80,0.18); color: #2e7d32; border: 1px solid #4caf50; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 800; margin-right: 6px;">
                 💵 COBRO / PAGO (${movDate})
               </span>
               <strong style="color: var(--color-text-main); font-size: 0.9rem;">${escapeStockHtml(mov.concept)}</strong>
             </div>
-            <div style="text-align: right;">
-              <strong style="color: #2e7d32; font-size: 1.1rem;">-$${amountFormatted}</strong>
-              <span style="display: block; font-size: 0.72rem; color: var(--color-text-muted);">Saldo posterior: $${balanceAfterFormatted}</span>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="text-align: right;">
+                <strong style="color: #2e7d32; font-size: 1.1rem;">-${amountFormatted}</strong>
+                <span style="display: block; font-size: 0.72rem; color: var(--color-text-muted);">Saldo posterior: ${balanceAfterFormatted}</span>
+              </div>
+              ${mov.documentNumber ? `<div style="display: flex; gap: 6px;">
+                <button type="button" class="btn btn-secondary" onclick="printSingleMovementPaymentReceipt('${escapeStockHtml(account.id)}', '${escapeStockHtml(mov.id || mov.date)}')" style="padding: 4px 8px; font-size: 0.75rem; font-weight: 700; border-radius: 6px; background: #fff; border: 1px solid #81c784; color: #2e7d32; cursor: pointer;" title="Imprimir ${escapeStockHtml(mov.documentNumber)} con duplicado">
+                  🖨️ ${escapeStockHtml(mov.documentNumber)}
+                </button>
+                <button type="button" class="btn btn-primary" onclick="sendSingleMovementPaymentWhatsApp('${escapeStockHtml(account.id)}', '${escapeStockHtml(mov.id || mov.date)}')" style="padding: 4px 8px; font-size: 0.75rem; font-weight: 800; background: #25d366; border: none; color: #fff; border-radius: 6px; cursor: pointer;" title="Compartir constancia por WhatsApp">
+                  📲 WA
+                </button>
+              </div>` : '<small style="color: var(--color-text-muted);">Registro histórico sin numeración</small>'}
             </div>
           </div>
         </div>
@@ -14105,16 +15926,42 @@ async function handleRecordCcPaymentSubmit(event) {
       idempotencyKey: `ar-payment:${authContext.userId}:${globalThis.crypto?.randomUUID?.() || Date.now()}`
     });
     await Promise.all([loadCanonicalCurrentAccounts(), refreshCanonicalCashSection(), loadPosRegisters()]);
+    const refreshedAccount = getCurrentAccounts().find(item => item.id === ccId);
+    const paymentMovement = refreshedAccount?.ledger?.find(item => String(item.id) === String(result.entry_id));
+    const receiptNumber = paymentMovement?.documentNumber || null;
     closeRecordCcPaymentModal();
     renderCurrentAccountsUI();
     populatePosCurrentAccountDropdown();
     if (modalCcDetailsIsOpen()) {
-      const refreshed = getCurrentAccounts().find(item => item.id === ccId);
-      if (refreshed) renderCcDetailsMovements(refreshed);
+      if (refreshedAccount) renderCcDetailsMovements(refreshedAccount);
       const debtEl = document.getElementById('cc-details-debt-badge');
       if (debtEl) debtEl.textContent = formatCashCurrency(result.balance);
     }
     if (window.showToast) window.showToast(`Pago de ${formatCashCurrency(amount)} confirmado. Saldo: ${formatCashCurrency(result.balance)}.`);
+
+    const paymentReceiptData = {
+      account,
+      amount,
+      method,
+      notes: note || 'Pago a cuenta corriente',
+      previousBalance: Number(account.current_balance || 0),
+      balance: Number(result.balance || 0),
+      receiptId: receiptNumber,
+      date: new Date().toISOString()
+    };
+
+    setTimeout(() => {
+      if (!receiptNumber) {
+        alert('La cobranza quedó registrada, pero no se obtuvo una numeración documental. No se emitirá un recibo informal.');
+        return;
+      }
+      if (confirm(`¿Deseás imprimir el recibo de cobranza ${receiptNumber} (con duplicado) por ${formatCashCurrency(amount)}?`)) {
+        printCustomerPaymentReceipt(paymentReceiptData);
+      }
+      if (account.phone && confirm(`¿Deseás enviar la constancia de pago por WhatsApp a ${account.customer_name}?`)) {
+        sendCustomerPaymentWhatsApp(paymentReceiptData);
+      }
+    }, 250);
   } catch (error) {
     console.error('No se confirmó la cobranza:', error);
     alert(`No se registró el pago.\n\n${error.message || 'Error desconocido'}`);
@@ -14133,30 +15980,45 @@ function sendCcWhatsAppReminder(ccId) {
 }
 
 function openPosExpressItemModal() {
-  alert('La venta libre está deshabilitada. Ingresá y aprobá el producto para mantener precio, stock y auditoría vinculados.');
+  const modal = document.getElementById('pos-express-item-modal');
+  if (modal) {
+    modal.style.display = 'block';
+    modal.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const nameInput = document.getElementById('pos-express-name');
+    if (nameInput) {
+      nameInput.value = '';
+      setTimeout(() => nameInput.focus(), 80);
+    }
+    const priceInput = document.getElementById('pos-express-price');
+    if (priceInput) priceInput.value = '';
+    const qtyInput = document.getElementById('pos-express-qty');
+    if (qtyInput) qtyInput.value = '1';
+    const skuInput = document.getElementById('pos-express-sku');
+    if (skuInput) skuInput.value = '';
+  }
 }
 
 function closePosExpressItemModal() {
   const modal = document.getElementById('pos-express-item-modal');
   if (modal) modal.style.display = 'none';
+  const unifiedInput = document.getElementById('pos-unified-search');
+  if (unifiedInput) unifiedInput.focus();
 }
 
 function handlePosExpressItemSubmit(e) {
   if (e) e.preventDefault();
-  alert('La venta libre está deshabilitada. Usá un producto del catálogo central.');
-  return;
-
-  /* Ruta legacy inaccesible. */
   const nameInput = document.getElementById('pos-express-name');
   const priceInput = document.getElementById('pos-express-price');
   const qtyInput = document.getElementById('pos-express-qty');
+  const skuInput = document.getElementById('pos-express-sku');
 
   const name = (nameInput?.value || '').trim();
   const price = Number(priceInput?.value || 0);
-  const qty = Math.max(1, Number(qtyInput?.value || 1));
+  const qty = Number(qtyInput?.value || 1);
+  const sku = (skuInput?.value || '').trim().slice(0, 120);
 
-  if (!name) {
-    alert('Ingresá una descripción o nombre para el ítem exprés.');
+  if (name.length < 3) {
+    alert('Ingresá una descripción o nombre para el ítem libre.');
     nameInput?.focus();
     return;
   }
@@ -14165,32 +16027,48 @@ function handlePosExpressItemSubmit(e) {
     priceInput?.focus();
     return;
   }
+  if (!Number.isInteger(qty) || qty <= 0 || qty > 999) {
+    alert('La cantidad debe ser un número entero entre 1 y 999.');
+    qtyInput?.focus();
+    return;
+  }
 
   const cart = getPosCartEngine();
-  const expressId = `EXPRESS-${Date.now()}`;
-  cart.addItem({
+  const expressId = `QUICK-${Date.now()}`;
+  const added = cart.addItem({
     id: expressId,
     product_code: expressId,
     name: name,
     price: price,
     quantity: qty,
-    availability: 'EXPRESS_UNMAPPED',
-    is_express: true,
+    line_type: 'QUICK_ENTRY',
+    product_id: null,
+    sku: sku || expressId,
+    metadata: { entered_from: 'pos-quick-entry' },
     image_url: 'assets/logo.jpg'
   });
+  if (!added) {
+    alert('No se pudo agregar el ítem rápido al ticket. Revisá nombre, precio y cantidad.');
+    return;
+  }
 
   renderPosCartItems();
   closePosExpressItemModal();
-  showToast(`⚡ Ítem libre '${name}' ($${price.toLocaleString('es-AR')}) agregado al ticket.`);
+  if (typeof showToast === 'function') {
+    showToast(`⚡ Ítem libre '${name}' ($${price.toLocaleString('es-AR')}) agregado al ticket.`);
+  }
 }
 
 function handlePosPaymentMethodChange() {
   const methodSelect = document.getElementById('pos-payment-method-select');
   const ccContainer = document.getElementById('pos-current-account-container');
   const mixedContainer = document.getElementById('pos-mixed-payment-container');
+  const cashChangePanel = document.getElementById('pos-cash-change-panel');
   
   if (!methodSelect) return;
   const val = methodSelect.value;
+
+  if (cashChangePanel) cashChangePanel.style.display = val === 'EFECTIVO' ? 'block' : 'none';
 
   if (mixedContainer) {
     mixedContainer.style.display = val === 'MIXTO' ? 'block' : 'none';

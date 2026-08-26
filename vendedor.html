@@ -1262,6 +1262,10 @@
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="internal-catalog" onclick="switchVendorTab('internal-catalog')">
           <span class="vendor-side-nav-icon" aria-hidden="true">▤</span><span>Catálogo interno</span>
         </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="fulfillments" onclick="switchVendorTab('fulfillments')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">🚚</span><span>Entregas & Encargos</span>
+          <span class="vendor-pending-fulfillments-count" id="vendor-sidebar-fulfillments-badge" hidden style="margin-left: auto; background: #ff9800; color: white; border-radius: 10px; padding: 2px 6px; font-size: 0.7rem; font-weight: 800;">0</span>
+        </button>
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="web-orders" onclick="switchVendorTab('web-orders')">
           <span class="vendor-side-nav-icon" aria-hidden="true">📦</span><span>Pedidos Web</span>
           <span class="vendor-pending-web-orders-count" id="vendor-sidebar-web-orders-badge" hidden style="margin-left: auto; background: #e53935; color: white; border-radius: 10px; padding: 2px 6px; font-size: 0.7rem; font-weight: 800;">0</span>
@@ -1722,7 +1726,7 @@
               <span class="voice-fab-icon">🎙️</span>
               <span class="voice-fab-pulse"></span>
             </button>
-            <span id="mobile-pos-assistant-progress" class="mobile-task-assistant-progress">Paso 1 de 6</span>
+            <span id="mobile-pos-assistant-progress" class="mobile-task-assistant-progress">Paso 1 de 7</span>
           </div>
         </header>
 
@@ -1752,6 +1756,14 @@
         </button>
       </div>
 
+      <!-- Barra de Ventas en Espera (Parked Tickets) -->
+      <div id="pos-parked-tickets-bar" style="display: none; background: rgba(255,152,0,0.12); border: 1.5px solid #ff9800; border-radius: 10px; padding: 8px 14px; margin-bottom: 12px; cursor: pointer;" onclick="openPosParkedTicketsModal()">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.85rem; font-weight: 800; color: #e65100;">⏸️ <span id="pos-parked-count-text">0 ventas en espera</span></span>
+          <small style="font-weight: 800; color: #e65100; text-decoration: underline;">Ver / Retomar ➔</small>
+        </div>
+      </div>
+
       <div id="pos-workspace-grid" class="pos-workspace-grid" data-mobile-view="catalog" style="display: none;">
         <!-- Columna Izquierda: Búsqueda Unificada, Dictado y Selección de Productos -->
         <div id="pos-catalog-column" class="pos-workspace-column">
@@ -1759,7 +1771,7 @@
           <div class="pos-unified-search-box">
             <div class="pos-search-input-wrapper">
               <span class="pos-search-icon-left" aria-hidden="true">🔍</span>
-              <input type="text" id="pos-unified-search" class="pos-unified-input" placeholder="⚡ Escanear código de barras, escribir nombre o dictar por voz..." autocomplete="off" autofocus>
+              <input type="text" id="pos-unified-search" class="pos-unified-input" placeholder="⚡ Escanear código de barras (ej: 5*7791234), nombre o dictar..." autocomplete="off" autofocus>
               <button type="button" id="pos-camera-scanner-btn" class="pos-camera-btn" onclick="openUniversalCameraScanner('pos')" aria-label="Usar cámara para escanear código de barras">
                 <span style="font-size: 1.15rem;" aria-hidden="true">📷</span>
                 <span>Usar cámara</span>
@@ -1771,50 +1783,65 @@
               </button>
             </div>
 
-            <div class="pos-search-helpers-row">
+            <div class="pos-search-helpers-row" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
               <span id="pos-scanner-indicator" class="pos-scanner-badge">⚡ Lector láser listo</span>
               <span id="pos-voice-status" class="pos-voice-status"></span>
-              <span id="pos-search-count-badge" style="color: var(--color-text-muted); font-weight: 700;">Catálogo interno</span>
-              <button type="button" class="btn btn-secondary" id="pos-express-item-btn" onclick="openPosExpressItemModal()" aria-disabled="true" title="Primero ingresá y aprobá el producto en el catálogo central" style="padding: 4px 12px; font-size: 0.8rem; font-weight: 700; border-radius: 8px; background: rgba(195,155,75,0.12); color: var(--color-accent-gold); border: 1px solid var(--color-accent-gold); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-left: auto;">
-                ⚡ + Ítem Exprés / Venta Libre
+              <span id="pos-search-count-badge" style="color: var(--color-text-muted); font-weight: 700;">Catálogo unificado</span>
+              <button type="button" class="btn btn-secondary" id="pos-express-item-btn" onclick="openPosExpressItemModal()" title="Cobrar inmediatamente un producto recién llegado o fuera de catálogo" style="padding: 6px 14px; font-size: 0.82rem; font-weight: 700; border-radius: 8px; background: rgba(195,155,75,0.15); color: var(--color-accent-gold); border: 1.5px solid var(--color-accent-gold); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-left: auto;">
+                ⚡ + Venta Rápida / Ítem Libre
               </button>
             </div>
 
-            <!-- Modal de Ítem Libre / Venta Exprés -->
-            <div class="wms-modal-backdrop" id="pos-express-item-modal" style="display: none; align-items: center; justify-content: center; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 9999; padding: 16px;">
-              <div class="wms-modal-card" style="background: #fff; border-radius: 16px; width: 100%; max-width: 440px; padding: 24px; box-shadow: 0 12px 36px rgba(0,0,0,0.25); position: relative;">
-                <button type="button" class="wms-modal-close" onclick="closePosExpressItemModal()" style="position: absolute; right: 16px; top: 16px; background: none; border: none; font-size: 1.4rem; cursor: pointer;">✕</button>
-                <h3 style="margin: 0 0 6px 0; font-family: 'Playfair Display', serif; font-size: 1.25rem; color: var(--color-text-main);">⚡ Venta Exprés / Ítem Libre</h3>
-                <p style="margin: 0 0 16px 0; font-size: 0.82rem; color: var(--color-text-muted);">Ingresá productos fuera de catálogo o recién recibidos sin trabar la venta.</p>
+            <!-- Filtros de Origen de Catálogo -->
+            <div class="pos-origin-filter-tabs" style="display: flex; gap: 6px; margin-top: 10px; overflow-x: auto; padding-bottom: 4px;">
+              <button type="button" id="pos-origin-all" class="pos-filter-pill active" onclick="setPosOriginFilter('all')">Todos</button>
+              <button type="button" id="pos-origin-own" class="pos-filter-pill" onclick="setPosOriginFilter('own_stock')">🌿 Stock propio</button>
+              <button type="button" id="pos-origin-backorder" class="pos-filter-pill" onclick="setPosOriginFilter('backorder')">📦 Por encargo</button>
+              <button type="button" id="pos-origin-b2b" class="pos-filter-pill" onclick="setPosOriginFilter('b2b')">🏢 Proveedores B2B</button>
+              <button type="button" id="pos-origin-local" class="pos-filter-pill" onclick="setPosOriginFilter('local_store')">🏬 Tiendas locales</button>
+              <button type="button" id="pos-sync-b2b-btn" class="pos-filter-pill" onclick="syncLegacyB2BCatalogToPos()" style="min-height: 44px; border-color: var(--color-accent-gold); color: var(--color-accent-gold);">↻ Sincronizar B2B</button>
+            </div>
+
+            <!-- Panel en línea de Ítem Libre / Venta Rápida -->
+            <section id="pos-express-item-modal" style="display: none; margin-top: 12px; padding: 2px;" aria-labelledby="pos-express-panel-title">
+              <div class="wms-modal-card" style="background: var(--color-card-bg); border: 1.5px solid var(--color-accent-gold); border-radius: 16px; width: 100%; padding: 20px; box-sizing: border-box; box-shadow: var(--shadow-md); position: relative;">
+                <button type="button" class="cash-secondary-btn" onclick="closePosExpressItemModal()" style="position: absolute; right: 14px; top: 12px; min-height: 44px;">Ocultar</button>
+                <h3 id="pos-express-panel-title" style="margin: 0 0 6px 0; padding-right: 90px; font-family: 'Playfair Display', serif; font-size: 1.25rem; color: var(--color-text-main);">⚡ Venta Rápida / Ítem Libre</h3>
+                <p style="margin: 0 0 16px 0; font-size: 0.82rem; color: var(--color-text-muted);">Cobrá inmediatamente un producto recién llegado sin trabar la atención.</p>
                 
                 <form id="pos-express-item-form" onsubmit="handlePosExpressItemSubmit(event)">
                   <div style="margin-bottom: 12px;">
-                    <label for="pos-express-name" style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Concepto / Producto:</label>
-                    <input type="text" id="pos-express-name" class="b2b-form-input" placeholder="Ej: Sustrato Klasmann 50L recién recibido" required style="width: 100%; font-size: 0.9rem;">
+                    <label for="pos-express-name" style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Concepto / Nombre *:</label>
+                    <input type="text" id="pos-express-name" class="b2b-form-input" placeholder="Ej: Sustrato Klasmann 50L recién llegado" required style="width: 100%; font-size: 0.9rem;">
                   </div>
 
-                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
                     <div>
-                      <label for="pos-express-price" style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Precio Unitario ($):</label>
-                      <input type="number" id="pos-express-price" class="b2b-form-input" placeholder="0" min="0" step="any" required style="width: 100%; font-size: 0.95rem; font-weight: 800; text-align: right;">
+                      <label for="pos-express-price" style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Precio Unitario ($) *:</label>
+                      <input type="number" id="pos-express-price" class="b2b-form-input" placeholder="0" min="1" step="any" required style="width: 100%; font-size: 0.95rem; font-weight: 800; text-align: right;">
                     </div>
                     <div>
-                      <label for="pos-express-qty" style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Cantidad:</label>
+                      <label for="pos-express-qty" style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Cantidad *:</label>
                       <input type="number" id="pos-express-qty" class="b2b-form-input" value="1" min="1" step="1" required style="width: 100%; font-size: 0.95rem; font-weight: 800; text-align: center;">
                     </div>
                   </div>
 
+                  <div style="margin-bottom: 16px;">
+                    <label for="pos-express-sku" style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Código de Barras / SKU (Opcional):</label>
+                    <input type="text" id="pos-express-sku" class="b2b-form-input" placeholder="Opcional" style="width: 100%; font-size: 0.85rem;">
+                  </div>
+
                   <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                    <button type="button" class="btn btn-secondary" onclick="closePosExpressItemModal()" style="padding: 8px 16px; border-radius: 8px;">Cancelar</button>
-                    <button type="submit" class="btn btn-primary" style="padding: 8px 18px; border-radius: 8px; font-weight: 700; background: var(--color-accent-gold); color: #1a1a1a; border: none; cursor: pointer;">🛒 Agregar al Ticket</button>
+                    <button type="button" class="btn btn-secondary" onclick="closePosExpressItemModal()" style="padding: 8px 16px; min-height: 44px; border-radius: 8px;">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" style="padding: 8px 18px; min-height: 44px; border-radius: 8px; font-weight: 700; background: var(--color-accent-gold); color: #1a1a1a; border: none; cursor: pointer;">🛒 Agregar al Ticket</button>
                   </div>
                 </form>
               </div>
-            </div>
+            </section>
 
             <!-- Grilla de Coincidencias en Tiempo Real -->
             <div id="pos-search-results-grid" class="pos-results-grid" style="margin-top: 15px;">
-              <!-- Productos del catálogo interno generados dinámicamente -->
+              <!-- Productos del catálogo generados dinámicamente -->
             </div>
           </div>
         </div>
@@ -1862,7 +1889,7 @@
               </ul>
             </div>
 
-            <!-- Ajuste de Precio: Descuento o Aumento (Porcentaje o Pesos) -->
+            <!-- Ajuste de Precio: Descuento o Aumento -->
             <div class="pos-adjustment-container">
               <label for="pos-adjustment-type" style="font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--color-text-muted); display: block; margin-bottom: 6px; text-align: center;">
                 🏷️ Ajuste de Precio (Descuento o Aumento):
@@ -1960,13 +1987,39 @@
                 </div>
               </div>
 
-              <input type="text" id="pos-notes-input" class="b2b-form-input" placeholder="Observaciones de la venta (opcional)..." style="font-size: 0.85rem;">
+              <!-- Panel de Cálculo de Vuelto para Cobro en Efectivo -->
+              <div id="pos-cash-change-panel" style="display: block; background: rgba(46,125,50,0.06); border: 1.5px solid #81c784; border-radius: 12px; padding: 12px; margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <label for="pos-cash-tendered-input" style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: #2e7d32;">💵 Paga con ($):</label>
+                  <button type="button" onclick="setPosExactCashTendered()" class="stock-entry-secondary-btn" style="padding: 2px 8px; font-size: 0.74rem; font-weight: 700;">Exacto</button>
+                </div>
+                <input type="number" id="pos-cash-tendered-input" class="b2b-form-input" placeholder="0" min="0" step="any" style="font-size: 1.05rem; font-weight: 900; text-align: right; color: #1b5e20; background: #fff;" oninput="updatePosCashChangeDisplay()">
+                <div id="pos-cash-denominations-chips" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
+                  <!-- Botones de billetes ARS -->
+                </div>
+                <div id="pos-cash-change-display" style="margin-top: 8px; padding: 6px 10px; border-radius: 8px; font-weight: 800; font-size: 0.88rem; text-align: center; background: #fff; border: 1px solid #c8e6c9; color: #2e7d32;">
+                  Vuelto al cliente: $0,00
+                </div>
+              </div>
+
+              <input type="text" id="pos-notes-input" class="b2b-form-input" placeholder="Observaciones de la venta (opcional)..." style="font-size: 0.85rem; margin-bottom: 8px;">
             </div>
 
-            <!-- Botón de Confirmación Borrador Draft -->
-            <button type="button" id="pos-create-draft-btn" class="b2b-checkout-btn" onclick="submitPosSaleDraft()" style="width: 100%; font-size: 1rem; font-weight: 800; padding: 14px; background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: #fff; border: 1.5px solid #81c784; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 14px rgba(46,125,50,0.3);">
-              📄 Confirmar Venta / Generar Borrador
-            </button>
+            <!-- Botones de Acción de Ticket: Cobrar / Poner en Espera / Vaciar -->
+            <div style="display: grid; gap: 8px; margin-bottom: 6px;">
+              <button type="button" id="pos-create-draft-btn" class="b2b-checkout-btn" onclick="submitPosSaleDraft()" style="width: 100%; font-size: 1rem; font-weight: 800; padding: 14px; background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: #fff; border: 1.5px solid #81c784; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 14px rgba(46,125,50,0.3);">
+                ✓ Confirmar Venta / Cobrar
+              </button>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <button type="button" id="pos-park-sale-btn" class="btn btn-secondary" onclick="parkCurrentPosSale()" style="padding: 8px; font-size: 0.8rem; font-weight: 700; border-color: #ff9800; color: #e65100; border-radius: 8px; background: rgba(255,152,0,0.08);">
+                  ⏸️ Poner en espera
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="clearPosCartItems()" style="padding: 8px; font-size: 0.8rem; font-weight: 700; border-color: #e57373; color: #c62828; border-radius: 8px; background: rgba(244,67,54,0.06);">
+                  🗑️ Vaciar ticket
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1980,6 +2033,58 @@
         <button type="button" class="pos-mobile-floating-action-btn">
           <span>Finalizar Venta ➔</span>
         </button>
+      </div>
+
+      <!-- MODAL DE VENTAS EN ESPERA (PARKED TICKETS) -->
+      <div id="pos-parked-tickets-modal" class="pos-confirm-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="pos-parked-modal-title">
+        <div class="pos-confirm-modal-card" style="max-width: 480px;">
+          <div class="pos-confirm-modal-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">⏸️</span>
+              <h3 id="pos-parked-modal-title" style="margin: 0; font-size: 1.1rem; color: var(--color-text-main);">Ventas en Espera</h3>
+            </div>
+            <button type="button" class="pos-confirm-modal-close" onclick="closePosParkedTicketsModal()" aria-label="Cerrar modal">✕</button>
+          </div>
+          <div class="pos-confirm-modal-body">
+            <div id="pos-parked-tickets-list" style="max-height: 280px; overflow-y: auto; display: grid; gap: 8px;">
+              <!-- Tarjetas de tickets en espera -->
+            </div>
+          </div>
+          <div class="pos-confirm-modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closePosParkedTicketsModal()" style="width: 100%;">Cerrar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL DE COMPROBANTE POSVENTA MULTICANAL -->
+      <div id="pos-post-sale-modal" class="pos-confirm-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="pos-post-sale-title">
+        <div class="pos-confirm-modal-card" style="max-width: 480px; text-align: center;">
+          <div style="font-size: 2.8rem; margin-bottom: 4px;">🎉</div>
+          <h3 id="pos-post-sale-title" style="margin: 0 0 4px 0; font-size: 1.35rem; color: #152d24;">¡Venta Confirmada!</h3>
+          <p id="pos-post-sale-doc-num" style="font-size: 0.95rem; font-weight: 800; color: var(--color-accent-gold); margin: 0 0 12px 0;">Comprobante #TICKET-0001</p>
+          <div id="pos-post-sale-summary-card" style="background: rgba(21,45,36,0.04); border-radius: 12px; padding: 12px; margin-bottom: 16px; text-align: left; font-size: 0.85rem;"></div>
+
+          <div style="display: grid; gap: 8px; margin-bottom: 16px;">
+            <button type="button" class="btn btn-primary" onclick="printCurrentSaleThermalTicket()" style="padding: 12px; font-weight: 800; font-size: 0.92rem; background: #152d24; color: #fff; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+              🖨️ Imprimir comprobante interno (80mm / 58mm)
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="sendCurrentSaleWhatsApp()" style="padding: 12px; font-weight: 800; font-size: 0.92rem; border-color: #25d366; color: #25d366; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+              📲 Enviar por WhatsApp al Cliente
+            </button>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <button type="button" class="btn btn-secondary" onclick="printCurrentSaleA4Pdf()" style="padding: 10px; font-weight: 700; font-size: 0.82rem; border-color: #1565c0; color: #1565c0; border-radius: 10px;">
+                📄 Imprimir / guardar PDF A4
+              </button>
+              <button type="button" class="btn btn-secondary" onclick="sendCurrentSaleEmail()" style="padding: 10px; font-weight: 700; font-size: 0.82rem; border-color: var(--color-border-subtle); border-radius: 10px;">
+                ✉️ Preparar correo
+              </button>
+            </div>
+          </div>
+
+          <button type="button" class="b2b-checkout-btn" onclick="closePosPostSaleModalAndNewSale()" style="width: 100%; padding: 12px; font-weight: 800; border-radius: 10px; background: #2e7d32;">
+            ＋ Nueva Venta (Espacio / Enter)
+          </button>
+        </div>
       </div>
 
       <!-- MODAL DE CONFIRMACIÓN PREVIA ANTES DE AGREGAR AL TICKET -->
@@ -2027,6 +2132,13 @@
                 <button type="button" class="pos-qty-btn" onclick="stepPosModalQty(1)" aria-label="Sumar una unidad">+</button>
               </div>
               <small id="pos-modal-qty-error" style="display: none; color: #c62828; font-weight: 700; margin-top: 6px;"></small>
+            </div>
+            <div id="pos-scan-delivery-container" style="display: none; margin-bottom: 20px; padding: 12px; border-radius: 12px; background: rgba(255,152,0,0.08); border: 1px solid #ffcc80;">
+              <label for="pos-scan-delivery-date" style="display: block; font-size: 0.82rem; font-weight: 800; text-transform: uppercase; color: #e65100; margin-bottom: 6px;">
+                Fecha estimada de entrega:
+              </label>
+              <input type="date" id="pos-scan-delivery-date" class="b2b-form-input" required style="width: 100%; min-height: 44px;">
+              <small style="display: block; margin-top: 5px; color: var(--color-text-muted);">El producto quedará pendiente en el Hub de Entregas.</small>
             </div>
           </div>
 
@@ -3201,6 +3313,181 @@
       </div>
     </section>
 
+    <!-- SECTION: HUB DE ENTREGAS Y SEGUIMIENTO DE ENCARGOS (FULFILLMENT HUB) -->
+    <section id="vendor-fulfillments-section" class="vendor-workspace-section" style="display: none; max-width: 1400px; margin: 30px auto; padding: 0 20px;" aria-labelledby="vendor-fulfillments-title">
+      <div style="background: var(--color-card-bg); border: 1.5px solid #ff9800; border-radius: 20px; padding: 24px; box-shadow: var(--shadow-md); color: var(--color-text-main);">
+
+        <!-- Header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
+          <div>
+            <span style="background: rgba(255,152,0,0.15); border: 1px solid #ff9800; color: #e65100; padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 800;">GESTIÓN DE BACKORDERS & LOGÍSTICA</span>
+            <h2 id="vendor-fulfillments-title" style="font-family: var(--font-serif); color: var(--color-text-main); font-size: 1.6rem; margin: 6px 0 0 0;">🚚 Hub de Entregas & Seguimiento de Encargos</h2>
+            <p style="font-size: 0.88rem; color: var(--color-text-muted); margin: 4px 0 0 0;">Control operativo de artículos vendidos por encargo, catálogo B2B y tiendas asociadas. Notificaciones de entrega por WhatsApp.</p>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button type="button" class="btn btn-secondary" onclick="loadFulfillmentsData(true)" style="border-color: #ff9800; color: #e65100; font-weight: 800; padding: 10px 16px; border-radius: 12px; font-size: 0.85rem; cursor: pointer;">
+              🔄 Actualizar
+            </button>
+            <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
+          </div>
+        </div>
+
+        <!-- Summary KPIs -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 22px;">
+          <div style="background: rgba(255,152,0,0.06); border: 1.5px solid #ffe082; border-radius: 14px; padding: 14px 18px;">
+            <span style="font-size: 0.76rem; text-transform: uppercase; color: #e65100; font-weight: 800;">🕒 Pendientes de Compra</span>
+            <strong id="fulfillments-kpi-pending" style="display: block; font-size: 1.5rem; color: #e65100; margin-top: 4px;">0 u.</strong>
+          </div>
+          <div style="background: rgba(33,150,243,0.06); border: 1.5px solid #90caf9; border-radius: 14px; padding: 14px 18px;">
+            <span style="font-size: 0.76rem; text-transform: uppercase; color: #1565c0; font-weight: 800;">🚚 En Camino / Proveedor</span>
+            <strong id="fulfillments-kpi-in-transit" style="display: block; font-size: 1.5rem; color: #1565c0; margin-top: 4px;">0 u.</strong>
+          </div>
+          <div style="background: rgba(76,175,80,0.08); border: 1.5px solid #a5d6a7; border-radius: 14px; padding: 14px 18px;">
+            <span style="font-size: 0.76rem; text-transform: uppercase; color: #2e7d32; font-weight: 800;">📦 Listos en Local</span>
+            <strong id="fulfillments-kpi-ready" style="display: block; font-size: 1.5rem; color: #2e7d32; margin-top: 4px;">0 u.</strong>
+          </div>
+          <div style="background: rgba(0,0,0,0.04); border: 1.5px solid var(--color-border-subtle); border-radius: 14px; padding: 14px 18px;">
+            <span style="font-size: 0.76rem; text-transform: uppercase; color: var(--color-text-muted); font-weight: 700;">✅ Entregados</span>
+            <strong id="fulfillments-kpi-fulfilled" style="display: block; font-size: 1.5rem; color: var(--color-text-main); margin-top: 4px;">0 u.</strong>
+          </div>
+        </div>
+
+        <!-- Filters & Search Toolbar -->
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="fulfillments-filter-chips">
+            <button type="button" class="b2b-filter-chip active" id="ful-filter-all" onclick="setFulfillmentsStatusFilter('ALL')">Todos</button>
+            <button type="button" class="b2b-filter-chip" id="ful-filter-pending" onclick="setFulfillmentsStatusFilter('PENDING')" style="border-color: #ff9800; color: #e65100;">🕒 Pendientes</button>
+            <button type="button" class="b2b-filter-chip" id="ful-filter-ordered" onclick="setFulfillmentsStatusFilter('ORDERED')" style="border-color: #42a5f5; color: #1565c0;">🛒 Pedidos a Proveedor</button>
+            <button type="button" class="b2b-filter-chip" id="ful-filter-transit" onclick="setFulfillmentsStatusFilter('IN_TRANSIT')" style="border-color: #26a69a; color: #00695c;">🚚 En Camino</button>
+            <button type="button" class="b2b-filter-chip" id="ful-filter-ready" onclick="setFulfillmentsStatusFilter('READY_FOR_PICKUP')" style="border-color: #66bb6a; color: #2e7d32;">📦 Listos para Retirar</button>
+            <button type="button" class="b2b-filter-chip" id="ful-filter-fulfilled" onclick="setFulfillmentsStatusFilter('FULFILLED')">✅ Entregados</button>
+          </div>
+
+          <div style="flex: 1; max-width: 380px; min-width: 240px; position: relative;">
+            <input type="search" id="fulfillments-search-input" placeholder="Buscar por cliente, producto, ticket..." oninput="handleFulfillmentsSearchInput(this.value)" style="width: 100%; padding: 8px 14px 8px 36px; border-radius: 10px; border: 1.5px solid var(--color-border-accent); background: var(--color-input-bg, #fff); color: var(--color-text-main); font-size: 0.88rem; box-sizing: border-box;">
+            <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 0.9rem; color: var(--color-text-muted);">🔍</span>
+          </div>
+        </div>
+
+        <!-- Fulfillments Table / List -->
+        <div style="overflow-x: auto; background: var(--color-card-bg-alt); border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 12px;">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+            <thead>
+              <tr style="border-bottom: 1.5px solid var(--color-border-accent); color: var(--color-text-muted);">
+                <th style="padding: 10px;">Ticket / Fecha</th>
+                <th style="padding: 10px;">Cliente & Contacto</th>
+                <th style="padding: 10px;">Producto & Cantidad</th>
+                <th style="padding: 10px;">Origen / Proveedor</th>
+                <th style="padding: 10px;">Fecha Prometida</th>
+                <th style="padding: 10px;">Estado</th>
+                <th style="padding: 10px; text-align: right;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="vendor-fulfillments-table-body">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- PANEL EN LÍNEA: CALCULADORA DE BILLETES ARS Y CONTEO FÍSICO -->
+    <section id="cash-bills-calculator-modal" class="vendor-workspace-section" style="display: none; max-width: 760px; margin: 24px auto; padding: 0 20px;" aria-labelledby="cash-bills-title">
+      <div style="background: var(--color-card-bg); border: 1.5px solid var(--color-accent-gold); border-radius: 16px; padding: 24px; width: 100%; box-sizing: border-box; box-shadow: var(--shadow-lg); color: var(--color-text-main);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 10px;">
+          <div>
+            <h3 id="cash-bills-title" style="margin: 0; font-size: 1.15rem; color: var(--color-text-main); font-weight: 800;">🧮 Conteo de Billetes ARS</h3>
+            <small style="color: var(--color-text-muted); font-size: 0.75rem;">Ingresá la cantidad de billetes por cada denominación</small>
+          </div>
+          <button type="button" class="cash-secondary-btn" onclick="closeCashBillsCalculatorModal()" style="min-height: 44px;">Ocultar</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;" id="bills-calculator-grid">
+          <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.04); border: 1px solid var(--color-border-subtle); border-radius: 8px; padding: 6px 10px;">
+            <strong style="width: 70px; font-size: 0.85rem; color: #2e7d32;">$20.000:</strong>
+            <input type="number" min="0" step="1" id="bill-qty-20000" class="b2b-form-input" placeholder="0" oninput="updateBillsCalculatorTotal()" style="padding: 4px 8px; font-size: 0.85rem; text-align: right;">
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.04); border: 1px solid var(--color-border-subtle); border-radius: 8px; padding: 6px 10px;">
+            <strong style="width: 70px; font-size: 0.85rem; color: #2e7d32;">$10.000:</strong>
+            <input type="number" min="0" step="1" id="bill-qty-10000" class="b2b-form-input" placeholder="0" oninput="updateBillsCalculatorTotal()" style="padding: 4px 8px; font-size: 0.85rem; text-align: right;">
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.04); border: 1px solid var(--color-border-subtle); border-radius: 8px; padding: 6px 10px;">
+            <strong style="width: 70px; font-size: 0.85rem; color: #2e7d32;">$2.000:</strong>
+            <input type="number" min="0" step="1" id="bill-qty-2000" class="b2b-form-input" placeholder="0" oninput="updateBillsCalculatorTotal()" style="padding: 4px 8px; font-size: 0.85rem; text-align: right;">
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.04); border: 1px solid var(--color-border-subtle); border-radius: 8px; padding: 6px 10px;">
+            <strong style="width: 70px; font-size: 0.85rem; color: #2e7d32;">$1.000:</strong>
+            <input type="number" min="0" step="1" id="bill-qty-1000" class="b2b-form-input" placeholder="0" oninput="updateBillsCalculatorTotal()" style="padding: 4px 8px; font-size: 0.85rem; text-align: right;">
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.04); border: 1px solid var(--color-border-subtle); border-radius: 8px; padding: 6px 10px;">
+            <strong style="width: 70px; font-size: 0.85rem; color: #2e7d32;">$500:</strong>
+            <input type="number" min="0" step="1" id="bill-qty-500" class="b2b-form-input" placeholder="0" oninput="updateBillsCalculatorTotal()" style="padding: 4px 8px; font-size: 0.85rem; text-align: right;">
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.04); border: 1px solid var(--color-border-subtle); border-radius: 8px; padding: 6px 10px;">
+            <strong style="width: 70px; font-size: 0.85rem; color: #2e7d32;">$200:</strong>
+            <input type="number" min="0" step="1" id="bill-qty-200" class="b2b-form-input" placeholder="0" oninput="updateBillsCalculatorTotal()" style="padding: 4px 8px; font-size: 0.85rem; text-align: right;">
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.04); border: 1px solid var(--color-border-subtle); border-radius: 8px; padding: 6px 10px;">
+            <strong style="width: 70px; font-size: 0.85rem; color: #2e7d32;">$100:</strong>
+            <input type="number" min="0" step="1" id="bill-qty-100" class="b2b-form-input" placeholder="0" oninput="updateBillsCalculatorTotal()" style="padding: 4px 8px; font-size: 0.85rem; text-align: right;">
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.04); border: 1px solid var(--color-border-subtle); border-radius: 8px; padding: 6px 10px;">
+            <strong style="width: 70px; font-size: 0.85rem; color: var(--color-text-muted);">Monedas $:</strong>
+            <input type="number" min="0" step="1" id="bill-qty-coins" class="b2b-form-input" placeholder="0" oninput="updateBillsCalculatorTotal()" style="padding: 4px 8px; font-size: 0.85rem; text-align: right;">
+          </div>
+        </div>
+
+        <div style="background: rgba(46,125,50,0.08); border: 1.5px solid #81c784; border-radius: 10px; padding: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <span style="font-weight: 700; color: var(--color-text-main); font-size: 0.95rem;">Total Contado Físico:</span>
+          <strong id="bills-calculator-total-display" style="font-size: 1.3rem; color: #2e7d32;">$0,00</strong>
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button type="button" class="btn btn-secondary" onclick="closeCashBillsCalculatorModal()" style="padding: 8px 16px; min-height: 44px; border-radius: 8px; font-weight: 700; cursor: pointer;">Cancelar</button>
+          <button type="button" class="btn btn-primary" onclick="applyBillsCalculatorTotal()" style="padding: 8px 20px; min-height: 44px; border-radius: 8px; font-weight: 800; background: #2e7d32; border-color: #81c784; color: #fff; cursor: pointer;">Aplicar al Cierre</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- MODAL DE CAMBIO DE ESTADO DE ENCARGO / ENTREGA -->
+    <div id="fulfillments-status-modal" class="pos-scan-confirm-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+      <div style="background: var(--color-card-bg); border: 1.5px solid #ff9800; border-radius: 16px; padding: 24px; width: 90%; max-width: 480px; box-shadow: var(--shadow-lg); color: var(--color-text-main);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 10px;">
+          <h3 style="margin: 0; font-size: 1.15rem; color: var(--color-text-main); font-weight: 800;">Actualizar Estado del Encargo</h3>
+          <button type="button" class="pos-confirm-modal-close" onclick="closeFulfillmentStatusModal()" style="background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--color-text-muted);">✕</button>
+        </div>
+
+        <div id="fulfillments-modal-product-summary" style="background: rgba(255,152,0,0.06); border-radius: 10px; padding: 12px; margin-bottom: 16px;">
+          <!-- Populated by JS -->
+        </div>
+
+        <form onsubmit="handleFulfillmentStatusSubmit(event)">
+          <div style="margin-bottom: 14px;">
+            <label style="display: block; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--color-text-muted); margin-bottom: 4px;">Nuevo Estado:</label>
+            <select id="fulfillments-modal-status-select" style="width: 100%; padding: 10px 12px; border-radius: 8px; border: 1.5px solid var(--color-border-accent); font-size: 0.9rem; font-weight: 700; background: var(--color-input-bg, #fff); color: var(--color-text-main);">
+              <option value="PENDING">🕒 PENDING · Pendiente de compra</option>
+              <option value="ORDERED">🛒 ORDERED · Pedido realizado al proveedor</option>
+              <option value="IN_TRANSIT">🚚 IN_TRANSIT · En camino a la tienda</option>
+              <option value="READY_FOR_PICKUP">📦 READY_FOR_PICKUP · En local listo para entrega</option>
+              <option value="FULFILLED">✅ FULFILLED · Entregado al cliente</option>
+              <option value="CANCELLED">✕ CANCELLED · Cancelado</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--color-text-muted); margin-bottom: 4px;">Observaciones / Guía de Envío (Opcional):</label>
+            <textarea id="fulfillments-modal-notes-input" rows="2" placeholder="Ej: Llega el viernes con el pedido B2B..." style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--color-border-subtle); font-size: 0.85rem; font-family: inherit; box-sizing: border-box;"></textarea>
+          </div>
+
+          <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button type="button" class="btn btn-secondary" onclick="closeFulfillmentStatusModal()" style="padding: 8px 16px; border-radius: 8px; font-weight: 700; cursor: pointer;">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="padding: 8px 20px; border-radius: 8px; font-weight: 800; background: #2e7d32; border-color: #81c784; color: #fff; cursor: pointer;">Guardar Cambio</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- SECTION: PRODUCTOS RETIRADOS Y AJUSTES DE STOCK -->
     <section id="vendor-retired-products-section" class="vendor-workspace-section" style="display: none; max-width: 1400px; margin: 30px auto; padding: 0 20px;" aria-labelledby="vendor-retired-title">
       <div style="background: var(--color-card-bg); border: 1.5px solid #c2a246; border-radius: 20px; padding: 24px; box-shadow: var(--shadow-md); color: var(--color-text-main);">
@@ -3453,6 +3740,10 @@
             <div class="cash-field">
               <label for="cash-counted-amount">Efectivo contado *</label>
               <input type="number" min="0" step="0.01" inputmode="decimal" id="cash-counted-amount" class="b2b-form-input" placeholder="Monto contado" oninput="updateCashDifferencePreview()">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+              <button type="button" class="cash-secondary-btn" onclick="openCashBillsCalculatorModal()" style="min-height:44px;">🧮 Contar billetes</button>
+              <button type="button" class="cash-secondary-btn" id="btn-print-cash-sheet" onclick="printCashClosureSheet()" style="min-height:44px;">🖨️ Imprimir planilla</button>
             </div>
             <div class="cash-field">
               <label for="cash-closure-notes">Observaciones del cierre</label>
@@ -4265,6 +4556,14 @@
             </div>
           </button>
 
+          <button type="button" class="vendor-sheet-op-btn" onclick="switchVendorTab('fulfillments'); closeVendorMobileOperationsMenu();">
+            <span class="vendor-sheet-icon">🚚</span>
+            <div>
+              <strong>Entregas & Encargos</strong>
+              <small>Seguimiento de backorders</small>
+            </div>
+          </button>
+
           <button type="button" class="vendor-sheet-op-btn" onclick="switchVendorTab('web-orders'); closeVendorMobileOperationsMenu();">
             <span class="vendor-sheet-icon">🛍️</span>
             <div>
@@ -4527,18 +4826,19 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="mapa-local.js?v=gba_leafgreen_v5"></script>
   <script src="saas-auth.js?v=saas_v2"></script>
-  <script src="app-config.js?v=config_v2"></script>
+  <script src="app-config.js?v=config_v3"></script>
   <script src="business-verticals.js?v=verticals_v1"></script>
   <script src="tenant-theme.js?v=theme_v1"></script>
   <script src="migration-ai.js?v=migration_v1"></script>
   <script src="migration-rollback.js?v=migration_v1"></script>
   <script src="migration-center.js?v=migration_v1"></script>
   <script src="tenant-onboarding.js?v=onboarding_v1"></script>
-  <script src="pos-cart-engine.js?v=cart_v2"></script>
-  <script src="operational-api.js?v=core_v2"></script>
+  <script src="pos-cart-engine.js?v=cart_v3"></script>
+  <script src="operational-api.js?v=core_v3"></script>
+  <script src="pos-desk-utils.js?v=pos_utils_v1"></script>
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=pos_mobile_v47"></script>
+  <script src="vendedor.js?v=pos_flexible_v1"></script>
 </body>
 </html>

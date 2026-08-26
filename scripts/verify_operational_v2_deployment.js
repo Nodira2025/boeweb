@@ -8,7 +8,13 @@ dotenv.config({ path: path.join(rootDir, '.env'), quiet: true });
 const TENANT_ID = process.env.PUBLIC_TENANT_ID
   || process.env.DEFAULT_TENANT_ID
   || '11111111-1111-1111-1111-111111111111';
-const EXPECTED_MIGRATIONS = Array.from({ length: 12 }, (_, index) => String(index).padStart(3, '0'));
+const EXPECTED_MIGRATIONS = Array.from({ length: 15 }, (_, index) => String(index).padStart(3, '0'));
+const FLEXIBLE_POS_TABLES = [
+  'sale_fulfillments_v2',
+  'external_catalog_sources_v2',
+  'external_catalog_offers_v2',
+  'parked_pos_tickets_v2'
+];
 
 function requireEnvironment(name) {
   const value = String(process.env[name] || '').trim();
@@ -44,6 +50,13 @@ async function verifyDeployment() {
   const appliedVersions = new Set(migrations.data.map(row => row.version));
   const missingVersions = EXPECTED_MIGRATIONS.filter(version => !appliedVersions.has(version));
   assert(missingVersions.length === 0, `Faltan migraciones: ${missingVersions.join(', ')}`);
+
+  for (const tableName of FLEXIBLE_POS_TABLES) {
+    await selectOrThrow(
+      service.from(tableName).select('id').limit(1),
+      `No se pudo verificar ${tableName}`
+    );
+  }
 
   const tenant = await selectOrThrow(
     service.from('tenants').select('id,status').eq('id', TENANT_ID).eq('status', 'ACTIVE'),
@@ -91,6 +104,7 @@ async function verifyDeployment() {
   const summary = {
     tenantId: TENANT_ID,
     migrations: EXPECTED_MIGRATIONS.length,
+    flexiblePosTables: FLEXIBLE_POS_TABLES.length,
     activeUsers: memberships.data.length,
     publishedConfigRevision: publishedConfig.data[0].revision,
     defaultLocations: locations.data.length,

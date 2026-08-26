@@ -17,7 +17,7 @@ class StorageMock {
 global.localStorage = new StorageMock();
 global.sessionStorage = new StorageMock();
 
-test('1. POS Cart Engine: rechaza ítems exprés fuera del catálogo autoritativo', () => {
+test('1. POS Cart Engine: acepta ítems de venta rápida/libre bajo contrato QUICK_ENTRY', () => {
   const cart = new PosCartEngine('POS');
   cart.clear();
 
@@ -31,9 +31,9 @@ test('1. POS Cart Engine: rechaza ítems exprés fuera del catálogo autoritativ
     is_express: true
   });
 
-  assert.equal(ok, false);
-  assert.equal(cart.getItemCount(), 0);
-  assert.equal(cart.calculateTotal(), 0);
+  assert.equal(ok, true);
+  assert.equal(cart.getItemCount(), 2);
+  assert.equal(cart.calculateTotal(), 37000);
 
   const draft = cart.createSaleDraft({
     tenantId: '11111111-1111-1111-1111-111111111111',
@@ -42,7 +42,10 @@ test('1. POS Cart Engine: rechaza ítems exprés fuera del catálogo autoritativ
     paymentMethod: 'EFECTIVO'
   });
 
-  assert.equal(draft.items.length, 0);
+  assert.equal(draft.items.length, 1);
+  assert.equal(draft.items[0].line_type, 'QUICK_ENTRY');
+  assert.equal(draft.items[0].product_id, null);
+  assert.equal(draft.items[0].unit_price, 18500);
 });
 
 test('2. La UI operativa no invoca el simulador local para confirmar ventas', () => {
@@ -79,7 +82,7 @@ test('4. Arqueo: sólo la asignación CASH integra el efectivo esperado', () => 
   assert.equal(expectedCash, 13000);
 });
 
-test('5. Un carrito POS nunca mezcla inventario canónico con un ítem exprés', () => {
+test('5. Un carrito POS admite tickets mixtos de inventario propio con ítem rápido sin tocar stock falso', () => {
   const cart = new PosCartEngine('POS');
   cart.clear();
   assert.equal(cart.addItem({
@@ -97,7 +100,10 @@ test('5. Un carrito POS nunca mezcla inventario canónico con un ítem exprés',
     quantity: 1,
     is_express: true,
     availability: 'EXPRESS_UNMAPPED'
-  }), false);
-  assert.equal(cart.getItemCount(), 2);
-  assert.equal(cart.getTotal(), 24000);
+  }), true);
+  assert.equal(cart.getItemCount(), 3);
+  assert.equal(cart.getTotal(), 49000);
+  const items = cart.getItems();
+  assert.equal(items[0].line_type, 'OWN_STOCK');
+  assert.equal(items[1].line_type, 'QUICK_ENTRY');
 });

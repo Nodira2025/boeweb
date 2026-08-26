@@ -831,6 +831,15 @@ function collectFutureAppConfig(brandProfile = collectLegacyBrandProfile()) {
         enabled: true,
         requireCreditLimit: true,
         blockOverdue: true
+      },
+      pos: {
+        barcodeDirectAdd: document.getElementById('app-pos-barcode-direct')?.checked,
+        billDenominations: String(document.getElementById('app-pos-bill-denominations')?.value || '')
+          .split(/[,;\s]+/)
+          .filter(Boolean)
+          .map(value => Number(value)),
+        parkedTicketsEnabled: document.getElementById('app-pos-parked-tickets')?.checked,
+        printDuplicateReceipts: document.getElementById('app-pos-print-duplicates')?.checked
       }
     }
   }, { tenantId: getAdminTenantId() });
@@ -861,6 +870,10 @@ function loadFutureAppConfigControls(config) {
   setControlValue('app-rule-cash-tolerance', normalized.rules.cash.differenceTolerance);
   setControlValue('app-rule-credit-limit', normalized.rules.currentAccount.requireCreditLimit, 'checked');
   setControlValue('app-rule-block-overdue', normalized.rules.currentAccount.blockOverdue, 'checked');
+  setControlValue('app-pos-barcode-direct', normalized.rules.pos.barcodeDirectAdd, 'checked');
+  setControlValue('app-pos-bill-denominations', normalized.rules.pos.billDenominations.join(', '));
+  setControlValue('app-pos-parked-tickets', normalized.rules.pos.parkedTicketsEnabled, 'checked');
+  setControlValue('app-pos-print-duplicates', normalized.rules.pos.printDuplicateReceipts, 'checked');
   updateAppConfigStatus(normalized.status === 'published' ? `Publicado · revisión ${normalized.revision}` : `Borrador · revisión ${normalized.revision}`);
   window.AppConfig.applyCssVariables(normalized);
   initializeAppConfigDirtyTracking();

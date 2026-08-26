@@ -15,6 +15,7 @@ const {
 } = operationalPackage;
 
 const migrationPath = path.resolve('scripts', 'migrations', '004_operational_core_and_config.sql');
+const flexibleSalesMigrationPath = path.resolve('scripts', 'migrations', '012_pos_flexible_sales.sql');
 const tenantTables = [
   'tenant_app_config',
   'tenant_configurations',
@@ -484,7 +485,8 @@ const testIds = Object.freeze({
   cashier: '22222222-2222-4222-8222-222222222222',
   salesperson: '33333333-3333-4333-8333-333333333333',
   customer: '44444444-4444-4444-8444-444444444444',
-  register: '55555555-5555-4555-8555-555555555555'
+  register: '55555555-5555-4555-8555-555555555555',
+  product: '66666666-6666-4666-8666-666666666666'
 });
 
 function buildDraft(overrides = {}) {
@@ -501,7 +503,7 @@ function buildDraft(overrides = {}) {
       secondary_method: 'TRANSFERENCIA',
       secondary_amount: 6000
     },
-    items: [{ product_id: 'SKU-001', quantity: 2, price: 5000 }],
+    items: [{ product_id: testIds.product, product_code: 'SKU-001', quantity: 2, price: 5000 }],
     total: 10000,
     ...overrides
   };
@@ -538,15 +540,24 @@ test('OperationalApi arma un pago mixto exacto y rechaza splits incompletos o de
     () => buildPayments(buildDraft({ payment_breakdown: { cash_amount: 0, secondary_method: 'TRANSFERENCIA', secondary_amount: 10000 } })),
     (error) => error instanceof OperationalApiError && error.code === 'INVALID_PAYMENT_SPLIT'
   );
+  assert.deepEqual(buildPayments(buildDraft({
+    payment_method: 'EFECTIVO',
+    payment_breakdown: null,
+    cash_tendered: 12000
+  })), [{ method: 'CASH', amount: 10000, metadata: { cash_tendered: 12000 } }]);
+  assert.throws(
+    () => buildPayments(buildDraft({ payment_method: 'EFECTIVO', payment_breakdown: null, cash_tendered: 9000 })),
+    (error) => error instanceof OperationalApiError && error.code === 'INSUFFICIENT_CASH_TENDERED'
+  );
 });
 
 test('OperationalApi preserva cajero y vendedor distintos y genera payload_hash determinista y sensible al contenido', async () => {
   const draftA = buildDraft();
   const draftSameMeaning = buildDraft({
-    items: [{ price: 5000, quantity: 2, product_id: 'SKU-001' }]
+    items: [{ price: 5000, quantity: 2, product_code: 'SKU-001', product_id: testIds.product }]
   });
   const draftChanged = buildDraft({
-    items: [{ product_id: 'SKU-001', quantity: 3, price: 5000 }],
+    items: [{ product_id: testIds.product, product_code: 'SKU-001', quantity: 3, price: 5000 }],
     total: 15000,
     payment_breakdown: { cash_amount: 6000, secondary_method: 'TRANSFERENCIA', secondary_amount: 9000 }
   });
@@ -587,24 +598,25 @@ test('cuenta corriente exige customer_id y nunca confunde customer_account_id co
 test('el comando conserva location_id para vincular la venta con la estantería correcta', async () => {
   const locationId = '99999999-9999-4999-8999-999999999999';
   const command = await buildCheckoutCommand(buildDraft({
-    items: [{ product_id: 'SKU-001', location_id: locationId, quantity: 2, price: 5000 }]
+    items: [{ product_id: testIds.product, product_code: 'SKU-001', location_id: locationId, quantity: 2, price: 5000 }]
   }));
 
   assert.equal(command.items[0].location_id, locationId);
   await assert.rejects(
     buildCheckoutCommand(buildDraft({
-      items: [{ product_id: 'SKU-001', location_id: 'shelf-local-no-uuid', quantity: 2, price: 5000 }]
+      items: [{ product_id: testIds.product, product_code: 'SKU-001', location_id: 'shelf-local-no-uuid', quantity: 2, price: 5000 }]
     })),
     (error) => error instanceof OperationalApiError && error.code === 'INVALID_LOCATION_ID'
   );
 });
 
-test('cliente y SQL mantienen paridad exacta de parámetros para checkout_sale_v2', () => {
+test('cliente y SQL mantienen paridad exacta de parámetros para checkout_sale_v3', () => {
   const apiSource = fs.readFileSync(path.resolve('operational-api.js'), 'utf8');
-  const callMatch = /\.rpc\s*\(\s*['"]checkout_sale_v2['"]\s*,\s*\{([\s\S]*?)\}\s*\)/.exec(apiSource);
-  assert.ok(callMatch, 'operational-api debe invocar checkout_sale_v2');
+  const callMatch = /\.rpc\s*\(\s*['"]checkout_sale_v3['"]\s*,\s*\{([\s\S]*?)\}\s*\)/.exec(apiSource);
+  assert.ok(callMatch, 'operational-api debe invocar checkout_sale_v3');
   const clientParameters = [...callMatch[1].matchAll(/\b(p_[a-z0-9_]+)\s*:/gi)].map((match) => match[1].toLowerCase());
-  const sqlDefinition = compact(functionDefinition(readMigration(), 'checkout_sale_v2').definition);
+  const flexibleSql = fs.readFileSync(flexibleSalesMigrationPath, 'utf8');
+  const sqlDefinition = compact(functionDefinition(flexibleSql, 'checkout_sale_v3').definition);
 
   assert.ok(clientParameters.length > 0);
   for (const parameter of clientParameters) {
@@ -628,7 +640,7 @@ test('checkoutSale impide suplantar tenant/cajero pero permite cerrar la venta a
 
   assert.equal(result.state, 'CONFIRMED');
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].name, 'checkout_sale_v2');
+  assert.equal(calls[0].name, 'checkout_sale_v3');
   assert.equal(calls[0].parameters.p_cashier_user_id, testIds.cashier);
   assert.equal(calls[0].parameters.p_salesperson_user_id, testIds.salesperson);
 
@@ -708,7 +720,7 @@ test('outbox nunca sobrescribe una intención previa con la misma clave y payloa
     await checkoutSale({ supabaseClient: failingClient, authContext, draft: buildDraft() });
     const original = readOutbox(testIds.tenant, testIds.cashier)[0];
     const divergentDraft = buildDraft({
-      items: [{ product_id: 'SKU-001', quantity: 3, price: 5000 }],
+      items: [{ product_id: testIds.product, product_code: 'SKU-001', quantity: 3, price: 5000 }],
       total: 15000,
       payment_breakdown: { cash_amount: 6000, secondary_method: 'TRANSFERENCIA', secondary_amount: 9000 }
     });

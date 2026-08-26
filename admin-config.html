@@ -519,6 +519,7 @@
           <button type="button" onclick="focusBrandConfig('brand-name-input')">Textos</button>
           <button type="button" onclick="focusAdminConfigControl('app-config-catalog', 'operacion')">Catálogo</button>
           <button type="button" onclick="focusAdminConfigControl('app-config-rules', 'operacion')">Reglas</button>
+          <button type="button" onclick="focusAdminConfigControl('app-config-pos', 'operacion')">POS</button>
         </nav>
 
         <div class="app-config-grid">
@@ -620,6 +621,28 @@
               <input id="app-rule-block-overdue" type="checkbox" checked disabled>
             </label>
           </fieldset>
+
+          <fieldset class="app-config-panel" id="app-config-pos">
+            <legend>Mostrador y comprobantes</legend>
+            <p>Preferencias de velocidad del POS. Las denominaciones sólo ayudan a calcular el vuelto; no reemplazan el conteo ni la caja central.</p>
+            <label class="app-config-toggle" for="app-pos-barcode-direct">
+              <strong>Agregar automáticamente al escanear un producto con stock</strong>
+              <input id="app-pos-barcode-direct" type="checkbox" checked>
+            </label>
+            <div class="app-config-field">
+              <label for="app-pos-bill-denominations">Billetes rápidos ARS</label>
+              <input id="app-pos-bill-denominations" type="text" inputmode="numeric" value="20000, 10000, 2000, 1000, 500, 200, 100" aria-describedby="app-pos-bill-help" autocomplete="off">
+              <small id="app-pos-bill-help">Separalos con comas. Se admiten hasta 20 importes enteros positivos.</small>
+            </div>
+            <label class="app-config-toggle" for="app-pos-parked-tickets">
+              <strong>Permitir ventas en espera</strong>
+              <input id="app-pos-parked-tickets" type="checkbox" checked>
+            </label>
+            <label class="app-config-toggle" for="app-pos-print-duplicates">
+              <strong>Imprimir duplicado de comprobantes internos</strong>
+              <input id="app-pos-print-duplicates" type="checkbox" checked>
+            </label>
+          </fieldset>
         </div>
 
         <div class="app-config-actions">
@@ -687,7 +710,7 @@
   <script src="business-verticals.js"></script>
   <script src="tenant-theme.js"></script>
   <script src="saas-auth.js?v=auth_v1"></script>
-  <script src="app-config.js?v=config_v2"></script>
-  <script src="admin-config.js?v=3.1"></script>
+  <script src="app-config.js?v=config_v3"></script>
+  <script src="admin-config.js?v=3.2"></script>
 </body>
 </html>
