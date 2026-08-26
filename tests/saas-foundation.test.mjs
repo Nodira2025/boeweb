@@ -46,6 +46,67 @@ test('SaaS Security: el selector local de roles está deshabilitado', () => {
   assert.equal(SaasAuth.switchActiveTenant(SAAS_TENANTS[1].id), false);
 });
 
+test('SaaS Session: recupera una sesión operativa válida y comparte la hidratación concurrente', async () => {
+  SaasAuth.logout();
+  const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const membership = {
+    tenant_id: SAAS_TENANTS[0].id,
+    user_id: userId,
+    email: 'operador@example.com',
+    name: 'Operador Test',
+    role: 'VENDEDOR',
+    active: true
+  };
+  let releaseAuth;
+  let getUserCalls = 0;
+  const authGate = new Promise(resolve => { releaseAuth = resolve; });
+  const query = {
+    select() { return this; },
+    eq() { return this; },
+    limit() { return this; },
+    async maybeSingle() { return { data: membership, error: null }; }
+  };
+  const client = {
+    auth: {
+      async getUser() {
+        getUserCalls += 1;
+        await authGate;
+        return { data: { user: { id: userId, email: membership.email } }, error: null };
+      }
+    },
+    from() { return query; }
+  };
+
+  const firstRecovery = SaasAuth.ensureOperationalContext(client);
+  const secondRecovery = SaasAuth.ensureOperationalContext(client);
+  assert.equal(getUserCalls, 1);
+  releaseAuth();
+  const [firstContext, secondContext] = await Promise.all([firstRecovery, secondRecovery]);
+
+  assert.equal(firstContext?.isVerified, true);
+  assert.equal(secondContext?.userId, userId);
+  assert.equal(SaasAuth.isOperationalContextReady(firstContext), true);
+  assert.equal(getUserCalls, 1);
+
+  const forcedContext = await SaasAuth.ensureOperationalContext(client, { forceRefresh: true });
+  assert.equal(forcedContext?.userId, userId);
+  assert.equal(getUserCalls, 2);
+});
+
+test('SaaS Session: no convierte una sesión inexistente en acceso operativo', async () => {
+  SaasAuth.logout();
+  const client = {
+    auth: {
+      async getUser() {
+        return { data: { user: null }, error: { message: 'No session' } };
+      }
+    }
+  };
+
+  assert.equal(await SaasAuth.ensureOperationalContext(client), null);
+  assert.equal(SaasAuth.getTenantContext().isVerified, false);
+});
+
 test('SaaS Roles: una membresía validada por Supabase recibe solo sus permisos', async () => {
   const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const membership = {

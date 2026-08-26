@@ -29,6 +29,12 @@ function getSafeStorageItem(storage, key) {
   }
 }
 
+function isOperationalUuid(value) {
+  const normalized = String(value || '').trim();
+  return /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(normalized)
+    && normalized.toLowerCase() !== '00000000-0000-0000-0000-000000000000';
+}
+
 class SaasAuthEngine {
   constructor() {
     const local = typeof localStorage !== 'undefined' ? localStorage : null;
@@ -44,6 +50,7 @@ class SaasAuthEngine {
     this.verifiedSession = false;
     this.tenantUsers = [];
     this.activeTenantProfile = null;
+    this.operationalContextRefresh = null;
   }
 
   getTenantContext() {
@@ -77,6 +84,35 @@ class SaasAuthEngine {
     if (!context.isVerified) return false;
     if (context.isSuperadmin || context.permissions.includes('*')) return true;
     return context.permissions.includes(permissionKey);
+  }
+
+  isOperationalContextReady(context = this.getTenantContext()) {
+    return Boolean(
+      context?.isVerified
+      && isOperationalUuid(context.tenantId)
+      && isOperationalUuid(context.userId)
+    );
+  }
+
+  async ensureOperationalContext(client, { forceRefresh = false } = {}) {
+    const currentContext = this.getTenantContext();
+    if (!forceRefresh && this.isOperationalContextReady(currentContext)) return currentContext;
+    if (!client?.auth || typeof client.auth.getUser !== 'function') return null;
+
+    // Varias vistas pueden pedir la sesión al mismo tiempo al abrir el portal.
+    // Se comparte una única hidratación para evitar consultas y estados cruzados.
+    if (!this.operationalContextRefresh) {
+      this.operationalContextRefresh = this.hydrateFromSupabase(client)
+        .then(() => {
+          const refreshedContext = this.getTenantContext();
+          return this.isOperationalContextReady(refreshedContext) ? refreshedContext : null;
+        })
+        .catch(() => null)
+        .finally(() => {
+          this.operationalContextRefresh = null;
+        });
+    }
+    return this.operationalContextRefresh;
   }
 
   async hydrateFromSupabase(client) {

@@ -120,9 +120,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (window.supabase && typeof window.supabase.createClient === 'function') {
       supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
       window.supabaseClient = supabaseClient;
-      if (window.SaasAuth?.hydrateFromSupabase) {
+      if (window.SaasAuth?.ensureOperationalContext) {
         try {
-          await window.SaasAuth.hydrateFromSupabase(supabaseClient);
+          await window.SaasAuth.ensureOperationalContext(supabaseClient);
           checkVendorAuth();
         } catch (authErr) {
           console.warn('SaasAuth optional hydration notice:', authErr);
@@ -1104,6 +1104,40 @@ function setVendorLoginMessage(message, state = 'error') {
   messageElement.hidden = !message;
 }
 
+async function ensureVendorOperationalSession({ showLogin = false, forceRefresh = false } = {}) {
+  if (!supabaseClient || typeof SaasAuth === 'undefined') {
+    if (showLogin) {
+      setVendorLoginMessage('El servicio de sesión no está disponible. Recargá la página.', 'error');
+      checkVendorAuth();
+    }
+    return null;
+  }
+
+  const context = typeof SaasAuth.ensureOperationalContext === 'function'
+    ? await SaasAuth.ensureOperationalContext(supabaseClient, { forceRefresh })
+    : SaasAuth.getTenantContext();
+  const ready = typeof SaasAuth.isOperationalContextReady === 'function'
+    ? SaasAuth.isOperationalContextReady(context)
+    : Boolean(context?.isVerified && context?.tenantId && context?.userId);
+
+  if (ready) return context;
+  if (showLogin) {
+    setVendorLoginMessage('Tu sesión venció o todavía no fue verificada. Ingresá nuevamente para continuar sin perder seguridad.', 'info');
+    checkVendorAuth();
+  }
+  return null;
+}
+
+async function reconnectVendorSession() {
+  const context = await ensureVendorOperationalSession({ showLogin: true, forceRefresh: true });
+  if (!context) return false;
+  populatePosSalespeople();
+  updateSaasHeaderUI();
+  await Promise.all([loadPosRegisters(), loadExternalCatalogOffers()]);
+  showToast(`✓ Sesión operativa verificada para ${context.userName}.`);
+  return true;
+}
+
 function toggleVendorPasswordVisibility() {
   const passwordInput = document.getElementById('auth-vendor-password');
   const toggleButton = document.getElementById('vendor-password-toggle');
@@ -1120,7 +1154,11 @@ function checkVendorAuth() {
   const authContext = typeof SaasAuth !== 'undefined'
     ? SaasAuth.getTenantContext()
     : { isVerified: false };
-  const activeVendor = authContext.isVerified ? authContext.userName : '';
+  const hasOperationalSession = typeof SaasAuth !== 'undefined'
+    && typeof SaasAuth.isOperationalContextReady === 'function'
+    ? SaasAuth.isOperationalContextReady(authContext)
+    : Boolean(authContext.isVerified && authContext.tenantId && authContext.userId);
+  const activeVendor = hasOperationalSession ? authContext.userName : '';
   const loginScreen = document.getElementById('vendedor-login-screen');
   const portalApp = document.getElementById('vendedor-portal-app');
   const vendorNameHeader = document.getElementById('active-vendor-display-name');
@@ -1129,7 +1167,7 @@ function checkVendorAuth() {
   const sidebarAvatar = document.getElementById('vendor-sidebar-avatar');
   const adminConfigLinks = document.querySelectorAll('[data-admin-config-link]');
 
-  if (authContext.isVerified && activeVendor) {
+  if (hasOperationalSession && activeVendor) {
     if (loginScreen) loginScreen.style.display = 'none';
     if (portalApp) portalApp.style.display = 'block';
     const activeVendorNameText = document.getElementById('active-vendor-name-text');
@@ -5298,9 +5336,9 @@ async function submitProductDraft(event) {
   const submitBtn = document.getElementById('fastupload-submit-btn');
 
   try {
-    const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
-    if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
-      throw new Error('Iniciá sesión para ingresar el producto en la cola central.');
+    const authContext = await ensureVendorOperationalSession({ showLogin: true });
+    if (!window.OperationalApi || !authContext) {
+      throw new Error('Iniciá sesión nuevamente para ingresar el producto en la cola central.');
     }
     const nameVal = document.getElementById('fastupload-name-input')?.value.trim();
     const categoryVal = document.getElementById('fastupload-category-input')?.value;
@@ -5515,8 +5553,8 @@ function updatePendingLocationIndicators(count) {
 
 async function fetchPendingLocationProducts() {
   if (!supabaseClient) return [];
-  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
-  if (!context?.isVerified) return [];
+  const context = await ensureVendorOperationalSession();
+  if (!context) return [];
   const { data, error } = await supabaseClient
     .from('catalog_product_drafts_v2')
     .select('*')
@@ -5950,8 +5988,8 @@ async function uploadLocationAssistantPhoto(productCode) {
 }
 
 async function upsertProductLocationWithFallback(location) {
-  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
-  if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+  const authContext = await ensureVendorOperationalSession({ showLogin: true });
+  if (!window.OperationalApi || !authContext) {
     throw new Error('Se requiere una sesión verificada para guardar una ubicación central.');
   }
   const code = String(location.wms_code || location.shelf_code || '').trim().toUpperCase();
@@ -5992,8 +6030,8 @@ async function persistLocationAssistant() {
     return;
   }
   try {
-    const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
-    if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+    const authContext = await ensureVendorOperationalSession({ showLogin: true });
+    if (!window.OperationalApi || !authContext) {
       throw new Error('Iniciá sesión para ubicar el borrador en la cola central.');
     }
     if (status) {
@@ -6253,7 +6291,13 @@ async function loadPendingProductDrafts() {
   try {
     let drafts = [];
     if (supabaseClient) {
-      const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+      const context = await ensureVendorOperationalSession();
+      if (!context) {
+        pendingDraftCache.clear();
+        refreshPendingDraftsBadge();
+        renderPendingDraftsList([]);
+        return;
+      }
       const { data, error } = await supabaseClient
         .from('catalog_product_drafts_v2')
         .select('*')
@@ -6361,8 +6405,8 @@ async function approveProductDraft(draftId) {
       return;
     }
 
-    const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
-    if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+    const authContext = await ensureVendorOperationalSession({ showLogin: true });
+    if (!window.OperationalApi || !authContext) {
       throw new Error('Iniciá sesión para aprobar el producto en el catálogo central.');
     }
     const approval = await window.OperationalApi.approveCatalogProductDraft({
@@ -6561,8 +6605,8 @@ async function rejectProductDraft(draftId) {
   if (!confirm('¿Estás seguro de que querés rechazar este borrador?')) return;
 
   try {
-    const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
-    if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
+    const authContext = await ensureVendorOperationalSession({ showLogin: true });
+    if (!window.OperationalApi || !authContext) {
       throw new Error('Iniciá sesión para revisar borradores.');
     }
     await window.OperationalApi.rejectCatalogProductDraft({
@@ -6584,6 +6628,7 @@ window.selectVendorCard = selectVendorCard;
 window.toggleVendorPasswordVisibility = toggleVendorPasswordVisibility;
 window.checkVendorAuth = checkVendorAuth;
 window.handleVendorLogin = handleVendorLogin;
+window.reconnectVendorSession = reconnectVendorSession;
 window.vendorLogout = vendorLogout;
 window.switchVendorTab = switchVendorTab;
 window.openStockCriterionModal = openStockCriterionModal;
@@ -6906,8 +6951,8 @@ async function refreshCanonicalCashSection() {
 }
 
 async function fetchCanonicalInternalCatalog() {
-  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
-  if (!supabaseClient || !context?.isVerified || !context.tenantId) {
+  const context = await ensureVendorOperationalSession();
+  if (!supabaseClient || !context) {
     throw new Error('Se requiere una sesión verificada para consultar el catálogo operativo.');
   }
 
@@ -8941,28 +8986,14 @@ function updateSaasHeaderUI() {
   }
 }
 
-function openSaasLoginModal() {
-  const modal = document.getElementById('saas-login-modal');
-  if (modal) modal.style.display = 'flex';
+async function openSaasLoginModal() {
+  return reconnectVendorSession();
 }
 
-function handleSaasLoginSubmit(event) {
+async function handleSaasLoginSubmit(event) {
   event.preventDefault();
-  const tenantId = document.getElementById('saas-login-tenant')?.value;
-  const name = document.getElementById('saas-login-name')?.value;
-  const email = document.getElementById('saas-login-email')?.value;
-  const role = document.getElementById('saas-login-role')?.value;
-
-  if (typeof SaasAuth !== 'undefined') {
-    SaasAuth.loginAsUser(name, email, role, tenantId);
-  }
-
   closeWmsModal('saas-login-modal');
-  updateSaasHeaderUI();
-  if (typeof renderWmsModulesGrid === 'function') {
-    renderWmsModulesGrid();
-  }
-  showToast(`✅ Sesión SaaS iniciada como ${name} (${role}) en ${SaasAuth.getTenantContext().tenantName}`);
+  return reconnectVendorSession();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -9722,12 +9753,12 @@ function getPosCartEngine() {
 async function loadPosRegisters() {
   const select = document.getElementById('pos-register-select');
   const status = document.getElementById('pos-register-status');
-  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  const context = await ensureVendorOperationalSession();
   if (!select) return [];
-  if (!supabaseClient || !context?.isVerified) {
+  if (!supabaseClient || !context) {
     select.innerHTML = '<option value="">Sesión operativa requerida</option>';
     select.disabled = true;
-    if (status) status.textContent = 'Iniciá sesión para seleccionar una caja.';
+    if (status) status.innerHTML = 'La sesión no está verificada. <button type="button" onclick="reconnectVendorSession()" style="min-height: 44px; margin-top: 6px; padding: 8px 12px; border: 1px solid #C2A246; border-radius: 10px; background: #F6F3E8; color: #152D24; font-weight: 800; cursor: pointer;">Reconectar sesión</button>';
     return [];
   }
 
@@ -9784,6 +9815,8 @@ async function loadPosRegisters() {
 }
 
 async function initPosWorkspace() {
+  const operationalContext = await ensureVendorOperationalSession({ showLogin: true });
+  if (!operationalContext) return;
   populatePosSalespeople();
   await Promise.all([loadPosRegisters(), loadCanonicalCurrentAccounts(), loadExternalCatalogOffers()]);
   populatePosCurrentAccountDropdown();
@@ -9792,8 +9825,8 @@ async function initPosWorkspace() {
   if (parkSaleButton) parkSaleButton.hidden = !parkedTicketsEnabled;
 
   const cashierDisplay = document.getElementById('pos-cashier-display');
-  if (cashierDisplay && typeof SaasAuth !== 'undefined') {
-    const ctx = SaasAuth.getTenantContext();
+  if (cashierDisplay) {
+    const ctx = operationalContext;
     cashierDisplay.textContent = `${ctx.userName} (${ctx.roleName})`;
     const syncB2BButton = document.getElementById('pos-sync-b2b-btn');
     if (syncB2BButton) syncB2BButton.hidden = !['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(String(ctx.role || '').toUpperCase());
@@ -10027,11 +10060,11 @@ function getAllSearchableProducts() {
 window.getAllSearchableProducts = getAllSearchableProducts;
 
 async function loadExternalCatalogOffers(query = '', sourceType = null) {
-  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  const authContext = await ensureVendorOperationalSession();
   const requestId = ++externalCatalogSearchSequence;
   const normalizedQuery = String(query || '').trim().slice(0, 120);
   const normalizedSourceType = sourceType ? String(sourceType).trim().toUpperCase() : null;
-  if (!window.OperationalApi?.fetchExternalCatalogOffers || !supabaseClient || !authContext?.isVerified) {
+  if (!window.OperationalApi?.fetchExternalCatalogOffers || !supabaseClient || !authContext) {
     if (requestId === externalCatalogSearchSequence) {
       externalCatalogOffers = [];
       externalCatalogSearchQuery = normalizedQuery;
@@ -10092,8 +10125,8 @@ function getPosExternalSourceType() {
 
 async function syncLegacyB2BCatalogToPos(triggerButton = null) {
   if (catalogRecoveryInFlight) return;
-  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
-  if (!window.OperationalApi?.recoverLegacyCatalogs || !supabaseClient || !authContext?.isVerified) {
+  const authContext = await ensureVendorOperationalSession({ showLogin: true });
+  if (!window.OperationalApi?.recoverLegacyCatalogs || !supabaseClient || !authContext) {
     alert('Iniciá sesión para recuperar los catálogos centrales.');
     return;
   }
@@ -12638,10 +12671,8 @@ async function submitPosSaleDraft() {
     return false;
   }
 
-  const authContext = typeof SaasAuth !== 'undefined'
-    ? SaasAuth.getTenantContext()
-    : { isVerified: false };
-  if (!supabaseClient || !authContext.isVerified || !authContext.userId) {
+  const authContext = await ensureVendorOperationalSession({ showLogin: true });
+  if (!supabaseClient || !authContext) {
     alert('🔒 Para vender necesitás iniciar sesión con tu usuario seguro de Supabase. No se modificó stock, caja ni cuenta corriente.');
     return false;
   }
@@ -15326,8 +15357,8 @@ function getCurrentAccounts() {
 }
 
 async function loadCanonicalCurrentAccounts() {
-  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
-  if (!supabaseClient || !context?.isVerified || !context.tenantId) {
+  const context = await ensureVendorOperationalSession();
+  if (!supabaseClient || !context) {
     canonicalCurrentAccounts = [];
     return canonicalCurrentAccounts;
   }
