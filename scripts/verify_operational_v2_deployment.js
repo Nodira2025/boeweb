@@ -8,7 +8,7 @@ dotenv.config({ path: path.join(rootDir, '.env'), quiet: true });
 const TENANT_ID = process.env.PUBLIC_TENANT_ID
   || process.env.DEFAULT_TENANT_ID
   || '11111111-1111-1111-1111-111111111111';
-const EXPECTED_MIGRATIONS = Array.from({ length: 16 }, (_, index) => String(index).padStart(3, '0'));
+const EXPECTED_MIGRATIONS = Array.from({ length: 17 }, (_, index) => String(index).padStart(3, '0'));
 const FLEXIBLE_POS_TABLES = [
   'sale_fulfillments_v2',
   'external_catalog_sources_v2',
