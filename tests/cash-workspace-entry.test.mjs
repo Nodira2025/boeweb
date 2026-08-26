@@ -18,3 +18,10 @@ test('Caja abre directamente la planilla operativa sin invocar un asistente inex
   assert.match(cashBranch, /cashDashboard\.style\.display = 'grid'/);
   assert.doesNotMatch(cashBranch, /switchCashWorkspaceMode/);
 });
+
+test('Caja consulta únicamente columnas existentes de cash_sessions_v2', () => {
+  const sessionQuery = vendorJs.match(/\.from\('cash_sessions_v2'\)[\s\S]*?\.maybeSingle\(\)/)?.[0] || '';
+  assert.match(sessionQuery, /closed_at,version/);
+  assert.doesNotMatch(sessionQuery, /updated_at/);
+  assert.match(vendorJs, /updatedAt: session\.closed_at \|\| session\.opened_at/);
+});

@@ -6873,7 +6873,7 @@ async function refreshCanonicalCashSection() {
     const selectedRegisterId = document.getElementById('pos-register-select')?.value || null;
     let sessionQuery = supabaseClient
       .from('cash_sessions_v2')
-      .select('id,register_id,status,opened_by,opened_at,opening_amount,closed_by,closed_at,updated_at')
+      .select('id,register_id,status,opened_by,opened_at,opening_amount,closed_by,closed_at,version')
       .eq('tenant_id', context.tenantId)
       .gte('opened_at', `${getTodayDateKey()}T00:00:00-03:00`)
       .order('opened_at', { ascending: false })
@@ -6935,7 +6935,7 @@ async function refreshCanonicalCashSection() {
       difference: sheet?.difference === null ? null : Number(sheet.difference),
       closureNotes: sheet?.closure_notes || '',
       cashBreakdown: sheet?.cash_breakdown || {},
-      updatedAt: session.updated_at || session.opened_at
+      updatedAt: session.closed_at || session.opened_at
     };
     renderCashSectionUI();
     return canonicalCashView;

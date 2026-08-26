@@ -22,5 +22,5 @@ test('Portal vendedor: una sesión ausente vuelve al acceso seguro y ofrece reco
 test('Portal vendedor: el cachebuster fuerza a descartar el código de sesión anterior', () => {
   assert.match(vendorHtml, /saas-auth\.js\?v=session_recovery_v3/);
   assert.match(vendorHtml, /operational-api\.js\?v=session_recovery_v3/);
-  assert.match(vendorHtml, /vendedor\.js\?v=cash_workspace_v4/);
+  assert.match(vendorHtml, /vendedor\.js\?v=cash_workspace_v5/);
 });
