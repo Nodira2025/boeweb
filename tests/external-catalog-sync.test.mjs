@@ -115,12 +115,15 @@ test('3. OperationalApi.fetchExternalCatalogOffers: lista ofertas activas', asyn
   const offers = await OperationalApi.fetchExternalCatalogOffers({
     supabaseClient: fakeSupabase,
     authContext: fakeAuthContext,
-    sourceId: testIds.source,
+    sourceType: 'B2B_SUPPLIER',
     query: 'LED',
-    activeOnly: true
+    limit: 80
   });
 
-  assert.equal(rpcCalled.name, 'list_external_catalog_offers_v2');
+  assert.equal(rpcCalled.name, 'search_external_catalog_offers_v2');
+  assert.equal(rpcCalled.params.p_source_type, 'B2B_SUPPLIER');
+  assert.equal(rpcCalled.params.p_query, 'LED');
+  assert.equal(rpcCalled.params.p_limit, 80);
   assert.equal(offers.length, 1);
   assert.equal(offers[0].external_sku, 'LED-Q150');
 });

@@ -37,9 +37,9 @@
 
   function normalizeUuid(value) {
     const normalized = String(value || '').trim();
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalized)
-      ? normalized
-      : null;
+    const isPostgresUuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(normalized);
+    const isZeroUuid = normalized.toLowerCase() === '00000000-0000-0000-0000-000000000000';
+    return isPostgresUuid && !isZeroUuid ? normalized : null;
   }
 
   function normalizeMoney(value) {
@@ -941,13 +941,39 @@
     });
   }
 
-  async function fetchExternalCatalogOffers({ supabaseClient, authContext, sourceId = null, query = null, activeOnly = true }) {
+  async function fetchExternalCatalogOffers({
+    supabaseClient,
+    authContext,
+    sourceType = null,
+    query = null,
+    limit = 120
+  }) {
     const { tenantId } = requireOperationalContext(supabaseClient, authContext);
-    return invokeOperationalRpc(supabaseClient, 'list_external_catalog_offers_v2', {
+    const normalizedSourceType = sourceType ? String(sourceType).trim().toUpperCase() : null;
+    const normalizedQuery = String(query || '').trim().slice(0, 120) || null;
+    const normalizedLimit = Math.min(200, Math.max(1, Math.trunc(Number(limit) || 120)));
+    if (normalizedSourceType && !['B2B_SUPPLIER', 'LOCAL_STORE'].includes(normalizedSourceType)) {
+      throw new OperationalApiError('El origen del catálogo externo no es válido.', 'INVALID_EXTERNAL_SOURCE_TYPE');
+    }
+    return invokeOperationalRpc(supabaseClient, 'search_external_catalog_offers_v2', {
       p_tenant_id: tenantId,
-      p_source_id: sourceId ? normalizeUuid(sourceId) : null,
-      p_query: query || null,
-      p_active_only: activeOnly !== false
+      p_query: normalizedQuery,
+      p_source_type: normalizedSourceType,
+      p_limit: normalizedLimit
+    });
+  }
+
+  async function syncLegacyB2BCatalog({ supabaseClient, authContext }) {
+    const { tenantId } = requireOperationalContext(supabaseClient, authContext);
+    return invokeOperationalRpc(supabaseClient, 'sync_legacy_b2b_catalog_v2', {
+      p_tenant_id: tenantId
+    });
+  }
+
+  async function recoverLegacyCatalogs({ supabaseClient, authContext }) {
+    const { tenantId } = requireOperationalContext(supabaseClient, authContext);
+    return invokeOperationalRpc(supabaseClient, 'recover_legacy_catalogs_v2', {
+      p_tenant_id: tenantId
     });
   }
 
@@ -978,8 +1004,10 @@
     submitCashClosure,
     transitionPublicOrder,
     retryPending,
+    recoverLegacyCatalogs,
     reviewInventoryCount,
     submitInventoryCount,
+    syncLegacyB2BCatalog,
     transferInventory,
     updateSaleFulfillment,
     upsertCatalogProduct,

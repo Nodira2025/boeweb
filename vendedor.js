@@ -49,6 +49,11 @@ let globalPosCart = null;
 let posScanPendingProduct = null;
 let externalCatalogOffers = [];
 let externalCatalogLoadError = '';
+let externalCatalogSearchSequence = 0;
+let externalCatalogSearchQuery = '';
+let externalCatalogSearchSourceType = null;
+let mobileExternalCatalogSearchTimer = null;
+let catalogRecoveryInFlight = false;
 let parkedPosTickets = [];
 let activeParkedTicketId = null;
 
@@ -1403,6 +1408,9 @@ function switchVendorTab(tab) {
       vcardCatalog.style.borderColor = 'var(--color-accent-gold)';
       vcardCatalog.style.transform = 'scale(1.02)';
     }
+    fetchB2BProducts(true)
+      .then(() => updateCategoryCounts())
+      .catch(error => console.error('No se pudo actualizar el catálogo B2B:', error));
   } else if (tab === 'portfolio') {
     if (portfolioSection) {
       portfolioSection.style.display = 'block';
@@ -1547,6 +1555,9 @@ function switchVendorTab(tab) {
       vcardNearbyStores.style.transform = 'scale(1.02)';
     }
     renderNearbyStoresSection();
+    loadExternalCatalogOffers('', 'LOCAL_STORE')
+      .then(() => renderNearbyStoresSection())
+      .catch(error => console.error('No se actualizaron las tiendas locales:', error));
   } else if (tab === 'retired-products' || tab === 'retired' || tab === 'mermas') {
     const retSection = document.getElementById('vendor-retired-products-section');
     if (retSection) {
@@ -6966,7 +6977,7 @@ async function fetchCanonicalInternalCatalog() {
       stock: product.track_stock ? (balance?.available || 0) : Number.MAX_SAFE_INTEGER,
       available_quantity: product.track_stock ? (balance?.available || 0) : null,
       location_id: balance?.location_id || null,
-      shelf_code: balance?.location?.code || '',
+      shelf_code: product.metadata?.shelf_code || balance?.location?.code || '',
       inventory_options: inventoryOptions,
       image,
       image_url: image,
@@ -9804,16 +9815,22 @@ async function initPosWorkspace() {
         const query = e.target.value;
         const clearBtn = document.getElementById('pos-search-clear-btn');
         if (clearBtn) clearBtn.style.display = query ? 'block' : 'none';
-
+        renderPosSearchResults(query.trim());
         inputDebounce = setTimeout(() => {
-          renderPosSearchResults(query.trim());
-        }, 150);
+          refreshPosExternalCatalogSearch(query, getPosExternalSourceType(), () => {
+            if ((document.getElementById('pos-unified-search')?.value || '') === query) {
+              renderPosSearchResults(query.trim());
+            }
+          }).catch(error => console.error('No se completó la búsqueda externa del POS:', error));
+        }, 280);
       });
 
       unifiedInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          handlePosBarcodeOrDirectSearch(unifiedInput.value.trim());
+          clearTimeout(inputDebounce);
+          handlePosBarcodeOrDirectSearch(unifiedInput.value.trim())
+            .catch(error => console.error('No se completó la búsqueda directa del POS:', error));
         }
       });
     }
@@ -9956,6 +9973,8 @@ function getAllSearchableProducts() {
       category: offer.category || 'Catálogo Externo',
       image: offer.metadata?.image_url || 'assets/logo.jpg',
       barcode: offer.metadata?.barcode || offer.external_sku || '',
+      brand: offer.metadata?.brand || '',
+      presentation: offer.metadata?.presentation || '',
       product_code: offer.external_sku,
       line_type: lineType,
       source_type: offer.source_type,
@@ -10007,24 +10026,39 @@ function getAllSearchableProducts() {
 }
 window.getAllSearchableProducts = getAllSearchableProducts;
 
-async function loadExternalCatalogOffers() {
+async function loadExternalCatalogOffers(query = '', sourceType = null) {
   const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  const requestId = ++externalCatalogSearchSequence;
+  const normalizedQuery = String(query || '').trim().slice(0, 120);
+  const normalizedSourceType = sourceType ? String(sourceType).trim().toUpperCase() : null;
   if (!window.OperationalApi?.fetchExternalCatalogOffers || !supabaseClient || !authContext?.isVerified) {
-    externalCatalogOffers = [];
-    externalCatalogLoadError = 'Iniciá sesión para consultar el catálogo B2B y las tiendas locales.';
+    if (requestId === externalCatalogSearchSequence) {
+      externalCatalogOffers = [];
+      externalCatalogSearchQuery = normalizedQuery;
+      externalCatalogSearchSourceType = normalizedSourceType;
+      externalCatalogLoadError = 'Iniciá sesión para consultar el catálogo B2B y las tiendas locales.';
+    }
     return externalCatalogOffers;
   }
   try {
     const response = await window.OperationalApi.fetchExternalCatalogOffers({
       supabaseClient,
       authContext,
-      activeOnly: true
+      query: normalizedQuery,
+      sourceType: normalizedSourceType,
+      limit: 120
     });
+    if (requestId !== externalCatalogSearchSequence) return externalCatalogOffers;
     externalCatalogOffers = Array.isArray(response) ? response : [];
+    externalCatalogSearchQuery = normalizedQuery;
+    externalCatalogSearchSourceType = normalizedSourceType;
     externalCatalogLoadError = '';
     return externalCatalogOffers;
   } catch (error) {
+    if (requestId !== externalCatalogSearchSequence) return externalCatalogOffers;
     externalCatalogOffers = [];
+    externalCatalogSearchQuery = normalizedQuery;
+    externalCatalogSearchSourceType = normalizedSourceType;
     externalCatalogLoadError = error.message || 'No se pudo cargar el catálogo externo.';
     console.error('No se pudo cargar el catálogo externo central:', error);
     return externalCatalogOffers;
@@ -10032,81 +10066,107 @@ async function loadExternalCatalogOffers() {
 }
 window.loadExternalCatalogOffers = loadExternalCatalogOffers;
 
-async function syncLegacyB2BCatalogToPos() {
-  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
-  if (!window.OperationalApi || !supabaseClient || !authContext?.isVerified) {
-    alert('Iniciá sesión para sincronizar el catálogo B2B central.');
-    return;
-  }
-  if (!['ADMIN', 'SUPERVISOR'].includes(String(authContext.role || '').toUpperCase())) {
-    alert('Sólo administración o supervisión puede sincronizar precios y proveedores B2B.');
-    return;
-  }
-  const button = document.getElementById('pos-sync-b2b-btn');
-  const originalLabel = button?.textContent || '↻ Sincronizar B2B';
-  if (button) {
-    button.disabled = true;
-    button.textContent = 'Sincronizando…';
-  }
-  try {
-    if (!Array.isArray(baseProducts) || baseProducts.length === 0) await fetchB2BProducts(true);
-    const bySupplier = new Map();
-    baseProducts.forEach(product => {
-      (product.supplier_products || []).forEach(supplierProduct => {
-        const retailPrice = Number(supplierProduct.price || 0);
-        if (!supplierProduct.supplier_id || retailPrice <= 0) return;
-        if (!bySupplier.has(supplierProduct.supplier_id)) bySupplier.set(supplierProduct.supplier_id, []);
-        bySupplier.get(supplierProduct.supplier_id).push({ product, supplierProduct, retailPrice });
-      });
-    });
-    if (bySupplier.size === 0) throw new Error('El catálogo B2B no contiene ofertas con precio válido.');
+function getExternalCatalogErrorFor(query = '', sourceType = null) {
+  const normalizedQuery = String(query || '').trim().slice(0, 120);
+  const normalizedSourceType = sourceType ? String(sourceType).trim().toUpperCase() : null;
+  return externalCatalogSearchQuery.toLocaleLowerCase('es') === normalizedQuery.toLocaleLowerCase('es')
+    && externalCatalogSearchSourceType === normalizedSourceType
+    ? externalCatalogLoadError
+    : '';
+}
 
-    let importedCount = 0;
-    for (const [supplierId, offers] of bySupplier.entries()) {
-      const source = await window.OperationalApi.upsertExternalCatalogSource({
-        supabaseClient,
-        authContext,
-        source: {
-          source_type: 'B2B_SUPPLIER',
-          name: supplierNames[supplierId] || supplierId,
-          estimated_days: 2,
-          active: true,
-          metadata: { legacy_supplier_id: supplierId }
-        }
-      });
-      await Promise.all(offers.map(({ product, supplierProduct, retailPrice }) =>
-        window.OperationalApi.upsertExternalCatalogOffer({
-          supabaseClient,
-          authContext,
-          offer: {
-            source_id: source.id,
-            external_sku: String(supplierProduct.id || product.id),
-            name: product.name,
-            category: product.category || 'General',
-            cost_price: retailPrice,
-            retail_price: retailPrice,
-            available_units: supplierProduct.available === false ? 0 : Math.max(0, Number(supplierProduct.stock || 0)),
-            active: supplierProduct.available !== false,
-            metadata: { image_url: product.image || '', source_link: supplierProduct.link || '' }
-          }
-        })
-      ));
-      importedCount += offers.length;
+async function refreshPosExternalCatalogSearch(query, sourceType, renderer) {
+  const normalizedQuery = String(query || '').trim().slice(0, 120);
+  const normalizedSourceType = sourceType ? String(sourceType).trim().toUpperCase() : null;
+  await loadExternalCatalogOffers(normalizedQuery, normalizedSourceType);
+  if (externalCatalogSearchQuery !== normalizedQuery
+      || externalCatalogSearchSourceType !== normalizedSourceType) return;
+  renderer();
+}
+
+function getPosExternalSourceType() {
+  if (posActiveOriginFilter === 'B2B') return 'B2B_SUPPLIER';
+  if (posActiveOriginFilter === 'LOCAL_STORE') return 'LOCAL_STORE';
+  return null;
+}
+
+async function syncLegacyB2BCatalogToPos(triggerButton = null) {
+  if (catalogRecoveryInFlight) return;
+  const authContext = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  if (!window.OperationalApi?.recoverLegacyCatalogs || !supabaseClient || !authContext?.isVerified) {
+    alert('Iniciá sesión para recuperar los catálogos centrales.');
+    return;
+  }
+  if (!['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(String(authContext.role || '').toUpperCase())) {
+    alert('Sólo administración o supervisión puede recuperar productos y proveedores.');
+    return;
+  }
+  catalogRecoveryInFlight = true;
+  const buttons = [...new Set([document.getElementById('pos-sync-b2b-btn'), triggerButton].filter(Boolean))];
+  const originalLabels = new Map(buttons.map(button => [button, button.textContent]));
+  buttons.forEach(button => {
+    button.disabled = true;
+    button.textContent = 'Recuperando…';
+  });
+  try {
+    const summary = await window.OperationalApi.recoverLegacyCatalogs({
+      supabaseClient,
+      authContext
+    });
+    await Promise.all([loadInternalCatalog(), loadExternalCatalogOffers('', null)]);
+    if (externalCatalogLoadError) throw new Error(externalCatalogLoadError);
+    if (Number(summary?.offers || 0) > 0 && externalCatalogOffers.length === 0) {
+      throw new Error('La recuperación terminó, pero el catálogo B2B no pudo verificarse desde esta sesión.');
     }
-    await loadExternalCatalogOffers();
-    renderPosSearchResults(document.getElementById('pos-unified-search')?.value || '');
-    if (window.showToast) window.showToast(`✓ ${importedCount} ofertas B2B listas para seleccionar en el POS.`);
+
+    const desktopQuery = document.getElementById('pos-unified-search')?.value || '';
+    const mobileQuery = document.getElementById('pos-assistant-search-input')?.value || '';
+    const activeQuery = mobilePosAssistantState.mode === 'nostock' && mobilePosAssistantState.step === 'search'
+      ? mobileQuery
+      : desktopQuery;
+    if (String(activeQuery).trim() || getPosExternalSourceType()) {
+      await loadExternalCatalogOffers(activeQuery, getPosExternalSourceType());
+    }
+    renderPosSearchResults(desktopQuery);
+    if (mobilePosAssistantState.mode === 'nostock' && mobilePosAssistantState.step === 'search') {
+      renderMobilePosAssistantSearchResults(mobileQuery);
+    }
+    const importedCount = Number(summary?.offers || externalCatalogOffers.length || 0);
+    if (window.showToast) {
+      const ownCount = Number(summary?.catalog_products || 0);
+      window.showToast(`✓ ${ownCount} productos físicos y ${importedCount.toLocaleString('es-AR')} ofertas B2B recuperados.`);
+    }
+    if (summary?.local?.reason === 'DEFAULT_LOCATION_REQUIRED') {
+      alert('El B2B quedó recuperado, pero el catálogo físico necesita una ubicación principal activa antes de importar su stock.');
+    }
   } catch (error) {
-    console.error('No se sincronizó el catálogo B2B:', error);
-    alert(`No se sincronizó el catálogo B2B.\n\n${error.message || 'Error desconocido'}`);
+    console.error('No se recuperaron los catálogos:', error);
+    alert(`No se recuperaron los catálogos.\n\n${error.message || 'Error desconocido'}`);
   } finally {
-    if (button) {
+    catalogRecoveryInFlight = false;
+    buttons.forEach(button => {
       button.disabled = false;
-      button.textContent = originalLabel;
-    }
+      button.textContent = originalLabels.get(button) || '↻ Actualizar catálogos';
+    });
   }
 }
 window.syncLegacyB2BCatalogToPos = syncLegacyB2BCatalogToPos;
+
+function canManageLegacyCatalogSync() {
+  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+  return Boolean(context?.isVerified
+    && ['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(String(context.role || '').toUpperCase()));
+}
+
+function renderLegacyCatalogSyncAction(label = 'Sincronizar catálogo B2B') {
+  if (!canManageLegacyCatalogSync()) return '';
+  return `
+    <button type="button" class="stock-entry-secondary-btn" onclick="syncLegacyB2BCatalogToPos(this)"
+      style="min-height: 44px; padding: 8px 14px; border-color: #c2a246; color: #152d24; font-weight: 800;">
+      ↻ ${escapeStockHtml(label)}
+    </button>
+  `;
+}
 
 function renderMobilePosAssistantSearchResults(query = '') {
   const container = document.getElementById('pos-assistant-results-container');
@@ -10119,7 +10179,9 @@ function renderMobilePosAssistantSearchResults(query = '') {
   const filtered = prods.filter(p => {
     const lineType = String(p.line_type || 'OWN_STOCK').toUpperCase();
     const isExternal = lineType === 'B2B_BACKORDER' || lineType === 'LOCAL_STORE_BACKORDER';
-    if (!isNoStockMode && (isExternal || (p.track_stock !== false && Number(p.stock || 0) <= 0))) return false;
+    const hasOwnStock = !isExternal && (p.track_stock === false || Number(p.stock || 0) > 0);
+    if (isNoStockMode && (hasOwnStock || (!isExternal && p.track_stock === false))) return false;
+    if (!isNoStockMode && (isExternal || !hasOwnStock)) return false;
     if (!q) return true;
     const nameMatch = p.name && p.name.toLowerCase().includes(q);
     const barcodeMatch = p.barcode && p.barcode.toLowerCase() === q;
@@ -10129,14 +10191,28 @@ function renderMobilePosAssistantSearchResults(query = '') {
   }).slice(0, 15);
 
   if (filtered.length === 0) {
+    const currentExternalError = isNoStockMode ? getExternalCatalogErrorFor(query, null) : '';
+    const missingExternalCatalog = isNoStockMode && !q && externalCatalogOffers.length === 0;
+    const title = currentExternalError
+      ? 'El catálogo externo no está disponible'
+      : (missingExternalCatalog
+      ? 'El catálogo para encargos todavía no está sincronizado'
+      : `No se encontraron coincidencias para "${escapeStockHtml(query)}"`);
+    const description = currentExternalError
+      || (missingExternalCatalog
+        ? 'Actualizá las fuentes históricas para recuperar proveedores y productos físicos sin duplicar datos.'
+        : 'Probá escribiendo parte del nombre o ingresá el producto al catálogo central.');
+    const primaryAction = currentExternalError
+      ? '<button type="button" class="stock-entry-secondary-btn" onclick="retryPosExternalCatalogSearch(\'mobile\')" style="min-height: 44px; padding: 8px 14px;">&#8635; Reintentar catálogo</button>'
+      : (missingExternalCatalog
+      ? renderLegacyCatalogSyncAction('Recuperar catálogos')
+      : `<button type="button" class="stock-entry-secondary-btn" onclick="switchVendorTab('fast-upload')" style="min-height: 44px; font-size: 0.8rem; padding: 8px 12px;">＋ Ingresar producto</button>`);
     container.innerHTML = `
-      <div style="padding: 24px 16px; text-align: center; color: var(--color-text-muted); background: rgba(21,45,36,0.03); border-radius: 12px; border: 1px dashed var(--color-border-subtle); margin-top: 10px;">
-        <span style="font-size: 1.8rem; display: block; margin-bottom: 6px;">🔍</span>
-        <strong style="color: var(--color-text-main); font-size: 0.92rem; display: block;">No se encontraron coincidencias para "${escapeStockHtml(query)}"</strong>
-        <p style="font-size: 0.78rem; margin: 4px 0 10px 0;">Probá escribiendo parte del nombre o ingresá el producto al catálogo central.</p>
-        <button type="button" class="stock-entry-secondary-btn" onclick="switchVendorTab('fast-upload')" style="font-size: 0.8rem; padding: 6px 12px;">
-          ＋ Ingresar producto
-        </button>
+      <div style="padding: 24px 16px; text-align: center; color: #6b4e2e; background: #f6f3e8; border-radius: 14px; border: 1.5px dashed #c2a246; margin-top: 10px;">
+        <span style="font-size: 1.8rem; display: block; margin-bottom: 6px;">${currentExternalError ? '⚠️' : (missingExternalCatalog ? '📦' : '🔍')}</span>
+        <strong style="color: #152d24; font-size: 0.92rem; display: block;">${title}</strong>
+        <p style="font-size: 0.78rem; margin: 6px 0 12px 0; line-height: 1.45;">${escapeStockHtml(description)}</p>
+        ${primaryAction}
       </div>
     `;
     return;
@@ -10145,7 +10221,7 @@ function renderMobilePosAssistantSearchResults(query = '') {
   container.innerHTML = `
     <div style="margin-top: 10px; display: grid; gap: 8px;">
       <small style="font-size: 0.74rem; font-weight: 800; color: var(--color-accent-gold); text-transform: uppercase;">
-        ${filtered.length} producto${filtered.length > 1 ? 's' : ''} disponible${filtered.length > 1 ? 's' : ''} (Tocá para elegir):
+        ${filtered.length} producto${filtered.length > 1 ? 's' : ''} visible${filtered.length > 1 ? 's' : ''} · ${q ? 'resultado de la búsqueda' : 'escribí para buscar en todo el catálogo'}:
       </small>
       ${filtered.map((p, idx) => {
         const pId = escapeStockHtml(String(p.cart_key || p.id || p.product_code));
@@ -10154,6 +10230,11 @@ function renderMobilePosAssistantSearchResults(query = '') {
         const stock = Number(p.stock || 0);
         const img = p.image || 'assets/logo.jpg';
         const hasLocation = Boolean(p.shelf_code && p.shelf_code !== 'Sin ubicación' && p.shelf_code !== 'SIN_ASIGNAR');
+        const lineType = String(p.line_type || 'OWN_STOCK').toUpperCase();
+        const isExternal = lineType === 'B2B_BACKORDER' || lineType === 'LOCAL_STORE_BACKORDER';
+        const originLabel = lineType === 'B2B_BACKORDER'
+          ? `🏭 ${p.source_name || 'Proveedor B2B'}`
+          : (lineType === 'LOCAL_STORE_BACKORDER' ? `🏪 ${p.source_name || 'Tienda local'}` : '🏷 Producto propio');
 
         return `
           <button type="button" 
@@ -10170,8 +10251,8 @@ function renderMobilePosAssistantSearchResults(query = '') {
                 ${idx + 1}. ${safeName}
               </strong>
               <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px; font-size: 0.72rem;">
-                <span style="color: ${stock > 0 ? '#2e7d32' : '#c62828'}; font-weight: 800;">
-                  ${stock > 0 ? `🟢 ${stock} u.` : '🔴 Sin stock'}
+                <span style="color: ${isExternal ? '#1565c0' : (stock > 0 ? '#2e7d32' : '#c62828')}; font-weight: 800;">
+                  ${isExternal ? `${escapeStockHtml(originLabel)} · ${Number(p.estimated_days || 2)} días` : (stock > 0 ? `🟢 ${stock} u.` : '📦 Propio sin stock')}
                 </span>
                 ${hasLocation ? `<span style="color: var(--color-accent-gold); font-weight: 700;">📍 ${escapeStockHtml(p.shelf_code)}</span>` : ''}
               </div>
@@ -10187,8 +10268,31 @@ window.renderMobilePosAssistantSearchResults = renderMobilePosAssistantSearchRes
 
 function handleMobilePosAssistantSearch(query) {
   renderMobilePosAssistantSearchResults(query);
+  clearTimeout(mobileExternalCatalogSearchTimer);
+  mobileExternalCatalogSearchTimer = setTimeout(() => {
+    refreshPosExternalCatalogSearch(query, null, () => {
+      if ((document.getElementById('pos-assistant-search-input')?.value || '') === query) {
+        renderMobilePosAssistantSearchResults(query);
+      }
+    }).catch(error => console.error('No se completó la búsqueda externa móvil:', error));
+  }, 280);
 }
 window.handleMobilePosAssistantSearch = handleMobilePosAssistantSearch;
+
+async function retryPosExternalCatalogSearch(target = 'desktop') {
+  try {
+    const isMobile = target === 'mobile';
+    const inputId = isMobile ? 'pos-assistant-search-input' : 'pos-unified-search';
+    const query = document.getElementById(inputId)?.value || '';
+    const sourceType = isMobile ? null : getPosExternalSourceType();
+    await loadExternalCatalogOffers(query, sourceType);
+    if (isMobile) renderMobilePosAssistantSearchResults(query);
+    else renderPosSearchResults(query);
+  } catch (error) {
+    console.error('No se pudo reintentar el catálogo externo:', error);
+  }
+}
+window.retryPosExternalCatalogSearch = retryPosExternalCatalogSearch;
 
 function selectMobilePosAssistantProduct(productId) {
   const prods = getAllSearchableProducts();
@@ -10445,7 +10549,7 @@ function renderMobilePosAssistant() {
         <!-- Rendered live below -->
       </div>
     `;
-    renderMobilePosAssistantSearchResults('');
+    handleMobilePosAssistantSearch('');
     return;
   }
 
@@ -11408,6 +11512,8 @@ function clearPosUnifiedSearch() {
   }
   if (clearBtn) clearBtn.style.display = 'none';
   renderPosSearchResults('');
+  refreshPosExternalCatalogSearch('', getPosExternalSourceType(), () => renderPosSearchResults(''))
+    .catch(error => console.error('No se restableció el catálogo externo del POS:', error));
 }
 
 function parsePosScanCommand(rawQuery) {
@@ -11447,24 +11553,46 @@ function setPosOriginFilter(filter) {
 
   const query = document.getElementById('pos-unified-search')?.value || '';
   renderPosSearchResults(query);
+  refreshPosExternalCatalogSearch(query, getPosExternalSourceType(), () => {
+    if (posActiveOriginFilter === (normalizedFilters[String(filter || 'all').toLowerCase()] || 'ALL')) {
+      renderPosSearchResults(document.getElementById('pos-unified-search')?.value || '');
+    }
+  }).catch(error => console.error('No se actualizó el origen externo seleccionado:', error));
 }
 window.setPosOriginFilter = setPosOriginFilter;
 
-function handlePosBarcodeOrDirectSearch(rawQuery) {
+async function handlePosBarcodeOrDirectSearch(rawQuery) {
   if (!rawQuery) return;
   const parsed = parsePosScanCommand(rawQuery);
   const cleanCode = parsed.code.toLowerCase().trim();
   const quantity = parsed.quantity;
 
-  const prods = getAllSearchableProducts();
+  let prods = getAllSearchableProducts();
 
   // 1. Coincidencia exacta por código de barras, SKU, product_code o ID
-  const exactMatch = prods.find(p =>
+  const findExactMatch = products => products.find(p =>
     (p.barcode && String(p.barcode).trim().toLowerCase() === cleanCode) ||
     (p.product_code && String(p.product_code).trim().toLowerCase() === cleanCode) ||
     (p.id && String(p.id).trim().toLowerCase() === cleanCode) ||
     (p.cart_key && String(p.cart_key).trim().toLowerCase() === cleanCode)
   );
+  let exactMatch = findExactMatch(prods);
+
+  // Un código fuera de la primera página B2B se resuelve en el servidor antes
+  // de informar que no existe. Esto cubre Enter, lector USB y cámara móvil.
+  if (!exactMatch) {
+    await loadExternalCatalogOffers(cleanCode, getPosExternalSourceType());
+    prods = getAllSearchableProducts();
+    exactMatch = findExactMatch(prods);
+    const externalError = getExternalCatalogErrorFor(cleanCode, getPosExternalSourceType());
+    if (!exactMatch && externalError) {
+      if (typeof showToast === 'function') {
+        showToast('⚠️ El catálogo externo no está disponible. Reintentá la búsqueda.', true);
+      }
+      renderPosSearchResults(rawQuery);
+      return;
+    }
+  }
 
   if (exactMatch) {
     const directAdd = typeof AppConfig !== 'undefined' ? AppConfig.get('rules.pos.barcodeDirectAdd', true) : true;
@@ -11502,6 +11630,8 @@ function handlePosBarcodeOrDirectSearch(rawQuery) {
       const clearBtn = document.getElementById('pos-search-clear-btn');
       if (clearBtn) clearBtn.style.display = 'none';
       renderPosSearchResults('');
+      refreshPosExternalCatalogSearch('', getPosExternalSourceType(), () => renderPosSearchResults(''))
+        .catch(error => console.error('No se restableció el catálogo tras el escaneo:', error));
       unifiedInput.focus();
     }
     return;
@@ -11550,6 +11680,8 @@ function handlePosBarcodeOrDirectSearch(rawQuery) {
       const clearBtn = document.getElementById('pos-search-clear-btn');
       if (clearBtn) clearBtn.style.display = 'none';
       renderPosSearchResults('');
+      refreshPosExternalCatalogSearch('', getPosExternalSourceType(), () => renderPosSearchResults(''))
+        .catch(error => console.error('No se restableció el catálogo tras la búsqueda:', error));
       unifiedInput.focus();
     }
   } else if (matches.length === 0) {
@@ -11589,6 +11721,11 @@ function togglePosVoiceSearch() {
       const clearBtn = document.getElementById('pos-search-clear-btn');
       if (clearBtn) clearBtn.style.display = 'block';
       renderPosSearchResults(transcript);
+      refreshPosExternalCatalogSearch(transcript, getPosExternalSourceType(), () => {
+        if ((document.getElementById('pos-unified-search')?.value || '') === transcript) {
+          renderPosSearchResults(transcript);
+        }
+      }).catch(error => console.error('No se completó la búsqueda externa por voz:', error));
     }
   };
 
@@ -11634,6 +11771,10 @@ function renderPosSearchResults(query = '') {
   }
 
   const cleanQuery = (query || '').toLowerCase().trim();
+  const externalSourceType = getPosExternalSourceType();
+  const externalError = ['OWN_STOCK', 'BACKORDER'].includes(posActiveOriginFilter)
+    ? ''
+    : getExternalCatalogErrorFor(query, externalSourceType);
 
   const filtered = prods.filter(p => {
     if (!cleanQuery) return true;
@@ -11642,19 +11783,48 @@ function renderPosSearchResults(query = '') {
   });
 
   if (countBadge) {
+    const isLimitedExternalPage = externalCatalogOffers.length >= 120
+      && !['OWN_STOCK', 'BACKORDER'].includes(posActiveOriginFilter);
     countBadge.textContent = cleanQuery
-      ? `${filtered.length} coincidencias`
-      : `${prods.length} productos disponibles para venta`;
+      ? `${filtered.length} coincidencias${isLimitedExternalPage ? ' visibles' : ''}${externalError ? ' · externo no disponible' : ''}`
+      : (isLimitedExternalPage
+        ? `Mostrando ${prods.length} · escribí para buscar en todo el catálogo`
+        : `${prods.length} productos disponibles para venta${externalError ? ' · externo no disponible' : ''}`);
   }
 
   if (filtered.length === 0) {
+    const isCatalogRecoveryState = !cleanQuery && (
+      (posActiveOriginFilter === 'B2B' && !externalCatalogOffers.some(product => product.source_type === 'B2B_SUPPLIER'))
+      || (posActiveOriginFilter === 'LOCAL_STORE' && !externalCatalogOffers.some(product => product.source_type === 'LOCAL_STORE'))
+      || (posActiveOriginFilter === 'ALL' && getAllSearchableProducts().length === 0)
+    );
+    const emptyTitle = externalError
+      ? 'El catálogo externo no está disponible'
+      : (isCatalogRecoveryState
+      ? 'Este catálogo todavía no fue recuperado'
+      : 'Sin coincidencias en este catálogo');
+    const emptyDescription = externalError
+      || (isCatalogRecoveryState
+        ? 'Administración puede recuperar ahora los productos históricos y proveedores, sin borrar ni duplicar datos.'
+        : '¿Es un producto recién llegado? Podés agregarlo inmediatamente como Ítem Libre / Venta Rápida.');
+    const recoveryAction = externalError
+      ? '<button type="button" class="stock-entry-secondary-btn" onclick="retryPosExternalCatalogSearch()" style="min-height: 44px; padding: 8px 14px; font-weight: 800;">&#8635; Reintentar catálogo</button>'
+      : (isCatalogRecoveryState
+      ? renderLegacyCatalogSyncAction('Recuperar catálogo B2B')
+      : '');
+    const quickEntryAction = externalError
+      ? ''
+      : '<button type="button" class="stock-entry-secondary-btn" onclick="openPosExpressItemModal()" style="min-height: 44px; padding: 8px 14px; font-weight: 800;">⚡ Venta Rápida / Ítem Libre</button>';
     grid.innerHTML = `
-      <div style="grid-column: 1 / -1; text-align: center; padding: 30px 15px; color: var(--color-text-muted); background: rgba(21,45,36,0.02); border-radius: 12px; border: 1px dashed var(--color-border-subtle);">
-        <span style="font-size: 2rem; display: block; margin-bottom: 6px;">🔍</span>
-        <strong style="display: block; font-size: 0.95rem; margin-bottom: 4px; color: var(--color-text-main);">Sin coincidencias en este catálogo</strong>
-        <p style="margin: 0 0 10px 0; font-size: 0.8rem;">¿Es un producto recién llegado? Podés agregarlo inmediatamente como Ítem Libre / Venta Rápida.</p>
-        <button type="button" class="stock-entry-secondary-btn" onclick="openPosExpressItemModal()" style="padding: 6px 14px; font-weight: 700;">⚡ Venta Rápida / Ítem Libre</button>
-      </div>
+      <section role="status" style="grid-column: 1 / -1; text-align: center; padding: 30px 15px; color: #6b4e2e; background: #f6f3e8; border-radius: 14px; border: 1.5px dashed #c2a246;">
+        <span aria-hidden="true" style="font-size: 2rem; display: block; margin-bottom: 6px;">${externalError ? '⚠️' : (isCatalogRecoveryState ? '📦' : '🔍')}</span>
+        <strong style="display: block; font-size: 0.95rem; margin-bottom: 4px; color: #152d24;">${emptyTitle}</strong>
+        <p style="margin: 0 0 12px 0; font-size: 0.8rem; line-height: 1.45;">${escapeStockHtml(emptyDescription)}</p>
+        <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;">
+          ${recoveryAction}
+          ${quickEntryAction}
+        </div>
+      </section>
     `;
     return;
   }
@@ -14869,7 +15039,8 @@ function getNearbyStores() {
         grouped.set(offer.source_id, {
           id: offer.source_id,
           name: offer.source_name,
-          phone: offer.source_contact_info || '',
+          phone: String(offer.source_phone || String(offer.source_contact_info || '').split('·')[0]).replace(/\D/g, ''),
+          address: offer.source_address || '',
           estimated_days: Number(offer.estimated_days || 2),
           catalog: []
         });
@@ -14950,12 +15121,25 @@ function renderNearbyStoresSection() {
       </div>
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <span style="font-size: 0.8rem; color: #2e7d32; font-weight: 700;">Stock: ${p.stock || 0} u.</span>
-        <button type="button" class="btn btn-secondary" onclick="orderNearbyProductViaWa('${p.id}', '${p.storePhone}', '${escapeStockHtml(p.name)}')" style="padding: 6px 12px; font-size: 0.78rem; border-color: #25d366; color: #25d366; font-weight: 700; border-radius: 8px;">
+        <button type="button" class="btn btn-secondary nearby-store-wa-btn"
+          data-product-id="${escapeStockHtml(p.id)}"
+          data-store-phone="${escapeStockHtml(p.storePhone)}"
+          data-product-name="${escapeStockHtml(p.name)}"
+          style="padding: 6px 12px; font-size: 0.78rem; border-color: #25d366; color: #25d366; font-weight: 700; border-radius: 8px;">
           💬 Pedir por WA
         </button>
       </div>
     </article>
   `).join('');
+  grid.querySelectorAll('.nearby-store-wa-btn').forEach(button => {
+    button.addEventListener('click', () => {
+      orderNearbyProductViaWa(
+        button.dataset.productId,
+        button.dataset.storePhone,
+        button.dataset.productName
+      );
+    });
+  });
 }
 
 function filterNearbyProductsByStore(storeId) {
@@ -15000,9 +15184,13 @@ async function handleSaveNearbyStore(event) {
       source: {
         source_type: 'LOCAL_STORE',
         name,
-        contact_info: [phone, address].filter(Boolean).join(' · '),
+        contact_info: phone || null,
         estimated_days: 2,
-        active: true
+        active: true,
+        metadata: {
+          address: address || null,
+          imported_from: 'nearby-store-text'
+        }
       }
     });
     await Promise.all(parsedCatalog.map((product, index) => window.OperationalApi.upsertExternalCatalogOffer({
@@ -15020,7 +15208,7 @@ async function handleSaveNearbyStore(event) {
         metadata: { imported_from: 'nearby-store-text' }
       }
     })));
-    await loadExternalCatalogOffers();
+    await loadExternalCatalogOffers('', 'LOCAL_STORE');
     closeAddNearbyStoreModal();
     renderNearbyStoresSection();
     renderPosSearchResults(document.getElementById('pos-unified-search')?.value || '');
@@ -16438,7 +16626,8 @@ function handleUniversalCameraScanSuccess(decodedText) {
         const clearBtn = document.getElementById('pos-search-clear-btn');
         if (clearBtn) clearBtn.style.display = 'block';
       }
-      handlePosBarcodeOrDirectSearch(cleanCode);
+      handlePosBarcodeOrDirectSearch(cleanCode)
+        .catch(error => console.error('No se completó la lectura del producto:', error));
     } else if (universalCameraActiveMode === 'stock') {
       const stockBarcodeInput = document.getElementById('fastupload-barcode-input');
       if (stockBarcodeInput) {

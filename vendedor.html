@@ -1799,7 +1799,7 @@
               <button type="button" id="pos-origin-backorder" class="pos-filter-pill" onclick="setPosOriginFilter('backorder')">📦 Por encargo</button>
               <button type="button" id="pos-origin-b2b" class="pos-filter-pill" onclick="setPosOriginFilter('b2b')">🏢 Proveedores B2B</button>
               <button type="button" id="pos-origin-local" class="pos-filter-pill" onclick="setPosOriginFilter('local_store')">🏬 Tiendas locales</button>
-              <button type="button" id="pos-sync-b2b-btn" class="pos-filter-pill" onclick="syncLegacyB2BCatalogToPos()" style="min-height: 44px; border-color: var(--color-accent-gold); color: var(--color-accent-gold);">↻ Sincronizar B2B</button>
+              <button type="button" id="pos-sync-b2b-btn" class="pos-filter-pill" onclick="syncLegacyB2BCatalogToPos(this)" style="min-height: 44px; border-color: var(--color-accent-gold); color: var(--color-accent-gold);">↻ Actualizar catálogos</button>
             </div>
 
             <!-- Panel en línea de Ítem Libre / Venta Rápida -->
@@ -4834,11 +4834,11 @@
   <script src="migration-center.js?v=migration_v1"></script>
   <script src="tenant-onboarding.js?v=onboarding_v1"></script>
   <script src="pos-cart-engine.js?v=cart_v3"></script>
-  <script src="operational-api.js?v=core_v3"></script>
+  <script src="operational-api.js?v=catalog_recovery_v2"></script>
   <script src="pos-desk-utils.js?v=pos_utils_v1"></script>
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=pos_flexible_v1"></script>
+  <script src="vendedor.js?v=catalog_recovery_v2"></script>
 </body>
 </html>
