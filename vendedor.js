@@ -1473,11 +1473,8 @@ function switchVendorTab(tab) {
       vcardCash.style.borderColor = '#ffb74d';
       vcardCash.style.transform = 'scale(1.02)';
     }
-    if (window.innerWidth <= 991) {
-      switchCashWorkspaceMode('assistant');
-    } else {
-      switchCashWorkspaceMode('classic');
-    }
+    const cashDashboard = document.getElementById('cash-classic-dashboard');
+    if (cashDashboard) cashDashboard.style.display = 'grid';
     renderCashSectionUI();
     Promise.all([refreshCanonicalCashSection(), loadPosRegisters()])
       .catch(error => console.error('No se pudo actualizar la caja central:', error));

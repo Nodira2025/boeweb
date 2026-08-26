@@ -3582,49 +3582,9 @@
         </div>
       </header>
 
-      <!-- CASH MODE SWITCHER (Mobile & Desktop) -->
-      <nav id="cash-mode-switcher-nav" class="pos-mode-switcher-nav" aria-label="Modo de Operación de Caja">
-        <button type="button" id="cash-mode-btn-assistant" class="pos-mode-btn active" onclick="switchCashWorkspaceMode('assistant')">
-          <span>🎙️ Asistente Guiado / Voz</span>
-        </button>
-        <button type="button" id="cash-mode-btn-classic" class="pos-mode-btn" onclick="switchCashWorkspaceMode('classic')">
-          <span>📋 Planilla Clásica</span>
-        </button>
-      </nav>
-
-      <!-- MOBILE / GUIDED CASH & ARQUEO ASSISTANT -->
-      <section id="mobile-cash-assistant" class="mobile-pos-assistant" aria-label="Asistente de Caja y Arqueo">
-        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <div>
-            <span class="pos-assistant-step-badge" id="mobile-cash-assistant-progress" style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: var(--color-accent-gold, #c2a246);">Paso 1 de 3</span>
-            <h3 id="mobile-cash-assistant-title" style="margin: 2px 0 0 0; font-size: 1.15rem; color: var(--color-text-main, #152d24);">¿Qué deseás hacer en caja?</h3>
-          </div>
-          <div>
-            <button type="button" id="mobile-cash-voice-assistant-btn" class="mobile-pos-voice-fab" onclick="toggleMobileCashVoiceAssistant()" title="Hablar con el Asistente" aria-label="Activar asistente de voz">
-              <span class="voice-fab-pulse"></span>
-              <span class="voice-icon">🎙️</span>
-            </button>
-          </div>
-        </header>
-
-        <div id="mobile-cash-voice-feedback" class="mobile-pos-voice-feedback" hidden>
-          <div class="pos-voice-wave"><span></span><span></span><span></span></div>
-          <span id="mobile-cash-voice-text">🎙️ Asistente escuchando...</span>
-        </div>
-
-        <div id="mobile-cash-assistant-content" class="pos-assistant-body">
-          <!-- Rendered via JS -->
-        </div>
-
-        <footer style="display: flex; justify-content: space-between; gap: 10px; margin-top: 16px;" id="mobile-cash-assistant-nav">
-          <button type="button" id="mobile-cash-assistant-back" class="stock-entry-secondary-btn" onclick="goBackMobileCashAssistant()" style="display: none; flex: 1; min-height: 44px;">
-            ◀ Atrás
-          </button>
-          <button type="button" id="mobile-cash-assistant-next" class="mobile-assistant-primary" onclick="continueMobileCashAssistant()" style="display: none; flex: 1; min-height: 44px;">
-            Continuar ➔
-          </button>
-        </footer>
-      </section>
+      <div class="pos-mode-switcher-nav" role="status" aria-label="Caja operativa" style="justify-content: flex-start; color: #152d24;">
+        <strong style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px;">📋 Caja y arqueo operativo</strong>
+      </div>
 
       <div class="cash-dashboard-grid" id="cash-classic-dashboard">
         <div class="cash-main-column">
@@ -4839,6 +4799,6 @@
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=session_recovery_v3"></script>
+  <script src="vendedor.js?v=cash_workspace_v4"></script>
 </body>
 </html>
