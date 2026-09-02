@@ -1031,7 +1031,7 @@
   </style>
   <link rel="stylesheet" href="vendedor-caja.css?v=white_label_v2">
   <link rel="stylesheet" href="vendedor-portal.css?v=white_label_v2">
-  <link rel="stylesheet" href="vendedor-stock.css?v=white_label_v6">
+  <link rel="stylesheet" href="vendedor-stock.css?v=white_label_v6_mobile_v1">
   <style id="vendor-rescue-critical-styles">
     .saas-prototype-only,
     #saas-login-modal {
@@ -2452,8 +2452,8 @@
     </section>
 
     <!-- SECTION: COLA DE BORRADORES Y APROBACIÓN (VISIBLE PARA TODOS) -->
-    <div id="vendor-drafts-review-section" class="vendor-workspace-section" style="display: none; max-width: 1100px; margin: 30px auto; padding: 0 20px;">
-      <div style="background: #fffefb; border: 2px solid var(--vendor-gold); border-radius: 20px; padding: 24px; box-shadow: 0 8px 24px rgba(92,59,30,0.06); color: #5c3b1e;">
+    <div id="vendor-drafts-review-section" class="vendor-workspace-section vendor-drafts-section-container" style="display: none;">
+      <div class="vendor-drafts-card-box">
         
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
           <div>
@@ -2475,11 +2475,11 @@
 
         <!-- Buscador y filtro de borradores -->
         <div style="margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
-          <input type="search" id="drafts-search-input" placeholder="🔍 Filtrar por nombre, SKU, marca o vendedor..." class="b2b-search-input" style="flex: 1; min-width: 260px; padding: 10px 14px; border-radius: 12px; border: 1.5px solid #d4c5a9; font-size: 0.9rem; background: #fff;" oninput="filterPendingProductDrafts(this.value)">
+          <input type="search" id="drafts-search-input" placeholder="🔍 Filtrar por nombre, SKU, marca o vendedor..." class="b2b-search-input" style="flex: 1; min-width: 240px; padding: 10px 14px; border-radius: 12px; border: 1.5px solid #d4c5a9; font-size: 0.9rem; background: #fff;" oninput="filterPendingProductDrafts(this.value)">
         </div>
 
         <!-- Grid de Borradores Pendientes -->
-        <div id="pending-drafts-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px;">
+        <div id="pending-drafts-grid" class="vendor-drafts-grid">
           <!-- Se renderizan vía JavaScript -->
         </div>
 
@@ -2488,55 +2488,55 @@
 
     <!-- MODAL PARA EDITAR BORRADOR EN CUALQUIER MOMENTO (UBICACIÓN Y COLA DE APROBACIÓN) -->
     <div id="draft-edit-modal" class="pos-confirm-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="draft-edit-modal-title">
-      <div class="pos-confirm-modal-card" style="max-width: 520px;">
-        <div class="pos-confirm-modal-header" style="background: #152d24; color: #fff; padding: 16px 20px; border-radius: 16px 16px 0 0;">
+      <div class="pos-confirm-modal-card" style="max-width: 500px; width: min(94vw, 500px); padding: 0; overflow: hidden; border-radius: 20px; display: flex; flex-direction: column; max-height: 90vh; box-shadow: 0 20px 60px rgba(0,0,0,0.3); margin: auto;">
+        <div class="pos-confirm-modal-header" style="background: #152d24; color: #fff; padding: 14px 18px; margin: 0; border-radius: 0; border-bottom: 1px solid rgba(194,162,70,0.3);">
           <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 1.4rem;">✏️</span>
+            <span style="font-size: 1.3rem;">✏️</span>
             <div>
-              <h3 id="draft-edit-modal-title" style="margin: 0; font-size: 1.15rem; color: var(--color-accent-gold);">Editar Borrador de Producto</h3>
-              <small style="color: rgba(255,255,255,0.8); font-size: 0.78rem;">Corrección rápida de conteo o datos del borrador</small>
+              <h3 id="draft-edit-modal-title" style="margin: 0; font-size: 1.1rem; color: var(--color-accent-gold);">Editar Borrador de Producto</h3>
+              <small style="color: rgba(255,255,255,0.8); font-size: 0.75rem;">Corrección rápida de conteo o datos del producto</small>
             </div>
           </div>
-          <button type="button" class="pos-confirm-modal-close" onclick="closeDraftEditModal()" aria-label="Cerrar modal" style="color: #fff;">✕</button>
+          <button type="button" class="pos-confirm-modal-close" onclick="closeDraftEditModal()" aria-label="Cerrar modal" style="color: #fff; font-size: 1.4rem; padding: 4px; min-width: 40px; min-height: 40px; display: flex; align-items: center; justify-content: center;">✕</button>
         </div>
 
-        <form id="draft-edit-form" onsubmit="handleDraftEditFormSubmit(event)" style="margin: 0;">
+        <form id="draft-edit-form" onsubmit="handleDraftEditFormSubmit(event)" style="margin: 0; display: flex; flex-direction: column; flex: 1; overflow: hidden;">
           <input type="hidden" id="draft-edit-id" value="">
-          <div class="pos-confirm-modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 14px; max-height: 75vh; overflow-y: auto;">
+          <div class="pos-confirm-modal-body" style="padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1;">
             
-            <div style="display: flex; gap: 14px; align-items: center; background: #fdfbf7; border: 1.5px solid var(--vendor-gold); border-radius: 12px; padding: 10px 14px;">
-              <img id="draft-edit-img-preview" src="assets/logo.jpg" alt="Producto" style="width: 56px; height: 56px; object-fit: contain; border-radius: 8px; background: #152d24;">
+            <div style="display: flex; gap: 12px; align-items: center; background: #fdfbf7; border: 1.5px solid var(--vendor-gold); border-radius: 12px; padding: 10px 12px;">
+              <img id="draft-edit-img-preview" src="assets/logo.jpg" alt="Producto" style="width: 50px; height: 50px; object-fit: contain; border-radius: 8px; background: #152d24; flex-shrink: 0;">
               <div style="flex: 1; min-width: 0;">
-                <span id="draft-edit-status-badge" style="display: inline-block; font-size: 0.72rem; font-weight: 800; color: #5c3b1e; background: rgba(194,162,70,0.2); padding: 2px 8px; border-radius: 6px; margin-bottom: 2px;">Borrador</span>
-                <div id="draft-edit-code-display" style="font-size: 0.8rem; color: var(--vendor-muted); font-weight: 700;">-</div>
+                <span id="draft-edit-status-badge" style="display: inline-block; font-size: 0.7rem; font-weight: 800; color: #5c3b1e; background: rgba(194,162,70,0.2); padding: 2px 8px; border-radius: 6px; margin-bottom: 2px;">Borrador</span>
+                <div id="draft-edit-code-display" style="font-size: 0.78rem; color: var(--vendor-muted); font-weight: 700; word-break: break-all;">-</div>
               </div>
             </div>
 
             <!-- CANTIDAD / STOCK (DESTACADO PARA ERRORES DE CONTEO) -->
             <div style="background: #f1f8e9; border: 2px solid #81c784; border-radius: 12px; padding: 12px 14px;">
-              <label for="draft-edit-stock" style="display: block; font-size: 0.85rem; font-weight: 900; color: #1b5e20; margin-bottom: 4px;">
+              <label for="draft-edit-stock" style="display: block; font-size: 0.82rem; font-weight: 900; color: #1b5e20; margin-bottom: 4px;">
                 📦 CANTIDAD RECIBIDA / STOCK CONTADO *
               </label>
               <div style="display: flex; align-items: center; gap: 10px;">
-                <input type="number" min="0" step="1" id="draft-edit-stock" class="b2b-form-input" required style="font-size: 1.25rem; font-weight: 900; color: #1b5e20; background: #fff; padding: 8px 12px; border: 2px solid #2e7d32; border-radius: 8px; width: 120px; text-align: center;">
+                <input type="number" min="0" step="1" id="draft-edit-stock" class="b2b-form-input" required style="font-size: 1.3rem; font-weight: 900; color: #1b5e20; background: #fff; padding: 8px 12px; border: 2px solid #2e7d32; border-radius: 8px; width: 110px; text-align: center; min-height: 44px;">
                 <span style="font-size: 0.88rem; font-weight: 700; color: #2e7d32;">unidades físicas</span>
               </div>
-              <small style="display: block; margin-top: 4px; color: #33691e; font-size: 0.78rem;">Corregí acá si el vendedor contó de más o de menos al recibir.</small>
+              <small style="display: block; margin-top: 4px; color: #33691e; font-size: 0.75rem;">Corregí acá si el vendedor contó de más o de menos al recibir.</small>
             </div>
 
             <div>
               <label for="draft-edit-name" style="display: block; font-size: 0.8rem; font-weight: 800; color: #5c3b1e; margin-bottom: 4px;">
                 Nombre del producto *
               </label>
-              <input type="text" id="draft-edit-name" class="b2b-form-input" required style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #d4c5a9;">
+              <input type="text" id="draft-edit-name" class="b2b-form-input" required style="width: 100%; min-height: 44px; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #d4c5a9; box-sizing: border-box;">
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;">
               <div>
                 <label for="draft-edit-category" style="display: block; font-size: 0.8rem; font-weight: 800; color: #5c3b1e; margin-bottom: 4px;">
                   Categoría *
                 </label>
-                <select id="draft-edit-category" class="b2b-form-input" required style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1.5px solid #d4c5a9;">
+                <select id="draft-edit-category" class="b2b-form-input" required style="width: 100%; min-height: 44px; padding: 8px 10px; border-radius: 8px; border: 1.5px solid #d4c5a9; box-sizing: border-box;">
                   <option value="Semillas">Semillas</option>
                   <option value="Sustratos">Sustratos</option>
                   <option value="Fertilizantes">Fertilizantes</option>
@@ -2554,7 +2554,7 @@
                 <label for="draft-edit-cost" style="display: block; font-size: 0.8rem; font-weight: 800; color: #5c3b1e; margin-bottom: 4px;">
                   Costo de compra ($)
                 </label>
-                <input type="number" min="0" step="0.01" id="draft-edit-cost" class="b2b-form-input" placeholder="0.00" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1.5px solid #d4c5a9;">
+                <input type="number" min="0" step="0.01" id="draft-edit-cost" class="b2b-form-input" placeholder="0.00" style="width: 100%; min-height: 44px; padding: 8px 10px; border-radius: 8px; border: 1.5px solid #d4c5a9; box-sizing: border-box;">
               </div>
             </div>
 
@@ -2562,12 +2562,12 @@
               <label for="draft-edit-price" style="display: block; font-size: 0.82rem; font-weight: 900; color: #2e7d32; margin-bottom: 4px;">
                 PRECIO FINAL DE VENTA ($ ARS) *
               </label>
-              <input type="number" min="0.01" step="0.01" id="draft-edit-price" class="b2b-form-input" required placeholder="0.00" style="width: 100%; padding: 10px 12px; font-size: 1.1rem; font-weight: 800; border-radius: 8px; border: 1.5px solid #2e7d32; color: #1b5e20; background: #f1f8e9;">
+              <input type="number" min="0.01" step="0.01" id="draft-edit-price" class="b2b-form-input" required placeholder="0.00" style="width: 100%; min-height: 44px; padding: 10px 12px; font-size: 1.1rem; font-weight: 800; border-radius: 8px; border: 1.5px solid #2e7d32; color: #1b5e20; background: #f1f8e9; box-sizing: border-box;">
             </div>
 
           </div>
 
-          <div class="pos-confirm-modal-footer" style="padding: 16px 20px; border-top: 1px solid #d4c5a9; display: flex; gap: 10px; background: #fffdfa; border-radius: 0 0 16px 16px;">
+          <div class="pos-confirm-modal-footer" style="padding: 12px 16px; border-top: 1px solid #d4c5a9; display: flex; gap: 10px; background: #fffdfa; margin: 0;">
             <button type="button" class="btn btn-secondary" onclick="closeDraftEditModal()" style="flex: 1; min-height: 44px; border-radius: 10px;">
               Cancelar
             </button>
@@ -4889,11 +4889,11 @@
   <script src="migration-center.js?v=migration_v1"></script>
   <script src="tenant-onboarding.js?v=onboarding_v1"></script>
   <script src="pos-cart-engine.js?v=cart_v3"></script>
-  <script src="operational-api.js?v=session_recovery_v3_draft_edit_v2"></script>
+  <script src="operational-api.js?v=session_recovery_v3_draft_edit_v3"></script>
   <script src="pos-desk-utils.js?v=pos_utils_v1"></script>
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=cash_workspace_v11_draft_edit_v2"></script>
+  <script src="vendedor.js?v=cash_workspace_v11_draft_edit_v3"></script>
 </body>
 </html>

@@ -109,3 +109,26 @@ test('vendedor.html y vendedor.js exponen modal de edición de borradores y bot�
   assert.match(vendedorJs, /openDraftEditModal\('\$\{escapeStockHtml\(product\.id\)\}',\s*event\)/);
   assert.match(vendedorJs, /openDraftEditModal\('\$\{draft\.id\}',\s*event\)/);
 });
+
+test('operational-api.js y netlify functions implementan fallback serverless cuando la RPC no existe en la BD', () => {
+  const updateProductDraftMjs = fs.readFileSync(path.join(root, 'netlify/functions/update-product-draft.mjs'), 'utf8');
+  assert.match(updateProductDraftMjs, /export async function handler\(event\)/);
+  assert.match(updateProductDraftMjs, /catalog_product_drafts_v2/);
+  assert.match(updateProductDraftMjs, /ALLOWED_ROLES = new Set\(\['ADMIN',\s*'SUPERVISOR',\s*'VENDEDOR'\]\)/);
+
+  assert.match(operationalApiSrc, /fetch\('\/\.netlify\/functions\/update-product-draft'/);
+  assert.match(operationalApiSrc, /isMissingRpc/);
+});
+
+test('Diseño responsive para móviles en cola de aprobación, tarjetas y modal', () => {
+  const vendedorStockCss = fs.readFileSync(path.join(root, 'vendedor-stock.css'), 'utf8');
+  assert.match(vendedorStockCss, /\.vendor-drafts-section-container/);
+  assert.match(vendedorStockCss, /\.vendor-drafts-card-box/);
+  assert.match(vendedorStockCss, /\.vendor-drafts-grid/);
+  assert.match(vendedorStockCss, /@media \(max-width: 768px\)/);
+
+  // Botones en dos niveles ordenados
+  assert.match(vendedorJs, /grid-template-columns: 1fr 1fr; gap: 8px;/);
+  assert.match(vendedorJs, /Aprobar y Publicar/);
+  assert.match(vendedorJs, /Rechazar/);
+});

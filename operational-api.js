@@ -557,11 +557,56 @@
     if (!safeDraftId || !updates || typeof updates !== 'object' || Array.isArray(updates)) {
       throw new OperationalApiError('Los datos para actualizar el borrador no son válidos.', 'INVALID_DRAFT_UPDATE');
     }
-    return invokeOperationalRpc(supabaseClient, 'update_catalog_product_draft_v2', {
-      p_tenant_id: tenantId,
-      p_draft_id: safeDraftId,
-      p_updates: updates
-    });
+
+    try {
+      return await invokeOperationalRpc(supabaseClient, 'update_catalog_product_draft_v2', {
+        p_tenant_id: tenantId,
+        p_draft_id: safeDraftId,
+        p_updates: updates
+      });
+    } catch (rpcError) {
+      const isMissingRpc = rpcError.code === 'PGRST202' ||
+        String(rpcError.message || '').includes('Could not find the function') ||
+        String(rpcError.message || '').includes('404');
+
+      if (!isMissingRpc) throw rpcError;
+
+      let token = authContext?.token || authContext?.session?.access_token;
+      if (!token && typeof supabaseClient?.auth?.getSession === 'function') {
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        token = sessionData?.session?.access_token;
+      }
+      if (!token && typeof window !== 'undefined' && window.localStorage) {
+        try {
+          const authKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+          if (authKey) {
+            const parsed = JSON.parse(localStorage.getItem(authKey));
+            token = parsed?.access_token;
+          }
+        } catch (_) {}
+      }
+
+      if (!token) throw rpcError;
+
+      const response = await fetch('/.netlify/functions/update-product-draft', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          tenantId,
+          draftId: safeDraftId,
+          updates
+        })
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.error) {
+        throw new OperationalApiError(result.error || 'Error al actualizar el borrador.', 'DRAFT_UPDATE_FAILED');
+      }
+      return result.draft;
+    }
   }
 
   async function rejectCatalogProductDraft({ supabaseClient, authContext, draftId, reason }) {

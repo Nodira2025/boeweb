@@ -5773,22 +5773,22 @@ function renderPendingLocationList() {
       ${pendingLocationProducts.map(product => {
         const isSelected = locationAssistantSelectedDraftIds.has(String(product.id));
         return `
-          <div class="location-pending-card" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: ${isSelected ? 'rgba(194,162,70,0.12)' : '#fff'}; border: 1.5px solid ${isSelected ? 'var(--vendor-gold)' : '#e2d7c0'}; border-radius: 12px; margin-bottom: 8px;">
-            <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="togglePendingLocationSelection('${escapeStockHtml(product.id)}', this.checked)" style="width: 20px; height: 20px; accent-color: var(--vendor-forest); cursor: pointer;" aria-label="Seleccionar ${escapeStockHtml(product.name || 'producto')}">
-            <div style="display: flex; align-items: center; gap: 10px; flex: 1; cursor: pointer;" onclick="selectPendingLocationProduct('${escapeStockHtml(product.id)}')">
+          <div class="location-pending-card" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: ${isSelected ? 'rgba(194,162,70,0.12)' : '#fff'}; border: 1.5px solid ${isSelected ? 'var(--vendor-gold)' : '#e2d7c0'}; border-radius: 12px; margin-bottom: 8px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 170px; cursor: pointer;" onclick="selectPendingLocationProduct('${escapeStockHtml(product.id)}')">
+              <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="togglePendingLocationSelection('${escapeStockHtml(product.id)}', this.checked)" onclick="event.stopPropagation()" style="width: 20px; height: 20px; accent-color: var(--vendor-forest); cursor: pointer;" aria-label="Seleccionar ${escapeStockHtml(product.name || 'producto')}">
               ${product.image_url
-                ? `<img src="${escapeStockHtml(product.image_url)}" alt="${escapeStockHtml(product.name || 'Producto pendiente')}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid #e0d5c1;">`
-                : '<span class="location-pending-placeholder" aria-hidden="true" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: #f5f2e8; border-radius: 8px; font-size: 1.2rem;">📦</span>'}
-              <div style="display: flex; flex-direction: column;">
-                <strong style="font-size: 0.92rem; color: var(--vendor-ink);">${escapeStockHtml(product.name || product.product_code || 'Producto sin nombre')}</strong>
+                ? `<img src="${escapeStockHtml(product.image_url)}" alt="${escapeStockHtml(product.name || 'Producto pendiente')}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid #e0d5c1; flex-shrink: 0;">`
+                : '<span class="location-pending-placeholder" aria-hidden="true" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: #f5f2e8; border-radius: 8px; font-size: 1.2rem; flex-shrink: 0;">📦</span>'}
+              <div style="display: flex; flex-direction: column; min-width: 0;">
+                <strong style="font-size: 0.92rem; color: var(--vendor-ink); word-break: break-word;">${escapeStockHtml(product.name || product.product_code || 'Producto sin nombre')}</strong>
                 <small style="font-size: 0.78rem; color: var(--vendor-muted);">${Number(product.stock) || 0} unidades · ${product.status === 'APPROVED' ? 'Aprobado' : 'En revisión'}</small>
               </div>
             </div>
-            <div style="display: flex; gap: 6px; align-items: center;">
-              <button type="button" onclick="openDraftEditModal('${escapeStockHtml(product.id)}', event)" class="stock-entry-secondary-btn" style="background: rgba(194,162,70,0.15); border: 1.5px solid var(--vendor-gold); color: #5c3b1e; font-weight: 800; font-size: 0.78rem; padding: 6px 10px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Editar cantidad o datos del producto">
+            <div style="display: flex; gap: 6px; align-items: center; margin-left: auto;">
+              <button type="button" onclick="openDraftEditModal('${escapeStockHtml(product.id)}', event)" class="stock-entry-secondary-btn" style="min-height: 38px; background: rgba(194,162,70,0.15); border: 1.5px solid var(--vendor-gold); color: #5c3b1e; font-weight: 800; font-size: 0.78rem; padding: 6px 10px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Editar cantidad o datos del producto">
                 ✏️ Editar
               </button>
-              <button type="button" onclick="selectPendingLocationProduct('${escapeStockHtml(product.id)}')" style="background: var(--vendor-forest); color: #fff; font-weight: 800; font-size: 0.78rem; padding: 6px 12px; border-radius: 8px; border: none; cursor: pointer;">
+              <button type="button" onclick="selectPendingLocationProduct('${escapeStockHtml(product.id)}')" style="min-height: 38px; background: var(--vendor-forest); color: #fff; font-weight: 800; font-size: 0.78rem; padding: 6px 12px; border-radius: 8px; border: none; cursor: pointer;">
                 Ubicar ›
               </button>
             </div>
@@ -6815,31 +6815,35 @@ function renderPendingDraftsList(drafts) {
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;">
             <div>
               <label style="display: block; font-size: 0.78rem; font-weight: 800; color: #1b5e20; margin-bottom: 2px;">📦 CANTIDAD (STOCK) *</label>
-              <input type="number" min="0" step="1" id="draft-stock-${draft.id}" value="${Number(draft.stock) >= 0 ? Number(draft.stock) : 0}" placeholder="Ej: 10" required class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.95rem; font-weight: 800; border-radius: 8px; border-color: #2e7d32; color: #1b5e20; background: #f1f8e9;">
+              <input type="number" min="0" step="1" id="draft-stock-${draft.id}" value="${Number(draft.stock) >= 0 ? Number(draft.stock) : 0}" placeholder="Ej: 10" required class="b2b-form-input" style="width: 100%; min-height: 42px; padding: 8px; font-size: 0.95rem; font-weight: 800; border-radius: 8px; border-color: #2e7d32; color: #1b5e20; background: #f1f8e9; box-sizing: border-box;">
             </div>
 
             <div>
               <label style="display: block; font-size: 0.78rem; font-weight: 800; color: #2e7d32; margin-bottom: 2px;">PRECIO PÚBLICO ($ ARS) *</label>
-              <input type="number" step="0.01" id="draft-price-${draft.id}" value="${Number(draft.sale_price) || ''}" placeholder="Ej: 22500" required class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.95rem; font-weight: 800; border-radius: 8px; border-color: #2e7d32; color: #1b5e20; background: #f1f8e9;">
+              <input type="number" step="0.01" id="draft-price-${draft.id}" value="${Number(draft.sale_price) || ''}" placeholder="Ej: 22500" required class="b2b-form-input" style="width: 100%; min-height: 42px; padding: 8px; font-size: 0.95rem; font-weight: 800; border-radius: 8px; border-color: #2e7d32; color: #1b5e20; background: #f1f8e9; box-sizing: border-box;">
             </div>
           </div>
 
-          <div style="display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap;">
-            <button type="button" onclick="openDraftEditModal('${draft.id}', event)" class="stock-entry-secondary-btn" style="background: rgba(194,162,70,0.18); border: 1.5px solid var(--vendor-gold); color: #5c3b1e; padding: 10px 14px; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;" title="Abrir ventana de edición completa">
-              ✏️ Editar
-            </button>
-            <button type="button" onclick="saveProductDraftChanges('${draft.id}')" style="background: #fffdfa; border: 1.5px solid var(--vendor-gold); color: #5c3b1e; padding: 10px 14px; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;" title="Guardar cambios de stock y datos en el borrador sin publicar todavía">
-              💾 Guardar
-            </button>
-            <button type="button" onclick="approveProductDraft('${draft.id}')" style="flex: 1; min-width: 140px; background: #2e7d32; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 0.88rem;">
-              ✅ Aprobar y Publicar
-            </button>
-            <button type="button" onclick="rejectProductDraft('${draft.id}')" style="background: rgba(239,83,80,0.2); color: #ef5350; border: 1px solid #ef5350; padding: 10px 14px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 0.85rem;">
-              ❌ Rechazar
-            </button>
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <button type="button" onclick="openDraftEditModal('${draft.id}', event)" class="stock-entry-secondary-btn" style="min-height: 44px; background: rgba(194,162,70,0.18); border: 1.5px solid var(--vendor-gold); color: #5c3b1e; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 4px;" title="Abrir ventana de edición completa">
+                ✏️ Editar
+              </button>
+              <button type="button" onclick="saveProductDraftChanges('${draft.id}')" style="min-height: 44px; background: #fffdfa; border: 1.5px solid var(--vendor-gold); color: #5c3b1e; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 4px;" title="Guardar cambios de stock y datos en el borrador sin publicar todavía">
+                💾 Guardar
+              </button>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" onclick="approveProductDraft('${draft.id}')" style="min-height: 44px; flex: 1; background: #2e7d32; color: #fff; border: none; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 0.88rem; display: flex; align-items: center; justify-content: center;">
+                ✅ Aprobar y Publicar
+              </button>
+              <button type="button" onclick="rejectProductDraft('${draft.id}')" style="min-height: 44px; background: rgba(239,83,80,0.15); color: #c62828; border: 1px solid #ef5350; padding: 0 14px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center;">
+                ❌ Rechazar
+              </button>
+            </div>
           </div>
 
         </div>
