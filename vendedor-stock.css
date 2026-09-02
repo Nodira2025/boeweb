@@ -4014,4 +4014,67 @@
   font-weight: 600;
 }
 
+/* Bandeja de Pendientes del Sector */
+.wms-sector-pending-tray {
+  background: linear-gradient(135deg, #fffdf7 0%, #fef9eb 100%);
+  border: 2px dashed #d4a342;
+  border-radius: 18px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 16px rgba(212, 163, 66, 0.12);
+}
+
+.wms-sector-pending-tray-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(212, 163, 66, 0.25);
+}
+
+.wms-sector-pending-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.wms-sector-pending-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1.5px solid #ebd9b2;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.wms-sector-pending-card.selected {
+  background: rgba(194, 162, 70, 0.12);
+  border-color: var(--vendor-gold, #c2a246);
+  box-shadow: 0 2px 8px rgba(194, 162, 70, 0.2);
+}
+
+/* Botón de Atajo de Guardado en Sector General */
+.wms-save-shortcut-btn {
+  background: linear-gradient(135deg, #f7f3e6 0%, #ede5cb 100%);
+  color: var(--vendor-forest, #152d24);
+  border: 1.5px solid var(--vendor-gold, #c2a246);
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(92, 59, 30, 0.08);
+  transition: all 0.2s ease;
+}
+
+.wms-save-shortcut-btn:hover {
+  background: linear-gradient(135deg, #ede5cb 0%, #e0d4b2 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(92, 59, 30, 0.15);
+}
+
 

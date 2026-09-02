@@ -5829,6 +5829,8 @@ function openEditProductLocation(productIdentifier, isMultiSlot = false) {
 window.openEditProductLocation = openEditProductLocation;
 
 function renderLocationChoiceCards(question, help, choices, handlerName) {
+  const state = locationAssistantState;
+  const showSectorShortcut = state.zone && state.step !== 'zone';
   return `
     ${renderLocationAssistantProductHeader()}
     <p class="assistant-question">${escapeStockHtml(question)}</p>
@@ -5839,7 +5841,14 @@ function renderLocationChoiceCards(question, help, choices, handlerName) {
           <strong>${escapeStockHtml(choice.label)}</strong>
           <small>${escapeStockHtml(choice.help || '')}</small>
         </button>`).join('')}
-    </div>`;
+    </div>
+    ${showSectorShortcut ? `
+      <div style="margin-top: 18px; text-align: center; border-top: 1px dashed rgba(194,162,70,0.4); padding-top: 14px;">
+        <button type="button" onclick="saveSectorOnlyLocation()" class="wms-save-shortcut-btn">
+          💾 Guardar sólo en ${escapeStockHtml(state.zone.label)} (Detallar góndola/balda luego)
+        </button>
+      </div>
+    ` : ''}`;
 }
 
 function getLocationZoneById(zoneId) {
@@ -6422,6 +6431,154 @@ async function persistLocationAssistant(saveAsMultiSlot = false) {
     }
   }
 }
+
+async function saveSectorOnlyLocation() {
+  const state = locationAssistantState;
+  const productsToPersist = (state.isBulk && Array.isArray(state.products) && state.products.length > 0)
+    ? state.products
+    : (state.product ? [state.product] : []);
+
+  if (!productsToPersist.length) {
+    showToast('Seleccioná al menos un producto para guardar en este sector.');
+    return;
+  }
+  const zone = state.zone || LOCATION_ZONE_OPTIONS[0];
+  const floorLevel = zone.floor_level || (zone.id === 'DP' ? 2 : (Number(zone.id.replace(/\D/g, '')) || 1));
+  const zonePrefix = zone.prefix || zone.id || 'S1';
+  const wmsCode = `${zonePrefix}-GENERAL`;
+  const locationLabel = `📍 ${zone.label} · Pendiente de góndola o balda`;
+
+  const status = document.getElementById('location-assistant-status');
+  if (status) {
+    status.hidden = false;
+    status.dataset.state = 'loading';
+    status.textContent = `Guardando ${productsToPersist.length} producto(s) en ${zone.label}…`;
+  }
+
+  try {
+    const authContext = await ensureVendorOperationalSession({ showLogin: true });
+    for (const draft of productsToPersist) {
+      const productCode = draft.product_code || draft.id;
+      const productLocation = {
+        product_id: productCode,
+        product_code: productCode,
+        name: draft.name || productCode,
+        image_url: draft.image_url || '',
+        barcode: draft.barcode || null,
+        floor_level: floorLevel,
+        shelf_code: 'GENERAL',
+        shelf_level: null,
+        stock: Math.max(0, Number(draft.stock) || 0),
+        qr_payload: draft.qr_payload || buildProductQrPayload(productCode),
+        area_name: zone.label,
+        wall_side: null,
+        shelf_position: null,
+        placement_photo_url: null,
+        placement_photo_path: null,
+        location_label: locationLabel,
+        wms_code: wmsCode,
+        updated_at: new Date().toISOString()
+      };
+
+      if (authContext && window.OperationalApi && draft.id && (draft.status === 'PENDING_LOCATION' || draft.status === 'PENDING_REVIEW')) {
+        await window.OperationalApi.locateCatalogProductDraft({
+          supabaseClient,
+          authContext,
+          draftId: draft.id,
+          location: {
+            code: wmsCode,
+            name: locationLabel,
+            location_type: 'SECTOR',
+            is_sellable: true,
+            is_default: false,
+            metadata: {
+              floor_level: floorLevel,
+              shelf_code: 'GENERAL',
+              is_sector_only: true
+            }
+          },
+          idempotencyKey: `locate-draft:${draft.id}:${globalThis.crypto?.randomUUID?.() || Date.now()}`
+        }).catch(e => console.warn('Locate draft error:', e));
+      }
+
+      saveLocalProductLocation(productLocation);
+
+      if (window.logMapHistoryAction) {
+        window.logMapHistoryAction(
+          'ASIGNACION_SECTOR_RAPIDA',
+          'Asignado a Sector general',
+          `Producto "${draft.name || productCode}" -> ${zone.label} (Detalle de balda pendiente)`,
+          'GENERAL',
+          floorLevel
+        );
+      }
+    }
+
+    storeMapDataLoaded = false;
+    if (typeof loadStoreMapData === 'function') loadStoreMapData(true).catch(() => {});
+    if (typeof loadInternalCatalog === 'function') loadInternalCatalog().catch(() => {});
+
+    showToast(`💾 ${productsToPersist.length} producto(s) asignado(s) a ${zone.label}.`);
+    locationAssistantSelectedDraftIds.clear();
+    await loadPendingLocationProducts();
+    renderStoreMapUI();
+    switchVendorTab('store-map');
+    if (window.openWmsSectorView) window.openWmsSectorView(floorLevel);
+  } catch (err) {
+    console.error('Error al guardar en sector general:', err);
+    showToast(`Error al guardar: ${err.message}`);
+  }
+}
+window.saveSectorOnlyLocation = saveSectorOnlyLocation;
+
+function startBatchSectorRefinement(productIds, sectorFloor) {
+  if (!Array.isArray(productIds) || !productIds.length) {
+    showToast('Seleccioná al menos un producto para ubicar en góndola.');
+    return;
+  }
+  const floorNum = Number(sectorFloor) || 1;
+  const zoneObj = LOCATION_ZONE_OPTIONS.find(z => Number(z.floor_level || z.floor) === floorNum) || LOCATION_ZONE_OPTIONS[0];
+
+  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
+  const canonicalLocs = (typeof window !== 'undefined' && Array.isArray(window.__canonicalWmsProductLocations)) ? window.__canonicalWmsProductLocations : [];
+  const allCandidates = [
+    ...storeLocs,
+    ...canonicalLocs,
+    ...(typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) ? internalCatalogProducts : []),
+    ...(typeof pendingLocationProducts !== 'undefined' && Array.isArray(pendingLocationProducts) ? pendingLocationProducts : [])
+  ];
+
+  const matchedProducts = productIds.map(id => {
+    const q = String(id).toUpperCase();
+    return allCandidates.find(p => 
+      String(p.id).toUpperCase() === q ||
+      String(p.product_id).toUpperCase() === q ||
+      String(p.product_code).toUpperCase() === q ||
+      String(p.sku).toUpperCase() === q
+    );
+  }).filter(Boolean);
+
+  if (!matchedProducts.length) {
+    showToast('No se encontraron los productos seleccionados.');
+    return;
+  }
+
+  locationAssistantState = {
+    ...createEmptyLocationAssistantState(),
+    step: 'wall',
+    product: matchedProducts[0],
+    products: matchedProducts,
+    zone: zoneObj,
+    isBulk: matchedProducts.length > 1,
+    isEditing: true
+  };
+
+  switchVendorTab('location-assistant');
+  renderLocationAssistant();
+  showToast(`📍 Asigná la Pared, Góndola y Balda para los ${matchedProducts.length} productos en ${zoneObj.label}.`);
+}
+window.startBatchSectorRefinement = startBatchSectorRefinement;
+
 
 function continueLocationAssistant() {
   if (locationAssistantState.step === 'photo') {

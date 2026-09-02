@@ -215,4 +215,24 @@ test('WMS Hierarchical Explorer: Navegación por 6 sectores, muebles/baldas y mo
   assert.match(mapCode, /wms-sector-card/);
 });
 
+test('Reubicación Progresiva: Guardado en Sector general, Bandeja de Pendientes y Refinamiento Grupal', () => {
+  const vendorCode = fs.readFileSync(path.join(process.cwd(), 'vendedor.js'), 'utf8');
+  const mapCode = fs.readFileSync(path.join(process.cwd(), 'mapa-local.js'), 'utf8');
+
+  // 1. Funciones de Guardado en Sector y Refinamiento Grupal en vendedor.js
+  assert.match(vendorCode, /function saveSectorOnlyLocation/);
+  assert.match(vendorCode, /function startBatchSectorRefinement/);
+  assert.match(vendorCode, /window\.saveSectorOnlyLocation\s*=/);
+  assert.match(vendorCode, /window\.startBatchSectorRefinement\s*=/);
+  assert.match(vendorCode, /wms-save-shortcut-btn/);
+
+  // 2. Bandeja de pendientes y selección múltiple en mapa-local.js
+  assert.match(mapCode, /wms-sector-pending-tray/);
+  assert.match(mapCode, /toggleSectorPendingSelection/);
+  assert.match(mapCode, /toggleAllSectorPendingSelection/);
+  assert.match(mapCode, /triggerBatchSectorRefinement/);
+  assert.match(mapCode, /window\.triggerBatchSectorRefinement\s*=/);
+});
+
+
 
