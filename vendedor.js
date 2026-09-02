@@ -2011,17 +2011,21 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
   // Match product only against tenant-scoped catalog and server-backed WMS reads.
   let matched = matchedProduct;
   const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
-  const allProducts = [...storeLocs, ...(internalCatalogProducts || [])];
+  const canonicalLocs = (typeof window !== 'undefined' && Array.isArray(window.__canonicalWmsProductLocations)) ? window.__canonicalWmsProductLocations : [];
+  const allProducts = [...storeLocs, ...canonicalLocs, ...(internalCatalogProducts || [])];
 
   if (!matched && raw) {
     // 1. Direct SKU, barcode, name or ID match
-    matched = allProducts.find(p => 
-      (p.barcode && p.barcode.toUpperCase() === upper) ||
-      (p.product_code && p.product_code.toUpperCase() === upper) ||
-      (p.id && String(p.id).toUpperCase() === upper) ||
-      (p.name && p.name.toUpperCase() === upper) ||
-      (p.name && p.name.toLowerCase().includes(raw.toLowerCase()))
-    );
+    matched = allProducts.find(p => {
+      if (!p) return false;
+      const pSku = String(p.sku || '').toUpperCase();
+      const pCode = String(p.product_code || '').toUpperCase();
+      const pId = String(p.id || '').toUpperCase();
+      const pProdId = String(p.product_id || '').toUpperCase();
+      const pBarcode = String(p.barcode || '').toUpperCase();
+      const pName = String(p.name || '').toUpperCase();
+      return pSku === upper || pCode === upper || pId === upper || pProdId === upper || pBarcode === upper || pName === upper || (p.name && p.name.toLowerCase().includes(raw.toLowerCase()));
+    });
   }
 
   // Determine if query is a direct full WMS code or shelf code
@@ -2111,7 +2115,11 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
     return sCode === rUpper || sClean === rClean || sCode.endsWith(rUpper) || sClean.endsWith(rClean);
   }) : null;
 
-  const isLocated = Boolean(physicalShelfMatch);
+  const isLocated = Boolean(
+    physicalShelfMatch || 
+    isExplicitWmsCode || 
+    (matched && ((matched.wms_code && matched.wms_code.includes('-')) || (matched.shelf_code && matched.shelf_code !== 'Sin ubicación' && matched.shelf_code !== 'SIN_ASIGNAR')))
+  );
   const layoutShelfCode = physicalShelfMatch ? physicalShelfMatch.code : shelfCode;
 
   // Area & floor
@@ -2466,22 +2474,34 @@ function searchShelfOnMap() {
     return;
   }
 
-  // 1. Check if it's a product in storeLocationProducts or internalCatalog
+  // 1. Check if it's a product in storeLocationProducts, canonicalWmsLocations, or internalCatalog
   let productMatch = null;
   if (window.findStoreMapProduct) {
     const res = window.findStoreMapProduct(rawVal);
-    if (res) productMatch = res.product;
+    if (res && res.hasMatchedProduct) productMatch = res.product;
   }
-  if (!productMatch && typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts)) {
+
+  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
+  const canonicalLocs = (typeof window !== 'undefined' && Array.isArray(window.__canonicalWmsProductLocations)) ? window.__canonicalWmsProductLocations : [];
+  const allCandidates = [
+    ...storeLocs,
+    ...canonicalLocs,
+    ...(typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) ? internalCatalogProducts : [])
+  ];
+
+  if (!productMatch && allCandidates.length) {
     const q = rawVal.toLowerCase();
-    productMatch = internalCatalogProducts.find(p => 
-      (p.name && p.name.toLowerCase().includes(q)) ||
-      (p.barcode && p.barcode.toLowerCase() === q) ||
-      (p.product_code && p.product_code.toLowerCase() === q) ||
-      (p.id && String(p.id).toLowerCase() === q) ||
-      (p.wms_code && p.wms_code.toLowerCase() === q) ||
-      (p.location && p.location.toLowerCase().includes(q))
-    );
+    productMatch = allCandidates.find(p => {
+      if (!p) return false;
+      const name = String(p.name || '').toLowerCase();
+      const barcode = String(p.barcode || '').toLowerCase();
+      const pCode = String(p.product_code || '').toLowerCase();
+      const sku = String(p.sku || '').toLowerCase();
+      const id = String(p.id || '').toLowerCase();
+      const pId = String(p.product_id || '').toLowerCase();
+      const wms = String(p.wms_code || p.shelf_code || p.location || '').toLowerCase();
+      return name.includes(q) || barcode === q || pCode === q || sku === q || id === q || pId === q || wms.includes(q);
+    });
   }
 
   // 2. Decode human location information
@@ -2496,13 +2516,15 @@ function searchShelfOnMap() {
     window.speakLocationVoicePhrase(info);
   }
 
-  // 5. Update the interactive 2D/3D map ONLY if located on an active shelf
-  if (info.isLocated) {
-    if (window.setFloorLevel) {
+  // 5. Update the interactive WMS sector view if located
+  if (info.isLocated && info.floorLevel) {
+    if (window.openWmsSectorView) {
+      window.openWmsSectorView(info.floorLevel);
+    } else if (window.setFloorLevel) {
       window.setFloorLevel(info.floorLevel);
     }
     if (window.selectShelf) {
-      window.selectShelf(info.layoutShelfCode || info.shelfCode, info.levelNum);
+      window.selectShelf(info.layoutShelfCode || info.shelfCode || info.wallCode, info.levelNum);
     }
     renderStoreMapUI(info.wallCode || info.zoneCode, info.layoutShelfCode || info.shelfCode, info.levelNum);
   }
@@ -5736,21 +5758,37 @@ function openEditProductLocation(productIdentifier, isMultiSlot = false) {
   if (!query) return;
 
   const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
+  const canonicalLocs = (typeof window !== 'undefined' && Array.isArray(window.__canonicalWmsProductLocations)) ? window.__canonicalWmsProductLocations : [];
   const allCandidates = [
     ...storeLocs,
+    ...canonicalLocs,
     ...(internalCatalogProducts || []),
     ...(pendingLocationProducts || [])
   ];
 
-  let targetProduct = allCandidates.find(p => 
-    (p.product_code && p.product_code.toUpperCase() === query) ||
-    (p.id && String(p.id).toUpperCase() === query) ||
-    (p.barcode && p.barcode.toUpperCase() === query) ||
-    (p.name && p.name.toUpperCase() === query)
-  );
+  let targetProduct = allCandidates.find(p => {
+    if (!p) return false;
+    const pCode = String(p.product_code || '').toUpperCase();
+    const pId = String(p.id || '').toUpperCase();
+    const pProdId = String(p.product_id || '').toUpperCase();
+    const pSku = String(p.sku || '').toUpperCase();
+    const pBarcode = String(p.barcode || '').toUpperCase();
+    const pName = String(p.name || '').toUpperCase();
+    return pCode === query || pId === query || pProdId === query || pSku === query || pBarcode === query || pName === query;
+  });
 
   if (!targetProduct && typeof getCatalogProductByCode === 'function') {
     targetProduct = getCatalogProductByCode(query);
+  }
+
+  if (!targetProduct) {
+    targetProduct = allCandidates.find(p => {
+      if (!p) return false;
+      const pName = String(p.name || '').toUpperCase();
+      const pCode = String(p.product_code || '').toUpperCase();
+      const pSku = String(p.sku || '').toUpperCase();
+      return pName.includes(query) || (query.length >= 4 && (pCode.includes(query) || pSku.includes(query)));
+    });
   }
 
   if (!targetProduct) {
@@ -5759,7 +5797,7 @@ function openEditProductLocation(productIdentifier, isMultiSlot = false) {
   }
 
   const decoded = decodeHumanWmsLocation(targetProduct.wms_code || targetProduct.shelf_code || targetProduct.location || '', targetProduct);
-  const zoneObj = LOCATION_ZONE_OPTIONS.find(z => z.id === decoded.zoneCode) || LOCATION_ZONE_OPTIONS[0];
+  const zoneObj = LOCATION_ZONE_OPTIONS.find(z => z.id === decoded.zoneCode || z.prefix === decoded.zoneCode) || LOCATION_ZONE_OPTIONS.find(z => Number(z.floor_level || z.floor) === Number(decoded.floorLevel)) || LOCATION_ZONE_OPTIONS[0];
   const typeObj = LOCATION_TYPE_OPTIONS.find(t => t.id === decoded.typeCode) || LOCATION_TYPE_OPTIONS[0];
   const compassObj = LOCATION_COMPASS_OPTIONS.find(c => c.id === decoded.compassCode) || LOCATION_COMPASS_OPTIONS[0];
   const wallObj = LOCATION_WALL_OPTIONS.find(w => w.id === decoded.wallCode) || LOCATION_WALL_OPTIONS[0];

@@ -696,8 +696,8 @@ function renderProductCardsList(products) {
           </small>
         </div>
         <div style="display: flex; flex-direction: column; gap: 4px;">
-          <button type="button" class="gba-qr-btn" onclick="if (window.openEditProductLocation) window.openEditProductLocation('${escapeMapHtml(product.product_code || product.id)}');" title="Reubicar">📍 Reubicar</button>
-          <button type="button" class="gba-qr-btn" onclick="printProductQrByCode('${escapeMapHtml(product.product_code || product.id)}')" title="Imprimir QR">🖨️ QR</button>
+          <button type="button" class="gba-qr-btn" onclick="if (window.openEditProductLocation) window.openEditProductLocation('${escapeMapHtml(product.product_code || product.sku || product.product_id || product.id)}');" title="Reubicar">📍 Reubicar</button>
+          <button type="button" class="gba-qr-btn" onclick="printProductQrByCode('${escapeMapHtml(product.product_code || product.sku || product.product_id || product.id)}')" title="Imprimir QR">🖨️ QR</button>
         </div>
       </article>`;
   }).join('');
