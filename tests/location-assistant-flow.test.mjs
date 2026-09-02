@@ -6,10 +6,20 @@ import path from 'node:path';
 test('Location Assistant: Constantes y estructura de pasos presentes en vendedor.js', () => {
   const code = fs.readFileSync(path.join(process.cwd(), 'vendedor.js'), 'utf8');
 
-  // 1. Elegí la zona (TIENDA o DEPÓSITO)
+  // 1. Elegí la zona / sector (6 Sectores temáticos)
   assert.match(code, /LOCATION_ZONE_OPTIONS/);
-  assert.match(code, /id:\s*'TI'/);
-  assert.match(code, /id:\s*'DP'/);
+  assert.match(code, /id:\s*'S1'/);
+  assert.match(code, /id:\s*'S2'/);
+  assert.match(code, /id:\s*'S3'/);
+  assert.match(code, /id:\s*'S4'/);
+  assert.match(code, /id:\s*'S5'/);
+  assert.match(code, /id:\s*'S6'/);
+  assert.match(code, /Sector 1 \(Parafernalia\)/);
+  assert.match(code, /Sector 2 \(Sustratos\)/);
+  assert.match(code, /Sector 3 \(Fertilizantes\)/);
+  assert.match(code, /Sector 4 \(Control de Plagas\)/);
+  assert.match(code, /Sector 5 \(Indoor y Herramientas\)/);
+  assert.match(code, /Sector 6 \(Bajo Escalera\)/);
 
   // 2. Elegí el tipo de ubicación
   assert.match(code, /LOCATION_TYPE_OPTIONS/);
@@ -58,9 +68,18 @@ test('Location Assistant: Constantes y estructura de pasos presentes en vendedor
   assert.match(code, /function persistLocationAssistant/);
 });
 
-test('Location Assistant: Construcción correcta del código generado (TI-D-P1-N3-C y TI-D-P1-N3-U) y guía de voz', () => {
+test('Location Assistant: Construcción correcta del código generado (S3-D-P1-N3-C y S6-I-P2-N2-U) y guía de voz', () => {
+  const ZONE_NOUN_MAP = {
+    'S1': 'el Sector 1 (Parafernalia)',
+    'S2': 'el Sector 2 (Sustratos)',
+    'S3': 'el Sector 3 (Fertilizantes)',
+    'S4': 'el Sector 4 (Control de Plagas)',
+    'S5': 'el Sector 5 (Indoor y Herramientas)',
+    'S6': 'el Sector 6 (Bajo Escalera)'
+  };
+
   function buildLocationInfo(zone, compass, wall, level, sector) {
-    const zonePrefix = zone.prefix || 'TI';
+    const zonePrefix = zone.prefix || 'S1';
     const compassCode = compass.id || 'D';
     const wallCode = wall.id || 'P1';
     const levelNum = Number(level.id) || 1;
@@ -71,7 +90,7 @@ test('Location Assistant: Construcción correcta del código generado (TI-D-P1-N
     const locationLabel = isChico
       ? `📍 ${zone.label} · ${compass.compass} de la PC · ${wall.label} · Nivel ${levelNum}`
       : `📍 ${zone.label} · ${compass.compass} de la PC · ${wall.label} · Nivel ${levelNum} · Sector ${sector.label}`;
-    const zoneNoun = zonePrefix === 'DP' ? 'el depósito' : 'la tienda';
+    const zoneNoun = ZONE_NOUN_MAP[zonePrefix] || `el ${zone.label}`;
     const sectorPhrase = isChico ? '' : `, sector ${sector.label.toLowerCase()}`;
     const voicePhrase = `Está en ${zoneNoun}, a la ${compass.compass.toLowerCase()} de la PC, ${wall.label.toLowerCase()}, nivel ${levelNum}${sectorPhrase}.`;
 
@@ -79,36 +98,36 @@ test('Location Assistant: Construcción correcta del código generado (TI-D-P1-N
   }
 
   const res1 = buildLocationInfo(
-    { label: 'Tienda', prefix: 'TI' },
+    { label: '🌿 Sector 3 (Fertilizantes)', prefix: 'S3' },
     { id: 'D', compass: 'Derecha' },
     { id: 'P1', label: 'Pared 1' },
     { id: 3, label: 'Nivel 3' },
     { id: 'C', label: 'Centro' }
   );
 
-  assert.equal(res1.wmsCode, 'TI-D-P1-N3-C');
-  assert.equal(res1.locationLabel, '📍 Tienda · Derecha de la PC · Pared 1 · Nivel 3 · Sector Centro');
-  assert.equal(res1.voicePhrase, 'Está en la tienda, a la derecha de la PC, pared 1, nivel 3, sector centro.');
+  assert.equal(res1.wmsCode, 'S3-D-P1-N3-C');
+  assert.equal(res1.locationLabel, '📍 🌿 Sector 3 (Fertilizantes) · Derecha de la PC · Pared 1 · Nivel 3 · Sector Centro');
+  assert.equal(res1.voicePhrase, 'Está en el Sector 3 (Fertilizantes), a la derecha de la PC, pared 1, nivel 3, sector centro.');
 
   const res2 = buildLocationInfo(
-    { label: 'Depósito', prefix: 'DP' },
+    { label: '📦 Sector 6 (Bajo Escalera)', prefix: 'S6' },
     { id: 'I', compass: 'Izquierda' },
     { id: 'P2', label: 'Pared 2' },
     { id: 2, label: 'Nivel 2' },
     { id: 'U', label: '👌 Es chico no hace falta' }
   );
 
-  assert.equal(res2.wmsCode, 'DP-I-P2-N2-U');
-  assert.equal(res2.locationLabel, '📍 Depósito · Izquierda de la PC · Pared 2 · Nivel 2');
-  assert.equal(res2.voicePhrase, 'Está en el depósito, a la izquierda de la PC, pared 2, nivel 2.');
+  assert.equal(res2.wmsCode, 'S6-I-P2-N2-U');
+  assert.equal(res2.locationLabel, '📍 📦 Sector 6 (Bajo Escalera) · Izquierda de la PC · Pared 2 · Nivel 2');
+  assert.equal(res2.voicePhrase, 'Está en el Sector 6 (Bajo Escalera), a la izquierda de la PC, pared 2, nivel 2.');
 });
 
-test('Mapa de Estanterías: PC Central como brújula en Tienda y Depósito con funciones de voz y parser', () => {
+test('Mapa de Estanterías: PC Central como brújula en los 6 Sectores con funciones de voz y parser', () => {
   const mapJs = fs.readFileSync(path.join(process.cwd(), 'mapa-local.js'), 'utf8');
 
-  // PC Central como Ancla / Brújula
-  assert.match(mapJs, /id:\s*'tie-pc-center'/);
-  assert.match(mapJs, /id:\s*'dep-pc-center'/);
+  // PC Central como Ancla / Brújula en Sectores
+  assert.match(mapJs, /id:\s*'sec1-pc-center'/);
+  assert.match(mapJs, /id:\s*'sec6-pc-center'/);
   assert.match(mapJs, /is_anchor:\s*true/);
 
   // Niveles 1 al 6

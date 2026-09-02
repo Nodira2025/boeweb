@@ -4,17 +4,44 @@
 
 const DEFAULT_STORE_SHELVES = [
   // =========================================================================
-  // SALÓN TIENDA (PISO 1): PC EN EL CENTRO COMO BRÚJULA
+  // SECTOR 1 (PISO 1): PARAFERNALIA
   // =========================================================================
-  { id: 'tie-pc-center', code: 'PC-CENTRO', zone_code: 'PC', name: '💻 PC Central (Punto de Referencia / Brújula)', floor_level: 1, x: 42, y: 40, width: 16, height: 16, icon: '💻', is_anchor: true },
+  { id: 'sec1-pc-center', code: 'PC-CENTRO', zone_code: 'PC', name: '💻 PC Central · Sector 1 (Parafernalia)', floor_level: 1, x: 42, y: 40, width: 16, height: 16, icon: '💻', is_anchor: true },
 
   // =========================================================================
-  // DEPÓSITO GENERAL (PISO 2): PC EN EL CENTRO COMO BRÚJULA
+  // SECTOR 2 (PISO 2): SUSTRATOS
   // =========================================================================
-  { id: 'dep-pc-center', code: 'PC-CENTRO', zone_code: 'PC', name: '💻 PC Central de Depósito (Brújula de Referencia)', floor_level: 2, x: 42, y: 40, width: 16, height: 16, icon: '💻', is_anchor: true }
+  { id: 'sec2-pc-center', code: 'PC-CENTRO', zone_code: 'PC', name: '💻 PC Central · Sector 2 (Sustratos)', floor_level: 2, x: 42, y: 40, width: 16, height: 16, icon: '💻', is_anchor: true },
+
+  // =========================================================================
+  // SECTOR 3 (PISO 3): FERTILIZANTES
+  // =========================================================================
+  { id: 'sec3-pc-center', code: 'PC-CENTRO', zone_code: 'PC', name: '💻 PC Central · Sector 3 (Fertilizantes)', floor_level: 3, x: 42, y: 40, width: 16, height: 16, icon: '💻', is_anchor: true },
+
+  // =========================================================================
+  // SECTOR 4 (PISO 4): CONTROL DE PLAGAS
+  // =========================================================================
+  { id: 'sec4-pc-center', code: 'PC-CENTRO', zone_code: 'PC', name: '💻 PC Central · Sector 4 (Control de Plagas)', floor_level: 4, x: 42, y: 40, width: 16, height: 16, icon: '💻', is_anchor: true },
+
+  // =========================================================================
+  // SECTOR 5 (PISO 5): INDOOR Y HERRAMIENTAS
+  // =========================================================================
+  { id: 'sec5-pc-center', code: 'PC-CENTRO', zone_code: 'PC', name: '💻 PC Central · Sector 5 (Indoor y Herramientas)', floor_level: 5, x: 42, y: 40, width: 16, height: 16, icon: '💻', is_anchor: true },
+
+  // =========================================================================
+  // SECTOR 6 (PISO 6): BAJO ESCALERA
+  // =========================================================================
+  { id: 'sec6-pc-center', code: 'PC-CENTRO', zone_code: 'PC', name: '💻 PC Central · Sector 6 (Bajo Escalera)', floor_level: 6, x: 42, y: 40, width: 16, height: 16, icon: '💻', is_anchor: true }
 ];
 
-const FLOOR_NAMES = { 1: '🏪 SALÓN TIENDA (PC AL CENTRO)', 2: '📦 DEPÓSITO GENERAL (PC AL CENTRO)' };
+const FLOOR_NAMES = {
+  1: '🌿 SECTOR 1 · PARAFERNALIA (PC AL CENTRO)',
+  2: '🌱 SECTOR 2 · SUSTRATOS (PC AL CENTRO)',
+  3: '🧪 SECTOR 3 · FERTILIZANTES (PC AL CENTRO)',
+  4: '🛡️ SECTOR 4 · CONTROL DE PLAGAS (PC AL CENTRO)',
+  5: '💡 SECTOR 5 · INDOOR Y HERRAMIENTAS (PC AL CENTRO)',
+  6: '📦 SECTOR 6 · BAJO ESCALERA (PC AL CENTRO)'
+};
 const LEVEL_NAMES = {
   1: 'Nv.1 Piso/Base (Abajo)',
   2: 'Nv.2 Bajo',
@@ -109,7 +136,7 @@ function exportMapHistoryCSV() {
     item.action_label,
     `"${String(item.details || '').replace(/"/g, '""')}"`,
     item.shelf_code || '-',
-    item.floor_level === 2 ? 'Depósito' : 'Tienda'
+    FLOOR_NAMES[item.floor_level] ? FLOOR_NAMES[item.floor_level].split('(')[0].trim() : (item.floor_level === 2 ? 'Depósito' : 'Tienda')
   ]);
   const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   const encodedUri = encodeURI(csvContent);
@@ -512,13 +539,30 @@ function showShelfDetailsModal(code) {
   if (window.showToast) window.showToast(message);
 }
 
+const ZONE_MAP_NAMES = {
+  'S1': 'Sector 1 (Parafernalia)',
+  'S2': 'Sector 2 (Sustratos)',
+  'S3': 'Sector 3 (Fertilizantes)',
+  'S4': 'Control de Plagas',
+  'S5': 'Sector 5 (Indoor y Herramientas)',
+  'S6': 'Sector 6 (Bajo Escalera)',
+  'SEC1': 'Sector 1 (Parafernalia)',
+  'SEC2': 'Sector 2 (Sustratos)',
+  'SEC3': 'Sector 3 (Fertilizantes)',
+  'SEC4': 'Control de Plagas',
+  'SEC5': 'Sector 5 (Indoor y Herramientas)',
+  'SEC6': 'Sector 6 (Bajo Escalera)',
+  'TI': 'Tienda',
+  'DP': 'Depósito'
+};
+
 function parseLocationCode(code) {
   const raw = String(code || '').trim().toUpperCase();
   const parts = raw.split('-');
   if (parts.length >= 6) {
     const [zone, compass, wall, shelf, level, sector] = parts;
     return {
-      zone: zone === 'TI' ? 'Tienda' : zone === 'DP' ? 'Depósito' : zone,
+      zone: ZONE_MAP_NAMES[zone] || (zone === 'TI' ? 'Tienda' : zone === 'DP' ? 'Depósito' : zone),
       zoneCode: zone,
       compass: compass === 'D' ? 'Derecha' : compass === 'I' ? 'Izquierda' : compass === 'F' ? 'Frente' : compass === 'A' ? 'Atrás' : compass,
       compassCode: compass,
@@ -534,7 +578,7 @@ function parseLocationCode(code) {
   } else if (parts.length === 5) {
     const [zone, compass, wall, level, sector] = parts;
     return {
-      zone: zone === 'TI' ? 'Tienda' : zone === 'DP' ? 'Depósito' : zone,
+      zone: ZONE_MAP_NAMES[zone] || (zone === 'TI' ? 'Tienda' : zone === 'DP' ? 'Depósito' : zone),
       zoneCode: zone,
       compass: compass === 'D' ? 'Derecha' : compass === 'I' ? 'Izquierda' : compass === 'F' ? 'Frente' : compass === 'A' ? 'Atrás' : compass,
       compassCode: compass,
@@ -557,7 +601,8 @@ function formatLocationVoiceText(loc) {
     if (parsed) loc = parsed;
     else return loc;
   }
-  const zone = loc.zone || (loc.zoneCode === 'DP' ? 'el depósito' : 'la tienda');
+  const zoneRaw = loc.zone || (loc.zoneCode ? ZONE_MAP_NAMES[loc.zoneCode] : null) || (loc.zoneCode === 'DP' ? 'el depósito' : 'la tienda');
+  const zone = zoneRaw.toLowerCase().startsWith('sector') || zoneRaw.toLowerCase().startsWith('control') ? `el ${zoneRaw}` : (zoneRaw === 'Tienda' ? 'la tienda' : zoneRaw === 'Depósito' ? 'el depósito' : zoneRaw);
   const compass = loc.compass || 'frente';
   const wall = loc.wall || 'Pared 1';
   const level = loc.level || `nivel ${loc.levelNum || 1}`;
@@ -866,8 +911,8 @@ function renderFloorTabs() {
   return Object.entries(FLOOR_NAMES).map(([floor, name]) => {
     const floorNum = Number(floor);
     const active = floorNum === selectedFloorLevel;
-    const label = floorNum === 1 ? '🏪 SALÓN TIENDA' : '📦 DEPÓSITO GENERAL';
-    return `<button type="button" class="gba-room-btn ${active ? 'active' : ''}" onclick="setFloorLevel(${floorNum})">${label}</button>`;
+    const shortLabel = name.split('(')[0].trim();
+    return `<button type="button" class="gba-room-btn ${active ? 'active' : ''}" onclick="setFloorLevel(${floorNum})">${shortLabel}</button>`;
   }).join('');
 }
 
@@ -916,6 +961,7 @@ function renderMapHistoryHTML() {
                   day: '2-digit', month: '2-digit', year: 'numeric',
                   hour: '2-digit', minute: '2-digit'
                 });
+                const sectorLabel = FLOOR_NAMES[item.floor_level] ? FLOOR_NAMES[item.floor_level].split('(')[0].trim() : (item.floor_level === 2 ? '📦 Depósito' : '🏪 Tienda');
                 return `
                   <tr>
                     <td style="white-space: nowrap; font-family: monospace; font-size: 0.82rem;">${formattedDate}</td>
@@ -923,7 +969,7 @@ function renderMapHistoryHTML() {
                     <td><span class="gba-history-badge ${badgeClass}">${escapeMapHtml(item.action_label || item.action)}</span></td>
                     <td>${escapeMapHtml(item.details)}</td>
                     <td><strong style="color: var(--color-accent-gold, #c2a246);">${escapeMapHtml(item.shelf_code || '-')}</strong></td>
-                    <td>${item.floor_level === 2 ? '📦 Depósito' : '🏪 Tienda'}</td>
+                    <td>${escapeMapHtml(sectorLabel)}</td>
                   </tr>
                 `;
               }).join('')}
@@ -946,10 +992,9 @@ function renderAddShelfModalHTML() {
         </div>
         <form onsubmit="event.preventDefault(); addNewStoreShelf(document.getElementById('new-shelf-floor').value, document.getElementById('new-shelf-wall').value, document.getElementById('new-shelf-type').value, document.getElementById('new-shelf-num').value, document.getElementById('new-shelf-name').value);">
           <div style="margin-bottom: 14px;">
-            <label style="display: block; font-size: 0.84rem; font-weight: 700; margin-bottom: 6px; color: #c2a246;">Sala / Planta</label>
+            <label style="display: block; font-size: 0.84rem; font-weight: 700; margin-bottom: 6px; color: #c2a246;">Sector / Sala</label>
             <select id="new-shelf-floor" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: #0f2019; border: 1.5px solid #2e6b4d; color: #fff; font-weight: 700; box-sizing: border-box;">
-              <option value="1" ${selectedFloorLevel === 1 ? 'selected' : ''}>🏪 Salón Tienda</option>
-              <option value="2" ${selectedFloorLevel === 2 ? 'selected' : ''}>📦 Depósito General</option>
+              ${Object.entries(FLOOR_NAMES).map(([flNum, flName]) => `<option value="${flNum}" ${selectedFloorLevel === Number(flNum) ? 'selected' : ''}>${flName.split('(')[0].trim()}</option>`).join('')}
             </select>
           </div>
           <div style="margin-bottom: 14px;">

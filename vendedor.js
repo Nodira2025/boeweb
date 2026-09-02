@@ -2026,10 +2026,11 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
 
   // Determine if query is a direct full WMS code or shelf code
   const fullParts = upper.split('-');
-  const isExplicitWmsCode = fullParts.length >= 5 && (fullParts[0] === 'TI' || fullParts[0] === 'DP');
+  const validZonePrefixes = ['TI', 'DP', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'SEC1', 'SEC2', 'SEC3', 'SEC4', 'SEC5', 'SEC6'];
+  const isExplicitWmsCode = fullParts.length >= 5 && validZonePrefixes.includes(fullParts[0]);
 
   let rawShelf = '';
-  let zoneCode = 'TI';
+  let zoneCode = 'S1';
   let compassCode = 'F';
   let wallCode = 'P1';
   let shelfCode = 'E1';
@@ -2057,7 +2058,7 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
     // Check if matched product has an actual location
     const pWms = String(matched.wms_code || '').toUpperCase();
     const pWmsParts = pWms.split('-');
-    if (pWmsParts.length >= 5 && (pWmsParts[0] === 'TI' || pWmsParts[0] === 'DP')) {
+    if (pWmsParts.length >= 5 && validZonePrefixes.includes(pWmsParts[0])) {
       if (pWmsParts.length >= 6) {
         zoneCode = pWmsParts[0];
         compassCode = pWmsParts[1];
@@ -2081,7 +2082,7 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
       if (wallMatch) wallCode = `P${wallMatch[1]}`;
       levelNum = Number(matched.shelf_level ?? matched.level) || 1;
       sectorCode = matched.sector || 'C';
-      zoneCode = matched.floor_level === 2 ? 'DP' : 'TI';
+      zoneCode = matched.floor_level === 6 ? 'S6' : matched.floor_level === 5 ? 'S5' : matched.floor_level === 4 ? 'S4' : matched.floor_level === 3 ? 'S3' : matched.floor_level === 2 ? 'S2' : 'S1';
     }
   } else {
     // Check if user typed a shelf code directly (e.g. P3-HEL2, HEL2, P1-E1, etc.)
@@ -2094,7 +2095,7 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
     if (matchedShelfDirect) {
       rawShelf = matchedShelfDirect.code;
       shelfCode = matchedShelfDirect.code;
-      zoneCode = matchedShelfDirect.floor_level === 2 ? 'DP' : 'TI';
+      zoneCode = matchedShelfDirect.floor_level === 6 ? 'S6' : matchedShelfDirect.floor_level === 5 ? 'S5' : matchedShelfDirect.floor_level === 4 ? 'S4' : matchedShelfDirect.floor_level === 3 ? 'S3' : matchedShelfDirect.floor_level === 2 ? 'S2' : 'S1';
       const wallMatch = shelfCode.match(/P([1-4])/);
       if (wallMatch) wallCode = `P${wallMatch[1]}`;
       compassCode = wallCode === 'P3' ? 'D' : wallCode === 'P4' ? 'I' : wallCode === 'P2' ? 'A' : 'F';
@@ -2114,8 +2115,16 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
   const layoutShelfCode = physicalShelfMatch ? physicalShelfMatch.code : shelfCode;
 
   // Area & floor
-  const floorLevel = physicalShelfMatch ? physicalShelfMatch.floor_level : ((zoneCode === 'DP' || zoneCode === 'DEPÓSITO') ? 2 : 1);
-  const areaLabel = floorLevel === 2 ? 'el Depósito General' : 'la Tienda';
+  const floorLevel = physicalShelfMatch ? physicalShelfMatch.floor_level : (
+    (zoneCode === 'S6' || zoneCode === 'SEC6') ? 6 :
+    (zoneCode === 'S5' || zoneCode === 'SEC5') ? 5 :
+    (zoneCode === 'S4' || zoneCode === 'SEC4') ? 4 :
+    (zoneCode === 'S3' || zoneCode === 'SEC3') ? 3 :
+    (zoneCode === 'S2' || zoneCode === 'SEC2') ? 2 :
+    (zoneCode === 'S1' || zoneCode === 'SEC1') ? 1 :
+    ((zoneCode === 'DP' || zoneCode === 'DEPÓSITO') ? 2 : 1)
+  );
+  const areaLabel = ZONE_NOUN_LABELS[zoneCode] || (floorLevel === 6 ? 'el Sector 6 (Bajo Escalera)' : floorLevel === 5 ? 'el Sector 5 (Indoor y Herramientas)' : floorLevel === 4 ? 'el Sector 4 (Control de Plagas)' : floorLevel === 3 ? 'el Sector 3 (Fertilizantes)' : floorLevel === 2 ? 'el Sector 2 (Sustratos)' : 'el Sector 1 (Parafernalia)');
 
   // Wall text
   const wallMap = {
@@ -3797,9 +3806,30 @@ const MOBILE_PRODUCT_ASSISTANT_STEPS = ['method', 'identify', 'details', 'review
 const LOCATION_ASSISTANT_STEP_ORDER = ['list', 'zone', 'type', 'compass', 'wall', 'level', 'sector', 'review'];
 
 const LOCATION_ZONE_OPTIONS = [
-  { id: 'TI', label: '🏬 Tienda / Salón', help: 'Salón de ventas y mostrador de atención (PC al centro)', prefix: 'TI', floor_level: 1 },
-  { id: 'DP', label: '📦 Depósito General', help: 'Área de guardado, reserva y stock general (PC al centro)', prefix: 'DP', floor_level: 2 }
+  { id: 'S1', label: '🌿 Sector 1 (Parafernalia)', help: 'Pipas, bongs, sedas, picadores y parafernalia (PC al centro)', prefix: 'S1', floor_level: 1 },
+  { id: 'S2', label: '🌱 Sector 2 (Sustratos)', help: 'Sustratos, tierras, turbas y enmiendas (PC al centro)', prefix: 'S2', floor_level: 2 },
+  { id: 'S3', label: '🧪 Sector 3 (Fertilizantes)', help: 'Fertilizantes, nutrientes y bioestimulantes (PC al centro)', prefix: 'S3', floor_level: 3 },
+  { id: 'S4', label: '🛡️ Sector 4 (Control de Plagas)', help: 'Insecticidas, preventivos y fitosanitarios (PC al centro)', prefix: 'S4', floor_level: 4 },
+  { id: 'S5', label: '💡 Sector 5 (Indoor y Herramientas)', help: 'Carpas, iluminación LED, turbinas y herramientas (PC al centro)', prefix: 'S5', floor_level: 5 },
+  { id: 'S6', label: '📦 Sector 6 (Bajo Escalera)', help: 'Espacio bajo escalera, reservas y stock pesado (PC al centro)', prefix: 'S6', floor_level: 6 }
 ];
+
+const ZONE_NOUN_LABELS = {
+  'S1': 'el Sector 1 (Parafernalia)',
+  'S2': 'el Sector 2 (Sustratos)',
+  'S3': 'el Sector 3 (Fertilizantes)',
+  'S4': 'el Sector 4 (Control de Plagas)',
+  'S5': 'el Sector 5 (Indoor y Herramientas)',
+  'S6': 'el Sector 6 (Bajo Escalera)',
+  'SEC1': 'el Sector 1 (Parafernalia)',
+  'SEC2': 'el Sector 2 (Sustratos)',
+  'SEC3': 'el Sector 3 (Fertilizantes)',
+  'SEC4': 'el Sector 4 (Control de Plagas)',
+  'SEC5': 'el Sector 5 (Indoor y Herramientas)',
+  'SEC6': 'el Sector 6 (Bajo Escalera)',
+  'TI': 'la Tienda',
+  'DP': 'el Depósito'
+};
 
 const LOCATION_TYPE_OPTIONS = [
   { id: 'EP', label: '🪜 Estante de pared', help: 'Módulos adosados a la pared perimetral' },
@@ -5775,6 +5805,8 @@ function renderLocationChoiceCards(question, help, choices, handlerName) {
 }
 
 function getLocationZoneById(zoneId) {
+  if (zoneId === 'TI') return LOCATION_ZONE_OPTIONS[0];
+  if (zoneId === 'DP') return LOCATION_ZONE_OPTIONS[5] || LOCATION_ZONE_OPTIONS[1];
   return LOCATION_ZONE_OPTIONS.find(option => option.id === zoneId) || null;
 }
 
@@ -5789,41 +5821,38 @@ function getLocationRouteLabels() {
     state.type?.label,
     state.compass?.label,
     state.wall?.label,
-    state.level?.label || (state.level?.id ? `Nivel ${state.level.id}` : null),
+    state.level ? `Nivel ${state.level.id}` : null,
     state.sector?.label
   ].filter(Boolean);
 }
 
 function printLocationQrLabel(wmsCode, locationLabel) {
   const qrSvgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(wmsCode)}`;
-  const win = window.open('', '_blank', 'width=450,height=550');
+  const win = window.open('', '_blank');
   if (!win) {
-    showToast('Habilitá las ventanas emergentes para imprimir la etiqueta.');
+    showToast('Permití las ventanas emergentes para imprimir la etiqueta QR.');
     return;
   }
   win.document.write(`
     <!DOCTYPE html>
     <html lang="es">
     <head>
-      <meta charset="utf-8">
+      <meta charset="UTF-8">
       <title>Etiqueta WMS · ${escapeStockHtml(wmsCode)}</title>
       <style>
-        @page { size: 60mm 60mm; margin: 4mm; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; margin: 0; padding: 6px; }
-        .label-card { border: 2.5px solid #152d24; border-radius: 10px; padding: 8px; }
-        .brand { font-size: 0.75rem; font-weight: 800; color: #152d24; text-transform: uppercase; letter-spacing: 0.5px; }
-        .wms-code { font-size: 1.25rem; font-weight: 900; color: #152d24; margin: 6px 0; font-family: monospace; letter-spacing: 1px; border: 1.5px dashed #c2a246; padding: 4px; border-radius: 6px; background: #fdfbf7; }
-        .qr-img { width: 130px; height: 130px; display: block; margin: 6px auto; }
-        .loc-desc { font-size: 0.75rem; font-weight: 600; color: #5c3b1e; margin-top: 4px; line-height: 1.2; }
+        @page { size: 60mm 40mm; margin: 0; }
+        body { font-family: system-ui, sans-serif; margin: 0; padding: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; box-sizing: border-box; text-align: center; }
+        .brand { font-size: 8px; font-weight: 800; letter-spacing: 1px; color: #555; text-transform: uppercase; margin-bottom: 2px; }
+        .wms-code { font-size: 14px; font-weight: 900; font-family: monospace; letter-spacing: 1px; color: #000; margin-bottom: 4px; }
+        .qr-img { width: 90px; height: 90px; display: block; margin: 0 auto 4px auto; }
+        .human-loc { font-size: 7px; color: #333; line-height: 1.1; max-width: 190px; }
       </style>
     </head>
     <body onload="window.print();">
-      <div class="label-card">
-        <div class="brand">🌿 BÔ GROW CLUB · ESTANTERÍAS</div>
-        <div class="wms-code">${escapeStockHtml(wmsCode)}</div>
-        <img class="qr-img" src="${qrSvgUrl}" alt="QR ${escapeStockHtml(wmsCode)}">
-        <div class="loc-desc">${escapeStockHtml(locationLabel)}</div>
-      </div>
+      <div class="brand">BÔ Grow Club · WMS</div>
+      <div class="wms-code">${escapeStockHtml(wmsCode)}</div>
+      <img class="qr-img" src="${qrSvgUrl}" alt="QR ${escapeStockHtml(wmsCode)}">
+      <div class="human-loc">${escapeStockHtml(locationLabel)}</div>
     </body>
     </html>
   `);
@@ -5839,7 +5868,7 @@ function renderLocationReviewStep() {
   const level = state.level || LOCATION_LEVEL_OPTIONS[0];
   const sector = state.sector || LOCATION_SECTOR_OPTIONS[0];
 
-  const zonePrefix = zone.prefix || 'TI';
+  const zonePrefix = zone.prefix || 'S1';
   const compassCode = compass.id || 'D';
   const wallCode = wall.id || 'P1';
   const levelNum = Number(level.id) || 1;
@@ -5952,8 +5981,8 @@ function renderLocationAssistant() {
     if (title) title.textContent = 'Elegí un producto a ubicar';
     content.innerHTML = renderPendingLocationList();
   } else if (step === 'zone') {
-    if (title) title.textContent = 'Paso 1: ¿Está en TIENDA o en DEPÓSITO?';
-    content.innerHTML = renderLocationChoiceCards('1. Elegí la zona', '¿Está en TIENDA o en DEPÓSITO? (Ambos tienen la PC al centro)', LOCATION_ZONE_OPTIONS, 'chooseLocationAssistantZone');
+    if (title) title.textContent = 'Paso 1: Elegí el sector del local';
+    content.innerHTML = renderLocationChoiceCards('1. Elegí el sector', '¿En qué sector del local está ubicado? (Todos tienen la PC al centro)', LOCATION_ZONE_OPTIONS, 'chooseLocationAssistantZone');
   } else if (step === 'type') {
     if (title) title.textContent = 'Paso 2: ¿Dónde lo guardaste? (Tipo de ubicación)';
     content.innerHTML = renderLocationChoiceCards('2. Elegí el tipo de ubicación', '¿Dónde lo guardaste? (Estante, Heladera, Vitrina, Góndola o Piso)', LOCATION_TYPE_OPTIONS, 'chooseLocationAssistantType');
