@@ -132,3 +132,14 @@ test('Diseño responsive para móviles en cola de aprobación, tarjetas y modal'
   assert.match(vendedorJs, /Aprobar y Publicar/);
   assert.match(vendedorJs, /Rechazar/);
 });
+
+test('http-auth.mjs valida UUIDs de PostgreSQL incluyendo seed tenants y rechaza inválidos', async () => {
+  const { isUuid } = await import('../netlify/functions/_shared/http-auth.mjs');
+  assert.equal(isUuid('11111111-1111-1111-1111-111111111111'), true);
+  assert.equal(isUuid('22222222-2222-2222-2222-222222222222'), true);
+  assert.equal(isUuid('e5f7c3be-f0ae-4e52-b046-18d6bc84c29f'), true);
+  assert.equal(isUuid('00000000-0000-0000-0000-000000000000'), false);
+  assert.equal(isUuid('invalid-uuid'), false);
+  assert.equal(isUuid(null), false);
+});
+
