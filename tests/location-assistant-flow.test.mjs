@@ -239,6 +239,35 @@ test('Reubicación Progresiva: Guardado en Sector general, Bandeja de Pendientes
   assert.match(vendorCode, /combinedLocations/);
 });
 
+test('Barra de Herramientas del Asistente de Ubicación: HTML, CSS y funciones operativas', () => {
+  const vendorHtml = fs.readFileSync(path.join(process.cwd(), 'vendedor.html'), 'utf8');
+  const vendorCode = fs.readFileSync(path.join(process.cwd(), 'vendedor.js'), 'utf8');
+  const vendorCss = fs.readFileSync(path.join(process.cwd(), 'vendedor-stock.css'), 'utf8');
+
+  // 1. Elementos de la barra en HTML
+  assert.match(vendorHtml, /class="location-assistant-toolbar"/);
+  assert.match(vendorHtml, /id="location-assistant-search-input"/);
+  assert.match(vendorHtml, /location-toolbar-btn-scan/);
+  assert.match(vendorHtml, /location-toolbar-btn-refresh/);
+  assert.match(vendorHtml, /location-toolbar-btn-map/);
+  assert.match(vendorHtml, /location-toolbar-btn-reset/);
+
+  // 2. Estilos en CSS
+  assert.match(vendorCss, /\.location-assistant-toolbar\s*\{/);
+  assert.match(vendorCss, /\.location-assistant-search-input\s*\{/);
+  assert.match(vendorCss, /\.location-toolbar-btn\s*\{/);
+  assert.match(vendorCss, /\.location-toolbar-btn-scan\s*\{/);
+
+  // 3. Funciones en vendedor.js
+  assert.match(vendorCode, /function handleLocationAssistantSearch/);
+  assert.match(vendorCode, /function clearLocationAssistantSearch/);
+  assert.match(vendorCode, /function refreshLocationAssistantList/);
+  assert.match(vendorCode, /function resetLocationAssistantToList/);
+  assert.match(vendorCode, /function handleLocationAssistantBarcodeScan/);
+  assert.match(vendorCode, /universalCameraActiveMode === 'location-assistant'/);
+});
+
+
 
 
 

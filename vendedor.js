@@ -5738,6 +5738,101 @@ function jumpToLocationAssistantStep(stepName) {
   }
 }
 
+let locationAssistantFilterQuery = '';
+
+function handleLocationAssistantSearch(query) {
+  locationAssistantFilterQuery = String(query || '').trim().toLowerCase();
+  const clearBtn = document.getElementById('location-assistant-search-clear');
+  if (clearBtn) clearBtn.style.display = locationAssistantFilterQuery ? 'flex' : 'none';
+
+  if (locationAssistantFilterQuery && locationAssistantState.step !== 'list') {
+    locationAssistantState.step = 'list';
+  }
+  renderLocationAssistant();
+}
+window.handleLocationAssistantSearch = handleLocationAssistantSearch;
+
+function clearLocationAssistantSearch() {
+  locationAssistantFilterQuery = '';
+  const input = document.getElementById('location-assistant-search-input');
+  if (input) input.value = '';
+  const clearBtn = document.getElementById('location-assistant-search-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  renderLocationAssistant();
+}
+window.clearLocationAssistantSearch = clearLocationAssistantSearch;
+
+async function refreshLocationAssistantList() {
+  const btn = document.getElementById('location-toolbar-refresh-btn');
+  if (btn) btn.classList.add('is-spinning');
+  try {
+    await loadPendingLocationProducts();
+    showToast(`✅ Lista de pendientes actualizada (${pendingLocationProducts.length} producto${pendingLocationProducts.length === 1 ? '' : 's'}).`);
+  } catch (err) {
+    showToast(`❌ Error al actualizar pendientes: ${err.message}`);
+  } finally {
+    if (btn) btn.classList.remove('is-spinning');
+  }
+}
+window.refreshLocationAssistantList = refreshLocationAssistantList;
+
+function resetLocationAssistantToList() {
+  locationAssistantState = {
+    ...createEmptyLocationAssistantState(),
+    step: 'list'
+  };
+  renderLocationAssistant();
+  showToast('📋 Volviste a la lista de pendientes.');
+}
+window.resetLocationAssistantToList = resetLocationAssistantToList;
+
+function handleLocationAssistantBarcodeScan(scannedCode) {
+  const code = String(scannedCode || '').trim();
+  if (!code) return;
+  const upper = code.toUpperCase();
+
+  // 1. Buscar coincidencia exacta en pendientes de ubicación
+  const matchedPending = pendingLocationProducts.find(p => {
+    if (!p) return false;
+    const pCode = String(p.product_code || '').toUpperCase();
+    const pSku = String(p.sku || '').toUpperCase();
+    const pBarcode = String(p.barcode || '').toUpperCase();
+    const pId = String(p.id || '').toUpperCase();
+    return pBarcode === upper || pSku === upper || pCode === upper || pId === upper;
+  });
+
+  if (matchedPending) {
+    clearLocationAssistantSearch();
+    const input = document.getElementById('location-assistant-search-input');
+    if (input) input.value = code;
+    selectPendingLocationProduct(matchedPending.id);
+    showToast(`🎯 Producto detectado: "${matchedPending.name || matchedPending.product_code}".`);
+    return;
+  }
+
+  // 2. Si no es coincidencia exacta, filtrar la lista de pendientes
+  const input = document.getElementById('location-assistant-search-input');
+  if (input) input.value = code;
+  handleLocationAssistantSearch(code);
+
+  // 3. Revisar si ya tiene ubicación asignada en WMS para dar aviso amigable
+  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
+  const canonicalLocs = (typeof window !== 'undefined' && Array.isArray(window.__canonicalWmsProductLocations)) ? window.__canonicalWmsProductLocations : [];
+  const alreadyLocated = [...storeLocs, ...canonicalLocs].find(p => {
+    if (!p) return false;
+    const pBarcode = String(p.barcode || '').toUpperCase();
+    const pSku = String(p.sku || p.product_code || '').toUpperCase();
+    return pBarcode === upper || pSku === upper;
+  });
+
+  if (alreadyLocated) {
+    showToast(`ℹ️ El producto "${alreadyLocated.name}" ya está ubicado en ${alreadyLocated.location_label || alreadyLocated.wms_code || 'WMS'}. Podés reubicarlo desde el mapa o buscador.`);
+  } else {
+    showToast(`⚠️ No se encontró un producto pendiente con el código "${code}".`);
+  }
+}
+window.handleLocationAssistantBarcodeScan = handleLocationAssistantBarcodeScan;
+
 function renderPendingLocationList() {
   if (!pendingLocationProducts.length) {
     return `
@@ -5746,8 +5841,34 @@ function renderPendingLocationList() {
         <span>Cuando ingreses un producto sin estante aparecerá en esta lista.</span>
       </div>`;
   }
+
+  let displayedProducts = pendingLocationProducts;
+  if (locationAssistantFilterQuery) {
+    displayedProducts = pendingLocationProducts.filter(p => {
+      if (!p) return false;
+      const q = locationAssistantFilterQuery;
+      const name = String(p.name || '').toLowerCase();
+      const code = String(p.product_code || '').toLowerCase();
+      const sku = String(p.sku || '').toLowerCase();
+      const barcode = String(p.barcode || '').toLowerCase();
+      const cat = String(p.category || '').toLowerCase();
+      return name.includes(q) || code.includes(q) || sku.includes(q) || barcode.includes(q) || cat.includes(q);
+    });
+  }
+
+  if (locationAssistantFilterQuery && !displayedProducts.length) {
+    return `
+      <div class="location-empty-state">
+        <strong>Sin coincidencias</strong>
+        <span>No se encontraron productos pendientes que coincidan con "<em>${escapeStockHtml(locationAssistantFilterQuery)}</em>".</span>
+        <button type="button" onclick="clearLocationAssistantSearch()" class="stock-entry-secondary-btn" style="margin-top: 12px; font-weight: 800; padding: 8px 16px; border-radius: 8px; cursor: pointer;">
+          Limpiar búsqueda
+        </button>
+      </div>`;
+  }
+
   const totalSelected = locationAssistantSelectedDraftIds.size;
-  const allSelected = pendingLocationProducts.length > 0 && pendingLocationProducts.every(p => locationAssistantSelectedDraftIds.has(String(p.id)));
+  const allSelected = displayedProducts.length > 0 && displayedProducts.every(p => locationAssistantSelectedDraftIds.has(String(p.id)));
 
   return `
     <p class="assistant-question">¿Qué producto vas a ubicar?</p>
@@ -5757,7 +5878,7 @@ function renderPendingLocationList() {
     <div style="display: flex; justify-content: space-between; align-items: center; background: #fdfbf7; border: 1.5px solid var(--vendor-gold); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; gap: 10px; flex-wrap: wrap;">
       <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 700; color: var(--vendor-forest);">
         <input type="checkbox" ${allSelected ? 'checked' : ''} onchange="toggleAllPendingLocations(this.checked)" style="width: 18px; height: 18px; accent-color: var(--vendor-forest); cursor: pointer;">
-        <span>Seleccionar todos (${pendingLocationProducts.length})</span>
+        <span>Seleccionar todos ${locationAssistantFilterQuery ? '(filtrados)' : ''} (${displayedProducts.length})</span>
       </label>
       <div style="display: flex; align-items: center; gap: 8px;">
         <span style="font-size: 0.82rem; font-weight: 800; color: var(--vendor-muted);">${totalSelected} seleccionado${totalSelected === 1 ? '' : 's'}</span>
@@ -5770,7 +5891,7 @@ function renderPendingLocationList() {
     </div>
 
     <div class="location-pending-list">
-      ${pendingLocationProducts.map(product => {
+      ${displayedProducts.map(product => {
         const isSelected = locationAssistantSelectedDraftIds.has(String(product.id));
         return `
           <div class="location-pending-card" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: ${isSelected ? 'rgba(194,162,70,0.12)' : '#fff'}; border: 1.5px solid ${isSelected ? 'var(--vendor-gold)' : '#e2d7c0'}; border-radius: 12px; margin-bottom: 8px; flex-wrap: wrap;">
@@ -6147,6 +6268,11 @@ function renderLocationAssistant() {
   } else {
     if (title) title.textContent = 'Paso 6: El sistema genera el código';
     content.innerHTML = renderLocationReviewStep();
+  }
+
+  const resetBtn = document.getElementById('location-toolbar-reset-btn');
+  if (resetBtn) {
+    resetBtn.style.display = step !== 'list' ? 'inline-flex' : 'none';
   }
 }
 
@@ -17293,6 +17419,7 @@ async function openUniversalCameraScanner(mode = 'pos') {
     else if (mode === 'stock') titleEl.textContent = '📷 Escanear Código para Ingreso de Stock';
     else if (mode === 'wms') titleEl.textContent = '📷 Escanear Ubicación / Módulo WMS';
     else if (mode === 'customer') titleEl.textContent = '📷 Escanear Pase Digital VIP del Cliente';
+    else if (mode === 'location-assistant') titleEl.textContent = '📷 Escanear Producto para Ubicar';
   }
 
   if (hintEl) {
@@ -17483,6 +17610,8 @@ function handleUniversalCameraScanSuccess(decodedText) {
       } else if (typeof simulateCustomerQRScan === 'function') {
         simulateCustomerQRScan();
       }
+    } else if (universalCameraActiveMode === 'location-assistant') {
+      handleLocationAssistantBarcodeScan(cleanCode);
     }
   }, 400);
 }

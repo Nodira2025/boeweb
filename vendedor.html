@@ -1031,7 +1031,7 @@
   </style>
   <link rel="stylesheet" href="vendedor-caja.css?v=white_label_v2">
   <link rel="stylesheet" href="vendedor-portal.css?v=white_label_v2">
-  <link rel="stylesheet" href="vendedor-stock.css?v=white_label_v6_mobile_v1">
+  <link rel="stylesheet" href="vendedor-stock.css?v=white_label_v7_toolbar_v1">
   <style id="vendor-rescue-critical-styles">
     .saas-prototype-only,
     #saas-login-modal {
@@ -2439,6 +2439,38 @@
           </div>
           <span id="location-assistant-count" class="location-assistant-count">0 pendientes</span>
         </header>
+
+        <!-- BARRA DE HERRAMIENTAS DEL ASISTENTE DE UBICACIÓN -->
+        <div class="location-assistant-toolbar" id="location-assistant-toolbar" role="toolbar" aria-label="Herramientas de ubicación de productos">
+          <div class="location-assistant-search-wrap">
+            <span class="location-assistant-search-icon" aria-hidden="true">🔍</span>
+            <input type="search" id="location-assistant-search-input" class="location-assistant-search-input" placeholder="Buscar por nombre, SKU o código..." oninput="handleLocationAssistantSearch(this.value)" autocomplete="off" aria-label="Buscar producto pendiente de ubicación">
+            <button type="button" id="location-assistant-search-clear" class="location-assistant-search-clear-btn" onclick="clearLocationAssistantSearch()" title="Limpiar búsqueda" aria-label="Limpiar búsqueda" style="display: none;">✕</button>
+          </div>
+
+          <div class="location-assistant-toolbar-actions">
+            <button type="button" class="location-toolbar-btn location-toolbar-btn-scan" onclick="openUniversalCameraScanner('location-assistant')" title="Escanear código de barras con la cámara" aria-label="Escanear código de barras con la cámara">
+              <span class="location-toolbar-btn-icon" aria-hidden="true">📷</span>
+              <span class="location-toolbar-btn-label">Escanear</span>
+            </button>
+
+            <button type="button" class="location-toolbar-btn location-toolbar-btn-refresh" id="location-toolbar-refresh-btn" onclick="refreshLocationAssistantList()" title="Actualizar lista de pendientes" aria-label="Actualizar lista de pendientes">
+              <span class="location-toolbar-btn-icon" aria-hidden="true">🔄</span>
+              <span class="location-toolbar-btn-label">Refrescar</span>
+            </button>
+
+            <button type="button" class="location-toolbar-btn location-toolbar-btn-map" onclick="switchVendorTab('store-map')" title="Ver Mapa WMS de los 6 Sectores" aria-label="Ver Mapa WMS de los 6 Sectores">
+              <span class="location-toolbar-btn-icon" aria-hidden="true">🗺️</span>
+              <span class="location-toolbar-btn-label">Ver Mapa</span>
+            </button>
+
+            <button type="button" class="location-toolbar-btn location-toolbar-btn-reset" id="location-toolbar-reset-btn" onclick="resetLocationAssistantToList()" title="Volver a la lista de pendientes" aria-label="Volver a la lista de pendientes" style="display: none;">
+              <span class="location-toolbar-btn-icon" aria-hidden="true">📋</span>
+              <span class="location-toolbar-btn-label">Lista</span>
+            </button>
+          </div>
+        </div>
+
         <div id="location-assistant-content" class="location-assistant-content" aria-live="polite"></div>
         <div id="location-assistant-status" class="stock-ai-status" role="status" aria-live="polite" hidden></div>
         <nav id="location-assistant-nav" class="mobile-task-assistant-nav location-assistant-nav" aria-label="Controles del asistente" hidden>
@@ -4894,6 +4926,6 @@
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=cash_workspace_v11_draft_edit_v3"></script>
+  <script src="vendedor.js?v=cash_workspace_v12_toolbar_v1"></script>
 </body>
 </html>
