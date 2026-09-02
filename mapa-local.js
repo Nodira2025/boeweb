@@ -82,10 +82,11 @@ let storeShelves = structuredClone(DEFAULT_STORE_SHELVES);
 let storeLocationProducts = [];
 let mapHistoryEntries = [];
 let selectedFloorLevel = 1;
-let selectedShelfCode = 'P1-E1';
+let selectedShelfCode = 'P1';
 let selectedInternalLevel = 3;
 let currentWmsView = 'sectors'; // 'sectors' | 'sector_detail' | 'history' | 'infography'
 let isAddShelfModalOpen = false;
+let isFullShelvesInspectorOpen = false;
 let storeMapSyncLabel = 'SISTEMA WMS EN LÍNEA';
 
 function escapeMapHtml(value) {
@@ -250,6 +251,101 @@ function normalizeShelfCode(rawCode) {
   return String(rawCode || '').trim().toUpperCase();
 }
 
+function parseLocationCode(code) {
+  const raw = String(code || '').trim().toUpperCase();
+  const parts = raw.split('-');
+  if (parts.length >= 6) {
+    const [zone, compass, wall, shelf, level, sector] = parts;
+    return {
+      zone: ZONE_MAP_NAMES[zone] || (zone === 'TI' ? 'Tienda' : zone === 'DP' ? 'Depósito' : zone),
+      zoneCode: zone,
+      compass: compass === 'D' ? 'Derecha' : compass === 'I' ? 'Izquierda' : compass === 'F' ? 'Frente' : compass === 'A' ? 'Atrás' : compass,
+      compassCode: compass,
+      wall: wall.replace('P', 'Pared '),
+      wallCode: wall,
+      shelf: shelf.startsWith('E') ? shelf.replace('E', 'Estante ') : shelf,
+      shelfCode: shelf,
+      level: level.replace('N', 'Nivel '),
+      levelNum: Number(level.replace(/\D/g, '')) || 1,
+      sector: sector === 'I' ? 'Izquierda' : sector === 'C' ? 'Centro' : sector === 'D' ? 'Derecha' : sector === 'U' ? 'Es chico / Sin sector' : sector,
+      sectorCode: sector
+    };
+  } else if (parts.length === 5) {
+    const [zone, compass, wall, level, sector] = parts;
+    return {
+      zone: ZONE_MAP_NAMES[zone] || (zone === 'TI' ? 'Tienda' : zone === 'DP' ? 'Depósito' : zone),
+      zoneCode: zone,
+      compass: compass === 'D' ? 'Derecha' : compass === 'I' ? 'Izquierda' : compass === 'F' ? 'Frente' : compass === 'A' ? 'Atrás' : compass,
+      compassCode: compass,
+      wall: wall.replace('P', 'Pared '),
+      wallCode: wall,
+      shelf: wall.replace('P', 'Pared '),
+      shelfCode: wall,
+      level: level.replace('N', 'Nivel '),
+      levelNum: Number(level.replace(/\D/g, '')) || 1,
+      sector: sector === 'I' ? 'Izquierda' : sector === 'C' ? 'Centro' : sector === 'D' ? 'Derecha' : sector === 'U' ? 'Es chico / Sin sector' : sector,
+      sectorCode: sector
+    };
+  }
+  return null;
+}
+
+function getCleanWallOrModuleInfo(rawCode) {
+  const code = String(rawCode || '').toUpperCase().trim();
+  const parsed = parseLocationCode(code);
+  
+  let wallCode = 'P1';
+  let compass = 'Frente';
+  let levelNum = 1;
+  let sectorSide = 'Centro';
+  
+  if (parsed) {
+    wallCode = parsed.wallCode || 'P1';
+    compass = parsed.compass || 'Frente';
+    levelNum = parsed.levelNum || 1;
+    sectorSide = parsed.sector || 'Centro';
+  } else {
+    const wallMatch = code.match(/P[1-4]/);
+    if (wallMatch) wallCode = wallMatch[0];
+    const lvlMatch = code.match(/N([1-6])/);
+    if (lvlMatch) levelNum = Number(lvlMatch[1]);
+  }
+
+  const WALL_TITLES = {
+    'P1': 'Pared 1 · Frente (Norte)',
+    'P2': 'Pared 2 · Fondo (Sur)',
+    'P3': 'Pared 3 · Lateral Derecho (Este)',
+    'P4': 'Pared 4 · Lateral Izquierdo (Oeste)',
+    'VIT1': 'Vitrina 1 · Vidriada',
+    'HEL1': 'Heladera 1 · Frío / Bioinsumos',
+    'PIS1': 'Pallet 1 · Piso',
+    'ISLA': 'Isla / Pasillo Central'
+  };
+
+  let cleanTitle = WALL_TITLES[wallCode] || `Pared ${wallCode}`;
+  if (code.includes('HEL')) cleanTitle = 'Heladera 1 · Frío / Bioinsumos';
+  else if (code.includes('VIT')) cleanTitle = 'Vitrina 1 · Vidriada';
+  else if (code.includes('PIS')) cleanTitle = 'Pallet 1 · Piso';
+
+  let icon = '🧱';
+  if (wallCode === 'P1') icon = '▲';
+  else if (wallCode === 'P2') icon = '▼';
+  else if (wallCode === 'P3') icon = '▶';
+  else if (wallCode === 'P4') icon = '◀';
+  else if (code.includes('HEL')) icon = '❄️';
+  else if (code.includes('VIT')) icon = '💎';
+  else if (code.includes('PIS')) icon = '📦';
+
+  return {
+    wallCode,
+    cleanTitle,
+    icon,
+    compass,
+    levelNum,
+    sectorSide
+  };
+}
+
 function getSectorProducts(floorLevel) {
   const floorNum = Number(floorLevel);
   const targetSectorId = `S${floorNum}`;
@@ -278,7 +374,6 @@ function getShelfProducts(shelfCode, level = null) {
     const rawCode = String(product.shelf_code || product.shelf || product.wms_code || product.location || '').toUpperCase();
     const productLevel = Number(product.shelf_level ?? product.level ?? 0);
     
-    // Parse wms code parts if present
     const wmsMatch = rawCode.match(/^S\d-([A-Z])-([A-Z0-9]+)-N(\d)-([A-Z])/i);
     let effectiveShelf = rawCode;
     let effectiveLevel = productLevel;
@@ -328,45 +423,6 @@ function ensureShelfExistsForLocation(shelfCode, floorLevel = 1, options = {}) {
   storeShelves.push(newShelf);
   logMapHistoryAction('CREAR_ESTANTE', 'Módulo WMS incorporado', `Se creó el módulo ${newShelf.code} en ${FLOOR_NAMES[floorLevel] || 'Sector'}`, newShelf.code, floorLevel);
   return newShelf;
-}
-
-function parseLocationCode(code) {
-  const raw = String(code || '').trim().toUpperCase();
-  const parts = raw.split('-');
-  if (parts.length >= 6) {
-    const [zone, compass, wall, shelf, level, sector] = parts;
-    return {
-      zone: ZONE_MAP_NAMES[zone] || (zone === 'TI' ? 'Tienda' : zone === 'DP' ? 'Depósito' : zone),
-      zoneCode: zone,
-      compass: compass === 'D' ? 'Derecha' : compass === 'I' ? 'Izquierda' : compass === 'F' ? 'Frente' : compass === 'A' ? 'Atrás' : compass,
-      compassCode: compass,
-      wall: wall.replace('P', 'Pared '),
-      wallCode: wall,
-      shelf: shelf.startsWith('E') ? shelf.replace('E', 'Estante ') : shelf,
-      shelfCode: shelf,
-      level: level.replace('N', 'Nivel '),
-      levelNum: Number(level.replace(/\D/g, '')) || 1,
-      sector: sector === 'I' ? 'Izquierda' : sector === 'C' ? 'Centro' : sector === 'D' ? 'Derecha' : sector === 'U' ? 'Es chico / Sin sector' : sector,
-      sectorCode: sector
-    };
-  } else if (parts.length === 5) {
-    const [zone, compass, wall, level, sector] = parts;
-    return {
-      zone: ZONE_MAP_NAMES[zone] || (zone === 'TI' ? 'Tienda' : zone === 'DP' ? 'Depósito' : zone),
-      zoneCode: zone,
-      compass: compass === 'D' ? 'Derecha' : compass === 'I' ? 'Izquierda' : compass === 'F' ? 'Frente' : compass === 'A' ? 'Atrás' : compass,
-      compassCode: compass,
-      wall: wall.replace('P', 'Pared '),
-      wallCode: wall,
-      shelf: wall.replace('P', 'Pared '),
-      shelfCode: wall,
-      level: level.replace('N', 'Nivel '),
-      levelNum: Number(level.replace(/\D/g, '')) || 1,
-      sector: sector === 'I' ? 'Izquierda' : sector === 'C' ? 'Centro' : sector === 'D' ? 'Derecha' : sector === 'U' ? 'Es chico / Sin sector' : sector,
-      sectorCode: sector
-    };
-  }
-  return null;
 }
 
 function formatLocationVoiceText(loc) {
@@ -505,6 +561,11 @@ function closeAddShelfModal() {
   rerenderStoreMap();
 }
 
+function toggleFullShelvesInspector() {
+  isFullShelvesInspectorOpen = !isFullShelvesInspectorOpen;
+  rerenderStoreMap();
+}
+
 function addNewStoreShelf(floorLevel, wallCode, typeCode, shelfNum, descriptiveName) {
   const num = Math.max(1, parseInt(shelfNum, 10) || 1);
   const code = `${wallCode}-${typeCode}${num}`;
@@ -564,22 +625,6 @@ function deleteStoreShelf(shelfCode) {
   rerenderStoreMap();
 }
 
-function handleShelfPhotoChange(event, shelfCode) {
-  const file = event.target.files && event.target.files[0];
-  if (!file) return;
-  const shelf = storeShelves.find(s => s.code === shelfCode);
-  if (!shelf) return;
-
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    shelf.photo_url = e.target.result;
-    logMapHistoryAction('FOTO_ESTANTE', 'Foto actualizada', `Se actualizó la foto de ${shelf.code}`, shelf.code, shelf.floor_level);
-    if (window.showToast) window.showToast(`📸 Foto del estante ${shelf.code} guardada.`);
-    rerenderStoreMap();
-  };
-  reader.readAsDataURL(file);
-}
-
 function showShelfDetailsModal(code) {
   const shelf = storeShelves.find(item => item.code === code);
   if (!shelf) return;
@@ -620,10 +665,16 @@ function focusStoreMapProduct(queryOrCode) {
   return info;
 }
 
-function renderProductRows(products) {
-  if (!products.length) return '';
+function renderProductCardsList(products) {
+  if (!products || !products.length) return '';
   return products.map(product => {
-    const exactPosition = product.shelf_position ? ` · Posición: ${escapeMapHtml(product.shelf_position)}` : '';
+    const rawLoc = String(product.wms_code || product.shelf_code || product.location || '');
+    const cleanInfo = getCleanWallOrModuleInfo(rawLoc);
+    const lvlNum = product.shelf_level ?? cleanInfo.levelNum ?? 1;
+    const lvlName = LEVEL_NAMES[lvlNum] || `Nivel ${lvlNum}`;
+    const secTag = cleanInfo.sectorSide ? ` · Sector ${cleanInfo.sectorSide}` : '';
+    const exactLoc = `${cleanInfo.cleanTitle} · ${lvlName}${secTag}`;
+
     const stockNum = Number(product.stock ?? product.on_hand) || 0;
     const stockBadgeClass = stockNum > 5 ? 'gba-badge-ok' : stockNum > 0 ? 'gba-badge-low' : 'gba-badge-zero';
     const stockLabel = stockNum > 5 ? `${stockNum} u.` : stockNum > 0 ? `${stockNum} u. (Bajo)` : '0 u. (Agotado)';
@@ -631,14 +682,22 @@ function renderProductRows(products) {
     
     return `
       <article class="wms-product-item-card" data-product-code="${escapeMapHtml(product.product_code || product.id)}">
-        <img src="${escapeMapHtml(imgUrl)}" alt="${escapeMapHtml(product.name || 'Producto')}" class="wms-product-thumb" onclick="openWmsLightbox('${escapeMapHtml(imgUrl)}', '${escapeMapHtml(product.name || 'Producto')}', 'Stock: ${stockLabel}')" title="Hacé clic para ampliar foto">
+        <img src="${escapeMapHtml(imgUrl)}" alt="${escapeMapHtml(product.name || 'Producto')}" class="wms-product-thumb" onclick="openWmsLightbox('${escapeMapHtml(imgUrl)}', '${escapeMapHtml(product.name || 'Producto')}', '${escapeMapHtml(exactLoc)} · Stock: ${stockLabel}')" title="Hacé clic para ampliar foto">
         <div style="flex: 1; min-width: 0;">
-          <strong style="display: block; font-size: 0.88rem; color: var(--vendor-forest, #152d24); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeMapHtml(product.name || 'Producto sin nombre')}</strong>
-          <small style="color: #666; font-size: 0.76rem; display: block;">${escapeMapHtml(product.product_code || product.id || 'SKU')} · <span class="gba-stock-pill ${stockBadgeClass}">${stockLabel}</span>${exactPosition}</small>
+          <strong style="display: block; font-size: 0.92rem; color: var(--vendor-forest, #152d24); font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${escapeMapHtml(product.name || 'Producto sin nombre')}
+          </strong>
+          <div style="display: flex; align-items: center; gap: 6px; margin: 3px 0 4px 0; flex-wrap: wrap;">
+            <span class="gba-stock-pill ${stockBadgeClass}">${stockLabel}</span>
+            <small style="color: #666; font-size: 0.76rem; font-family: monospace;">SKU: ${escapeMapHtml(product.product_code || product.id || '-')}</small>
+          </div>
+          <small style="color: #4a5d4e; font-size: 0.78rem; font-weight: 700; display: block;">
+            📍 ${escapeMapHtml(exactLoc)}
+          </small>
         </div>
-        <div style="display: flex; gap: 4px;">
+        <div style="display: flex; flex-direction: column; gap: 4px;">
           <button type="button" class="gba-qr-btn" onclick="if (window.openEditProductLocation) window.openEditProductLocation('${escapeMapHtml(product.product_code || product.id)}');" title="Reubicar">📍 Reubicar</button>
-          <button type="button" class="gba-qr-btn" onclick="printProductQrByCode('${escapeMapHtml(product.product_code || product.id)}')" title="Imprimir QR">QR</button>
+          <button type="button" class="gba-qr-btn" onclick="printProductQrByCode('${escapeMapHtml(product.product_code || product.id)}')" title="Imprimir QR">🖨️ QR</button>
         </div>
       </article>`;
   }).join('');
@@ -659,7 +718,7 @@ function renderWmsSectorsGrid() {
               <img src="${escapeMapHtml(customPhoto)}" alt="${escapeMapHtml(sector.name)}">
               <span class="wms-sector-zoom-badge">🔍 Ampliar Foto</span>
               <label class="wms-sector-photo-btn" onclick="event.stopPropagation()">
-                📸 Cambiar
+                📸 Cambiar Foto
                 <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden onchange="handleSectorPhotoUpload(event, '${sector.id}')">
               </label>
             </div>
@@ -669,7 +728,7 @@ function renderWmsSectorsGrid() {
                 <p class="wms-sector-card-desc">${escapeMapHtml(sector.desc)}</p>
               </div>
               <div class="wms-sector-card-footer">
-                <span class="wms-sector-pill">📦 ${skuCount} SKUs · ${totalStock} u.</span>
+                <span class="wms-sector-pill">📦 ${skuCount} productos · ${totalStock} u.</span>
                 <button type="button" class="wms-sector-action-btn" onclick="openWmsSectorView(${sector.floor})">
                   Explorar Sector ➔
                 </button>
@@ -685,21 +744,23 @@ function renderWmsSectorsGrid() {
 function renderWmsSectorDetail() {
   const sector = WMS_SECTOR_DEFS.find(s => s.floor === selectedFloorLevel) || WMS_SECTOR_DEFS[0];
   const customPhoto = getSectorCustomPhoto(sector.id);
-  const sectorShelves = storeShelves.filter(s => s.floor_level === selectedFloorLevel && !s.is_anchor);
-  
-  // Si no hay estantes en la lista para este sector, agregamos las 4 paredes por defecto
-  const effectiveShelves = sectorShelves.length > 0 ? sectorShelves : [
-    { code: 'P1-E1', name: 'Pared 1 · Frente (Norte)', icon: '🪵', floor_level: selectedFloorLevel },
-    { code: 'P2-E1', name: 'Pared 2 · Fondo (Sur)', icon: '🪵', floor_level: selectedFloorLevel },
-    { code: 'P3-E1', name: 'Pared 3 · Lateral Derecho (Este)', icon: '🪵', floor_level: selectedFloorLevel },
-    { code: 'P4-E1', name: 'Pared 4 · Lateral Izquierdo (Oeste)', icon: '🪵', floor_level: selectedFloorLevel }
-  ];
+  const sectorProducts = getSectorProducts(sector.floor);
+  const totalStock = sectorProducts.reduce((sum, p) => sum + (Number(p.stock ?? p.on_hand) || 0), 0);
 
-  const currentShelf = effectiveShelves.find(s => s.code === selectedShelfCode) || effectiveShelves[0];
-  selectedShelfCode = currentShelf.code;
+  // Group products cleanly by Wall / Module code (e.g. P1, P2, P3, P4, HEL1, VIT1, PIS1)
+  const wallGroups = new Map();
+  sectorProducts.forEach(prod => {
+    const rawLoc = String(prod.wms_code || prod.shelf_code || prod.location || '');
+    const cleanInfo = getCleanWallOrModuleInfo(rawLoc);
+    const key = cleanInfo.wallCode;
+    if (!wallGroups.has(key)) {
+      wallGroups.set(key, { info: cleanInfo, products: [] });
+    }
+    wallGroups.get(key).products.push(prod);
+  });
 
   return `
-    <div style="display: flex; flex-direction: column; gap: 20px;">
+    <div style="display: flex; flex-direction: column; gap: 18px;">
       
       <!-- Top Navigation & Breadcrumb -->
       <div class="wms-explorer-top-bar">
@@ -707,82 +768,153 @@ function renderWmsSectorDetail() {
           <button type="button" class="wms-breadcrumb-btn" onclick="backToWmsSectors()">
             ⬅ Volver a los 6 Sectores
           </button>
-          <span style="color: var(--vendor-gold, #c2a246); font-weight: 800;">${sector.icon} ${escapeMapHtml(sector.name)}</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="color: var(--vendor-gold, #c2a246); font-weight: 800; font-size: 1.05rem;">
+              ${sector.icon} ${escapeMapHtml(sector.name)}
+            </span>
+            <span class="gba-stock-pill gba-badge-ok">${sectorProducts.length} productos · ${totalStock} u.</span>
+          </div>
         </div>
         <div style="display: flex; gap: 8px;">
-          <button type="button" class="gba-pad-btn" onclick="openAddShelfModal()" style="background: var(--vendor-forest, #152d24); border-color: var(--vendor-gold, #c2a246);">
-            ➕ Nuevo Módulo
+          <button type="button" class="gba-pad-btn" onclick="if(window.openLocationAssistant) window.openLocationAssistant();" style="background: var(--vendor-forest, #152d24); border-color: var(--vendor-gold, #c2a246);">
+            ➕ Ubicar Producto Aquí
           </button>
         </div>
       </div>
 
-      <!-- Furniture / Walls Selection Grid -->
-      <div>
-        <h4 style="margin: 0 0 12px 0; color: var(--vendor-forest, #152d24); font-size: 1rem; font-weight: 800;">
-          🧱 Paredes y Módulos de Guardado en este Sector:
-        </h4>
-        <div class="wms-furniture-grid">
-          ${effectiveShelves.map(shelf => {
-            const count = getShelfUnitCount(shelf.code);
-            const isSelected = shelf.code === selectedShelfCode;
+      <!-- Main Content: Active Products grouped cleanly by Wall/Module -->
+      ${sectorProducts.length > 0 ? `
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          ${Array.from(wallGroups.entries()).map(([wallKey, group]) => {
+            const wallUnits = group.products.reduce((sum, p) => sum + (Number(p.stock ?? p.on_hand) || 0), 0);
+            
+            // Group products in this wall by level
+            const levelMap = new Map();
+            group.products.forEach(p => {
+              const rawLoc = String(p.wms_code || p.shelf_code || p.location || '');
+              const cleanInfo = getCleanWallOrModuleInfo(rawLoc);
+              const lvl = p.shelf_level ?? cleanInfo.levelNum ?? 1;
+              if (!levelMap.has(lvl)) levelMap.set(lvl, []);
+              levelMap.get(lvl).push(p);
+            });
 
             return `
-              <div class="wms-furniture-card ${isSelected ? 'active' : ''}" onclick="selectShelf('${escapeMapHtml(shelf.code)}')">
-                <div class="wms-furniture-card-header">
-                  <span class="wms-furniture-code">${escapeMapHtml(shelf.code)}</span>
-                  <span class="gba-stock-pill gba-badge-ok">${count} u.</span>
-                </div>
-                <strong style="color: var(--vendor-forest, #152d24); font-size: 0.95rem; display: block; margin-bottom: 6px;">${shelf.icon || '🗄️'} ${escapeMapHtml(shelf.name || shelf.code)}</strong>
-                <small style="color: #666; display: block;">${isSelected ? '👉 Nivel seleccionado abajo' : 'Tocá para ver baldas y productos'}</small>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </div>
-
-      <!-- Shelf Levels Accordion (Nivel 6 Tope down to Nivel 1 Piso) -->
-      <div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <h4 style="margin: 0; color: var(--vendor-forest, #152d24); font-size: 1.05rem; font-weight: 800;">
-            🪜 Baldas y Altura de ${escapeMapHtml(currentShelf.name || currentShelf.code)} (N1 Piso a N6 Tope):
-          </h4>
-        </div>
-
-        <div class="wms-levels-container">
-          ${[6, 5, 4, 3, 2, 1].map(lvlNum => {
-            const lvlProducts = getShelfProducts(currentShelf.code, lvlNum);
-            const lvlUnits = lvlProducts.reduce((sum, p) => sum + (Number(p.stock ?? p.on_hand) || 0), 0);
-            const isSelectedLevel = lvlNum === selectedInternalLevel;
-
-            return `
-              <div class="wms-level-row">
-                <div class="wms-level-header" onclick="setInternalLevel(${lvlNum})" style="cursor: pointer;">
-                  <strong>
-                    <span>${lvlNum === 1 ? '🧱' : lvlNum === 6 ? '🔝' : '📦'}</span>
-                    ${LEVEL_NAMES[lvlNum]} · ${lvlProducts.length} productos (${lvlUnits} u.)
-                  </strong>
-                  <span style="font-size: 0.8rem; font-weight: 700; color: var(--vendor-forest, #152d24);">
-                    ${isSelectedLevel ? '▲ Desplegado' : '▼ Ver balda'}
+              <section class="wms-sector-wall-group">
+                <header class="wms-wall-group-header">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.3rem;">${group.info.icon}</span>
+                    <div>
+                      <h4 style="margin: 0; color: var(--vendor-forest, #152d24); font-size: 1.05rem; font-weight: 800;">
+                        ${escapeMapHtml(group.info.cleanTitle)}
+                      </h4>
+                      <small style="color: #666; font-size: 0.78rem;">Orientación respecto a PC: ${escapeMapHtml(group.info.compass)}</small>
+                    </div>
+                  </div>
+                  <span class="wms-sector-pill">
+                    ${group.products.length} producto${group.products.length === 1 ? '' : 's'} · ${wallUnits} u.
                   </span>
-                </div>
-                <div class="wms-level-body" ${isSelectedLevel ? '' : 'style="display: none;"'}>
-                  ${lvlProducts.length > 0 ? `
-                    <div class="wms-products-grid">
-                      ${renderProductRows(lvlProducts)}
+                </header>
+
+                <div class="wms-wall-group-body">
+                  ${Array.from(levelMap.entries()).sort((a, b) => b[0] - a[0]).map(([lvlNum, prods]) => `
+                    <div style="margin-bottom: 12px;">
+                      <div class="wms-level-subheading">
+                        <span>🪜 ${LEVEL_NAMES[lvlNum] || `Nivel ${lvlNum}`}</span>
+                        <small>(${prods.length} ítem${prods.length === 1 ? '' : 's'})</small>
+                      </div>
+                      <div class="wms-products-grid">
+                        ${renderProductCardsList(prods)}
+                      </div>
                     </div>
-                  ` : `
-                    <div class="wms-empty-slot-card">
-                      <span>🌿 Esta balda está libre y disponible para ubicar productos.</span>
-                      <button type="button" class="wms-empty-slot-btn" onclick="if(window.openLocationAssistant) window.openLocationAssistant();">
-                        ➕ Asignar Producto
-                      </button>
-                    </div>
-                  `}
+                  `).join('')}
                 </div>
-              </div>
+              </section>
             `;
           }).join('')}
         </div>
+      ` : `
+        <div class="wms-empty-slot-card" style="padding: 32px 20px; text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center;">
+          <span style="font-size: 2.2rem;">🌱</span>
+          <strong style="font-size: 1.1rem; color: var(--vendor-forest, #152d24);">No hay productos ubicados en este sector todavía</strong>
+          <p style="margin: 0; max-width: 420px; font-size: 0.88rem; color: #666;">
+            Podés asignar productos a las paredes o módulos de este sector desde el Asistente de Ubicación.
+          </p>
+          <button type="button" class="wms-sector-action-btn" onclick="if(window.openLocationAssistant) window.openLocationAssistant();" style="margin-top: 6px;">
+            ➕ Asignar Primer Producto
+          </button>
+        </div>
+      `}
+
+      <!-- Collapsible Full Inspector for Empty Shelves & Levels N1 to N6 -->
+      <div style="background: #ffffff; border: 1.5px solid rgba(194, 162, 70, 0.35); border-radius: 16px; overflow: hidden; margin-top: 8px;">
+        <div style="padding: 14px 18px; background: #faf7ee; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleFullShelvesInspector()">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.1rem;">📐</span>
+            <strong style="color: var(--vendor-forest, #152d24); font-size: 0.95rem;">
+              Explorador Completo de Baldas (Nivel 1 al 6 y Espacios Disponibles)
+            </strong>
+          </div>
+          <span style="font-size: 0.85rem; font-weight: 700; color: var(--vendor-gold, #c2a246);">
+            ${isFullShelvesInspectorOpen ? '▲ Ocultar' : '▼ Ver baldas vacías'}
+          </span>
+        </div>
+
+        ${isFullShelvesInspectorOpen ? `
+          <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+            <div class="wms-furniture-grid">
+              ${['P1', 'P2', 'P3', 'P4'].map(wCode => {
+                const wInfo = getCleanWallOrModuleInfo(wCode);
+                const isSelected = wCode === selectedShelfCode;
+                const count = getShelfUnitCount(wCode);
+                return `
+                  <div class="wms-furniture-card ${isSelected ? 'active' : ''}" onclick="selectShelf('${wCode}')">
+                    <div class="wms-furniture-card-header">
+                      <span class="wms-furniture-code">${wCode}</span>
+                      <span class="gba-stock-pill gba-badge-ok">${count} u.</span>
+                    </div>
+                    <strong style="color: var(--vendor-forest, #152d24); font-size: 0.95rem; display: block; margin-bottom: 4px;">${wInfo.icon} ${escapeMapHtml(wInfo.cleanTitle)}</strong>
+                    <small style="color: #666; font-size: 0.76rem;">${isSelected ? '👉 Baldas N1..N6 desplegadas abajo' : 'Tocá para inspeccionar baldas'}</small>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+
+            <!-- Levels of the selected shelf -->
+            <div class="wms-levels-container" style="margin-top: 10px;">
+              ${[6, 5, 4, 3, 2, 1].map(lvlNum => {
+                const lvlProducts = getShelfProducts(selectedShelfCode, lvlNum);
+                const isSelectedLevel = lvlNum === selectedInternalLevel;
+                return `
+                  <div class="wms-level-row">
+                    <div class="wms-level-header" onclick="setInternalLevel(${lvlNum})" style="cursor: pointer;">
+                      <strong>
+                        <span>${lvlNum === 1 ? '🧱' : lvlNum === 6 ? '🔝' : '📦'}</span>
+                        ${LEVEL_NAMES[lvlNum]} · ${lvlProducts.length} productos
+                      </strong>
+                      <span style="font-size: 0.8rem; font-weight: 700; color: var(--vendor-forest, #152d24);">
+                        ${isSelectedLevel ? '▲ Desplegado' : '▼ Ver'}
+                      </span>
+                    </div>
+                    <div class="wms-level-body" ${isSelectedLevel ? '' : 'style="display: none;"'}>
+                      ${lvlProducts.length > 0 ? `
+                        <div class="wms-products-grid">
+                          ${renderProductCardsList(lvlProducts)}
+                        </div>
+                      ` : `
+                        <div class="wms-empty-slot-card">
+                          <span>🌿 Esta balda está libre y disponible.</span>
+                          <button type="button" class="wms-empty-slot-btn" onclick="if(window.openLocationAssistant) window.openLocationAssistant();">
+                            ➕ Asignar Producto
+                          </button>
+                        </div>
+                      `}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        ` : ''}
       </div>
 
     </div>
@@ -976,6 +1108,7 @@ window.deleteStoreShelf = deleteStoreShelf;
 window.addNewStoreShelf = addNewStoreShelf;
 window.openAddShelfModal = openAddShelfModal;
 window.closeAddShelfModal = closeAddShelfModal;
+window.toggleFullShelvesInspector = toggleFullShelvesInspector;
 window.getMapHistory = getMapHistory;
 window.logMapHistoryAction = logMapHistoryAction;
 window.exportMapHistoryCSV = exportMapHistoryCSV;

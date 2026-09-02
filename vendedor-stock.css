@@ -3971,3 +3971,47 @@
   to { opacity: 1; }
 }
 
+/* Grupos Limpios de Paredes y Módulos por Sector */
+.wms-sector-wall-group {
+  background: #ffffff;
+  border: 1.5px solid rgba(194, 162, 70, 0.35);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(21, 45, 36, 0.06);
+}
+
+.wms-wall-group-header {
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #f8f6ee 0%, #f1ece0 100%);
+  border-bottom: 1.5px solid rgba(194, 162, 70, 0.25);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.wms-wall-group-body {
+  padding: 16px 20px;
+}
+
+.wms-level-subheading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: var(--vendor-forest, #152d24);
+  background: rgba(21, 45, 36, 0.05);
+  padding: 6px 12px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  width: fit-content;
+}
+
+.wms-level-subheading small {
+  color: #777;
+  font-weight: 600;
+}
+
+
