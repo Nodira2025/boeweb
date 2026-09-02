@@ -1966,6 +1966,7 @@ async function loadStoreMapData(forceReload = false) {
       is_anchor: false,
       metadata: module.metadata || {}
     }));
+
     const productLocations = getWmsLocations().map(location => ({
       ...location,
       floor_level: Number(location.location_metadata?.floor_level) || (String(location.module_code).startsWith('DP') ? 2 : 1),
@@ -1975,8 +1976,69 @@ async function loadStoreMapData(forceReload = false) {
       location_label: location.location_name,
       wms_code: location.module_code
     }));
+
+    // Cargar e integrar borradores que ya tienen asignado un Sector o Góndola
+    let draftLocations = [];
+    try {
+      const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
+      if (supabaseClient && context?.tenantId) {
+        const { data: drafts } = await supabaseClient
+          .from('catalog_product_drafts_v2')
+          .select('*')
+          .eq('tenant_id', context.tenantId)
+          .in('status', ['PENDING_LOCATION', 'PENDING_REVIEW'])
+          .order('created_at', { ascending: false });
+
+        if (Array.isArray(drafts)) {
+          draftLocations = drafts.map(d => {
+            const hyd = hydrateProductDraft(d);
+            const locData = d.location_data || {};
+            const meta = locData.metadata || hyd.metadata || {};
+            const wmsCode = locData.code || hyd.wms_code || hyd.shelf_code || '';
+            const floor = Number(meta.floor_level || hyd.floor_level) || (
+              wmsCode.startsWith('S6') || wmsCode.startsWith('DP') ? 6 :
+              wmsCode.startsWith('S5') ? 5 :
+              wmsCode.startsWith('S4') ? 4 :
+              wmsCode.startsWith('S3') ? 3 :
+              wmsCode.startsWith('S2') ? 2 : 1
+            );
+            return {
+              id: hyd.id,
+              draft_id: hyd.id,
+              product_id: hyd.id,
+              product_code: hyd.product_code || hyd.sku || hyd.id,
+              sku: hyd.sku || hyd.product_code || hyd.id,
+              name: hyd.name || hyd.product_code || 'Producto',
+              barcode: hyd.barcode || '',
+              stock: Math.max(0, Number(hyd.stock || hyd.stock_quantity) || 0),
+              image_url: hyd.image_url || '',
+              floor_level: floor,
+              shelf_code: locData.code || hyd.shelf_code || 'GENERAL',
+              shelf_level: meta.shelf_level || hyd.shelf_level || null,
+              location_label: locData.name || hyd.location_label || `Sector ${floor} (Borrador)`,
+              wms_code: wmsCode || `S${floor}-GENERAL`,
+              is_draft: true,
+              is_sector_only: Boolean(locData.metadata?.is_sector_only || wmsCode.endsWith('-GENERAL') || wmsCode === 'GENERAL' || !wmsCode)
+            };
+          });
+        }
+      }
+    } catch (draftErr) {
+      console.warn('Error al cargar borradores en el mapa WMS:', draftErr);
+    }
+
+    const combinedLocations = [...productLocations];
+    const existingCodes = new Set(productLocations.map(p => String(p.product_code || p.sku || p.id).toUpperCase()));
+    draftLocations.forEach(d => {
+      const code = String(d.product_code || d.sku || d.id).toUpperCase();
+      if (!existingCodes.has(code)) {
+        combinedLocations.push(d);
+        existingCodes.add(code);
+      }
+    });
+
     if (window.setStoreMapData) {
-      window.setStoreMapData(shelves, productLocations, 'Inventario central sincronizado');
+      window.setStoreMapData(shelves, combinedLocations, 'Inventario central y borradores sincronizados');
     }
     storeMapDataLoaded = true;
   } catch (error) {
@@ -2012,7 +2074,13 @@ function decodeHumanWmsLocation(queryOrCode, matchedProduct = null) {
   let matched = matchedProduct;
   const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
   const canonicalLocs = (typeof window !== 'undefined' && Array.isArray(window.__canonicalWmsProductLocations)) ? window.__canonicalWmsProductLocations : [];
-  const allProducts = [...storeLocs, ...canonicalLocs, ...(internalCatalogProducts || [])];
+  const allProducts = [
+    ...storeLocs,
+    ...canonicalLocs,
+    ...(typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) ? internalCatalogProducts : []),
+    ...(typeof pendingLocationProducts !== 'undefined' && Array.isArray(pendingLocationProducts) ? pendingLocationProducts : []),
+    ...(typeof pendingDraftCache !== 'undefined' ? Array.from(pendingDraftCache.values()) : [])
+  ];
 
   if (!matched && raw) {
     // 1. Direct SKU, barcode, name or ID match
@@ -2486,7 +2554,9 @@ function searchShelfOnMap() {
   const allCandidates = [
     ...storeLocs,
     ...canonicalLocs,
-    ...(typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) ? internalCatalogProducts : [])
+    ...(typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) ? internalCatalogProducts : []),
+    ...(typeof pendingLocationProducts !== 'undefined' && Array.isArray(pendingLocationProducts) ? pendingLocationProducts : []),
+    ...(typeof pendingDraftCache !== 'undefined' ? Array.from(pendingDraftCache.values()) : [])
   ];
 
   if (!productMatch && allCandidates.length) {
@@ -5763,7 +5833,8 @@ function openEditProductLocation(productIdentifier, isMultiSlot = false) {
     ...storeLocs,
     ...canonicalLocs,
     ...(internalCatalogProducts || []),
-    ...(pendingLocationProducts || [])
+    ...(pendingLocationProducts || []),
+    ...(typeof pendingDraftCache !== 'undefined' ? Array.from(pendingDraftCache.values()) : [])
   ];
 
   let targetProduct = allCandidates.find(p => {
@@ -5804,9 +5875,12 @@ function openEditProductLocation(productIdentifier, isMultiSlot = false) {
   const levelObj = LOCATION_LEVEL_OPTIONS.find(l => Number(l.id) === Number(decoded.levelNum)) || LOCATION_LEVEL_OPTIONS[0];
   const sectorObj = LOCATION_SECTOR_OPTIONS.find(s => s.id === decoded.sectorCode) || LOCATION_SECTOR_OPTIONS[0];
 
+  const isSectorOnly = decoded.isSectorOnly || decoded.shelfCode === 'GENERAL' || String(targetProduct.wms_code || '').endsWith('-GENERAL');
+  const targetStep = isSectorOnly ? 'wall' : 'review';
+
   locationAssistantState = {
     ...createEmptyLocationAssistantState(),
-    step: 'review',
+    step: targetStep,
     product: targetProduct,
     products: [targetProduct],
     isEditing: true,
@@ -6545,7 +6619,8 @@ function startBatchSectorRefinement(productIds, sectorFloor) {
     ...storeLocs,
     ...canonicalLocs,
     ...(typeof internalCatalogProducts !== 'undefined' && Array.isArray(internalCatalogProducts) ? internalCatalogProducts : []),
-    ...(typeof pendingLocationProducts !== 'undefined' && Array.isArray(pendingLocationProducts) ? pendingLocationProducts : [])
+    ...(typeof pendingLocationProducts !== 'undefined' && Array.isArray(pendingLocationProducts) ? pendingLocationProducts : []),
+    ...(typeof pendingDraftCache !== 'undefined' ? Array.from(pendingDraftCache.values()) : [])
   ];
 
   const matchedProducts = productIds.map(id => {

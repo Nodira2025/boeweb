@@ -373,13 +373,25 @@ function getCleanWallOrModuleInfo(rawCode) {
 function getSectorProducts(floorLevel) {
   const floorNum = Number(floorLevel);
   const targetSectorId = `S${floorNum}`;
-  const allProducts = Array.isArray(storeLocationProducts) && storeLocationProducts.length > 0
-    ? storeLocationProducts
-    : (typeof window !== 'undefined' && Array.isArray(window.internalCatalogProducts) ? window.internalCatalogProducts : []);
+  const storeLocs = Array.isArray(storeLocationProducts) ? storeLocationProducts : [];
+  const catalogLocs = (typeof window !== 'undefined' && Array.isArray(window.internalCatalogProducts)) ? window.internalCatalogProducts : [];
+  const canonicalLocs = (typeof window !== 'undefined' && Array.isArray(window.__canonicalWmsProductLocations)) ? window.__canonicalWmsProductLocations : [];
 
-  return allProducts.filter(p => {
+  const combined = [...storeLocs];
+  const seen = new Set(storeLocs.map(p => String(p.product_code || p.sku || p.id).toUpperCase()));
+  
+  [...catalogLocs, ...canonicalLocs].forEach(p => {
+    if (!p) return;
+    const key = String(p.product_code || p.sku || p.id).toUpperCase();
+    if (!seen.has(key)) {
+      combined.push(p);
+      seen.add(key);
+    }
+  });
+
+  return combined.filter(p => {
     const pFloor = Number(p.floor_level || p.floor || 0);
-    const pWms = String(p.wms_code || p.location || '').toUpperCase();
+    const pWms = String(p.wms_code || p.location || p.shelf_code || '').toUpperCase();
     if (pFloor === floorNum) return true;
     if (pWms.startsWith(targetSectorId + '-') || pWms.startsWith(`SEC${floorNum}-`)) return true;
     if (floorNum === 1 && (pWms.startsWith('TI-') || (!pWms && !pFloor))) return true;

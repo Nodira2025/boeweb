@@ -232,7 +232,13 @@ test('Reubicación Progresiva: Guardado en Sector general, Bandeja de Pendientes
   assert.match(mapCode, /toggleAllSectorPendingSelection/);
   assert.match(mapCode, /triggerBatchSectorRefinement/);
   assert.match(mapCode, /window\.triggerBatchSectorRefinement\s*=/);
+
+  // 3. Integración de borradores ubicados en el mapa WMS
+  assert.match(vendorCode, /catalog_product_drafts_v2/);
+  assert.match(vendorCode, /draftLocations/);
+  assert.match(vendorCode, /combinedLocations/);
 });
+
 
 
 
