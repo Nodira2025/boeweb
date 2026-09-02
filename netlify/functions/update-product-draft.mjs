@@ -1,4 +1,4 @@
-﻿import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import {
   authenticateBearer,
   getBearerToken,
@@ -53,8 +53,11 @@ async function processRequest({ method, headers, body }) {
     }
 
     const { tenantId, draftId, updates } = body || {};
-    if (!isUuid(tenantId) || !isUuid(draftId)) {
-      const err = new Error('Identificadores de comercio o borrador no válidos.');
+    const safeDraftId = draftId ? String(draftId).trim() : '';
+    const safeTenantId = tenantId ? String(tenantId).trim() : '';
+
+    if (!isUuid(safeDraftId)) {
+      const err = new Error('Identificador de borrador no válido.');
       err.statusCode = 422;
       throw err;
     }
@@ -71,14 +74,12 @@ async function processRequest({ method, headers, body }) {
     });
 
     const caller = await authenticateBearer(supabaseAdmin, headers);
-    await verifyCallerRole(supabaseAdmin, caller.id, tenantId);
 
     // Buscar borrador existente
     const { data: draft, error: fetchError } = await supabaseAdmin
       .from('catalog_product_drafts_v2')
       .select('*')
-      .eq('id', draftId)
-      .eq('tenant_id', tenantId)
+      .eq('id', safeDraftId)
       .maybeSingle();
 
     if (fetchError) throw fetchError;
@@ -87,6 +88,15 @@ async function processRequest({ method, headers, body }) {
       notFound.statusCode = 404;
       throw notFound;
     }
+
+    const targetTenantId = draft.tenant_id;
+    if (safeTenantId && isUuid(safeTenantId) && safeTenantId !== targetTenantId) {
+      const mismatch = new Error('El borrador no corresponde al comercio especificado.');
+      mismatch.statusCode = 403;
+      throw mismatch;
+    }
+
+    await verifyCallerRole(supabaseAdmin, caller.id, targetTenantId);
 
     if (!['PENDING_LOCATION', 'PENDING_REVIEW'].includes(draft.status)) {
       const invalidStatus = new Error('Solo se pueden actualizar borradores pendientes de ubicación o revisión.');
@@ -127,8 +137,8 @@ async function processRequest({ method, headers, body }) {
     const { data: updatedDraft, error: updateError } = await supabaseAdmin
       .from('catalog_product_drafts_v2')
       .update(updatePayload)
-      .eq('id', draftId)
-      .eq('tenant_id', tenantId)
+      .eq('id', safeDraftId)
+      .eq('tenant_id', targetTenantId)
       .select()
       .single();
 
@@ -137,11 +147,11 @@ async function processRequest({ method, headers, body }) {
     // Registrar en auditoría
     try {
       await supabaseAdmin.from('operational_audit_log').insert({
-        tenant_id: tenantId,
+        tenant_id: targetTenantId,
         actor_user_id: caller.id,
         action: 'CATALOG_PRODUCT_DRAFT_UPDATED',
         entity_type: 'CATALOG_PRODUCT_DRAFT_V2',
-        entity_id: draftId,
+        entity_id: safeDraftId,
         after_data: {
           name: newName,
           category: newCategory,

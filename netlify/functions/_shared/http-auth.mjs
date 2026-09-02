@@ -192,7 +192,9 @@ export async function authenticateBearer(supabaseAdmin, headers) {
 }
 
 export function isUuid(value) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+  const normalized = String(value || '').trim();
+  return /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(normalized) &&
+    normalized.toLowerCase() !== '00000000-0000-0000-0000-000000000000';
 }
 
 export function safeErrorStatus(error, fallback = 400) {
