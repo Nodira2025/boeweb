@@ -2311,6 +2311,7 @@
                   <option value="Macetas">Macetas</option>
                   <option value="Medición y Riego">Medición y Riego</option>
                   <option value="Parafernalia">Parafernalia</option>
+                  <option value="Ventilación">Ventilación</option>
                   <option value="Otros">Otros</option>
                 </select>
               </div>
@@ -2485,6 +2486,99 @@
       </div>
     </div>
 
+    <!-- MODAL PARA EDITAR BORRADOR EN CUALQUIER MOMENTO (UBICACIÓN Y COLA DE APROBACIÓN) -->
+    <div id="draft-edit-modal" class="pos-confirm-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="draft-edit-modal-title">
+      <div class="pos-confirm-modal-card" style="max-width: 520px;">
+        <div class="pos-confirm-modal-header" style="background: #152d24; color: #fff; padding: 16px 20px; border-radius: 16px 16px 0 0;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 1.4rem;">✏️</span>
+            <div>
+              <h3 id="draft-edit-modal-title" style="margin: 0; font-size: 1.15rem; color: var(--color-accent-gold);">Editar Borrador de Producto</h3>
+              <small style="color: rgba(255,255,255,0.8); font-size: 0.78rem;">Corrección rápida de conteo o datos del borrador</small>
+            </div>
+          </div>
+          <button type="button" class="pos-confirm-modal-close" onclick="closeDraftEditModal()" aria-label="Cerrar modal" style="color: #fff;">✕</button>
+        </div>
+
+        <form id="draft-edit-form" onsubmit="handleDraftEditFormSubmit(event)" style="margin: 0;">
+          <input type="hidden" id="draft-edit-id" value="">
+          <div class="pos-confirm-modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 14px; max-height: 75vh; overflow-y: auto;">
+            
+            <div style="display: flex; gap: 14px; align-items: center; background: #fdfbf7; border: 1.5px solid var(--vendor-gold); border-radius: 12px; padding: 10px 14px;">
+              <img id="draft-edit-img-preview" src="assets/logo.jpg" alt="Producto" style="width: 56px; height: 56px; object-fit: contain; border-radius: 8px; background: #152d24;">
+              <div style="flex: 1; min-width: 0;">
+                <span id="draft-edit-status-badge" style="display: inline-block; font-size: 0.72rem; font-weight: 800; color: #5c3b1e; background: rgba(194,162,70,0.2); padding: 2px 8px; border-radius: 6px; margin-bottom: 2px;">Borrador</span>
+                <div id="draft-edit-code-display" style="font-size: 0.8rem; color: var(--vendor-muted); font-weight: 700;">-</div>
+              </div>
+            </div>
+
+            <!-- CANTIDAD / STOCK (DESTACADO PARA ERRORES DE CONTEO) -->
+            <div style="background: #f1f8e9; border: 2px solid #81c784; border-radius: 12px; padding: 12px 14px;">
+              <label for="draft-edit-stock" style="display: block; font-size: 0.85rem; font-weight: 900; color: #1b5e20; margin-bottom: 4px;">
+                📦 CANTIDAD RECIBIDA / STOCK CONTADO *
+              </label>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="number" min="0" step="1" id="draft-edit-stock" class="b2b-form-input" required style="font-size: 1.25rem; font-weight: 900; color: #1b5e20; background: #fff; padding: 8px 12px; border: 2px solid #2e7d32; border-radius: 8px; width: 120px; text-align: center;">
+                <span style="font-size: 0.88rem; font-weight: 700; color: #2e7d32;">unidades físicas</span>
+              </div>
+              <small style="display: block; margin-top: 4px; color: #33691e; font-size: 0.78rem;">Corregí acá si el vendedor contó de más o de menos al recibir.</small>
+            </div>
+
+            <div>
+              <label for="draft-edit-name" style="display: block; font-size: 0.8rem; font-weight: 800; color: #5c3b1e; margin-bottom: 4px;">
+                Nombre del producto *
+              </label>
+              <input type="text" id="draft-edit-name" class="b2b-form-input" required style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1.5px solid #d4c5a9;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div>
+                <label for="draft-edit-category" style="display: block; font-size: 0.8rem; font-weight: 800; color: #5c3b1e; margin-bottom: 4px;">
+                  Categoría *
+                </label>
+                <select id="draft-edit-category" class="b2b-form-input" required style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1.5px solid #d4c5a9;">
+                  <option value="Semillas">Semillas</option>
+                  <option value="Sustratos">Sustratos</option>
+                  <option value="Fertilizantes">Fertilizantes</option>
+                  <option value="Indoor">Indoor</option>
+                  <option value="Vaporizadores">Vaporizadores</option>
+                  <option value="Macetas">Macetas</option>
+                  <option value="Medición y Riego">Medición y Riego</option>
+                  <option value="Parafernalia">Parafernalia</option>
+                  <option value="Ventilación">Ventilación</option>
+                  <option value="Otros">Otros</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="draft-edit-cost" style="display: block; font-size: 0.8rem; font-weight: 800; color: #5c3b1e; margin-bottom: 4px;">
+                  Costo de compra ($)
+                </label>
+                <input type="number" min="0" step="0.01" id="draft-edit-cost" class="b2b-form-input" placeholder="0.00" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1.5px solid #d4c5a9;">
+              </div>
+            </div>
+
+            <div>
+              <label for="draft-edit-price" style="display: block; font-size: 0.82rem; font-weight: 900; color: #2e7d32; margin-bottom: 4px;">
+                PRECIO FINAL DE VENTA ($ ARS) *
+              </label>
+              <input type="number" min="0.01" step="0.01" id="draft-edit-price" class="b2b-form-input" required placeholder="0.00" style="width: 100%; padding: 10px 12px; font-size: 1.1rem; font-weight: 800; border-radius: 8px; border: 1.5px solid #2e7d32; color: #1b5e20; background: #f1f8e9;">
+            </div>
+
+          </div>
+
+          <div class="pos-confirm-modal-footer" style="padding: 16px 20px; border-top: 1px solid #d4c5a9; display: flex; gap: 10px; background: #fffdfa; border-radius: 0 0 16px 16px;">
+            <button type="button" class="btn btn-secondary" onclick="closeDraftEditModal()" style="flex: 1; min-height: 44px; border-radius: 10px;">
+              Cancelar
+            </button>
+            <button type="submit" id="draft-edit-save-btn" class="b2b-checkout-btn" style="flex: 1.6; min-height: 44px; border-radius: 10px; font-weight: 800; background: #2e7d32;">
+              💾 Guardar Cambios
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <section id="vendor-internal-catalog-section" class="vendor-workspace-section internal-catalog-workspace" style="display: none;" aria-labelledby="internal-catalog-title">
       <header class="internal-catalog-hero">
         <div>
@@ -2566,7 +2660,7 @@
               <label class="internal-editor-field"><span>Marca</span><input id="internal-editor-brand"></label>
               <label class="internal-editor-field"><span>Presentación</span><input id="internal-editor-presentation"></label>
               <label class="internal-editor-field"><span>Categoría *</span><select id="internal-editor-category" required>
-                <option>Semillas</option><option>Sustratos</option><option>Fertilizantes</option><option>Indoor</option><option>Vaporizadores</option><option>Macetas</option><option>Medición y Riego</option><option>Parafernalia</option><option>Otros</option>
+                <option>Semillas</option><option>Sustratos</option><option>Fertilizantes</option><option>Indoor</option><option>Vaporizadores</option><option>Macetas</option><option>Medición y Riego</option><option>Parafernalia</option><option>Ventilación</option><option>Otros</option>
               </select></label>
               <label class="internal-editor-field"><span>Código de barras</span><input id="internal-editor-barcode" inputmode="numeric"></label>
               <label class="internal-editor-field"><span>Precio de venta *</span><input id="internal-editor-price" type="number" min="0.01" step="0.01" required></label>
@@ -3808,6 +3902,7 @@
           <li><button class="b2b-category-btn" data-category="Macetas">🪴 Macetas <span class="category-count" id="count-Macetas"></span></button></li>
           <li><button class="b2b-category-btn" data-category="Medición y Riego">📐 Medición y Riego <span class="category-count" id="count-Medicion"></span></button></li>
           <li><button class="b2b-category-btn" data-category="Parafernalia">🍁 Parafernalia <span class="category-count" id="count-Parafernalia"></span></button></li>
+          <li><button class="b2b-category-btn" data-category="Ventilación">🌀 Ventilación <span class="category-count" id="count-Ventilacion"></span></button></li>
           <li><button class="b2b-category-btn" data-category="Otros">✨ Otros <span class="category-count" id="count-Otros"></span></button></li>
         </ul>
 
@@ -4794,11 +4889,11 @@
   <script src="migration-center.js?v=migration_v1"></script>
   <script src="tenant-onboarding.js?v=onboarding_v1"></script>
   <script src="pos-cart-engine.js?v=cart_v3"></script>
-  <script src="operational-api.js?v=session_recovery_v3"></script>
+  <script src="operational-api.js?v=session_recovery_v3_draft_edit_v2"></script>
   <script src="pos-desk-utils.js?v=pos_utils_v1"></script>
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
-  <script src="vendedor.js?v=cash_workspace_v11"></script>
+  <script src="vendedor.js?v=cash_workspace_v11_draft_edit_v2"></script>
 </body>
 </html>

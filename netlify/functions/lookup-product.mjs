@@ -181,7 +181,8 @@ function mapCategory(...values) {
     ['Vaporizadores', /vaporiz|vaporizer/],
     ['Macetas', /maceta|plant pot|flower pot/],
     ['Medición y Riego', /riego|irrig|medidor|meter|conductiv|\bph\b|\bec\b/],
-    ['Indoor', /indoor|lámpara|lampara|lighting|\bled\b|extractor|ventilador|carpa|prohanger|polea|ratchet|colgador|hanger/],
+    ['Ventilación', /ventilaci[oó]n|extractor|ventilador|turbina|cooler|filtro\s*(?:de\s*)?carb[oó]n|conducto|aluconnect|ozonizador/i],
+    ['Indoor', /indoor|lámpara|lampara|lighting|\bled\b|carpa|prohanger|polea|ratchet|colgador|hanger/],
     ['Parafernalia', /grinder|picador|papel|pipa|bong|parafernalia/]
   ];
   return categoryRules.find(([, pattern]) => pattern.test(text))?.[0] || 'Otros';

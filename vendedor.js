@@ -416,10 +416,10 @@ async function updateCategoryCounts() {
     }
 
     // List of categories in B2B
-    const categories = ['Semillas', 'Sustratos', 'Fertilizantes', 'Indoor', 'Vaporizadores', 'Macetas', 'Medición y Riego', 'Parafernalia', 'Otros'];
+    const categories = ['Semillas', 'Sustratos', 'Fertilizantes', 'Indoor', 'Vaporizadores', 'Macetas', 'Medición y Riego', 'Parafernalia', 'Ventilación', 'Otros'];
     
     for (const cat of categories) {
-      const elementId = cat === 'Medición y Riego' ? 'count-Medicion' : `count-${cat}`;
+      const elementId = cat === 'Medición y Riego' ? 'count-Medicion' : (cat === 'Ventilación' ? 'count-Ventilacion' : `count-${cat}`);
       const countEl = document.getElementById(elementId);
       if (!countEl) continue;
 
@@ -5784,9 +5784,14 @@ function renderPendingLocationList() {
                 <small style="font-size: 0.78rem; color: var(--vendor-muted);">${Number(product.stock) || 0} unidades · ${product.status === 'APPROVED' ? 'Aprobado' : 'En revisión'}</small>
               </div>
             </div>
-            <button type="button" onclick="selectPendingLocationProduct('${escapeStockHtml(product.id)}')" style="background: none; border: 1px solid var(--vendor-gold); color: var(--vendor-forest); font-weight: 800; font-size: 0.78rem; padding: 6px 10px; border-radius: 8px; cursor: pointer;">
-              Ubicar ›
-            </button>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button type="button" onclick="openDraftEditModal('${escapeStockHtml(product.id)}', event)" class="stock-entry-secondary-btn" style="background: rgba(194,162,70,0.15); border: 1.5px solid var(--vendor-gold); color: #5c3b1e; font-weight: 800; font-size: 0.78rem; padding: 6px 10px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Editar cantidad o datos del producto">
+                ✏️ Editar
+              </button>
+              <button type="button" onclick="selectPendingLocationProduct('${escapeStockHtml(product.id)}')" style="background: var(--vendor-forest); color: #fff; font-weight: 800; font-size: 0.78rem; padding: 6px 12px; border-radius: 8px; border: none; cursor: pointer;">
+                Ubicar ›
+              </button>
+            </div>
           </div>`;
       }).join('')}
     </div>`;
@@ -5814,14 +5819,34 @@ function renderLocationAssistantProductHeader() {
     <div class="location-assistant-product" style="display: flex; align-items: center; gap: 12px; background: #fffdfa; border: 1.5px solid ${isEditing ? 'var(--vendor-gold)' : 'rgba(194,162,70,0.3)'}; border-radius: 12px; padding: 10px 14px; margin-bottom: 14px;">
       ${product.image_url ? `<img src="${escapeStockHtml(product.image_url)}" alt="${escapeStockHtml(product.name || 'Producto')}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px;">` : ''}
       <div style="flex: 1;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <strong style="font-size: 0.95rem; color: var(--vendor-ink);">${escapeStockHtml(product.name || product.product_code || 'Producto')}</strong>
-          ${isEditing ? '<span style="background: rgba(194,162,70,0.2); color: #5c3b1e; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 6px;">✏️ Reubicación</span>' : ''}
+        <div style="display: flex; align-items: center; gap: 8px; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <strong style="font-size: 0.95rem; color: var(--vendor-ink);">${escapeStockHtml(product.name || product.product_code || 'Producto')}</strong>
+            ${isEditing ? '<span style="background: rgba(194,162,70,0.2); color: #5c3b1e; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 6px;">✏️ Reubicación</span>' : ''}
+          </div>
+          <button type="button" onclick="openDraftEditModal('${escapeStockHtml(product.id)}', event)" class="stock-entry-secondary-btn" style="background: rgba(194,162,70,0.15); border: 1.5px solid var(--vendor-gold); color: #5c3b1e; font-weight: 800; font-size: 0.78rem; padding: 4px 10px; border-radius: 6px; cursor: pointer;" title="Editar datos y cantidad del producto">
+            ✏️ Editar
+          </button>
         </div>
-        <small style="font-size: 0.8rem; color: var(--vendor-muted);">${Number(product.stock) || 0} unidades · ${escapeStockHtml(product.product_code || '')}</small>
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap;">
+          <span style="font-size: 0.78rem; color: var(--vendor-muted);">${escapeStockHtml(product.product_code || '')}</span>
+          <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; font-weight: 800; color: #1b5e20; background: #f1f8e9; border: 1px solid #81c784; padding: 2px 8px; border-radius: 6px;">
+            <span>Stock:</span>
+            <input type="number" min="0" step="1" id="location-assistant-stock-input" value="${Number(product.stock) >= 0 ? Number(product.stock) : 0}" style="width: 60px; padding: 2px 4px; font-size: 0.85rem; font-weight: 800; text-align: center; border: 1px solid #2e7d32; border-radius: 4px; background: #fff;" oninput="updateLocationAssistantStock(this.value)">
+            <span>u.</span>
+          </label>
+        </div>
       </div>
     </div>`;
 }
+
+function updateLocationAssistantStock(value) {
+  const num = Math.max(0, parseInt(value, 10) || 0);
+  if (locationAssistantState.product) {
+    locationAssistantState.product.stock = num;
+  }
+}
+window.updateLocationAssistantStock = updateLocationAssistantStock;
 
 function openEditProductLocation(productIdentifier, isMultiSlot = false) {
   const query = String(productIdentifier || '').trim().toUpperCase();
@@ -6423,6 +6448,22 @@ async function persistLocationAssistant(saveAsMultiSlot = false) {
       };
 
       if (draft.id && (draft.status === 'PENDING_LOCATION' || draft.status === 'PENDING_REVIEW')) {
+        const inputStockEl = document.getElementById('location-assistant-stock-input');
+        const currentStockVal = inputStockEl ? Math.max(0, parseInt(inputStockEl.value, 10) || 0) : (Number(draft.stock) || 0);
+        if (Number.isFinite(currentStockVal) && currentStockVal !== Number(draft.stock_quantity ?? draft.stock)) {
+          try {
+            await window.OperationalApi.updateCatalogProductDraft({
+              supabaseClient,
+              authContext,
+              draftId: draft.id,
+              updates: { stock_quantity: currentStockVal }
+            });
+            draft.stock = currentStockVal;
+            draft.stock_quantity = currentStockVal;
+          } catch (updateErr) {
+            console.warn('Aviso actualizando stock en asistente de ubicación:', updateErr);
+          }
+        }
         await window.OperationalApi.locateCatalogProductDraft({
           supabaseClient,
           authContext,
@@ -6732,7 +6773,7 @@ function renderPendingDraftsList(drafts) {
     return;
   }
 
-  const categoriesList = ['Semillas', 'Sustratos', 'Fertilizantes', 'Indoor', 'Vaporizadores', 'Macetas', 'Medición y Riego', 'Parafernalia', 'Otros'];
+  const categoriesList = ['Semillas', 'Sustratos', 'Fertilizantes', 'Indoor', 'Vaporizadores', 'Macetas', 'Medición y Riego', 'Parafernalia', 'Ventilación', 'Otros'];
 
   container.innerHTML = drafts.map(draft => {
     const dateStr = draft.created_at ? new Date(draft.created_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : 'Reciente';
@@ -6748,7 +6789,6 @@ function renderPendingDraftsList(drafts) {
 
         <div style="padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 10px;">
           <div style="background: #f7f4ea; border: 1px solid rgba(194,162,70,0.4); border-radius: 12px; padding: 10px 14px; font-size: 0.82rem; color: #5c3b1e;">
-            <p style="margin: 0 0 4px 0; color: #5c3b1e;"><strong>📦 Stock Cargado:</strong> ${draft.stock || 0} unidades</p>
             <p style="margin: 0 0 4px 0; color: #5c3b1e;"><strong>📍 Ubicación:</strong> ${escapeStockHtml(draft.location_label || draft.location || draft.shelf_code || 'No especificada')}</p>
             ${draft.product_code ? `<p style="margin: 0 0 4px; color: #5c3b1e;"><strong>SKU / Código:</strong> ${escapeStockHtml(draft.product_code)}</p>` : ''}
             ${draft.barcode ? `<p style="margin: 0 0 4px; color: #5c3b1e;"><strong>Barra:</strong> ${escapeStockHtml(draft.barcode)}</p>` : ''}
@@ -6775,13 +6815,26 @@ function renderPendingDraftsList(drafts) {
             </div>
           </div>
 
-          <div>
-            <label style="display: block; font-size: 0.78rem; font-weight: 800; color: #2e7d32; margin-bottom: 2px;">PRECIO FINAL AL PÚBLICO ($ ARS) *</label>
-            <input type="number" step="0.01" id="draft-price-${draft.id}" value="${Number(draft.sale_price) || ''}" placeholder="Ej: 22500" required class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 1rem; font-weight: 800; border-radius: 8px; border-color: #2e7d32; color: #1b5e20; background: #f1f8e9;">
+          <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px;">
+            <div>
+              <label style="display: block; font-size: 0.78rem; font-weight: 800; color: #1b5e20; margin-bottom: 2px;">📦 CANTIDAD (STOCK) *</label>
+              <input type="number" min="0" step="1" id="draft-stock-${draft.id}" value="${Number(draft.stock) >= 0 ? Number(draft.stock) : 0}" placeholder="Ej: 10" required class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.95rem; font-weight: 800; border-radius: 8px; border-color: #2e7d32; color: #1b5e20; background: #f1f8e9;">
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 0.78rem; font-weight: 800; color: #2e7d32; margin-bottom: 2px;">PRECIO PÚBLICO ($ ARS) *</label>
+              <input type="number" step="0.01" id="draft-price-${draft.id}" value="${Number(draft.sale_price) || ''}" placeholder="Ej: 22500" required class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.95rem; font-weight: 800; border-radius: 8px; border-color: #2e7d32; color: #1b5e20; background: #f1f8e9;">
+            </div>
           </div>
 
-          <div style="display: flex; gap: 8px; margin-top: 6px;">
-            <button type="button" onclick="approveProductDraft('${draft.id}')" style="flex: 1; background: #2e7d32; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 0.88rem;">
+          <div style="display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap;">
+            <button type="button" onclick="openDraftEditModal('${draft.id}', event)" class="stock-entry-secondary-btn" style="background: rgba(194,162,70,0.18); border: 1.5px solid var(--vendor-gold); color: #5c3b1e; padding: 10px 14px; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;" title="Abrir ventana de edición completa">
+              ✏️ Editar
+            </button>
+            <button type="button" onclick="saveProductDraftChanges('${draft.id}')" style="background: #fffdfa; border: 1.5px solid var(--vendor-gold); color: #5c3b1e; padding: 10px 14px; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;" title="Guardar cambios de stock y datos en el borrador sin publicar todavía">
+              💾 Guardar
+            </button>
+            <button type="button" onclick="approveProductDraft('${draft.id}')" style="flex: 1; min-width: 140px; background: #2e7d32; color: #fff; border: none; padding: 10px; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 0.88rem;">
               ✅ Aprobar y Publicar
             </button>
             <button type="button" onclick="rejectProductDraft('${draft.id}')" style="background: rgba(239,83,80,0.2); color: #ef5350; border: 1px solid #ef5350; padding: 10px 14px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 0.85rem;">
@@ -6890,6 +6943,226 @@ async function ensureLocalStoreSupplierExists() {
   if (error) console.warn('Aviso al asegurar el proveedor local_store:', error.message);
 }
 
+// Modal para edición en cualquier momento (Ubicación y Cola de Aprobación)
+function openDraftEditModal(draftId, event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  const modal = document.getElementById('draft-edit-modal');
+  if (!modal) return;
+
+  let draft = pendingDraftCache.get(draftId);
+  if (!draft) {
+    draft = pendingLocationProducts.find(p => String(p.id) === String(draftId));
+  }
+  if (!draft && locationAssistantState.product && String(locationAssistantState.product.id) === String(draftId)) {
+    draft = locationAssistantState.product;
+  }
+  if (!draft) {
+    showToast('⚠️ No se encontró la información del producto.');
+    return;
+  }
+
+  document.getElementById('draft-edit-id').value = draft.id;
+  const imgPreview = document.getElementById('draft-edit-img-preview');
+  if (imgPreview) imgPreview.src = draft.image_url || 'assets/logo.jpg';
+  
+  const codeDisplay = document.getElementById('draft-edit-code-display');
+  if (codeDisplay) codeDisplay.textContent = draft.product_code || draft.barcode || 'Borrador sin SKU';
+  
+  const statusBadge = document.getElementById('draft-edit-status-badge');
+  if (statusBadge) {
+    statusBadge.textContent = draft.status === 'PENDING_LOCATION' ? '⌖ Por Ubicar' : '👑 Pendiente de Aprobación';
+  }
+
+  const stockVal = Number(draft.stock ?? draft.stock_quantity ?? 0);
+  document.getElementById('draft-edit-stock').value = isNaN(stockVal) || stockVal < 0 ? 0 : stockVal;
+  document.getElementById('draft-edit-name').value = draft.name || '';
+  document.getElementById('draft-edit-category').value = draft.category || 'Otros';
+  document.getElementById('draft-edit-cost').value = Number(draft.cost_price) || '';
+  document.getElementById('draft-edit-price').value = Number(draft.sale_price ?? draft.price) || '';
+
+  modal.style.display = 'flex';
+  const stockInput = document.getElementById('draft-edit-stock');
+  if (stockInput) {
+    setTimeout(() => stockInput.focus(), 50);
+  }
+}
+window.openDraftEditModal = openDraftEditModal;
+
+function closeDraftEditModal() {
+  const modal = document.getElementById('draft-edit-modal');
+  if (modal) modal.style.display = 'none';
+}
+window.closeDraftEditModal = closeDraftEditModal;
+
+async function handleDraftEditFormSubmit(event) {
+  event.preventDefault();
+  const draftId = document.getElementById('draft-edit-id').value;
+  const nameVal = document.getElementById('draft-edit-name').value.trim();
+  const catVal = document.getElementById('draft-edit-category').value;
+  const costVal = parseFloat(document.getElementById('draft-edit-cost').value) || 0;
+  const priceVal = parseFloat(document.getElementById('draft-edit-price').value) || 0;
+  const stockVal = parseInt(document.getElementById('draft-edit-stock').value, 10);
+
+  if (!nameVal) {
+    showToast('⚠️ Por favor ingresá un nombre para el producto.');
+    return;
+  }
+  if (isNaN(stockVal) || stockVal < 0) {
+    showToast('⚠️ La cantidad debe ser un número mayor o igual a 0.');
+    return;
+  }
+  if (isNaN(priceVal) || priceVal <= 0) {
+    showToast('⚠️ El precio de venta debe ser mayor a 0.');
+    return;
+  }
+
+  const saveBtn = document.getElementById('draft-edit-save-btn');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = '⏳ Guardando...';
+  }
+
+  try {
+    const authContext = await ensureVendorOperationalSession({ showLogin: true });
+    if (!window.OperationalApi || !authContext) {
+      throw new Error('Iniciá sesión para guardar cambios en el borrador.');
+    }
+
+    await window.OperationalApi.updateCatalogProductDraft({
+      supabaseClient,
+      authContext,
+      draftId,
+      updates: {
+        name: nameVal,
+        category: catVal,
+        cost_price: costVal,
+        sale_price: priceVal,
+        stock_quantity: stockVal,
+        metadata: {
+          last_saved_at: new Date().toISOString()
+        }
+      }
+    });
+
+    if (pendingDraftCache.has(draftId)) {
+      const draft = pendingDraftCache.get(draftId);
+      draft.name = nameVal;
+      draft.category = catVal;
+      draft.cost_price = costVal;
+      draft.sale_price = priceVal;
+      draft.stock = stockVal;
+      draft.stock_quantity = stockVal;
+      pendingDraftCache.set(draftId, draft);
+      renderPendingDraftsList(Array.from(pendingDraftCache.values()));
+    }
+
+    const pendingLoc = pendingLocationProducts.find(p => String(p.id) === String(draftId));
+    if (pendingLoc) {
+      pendingLoc.name = nameVal;
+      pendingLoc.category = catVal;
+      pendingLoc.cost_price = costVal;
+      pendingLoc.sale_price = priceVal;
+      pendingLoc.stock = stockVal;
+      pendingLoc.stock_quantity = stockVal;
+      renderLocationAssistant();
+    }
+
+    if (locationAssistantState.product && String(locationAssistantState.product.id) === String(draftId)) {
+      locationAssistantState.product.name = nameVal;
+      locationAssistantState.product.category = catVal;
+      locationAssistantState.product.cost_price = costVal;
+      locationAssistantState.product.sale_price = priceVal;
+      locationAssistantState.product.stock = stockVal;
+      locationAssistantState.product.stock_quantity = stockVal;
+      renderLocationAssistant();
+    }
+
+    closeDraftEditModal();
+    showToast(`💾 Cambios guardados: "${nameVal}" (${stockVal} u.)`);
+  } catch (err) {
+    console.error('Error al guardar borrador desde modal:', err);
+    showToast(`❌ Error al guardar: ${err.message}`);
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = '💾 Guardar Cambios';
+    }
+  }
+}
+window.handleDraftEditFormSubmit = handleDraftEditFormSubmit;
+
+// Guardar cambios en el borrador (stock, precio, nombre, categoría, costo) sin publicar
+async function saveProductDraftChanges(draftId) {
+  try {
+    const draft = pendingDraftCache.get(draftId);
+    if (!draft) throw new Error('El borrador ya no está disponible. Actualizá la lista.');
+
+    const nameInput = document.getElementById(`draft-name-${draftId}`);
+    const catInput = document.getElementById(`draft-cat-${draftId}`);
+    const costInput = document.getElementById(`draft-cost-${draftId}`);
+    const priceInput = document.getElementById(`draft-price-${draftId}`);
+    const stockInput = document.getElementById(`draft-stock-${draftId}`);
+
+    const nameVal = nameInput ? nameInput.value.trim() : (draft.name || 'Producto BÔ');
+    const catVal = catInput ? catInput.value : (draft.category || 'Otros');
+    const costVal = costInput ? parseFloat(costInput.value) || 0 : (Number(draft.cost_price) || 0);
+    const priceVal = priceInput ? parseFloat(priceInput.value) || 0 : (Number(draft.sale_price) || 0);
+    const stockVal = stockInput ? parseInt(stockInput.value, 10) : Number(draft.stock || 0);
+
+    if (!nameVal) {
+      showToast('⚠️ Por favor ingresá un nombre para el producto.');
+      if (nameInput) nameInput.focus();
+      return;
+    }
+
+    if (isNaN(stockVal) || stockVal < 0) {
+      showToast('⚠️ Por favor ingresá una cantidad de stock válida mayor o igual a 0.');
+      if (stockInput) stockInput.focus();
+      return;
+    }
+
+    const authContext = await ensureVendorOperationalSession({ showLogin: true });
+    if (!window.OperationalApi || !authContext) {
+      throw new Error('Iniciá sesión para guardar cambios en el borrador.');
+    }
+
+    const updated = await window.OperationalApi.updateCatalogProductDraft({
+      supabaseClient,
+      authContext,
+      draftId,
+      updates: {
+        name: nameVal,
+        category: catVal,
+        cost_price: costVal,
+        sale_price: priceVal,
+        stock_quantity: stockVal,
+        metadata: {
+          ...draft.metadata,
+          last_saved_at: new Date().toISOString()
+        }
+      }
+    });
+
+    draft.name = nameVal;
+    draft.category = catVal;
+    draft.cost_price = costVal;
+    draft.sale_price = priceVal;
+    draft.stock = stockVal;
+    draft.stock_quantity = stockVal;
+    pendingDraftCache.set(draftId, draft);
+
+    showToast(`💾 Cambios guardados: "${nameVal}" (${stockVal} u.)`);
+    return updated;
+  } catch (err) {
+    console.error('Error al guardar cambios del borrador:', err);
+    showToast(`❌ Error al guardar: ${err.message}`);
+  }
+}
+window.saveProductDraftChanges = saveProductDraftChanges;
+
 // Aprobar el borrador, publicar y vincularlo a su ubicación física.
 async function approveProductDraft(draftId) {
   try {
@@ -6899,11 +7172,13 @@ async function approveProductDraft(draftId) {
     const catInput = document.getElementById(`draft-cat-${draftId}`);
     const costInput = document.getElementById(`draft-cost-${draftId}`);
     const priceInput = document.getElementById(`draft-price-${draftId}`);
+    const stockInput = document.getElementById(`draft-stock-${draftId}`);
 
     const nameVal = nameInput ? nameInput.value.trim() : (draft.name || 'Producto BÔ');
     const catVal = catInput ? catInput.value : (draft.category || 'Otros');
     const costVal = costInput ? parseFloat(costInput.value) || 0 : 0;
     const priceVal = priceInput ? parseFloat(priceInput.value) || 0 : (Number(draft.sale_price) || Number(draft.price) || 0);
+    const stockVal = stockInput ? parseInt(stockInput.value, 10) : Number(draft.stock || 0);
 
     if (!nameVal) {
       showToast('⚠️ Por favor ingresá un nombre para el producto.');
@@ -6914,6 +7189,12 @@ async function approveProductDraft(draftId) {
     if (isNaN(priceVal) || priceVal <= 0) {
       showToast('⚠️ Por favor ingresá un precio final válido mayor a 0.');
       if (priceInput) priceInput.focus();
+      return;
+    }
+
+    if (isNaN(stockVal) || stockVal < 0) {
+      showToast('⚠️ Por favor ingresá una cantidad de stock válida mayor o igual a 0.');
+      if (stockInput) stockInput.focus();
       return;
     }
 
@@ -6930,6 +7211,9 @@ async function approveProductDraft(draftId) {
         category: catVal,
         cost_price: costVal,
         sale_price: priceVal,
+        stock_quantity: stockVal,
+        stock: stockVal,
+        initial_quantity: stockVal,
         metadata: {
           approved_from: 'vendor-drafts-review'
         }
@@ -6938,7 +7222,7 @@ async function approveProductDraft(draftId) {
     });
     pendingDraftCache.delete(draftId);
     storeMapDataLoaded = false;
-    showToast(`Producto "${nameVal}" aprobado con stock y ubicación vinculados.`);
+    showToast(`Producto "${nameVal}" aprobado con ${stockVal} u. y ubicación vinculadas.`);
     await Promise.all([
       loadPendingProductDrafts(),
       refreshPendingLocationBadge(),
@@ -11064,6 +11348,7 @@ function renderMobilePosAssistant() {
               <option value="Indoor">Indoor</option>
               <option value="Parafernalia">Parafernalia</option>
               <option value="Vaporizadores">Vaporizadores</option>
+              <option value="Ventilación">Ventilación</option>
               <option value="Otros" selected>Otros</option>
             </select>
           </div>

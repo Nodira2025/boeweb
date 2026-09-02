@@ -551,6 +551,19 @@
     });
   }
 
+  async function updateCatalogProductDraft({ supabaseClient, authContext, draftId, updates = {} }) {
+    const { tenantId } = requireOperationalContext(supabaseClient, authContext);
+    const safeDraftId = normalizeUuid(draftId);
+    if (!safeDraftId || !updates || typeof updates !== 'object' || Array.isArray(updates)) {
+      throw new OperationalApiError('Los datos para actualizar el borrador no son válidos.', 'INVALID_DRAFT_UPDATE');
+    }
+    return invokeOperationalRpc(supabaseClient, 'update_catalog_product_draft_v2', {
+      p_tenant_id: tenantId,
+      p_draft_id: safeDraftId,
+      p_updates: updates
+    });
+  }
+
   async function rejectCatalogProductDraft({ supabaseClient, authContext, draftId, reason }) {
     const { tenantId } = requireOperationalContext(supabaseClient, authContext);
     const safeDraftId = normalizeUuid(draftId);
@@ -1009,6 +1022,7 @@
     submitInventoryCount,
     syncLegacyB2BCatalog,
     transferInventory,
+    updateCatalogProductDraft,
     updateSaleFulfillment,
     upsertCatalogProduct,
     upsertCustomer,
