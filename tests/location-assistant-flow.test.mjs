@@ -142,3 +142,27 @@ test('Asistente de Voz WMS: Pregunta inicial, selección de coincidencias, foto 
   assert.match(code, /window\.selectVoiceAssistantProduct/);
 });
 
+test('Location Assistant: Selección masiva, reubicación y edición posterior de ubicaciones', () => {
+  const code = fs.readFileSync(path.join(process.cwd(), 'vendedor.js'), 'utf8');
+  const mapCode = fs.readFileSync(path.join(process.cwd(), 'mapa-local.js'), 'utf8');
+
+  // 1. Selección masiva y estado extendido
+  assert.match(code, /locationAssistantSelectedDraftIds/);
+  assert.match(code, /function togglePendingLocationSelection/);
+  assert.match(code, /function toggleAllPendingLocations/);
+  assert.match(code, /function startBulkLocationAssignment/);
+  assert.match(code, /Seleccionar todos/);
+
+  // 2. Reubicación y edición posterior
+  assert.match(code, /function openEditProductLocation/);
+  assert.match(code, /window\.openEditProductLocation\s*=\s*openEditProductLocation/);
+  assert.match(code, /function jumpToLocationAssistantStep/);
+  assert.match(code, /isBulk/);
+  assert.match(code, /isEditing/);
+  assert.match(code, /isMultiSlot/);
+
+  // 3. Botón Reubicar en el Plano del Local
+  assert.match(mapCode, /openEditProductLocation/);
+  assert.match(mapCode, /📍 Reubicar/);
+});
+

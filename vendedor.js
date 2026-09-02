@@ -5538,7 +5538,6 @@ function hydrateProductDraft(rawDraft) {
 function isPendingLocationProduct(draft) {
   return draft && draft.status !== 'REJECTED' && !String(draft.shelf_code || '').trim();
 }
-
 function updatePendingLocationIndicators(count) {
   document.querySelectorAll('[data-pending-location-count]').forEach(element => {
     element.textContent = String(count);
@@ -5548,26 +5547,45 @@ function updatePendingLocationIndicators(count) {
   if (quickCopy) quickCopy.textContent = count ? `${count} producto${count === 1 ? '' : 's'} esperando ubicación` : 'No hay productos pendientes';
 }
 
-async function fetchPendingLocationProducts() {
-  if (!supabaseClient) return [];
-  const context = await ensureVendorOperationalSession();
-  if (!context) return [];
-  const { data, error } = await supabaseClient
-    .from('catalog_product_drafts_v2')
-    .select('*')
-    .eq('tenant_id', context.tenantId)
-    .eq('status', 'PENDING_LOCATION')
-    .order('created_at', { ascending: false });
-  if (error) throw new Error(`No se pudo consultar la cola de ubicación: ${error.message}`);
-  return (data || []).map(hydrateProductDraft);
+function togglePendingLocationSelection(draftId, isChecked) {
+  const idStr = String(draftId);
+  if (isChecked) {
+    locationAssistantSelectedDraftIds.add(idStr);
+  } else {
+    locationAssistantSelectedDraftIds.delete(idStr);
+  }
+  renderLocationAssistant();
 }
 
-async function refreshPendingLocationBadge() {
-  try {
-    const products = await fetchPendingLocationProducts();
-    updatePendingLocationIndicators(products.length);
-  } catch (error) {
-    console.warn('No se pudo actualizar el contador de ubicación:', error.message);
+function toggleAllPendingLocations(isChecked) {
+  if (isChecked) {
+    pendingLocationProducts.forEach(p => locationAssistantSelectedDraftIds.add(String(p.id)));
+  } else {
+    locationAssistantSelectedDraftIds.clear();
+  }
+  renderLocationAssistant();
+}
+
+function startBulkLocationAssignment() {
+  const selected = pendingLocationProducts.filter(p => locationAssistantSelectedDraftIds.has(String(p.id)));
+  if (!selected.length) {
+    showToast('Seleccioná al menos un producto para ubicar masivamente.');
+    return;
+  }
+  locationAssistantState = {
+    ...createEmptyLocationAssistantState(),
+    step: 'zone',
+    product: selected[0],
+    products: selected,
+    isBulk: true
+  };
+  renderLocationAssistant();
+}
+
+function jumpToLocationAssistantStep(stepName) {
+  if (LOCATION_ASSISTANT_STEP_ORDER.includes(stepName)) {
+    locationAssistantState.step = stepName;
+    renderLocationAssistant();
   }
 }
 
@@ -5579,33 +5597,141 @@ function renderPendingLocationList() {
         <span>Cuando ingreses un producto sin estante aparecerá en esta lista.</span>
       </div>`;
   }
+  const totalSelected = locationAssistantSelectedDraftIds.size;
+  const allSelected = pendingLocationProducts.length > 0 && pendingLocationProducts.every(p => locationAssistantSelectedDraftIds.has(String(p.id)));
+
   return `
     <p class="assistant-question">¿Qué producto vas a ubicar?</p>
-    <p class="assistant-help">Podés recorrer el local y completar uno detrás de otro.</p>
+    <p class="assistant-help">Podés seleccionar varios para ubicarlos en la misma góndola o avanzar uno por uno.</p>
+
+    <!-- Barra de Selección Masiva -->
+    <div style="display: flex; justify-content: space-between; align-items: center; background: #fdfbf7; border: 1.5px solid var(--vendor-gold); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; gap: 10px; flex-wrap: wrap;">
+      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 700; color: var(--vendor-forest);">
+        <input type="checkbox" ${allSelected ? 'checked' : ''} onchange="toggleAllPendingLocations(this.checked)" style="width: 18px; height: 18px; accent-color: var(--vendor-forest); cursor: pointer;">
+        <span>Seleccionar todos (${pendingLocationProducts.length})</span>
+      </label>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 0.82rem; font-weight: 800; color: var(--vendor-muted);">${totalSelected} seleccionado${totalSelected === 1 ? '' : 's'}</span>
+        ${totalSelected > 0 ? `
+          <button type="button" onclick="startBulkLocationAssignment()" style="background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: #fff; border: 1px solid #81c784; padding: 6px 14px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(46,125,50,0.25);">
+            🚀 Ubicar seleccionados (${totalSelected})
+          </button>
+        ` : ''}
+      </div>
+    </div>
+
     <div class="location-pending-list">
-      ${pendingLocationProducts.map(product => `
-        <button type="button" class="location-pending-card" onclick="selectPendingLocationProduct('${escapeStockHtml(product.id)}')">
-          ${product.image_url
-            ? `<img src="${escapeStockHtml(product.image_url)}" alt="${escapeStockHtml(product.name || 'Producto pendiente')}">`
-            : '<span class="location-pending-placeholder" aria-hidden="true">□</span>'}
-          <span>
-            <strong>${escapeStockHtml(product.name || product.product_code || 'Producto sin nombre')}</strong>
-            <small>${Number(product.stock) || 0} unidades · ${product.status === 'APPROVED' ? 'Aprobado' : 'En revisión'}</small>
-          </span>
-          <span aria-hidden="true">›</span>
-        </button>`).join('')}
+      ${pendingLocationProducts.map(product => {
+        const isSelected = locationAssistantSelectedDraftIds.has(String(product.id));
+        return `
+          <div class="location-pending-card" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: ${isSelected ? 'rgba(194,162,70,0.12)' : '#fff'}; border: 1.5px solid ${isSelected ? 'var(--vendor-gold)' : '#e2d7c0'}; border-radius: 12px; margin-bottom: 8px;">
+            <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="togglePendingLocationSelection('${escapeStockHtml(product.id)}', this.checked)" style="width: 20px; height: 20px; accent-color: var(--vendor-forest); cursor: pointer;" aria-label="Seleccionar ${escapeStockHtml(product.name || 'producto')}">
+            <div style="display: flex; align-items: center; gap: 10px; flex: 1; cursor: pointer;" onclick="selectPendingLocationProduct('${escapeStockHtml(product.id)}')">
+              ${product.image_url
+                ? `<img src="${escapeStockHtml(product.image_url)}" alt="${escapeStockHtml(product.name || 'Producto pendiente')}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid #e0d5c1;">`
+                : '<span class="location-pending-placeholder" aria-hidden="true" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: #f5f2e8; border-radius: 8px; font-size: 1.2rem;">📦</span>'}
+              <div style="display: flex; flex-direction: column;">
+                <strong style="font-size: 0.92rem; color: var(--vendor-ink);">${escapeStockHtml(product.name || product.product_code || 'Producto sin nombre')}</strong>
+                <small style="font-size: 0.78rem; color: var(--vendor-muted);">${Number(product.stock) || 0} unidades · ${product.status === 'APPROVED' ? 'Aprobado' : 'En revisión'}</small>
+              </div>
+            </div>
+            <button type="button" onclick="selectPendingLocationProduct('${escapeStockHtml(product.id)}')" style="background: none; border: 1px solid var(--vendor-gold); color: var(--vendor-forest); font-weight: 800; font-size: 0.78rem; padding: 6px 10px; border-radius: 8px; cursor: pointer;">
+              Ubicar ›
+            </button>
+          </div>`;
+      }).join('')}
     </div>`;
 }
 
 function renderLocationAssistantProductHeader() {
-  const product = locationAssistantState.product;
+  const state = locationAssistantState;
+  if (state.isBulk && state.products && state.products.length > 1) {
+    return `
+      <div style="background: rgba(46,125,50,0.08); border: 1.5px solid #81c784; border-radius: 12px; padding: 10px 14px; margin-bottom: 14px;">
+        <span style="font-size: 0.72rem; font-weight: 800; color: #1b5e20; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;">🚀 Ubicación Masiva de Productos (${state.products.length})</span>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; max-height: 80px; overflow-y: auto;">
+          ${state.products.map(p => `
+            <span style="background: #fff; border: 1px solid #a5d6a7; border-radius: 6px; padding: 2px 8px; font-size: 0.78rem; font-weight: 700; color: #152d24;">
+              ${escapeStockHtml(p.name || p.product_code || 'Producto')} (${Number(p.stock) || 0}u)
+            </span>
+          `).join('')}
+        </div>
+      </div>`;
+  }
+  const product = state.product;
   if (!product) return '';
+  const isEditing = state.isEditing;
   return `
-    <div class="location-assistant-product">
-      ${product.image_url ? `<img src="${escapeStockHtml(product.image_url)}" alt="${escapeStockHtml(product.name || 'Producto')}">` : ''}
-      <span><strong>${escapeStockHtml(product.name || product.product_code || 'Producto')}</strong><small>${Number(product.stock) || 0} unidades · ${escapeStockHtml(product.product_code || '')}</small></span>
+    <div class="location-assistant-product" style="display: flex; align-items: center; gap: 12px; background: #fffdfa; border: 1.5px solid ${isEditing ? 'var(--vendor-gold)' : 'rgba(194,162,70,0.3)'}; border-radius: 12px; padding: 10px 14px; margin-bottom: 14px;">
+      ${product.image_url ? `<img src="${escapeStockHtml(product.image_url)}" alt="${escapeStockHtml(product.name || 'Producto')}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px;">` : ''}
+      <div style="flex: 1;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <strong style="font-size: 0.95rem; color: var(--vendor-ink);">${escapeStockHtml(product.name || product.product_code || 'Producto')}</strong>
+          ${isEditing ? '<span style="background: rgba(194,162,70,0.2); color: #5c3b1e; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 6px;">✏️ Reubicación</span>' : ''}
+        </div>
+        <small style="font-size: 0.8rem; color: var(--vendor-muted);">${Number(product.stock) || 0} unidades · ${escapeStockHtml(product.product_code || '')}</small>
+      </div>
     </div>`;
 }
+
+function openEditProductLocation(productIdentifier, isMultiSlot = false) {
+  const query = String(productIdentifier || '').trim().toUpperCase();
+  if (!query) return;
+
+  const storeLocs = (typeof window !== 'undefined' && Array.isArray(window.storeLocationProducts)) ? window.storeLocationProducts : [];
+  const allCandidates = [
+    ...storeLocs,
+    ...(internalCatalogProducts || []),
+    ...(pendingLocationProducts || [])
+  ];
+
+  let targetProduct = allCandidates.find(p => 
+    (p.product_code && p.product_code.toUpperCase() === query) ||
+    (p.id && String(p.id).toUpperCase() === query) ||
+    (p.barcode && p.barcode.toUpperCase() === query) ||
+    (p.name && p.name.toUpperCase() === query)
+  );
+
+  if (!targetProduct && typeof getCatalogProductByCode === 'function') {
+    targetProduct = getCatalogProductByCode(query);
+  }
+
+  if (!targetProduct) {
+    showToast(`No se encontró el producto ${productIdentifier} para reubicar.`);
+    return;
+  }
+
+  const decoded = decodeHumanWmsLocation(targetProduct.wms_code || targetProduct.shelf_code || targetProduct.location || '', targetProduct);
+  const zoneObj = LOCATION_ZONE_OPTIONS.find(z => z.id === decoded.zoneCode) || LOCATION_ZONE_OPTIONS[0];
+  const typeObj = LOCATION_TYPE_OPTIONS.find(t => t.id === decoded.typeCode) || LOCATION_TYPE_OPTIONS[0];
+  const compassObj = LOCATION_COMPASS_OPTIONS.find(c => c.id === decoded.compassCode) || LOCATION_COMPASS_OPTIONS[0];
+  const wallObj = LOCATION_WALL_OPTIONS.find(w => w.id === decoded.wallCode) || LOCATION_WALL_OPTIONS[0];
+  const levelObj = LOCATION_LEVEL_OPTIONS.find(l => Number(l.id) === Number(decoded.levelNum)) || LOCATION_LEVEL_OPTIONS[0];
+  const sectorObj = LOCATION_SECTOR_OPTIONS.find(s => s.id === decoded.sectorCode) || LOCATION_SECTOR_OPTIONS[0];
+
+  locationAssistantState = {
+    ...createEmptyLocationAssistantState(),
+    step: 'review',
+    product: targetProduct,
+    products: [targetProduct],
+    isEditing: true,
+    isMultiSlot: Boolean(isMultiSlot),
+    isBulk: false,
+    zone: zoneObj,
+    type: typeObj,
+    compass: compassObj,
+    wall: wallObj,
+    level: levelObj,
+    sector: sectorObj,
+    photoPreviewUrl: targetProduct.placement_photo_url || targetProduct.image_url || '',
+    photoPath: targetProduct.placement_photo_path || null
+  };
+
+  switchVendorTab('location-assistant');
+  renderLocationAssistant();
+  showToast(`📍 Reubicando "${targetProduct.name || targetProduct.product_code}". Cambiá de estante o nivel.`);
+}
+window.openEditProductLocation = openEditProductLocation;
 
 function renderLocationChoiceCards(question, help, choices, handlerName) {
   return `
@@ -5703,10 +5829,13 @@ function renderLocationReviewStep() {
   const sectorPhrase = isChico ? '' : `, sector ${sector.label.toLowerCase()}`;
   const voicePhrase = `Está en ${zoneNoun}, a la ${compass.compass.toLowerCase()} de la PC, ${wall.label.toLowerCase()}, nivel ${levelNum}${sectorPhrase}.`;
 
+  const isBulk = state.isBulk && state.products && state.products.length > 1;
+  const isEditing = state.isEditing;
+
   return `
     ${renderLocationAssistantProductHeader()}
-    <p class="assistant-question">Paso 6: El sistema generó el código</p>
-    <p class="assistant-help">Ubicación estructurada con la PC central como punto de referencia. Código para QR y respuesta guiada por voz.</p>
+    <p class="assistant-question">Paso 6: Revisión y código generado</p>
+    <p class="assistant-help">Tocá cualquier casilla para cambiar ese dato puntual (ej. Nivel o Góndola) antes de guardar.</p>
     
     <div style="background: rgba(255, 253, 246, 0.98); border: 2px solid var(--vendor-gold); border-radius: 16px; padding: 18px; margin-bottom: 16px; box-shadow: 0 4px 14px rgba(92,59,30,0.08);">
       
@@ -5716,35 +5845,35 @@ function renderLocationReviewStep() {
         <span style="font-size: 1.5rem; font-family: monospace; font-weight: 900; color: #ffffff; letter-spacing: 2px;">${escapeStockHtml(wmsCode)}</span>
       </div>
 
-      <!-- Cuadrícula Desglosada -->
+      <!-- Cuadrícula Desglosada con Salto Directo a Pasos -->
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 14px;">
-        <div style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3);">
-          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">1. Zona</small>
+        <div onclick="jumpToLocationAssistantStep('zone')" style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3); cursor: pointer;" title="Hacé clic para cambiar la zona">
+          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">1. Zona ✏️</small>
           <strong style="color: var(--vendor-forest); font-size: 0.85rem;">${escapeStockHtml(zone.label || '-')}</strong>
         </div>
-        <div style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3);">
-          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">2. Tipo</small>
+        <div onclick="jumpToLocationAssistantStep('type')" style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3); cursor: pointer;" title="Hacé clic para cambiar el tipo">
+          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">2. Tipo ✏️</small>
           <strong style="color: var(--vendor-forest); font-size: 0.85rem;">${escapeStockHtml(type.label || '-')}</strong>
         </div>
-        <div style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3);">
-          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">3. Brújula PC</small>
+        <div onclick="jumpToLocationAssistantStep('compass')" style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3); cursor: pointer;" title="Hacé clic para cambiar la orientación respecto a la PC">
+          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">3. Brújula PC ✏️</small>
           <strong style="color: var(--vendor-forest); font-size: 0.85rem;">${escapeStockHtml(compass.label || '-')}</strong>
         </div>
-        <div style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3);">
-          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">4. Pared</small>
+        <div onclick="jumpToLocationAssistantStep('wall')" style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3); cursor: pointer;" title="Hacé clic para cambiar la pared o góndola">
+          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">4. Pared ✏️</small>
           <strong style="color: var(--vendor-forest); font-size: 0.85rem;">${escapeStockHtml(wall.label || '-')}</strong>
         </div>
-        <div style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3);">
-          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">5. Nivel</small>
+        <div onclick="jumpToLocationAssistantStep('level')" style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3); cursor: pointer;" title="Hacé clic para cambiar el nivel de altura">
+          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">5. Nivel ✏️</small>
           <strong style="color: var(--vendor-forest); font-size: 0.85rem;">Nivel ${levelNum}</strong>
         </div>
-        <div style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3);">
-          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">6. Sector</small>
+        <div onclick="jumpToLocationAssistantStep('sector')" style="background: #f7f4ea; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(194,162,70,0.3); cursor: pointer;" title="Hacé clic para cambiar el sector dentro del nivel">
+          <small style="color: var(--vendor-muted); display: block; font-size: 0.68rem; text-transform: uppercase; font-weight: 800;">6. Sector ✏️</small>
           <strong style="color: var(--vendor-forest); font-size: 0.85rem;">${escapeStockHtml(sector.label || '-')}</strong>
         </div>
       </div>
 
-      <!-- Tarjeta Guía por Voz (Panel 8) -->
+      <!-- Tarjeta Guía por Voz -->
       <div style="padding: 12px; background: rgba(30, 70, 32, 0.08); border-radius: 12px; border-left: 4px solid var(--vendor-forest); margin-bottom: 12px;">
         <span style="font-size: 0.75rem; color: var(--vendor-forest); font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; display: block;">🎙️ Búsqueda por Voz / Guía Asistente</span>
         <strong style="font-size: 0.95rem; color: var(--vendor-ink); display: block; margin: 4px 0; font-style: italic;">“${escapeStockHtml(voicePhrase)}”</strong>
@@ -5753,9 +5882,15 @@ function renderLocationReviewStep() {
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 10px;">
-      <button type="button" class="mobile-assistant-primary" onclick="persistLocationAssistant()" style="width: 100%; padding: 16px; font-size: 1.05rem; font-weight: 800; border-radius: 14px; background: var(--vendor-forest); color: #ffffff; cursor: pointer; border: none; box-shadow: 0 4px 14px rgba(21,45,36,0.2);">
-        💾 Guardar Ubicación
+      <button type="button" class="mobile-assistant-primary" onclick="persistLocationAssistant(false)" style="width: 100%; padding: 16px; font-size: 1.05rem; font-weight: 800; border-radius: 14px; background: var(--vendor-forest); color: #ffffff; cursor: pointer; border: none; box-shadow: 0 4px 14px rgba(21,45,36,0.2);">
+        ${isBulk ? `💾 Guardar Ubicación para los ${state.products.length} productos` : isEditing ? '💾 Guardar Nueva Ubicación' : '💾 Guardar Ubicación'}
       </button>
+
+      ${isEditing && !isBulk ? `
+        <button type="button" onclick="persistLocationAssistant(true)" style="width: 100%; padding: 12px; font-size: 0.92rem; font-weight: 800; border-radius: 12px; background: rgba(194,162,70,0.18); border: 1.5px solid var(--vendor-gold); color: #5c3b1e; cursor: pointer;">
+          ➕ Guardar como Ubicación Adicional (Multi-Slot WMS)
+        </button>
+      ` : ''}
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
         <button type="button" class="assistant-choice-card" onclick="printLocationQrLabel('${escapeStockHtml(wmsCode)}', '${escapeStockHtml(locationLabel)}')" style="padding: 10px; justify-content: center; align-items: center; text-align: center; background: #fffdfa; border: 1.5px solid var(--vendor-gold);">
@@ -5823,6 +5958,7 @@ async function loadPendingLocationProducts() {
     }
     pendingLocationProducts = await fetchPendingLocationProducts();
     updatePendingLocationIndicators(pendingLocationProducts.length);
+    locationAssistantSelectedDraftIds.clear();
     locationAssistantState = createEmptyLocationAssistantState();
     renderLocationAssistant();
     if (status) status.hidden = true;
@@ -5842,7 +5978,13 @@ function selectPendingLocationProduct(draftId) {
     showToast('Ese producto ya no está pendiente. Actualizá la lista.');
     return;
   }
-  locationAssistantState = { ...createEmptyLocationAssistantState(), step: 'zone', product };
+  locationAssistantState = {
+    ...createEmptyLocationAssistantState(),
+    step: 'zone',
+    product,
+    products: [product],
+    isBulk: false
+  };
   renderLocationAssistant();
 }
 
@@ -6018,38 +6160,36 @@ async function upsertProductLocationWithFallback(location) {
   return cachedLocation;
 }
 
-async function persistLocationAssistant() {
+async function persistLocationAssistant(saveAsMultiSlot = false) {
   const state = locationAssistantState;
-  const draft = state.product;
+  const productsToPersist = (state.isBulk && Array.isArray(state.products) && state.products.length > 0)
+    ? state.products
+    : (state.product ? [state.product] : []);
+
   const status = document.getElementById('location-assistant-status');
-  if (!draft || !state.zone || !state.compass || !state.wall || !state.level || !state.sector) {
+  if (!productsToPersist.length || !state.zone || !state.compass || !state.wall || !state.level || !state.sector) {
     showToast('Completá todos los pasos antes de guardar.');
     return;
   }
   try {
     const authContext = await ensureVendorOperationalSession({ showLogin: true });
     if (!window.OperationalApi || !authContext) {
-      throw new Error('Iniciá sesión para ubicar el borrador en la cola central.');
+      throw new Error('Iniciá sesión para ubicar productos en la base central.');
     }
     if (status) {
       status.hidden = false;
       status.dataset.state = 'loading';
-      status.textContent = 'Guardando la ubicación y actualizando el stock…';
+      status.textContent = `Guardando ubicación para ${productsToPersist.length} producto${productsToPersist.length === 1 ? '' : 's'}…`;
     }
-    const productCode = draft.product_code || draft.id;
-    const photo = await uploadLocationAssistantPhoto(productCode);
 
     const zone = state.zone;
-    const type = state.type || LOCATION_TYPE_OPTIONS[0];
-    const compass = state.compass;
     const wall = state.wall;
     const level = state.level;
     const sector = state.sector;
     const levelNum = Number(level.id) || 1;
     const floorLevel = zone.floor_level || (zone.id === 'DP' ? 2 : 1);
-
     const zonePrefix = zone.prefix || 'TI';
-    const compassCode = compass.id || 'D';
+    const compassCode = state.compass.id || 'D';
     const wallCode = wall.id || 'P1';
     const sectorCode = sector.id || 'C';
     const isChico = sectorCode === 'U' || (sector.label && (sector.label.toLowerCase().includes('chico') || sector.label.toLowerCase().includes('no hace falta')));
@@ -6057,78 +6197,127 @@ async function persistLocationAssistant() {
     // Código estándar oficial: TI-D-P1-N3-C (o TI-D-P1-N3-U)
     const wmsCode = `${zonePrefix}-${compassCode}-${wallCode}-N${levelNum}-${sectorCode}`;
     const locationLabel = isChico
-      ? `📍 ${zone.label} · ${compass.compass} de la PC · ${wall.label} · Nivel ${levelNum}`
-      : `📍 ${zone.label} · ${compass.compass} de la PC · ${wall.label} · Nivel ${levelNum} · Sector ${sector.label}`;
+      ? `📍 ${zone.label} · ${state.compass.compass} de la PC · ${wall.label} · Nivel ${levelNum}`
+      : `📍 ${zone.label} · ${state.compass.compass} de la PC · ${wall.label} · Nivel ${levelNum} · Sector ${sector.label}`;
 
-    const overrides = {
-      floor_level: floorLevel,
-      shelf_code: wallCode,
-      shelf_level: levelNum,
-      location_area: zone.label,
-      location_wall: wall.label,
-      shelf_position: sector.label,
-      placement_photo_url: photo.url,
-      placement_photo_path: photo.path,
-      location_label: locationLabel,
-      location_status: 'LOCATED'
-    };
-    const metadata = buildLocationAssistantMetadata(draft, overrides);
-    const productLocation = {
-      product_id: productCode,
-      product_code: productCode,
-      name: draft.name || productCode,
-      image_url: draft.image_url || photo.url,
-      barcode: draft.barcode || null,
-      floor_level: floorLevel,
-      shelf_code: wallCode,
-      shelf_level: levelNum,
-      stock: Math.max(0, Number(draft.stock) || 0),
-      qr_payload: draft.qr_payload || buildProductQrPayload(productCode),
-      area_name: zone.label,
-      wall_side: wall.label,
-      shelf_position: sector.label,
-      placement_photo_url: photo.url,
-      placement_photo_path: photo.path,
-      location_label: locationLabel,
-      updated_at: new Date().toISOString()
-    };
-    productLocation.wms_code = wmsCode;
-    await window.OperationalApi.locateCatalogProductDraft({
-      supabaseClient,
-      authContext,
-      draftId: draft.id,
-      location: {
-        code: wmsCode,
-        name: locationLabel,
-        location_type: 'SHELF',
-        is_sellable: true,
-        is_default: false,
-        metadata: {
-          ...metadata,
-          placement_photo_url: photo.url,
-          placement_photo_path: photo.path
-        }
-      },
-      idempotencyKey: `locate-draft:${draft.id}:${globalThis.crypto?.randomUUID?.() || Date.now()}`
-    });
-    // Copia de presentación para el mapa mientras se actualiza la vista; el
-    // servidor continúa siendo la única autoridad sobre ubicación y stock.
-    saveLocalProductLocation(productLocation);
+    // Subir foto una sola vez si aplica
+    const leadCode = productsToPersist[0].product_code || productsToPersist[0].id;
+    const photo = await uploadLocationAssistantPhoto(leadCode);
 
+    // Asegurar existencia del módulo en el mapa si aplica
     if (window.ensureShelfExistsForLocation) {
       window.ensureShelfExistsForLocation(wallCode, floorLevel, locationLabel);
     }
-    if (window.logMapHistoryAction) {
-      window.logMapHistoryAction('ASISTENTE_UBICACION', 'Ubicación de producto asignada', `Producto "${draft.name}" ubicado en ${wmsCode}`, wallCode, floorLevel);
+
+    for (const draft of productsToPersist) {
+      const productCode = draft.product_code || draft.id;
+      const overrides = {
+        floor_level: floorLevel,
+        shelf_code: wallCode,
+        shelf_level: levelNum,
+        location_area: zone.label,
+        location_wall: wall.label,
+        shelf_position: sector.label,
+        placement_photo_url: photo.url,
+        placement_photo_path: photo.path,
+        location_label: locationLabel,
+        location_status: 'LOCATED'
+      };
+      const metadata = buildLocationAssistantMetadata(draft, overrides);
+      const productLocation = {
+        product_id: productCode,
+        product_code: productCode,
+        name: draft.name || productCode,
+        image_url: draft.image_url || photo.url,
+        barcode: draft.barcode || null,
+        floor_level: floorLevel,
+        shelf_code: wallCode,
+        shelf_level: levelNum,
+        stock: Math.max(0, Number(draft.stock) || 0),
+        qr_payload: draft.qr_payload || buildProductQrPayload(productCode),
+        area_name: zone.label,
+        wall_side: wall.label,
+        shelf_position: sector.label,
+        placement_photo_url: photo.url,
+        placement_photo_path: photo.path,
+        location_label: locationLabel,
+        wms_code: wmsCode,
+        updated_at: new Date().toISOString()
+      };
+
+      if (draft.id && (draft.status === 'PENDING_LOCATION' || draft.status === 'PENDING_REVIEW')) {
+        await window.OperationalApi.locateCatalogProductDraft({
+          supabaseClient,
+          authContext,
+          draftId: draft.id,
+          location: {
+            code: wmsCode,
+            name: locationLabel,
+            location_type: 'SHELF',
+            is_sellable: true,
+            is_default: false,
+            metadata: {
+              ...metadata,
+              placement_photo_url: photo.url,
+              placement_photo_path: photo.path
+            }
+          },
+          idempotencyKey: `locate-draft:${draft.id}:${globalThis.crypto?.randomUUID?.() || Date.now()}`
+        });
+      } else {
+        // Producto ya aprobado o existente en inventario: registrar ubicación central
+        await window.OperationalApi.upsertInventoryLocation({
+          supabaseClient,
+          authContext,
+          location: {
+            code: wmsCode,
+            name: locationLabel,
+            location_type: 'SHELF',
+            is_sellable: true,
+            is_default: false,
+            metadata: {
+              ...metadata,
+              product_code: productCode,
+              placement_photo_url: photo.url,
+              placement_photo_path: photo.path
+            }
+          }
+        });
+      }
+
+      saveLocalProductLocation(productLocation);
+
+      if (window.logMapHistoryAction) {
+        window.logMapHistoryAction(
+          state.isEditing ? 'REUBICACION_PRODUCTO' : 'ASISTENTE_UBICACION',
+          state.isEditing ? 'Producto reubicado' : 'Ubicación asignada',
+          `Producto "${draft.name || productCode}" -> ${wmsCode}${saveAsMultiSlot ? ' (Multi-Slot)' : ''}`,
+          wallCode,
+          floorLevel
+        );
+      }
     }
 
     storeMapDataLoaded = false;
-    showToast(`✅ Ubicación guardada: ${wmsCode}`);
+    if (typeof loadStoreMapData === 'function') {
+      loadStoreMapData(true).catch(e => console.warn('Recarga de mapa en segundo plano:', e));
+    }
+    if (typeof loadInternalCatalog === 'function') {
+      loadInternalCatalog().catch(e => console.warn('Recarga de catálogo en segundo plano:', e));
+    }
+
+    const successMsg = productsToPersist.length > 1
+      ? `✅ ${productsToPersist.length} productos ubicados en ${wmsCode}`
+      : `✅ Ubicación guardada: ${wmsCode}`;
+
+    showToast(successMsg);
     if (status) {
       status.hidden = false;
       status.dataset.state = 'success';
-      status.textContent = 'Producto ubicado correctamente. Cargando siguientes…';
+      status.textContent = `${successMsg}. Actualizando lista…`;
     }
+
+    locationAssistantSelectedDraftIds.clear();
     await loadPendingLocationProducts();
   } catch (error) {
     console.error('Error al guardar ubicación asistida:', error);
@@ -7791,6 +7980,9 @@ function renderInternalCatalogGrid() {
         <div style="margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08);">
           <span style="font-size: 1.1rem; font-weight: 900; color: #66bb6a;">$${Number(product.price).toLocaleString('es-AR')}</span>
           <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button type="button" onclick="openEditProductLocation('${escapeStockHtml(product.id)}')" style="background: rgba(46,125,50,0.15); border: 1px solid #66bb6a; color: #81c784; padding: 6px 10px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer;" title="Reubicar o cambiar nivel en estantería">
+              📍 Ubicación
+            </button>
             <button type="button" onclick="openProductQrModal('${escapeStockHtml(product.product_code || product.barcode || product.id)}', '${escapeStockHtml(product.name)}', ${product.price || 0})" style="background: rgba(46,125,50,0.15); border: 1px solid #66bb6a; color: #66bb6a; padding: 6px 10px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer;" title="Ver e imprimir código QR">
               🔲 QR
             </button>

@@ -747,6 +747,7 @@ function renderProductRows(products) {
           <small>${escapeMapHtml(product.product_code || product.id || 'SIN CÓD')} · <span class="gba-stock-pill ${stockBadgeClass}">${stockLabel}</span>${exactPosition}</small>
         </div>
         <div style="display: flex; gap: 6px;">
+          <button type="button" class="gba-qr-btn" onclick="if (window.openEditProductLocation) window.openEditProductLocation('${escapeMapHtml(product.product_code || product.id)}'); else if (window.showToast) window.showToast('Asistente de ubicación no disponible.');" title="Reubicar o cambiar nivel en góndola">📍 Reubicar</button>
           <button type="button" class="gba-qr-btn" onclick="openStockAdjustmentModal('${escapeMapHtml(product.product_code || product.id)}', 'add')" title="Ajustar Stock Físico">📦 Ajustar</button>
           <button type="button" class="gba-qr-btn" onclick="printProductQrByCode('${escapeMapHtml(product.product_code || product.id)}')" aria-label="Imprimir Etiqueta QR">QR</button>
         </div>
