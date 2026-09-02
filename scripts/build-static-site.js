@@ -32,6 +32,7 @@ const PUBLIC_ROOT_FILES = [
   'pacientes.js',
   'perfil.html',
   'pos-cart-engine.js',
+  'pos-desk-utils.js',
   'pos-inventory-sync.js',
   'products.json',
   'public-catalog-unification.js',

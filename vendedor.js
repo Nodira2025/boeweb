@@ -3863,6 +3863,7 @@ const LOCATION_SHELF_LABELS = {
 let mobileProductAssistantStep = 'method';
 let mobileProductEntryMethod = '';
 let pendingLocationProducts = [];
+let locationAssistantSelectedDraftIds = new Set();
 let locationAssistantState = createEmptyLocationAssistantState();
 
 function createEmptyLocationAssistantState() {
