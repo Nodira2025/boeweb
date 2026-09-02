@@ -189,3 +189,30 @@ test('Location Assistant: Selección masiva, reubicación y edición posterior d
   assert.match(code, /function refreshPendingLocationBadge/);
 });
 
+test('WMS Hierarchical Explorer: Navegación por 6 sectores, muebles/baldas y modal Lightbox', () => {
+  const mapCode = fs.readFileSync(path.join(process.cwd(), 'mapa-local.js'), 'utf8');
+
+  // 1. Definición de los 6 sectores
+  assert.match(mapCode, /WMS_SECTOR_DEFS/);
+  assert.match(mapCode, /Sector 1 · Parafernalia/);
+  assert.match(mapCode, /Sector 2 · Sustratos/);
+  assert.match(mapCode, /Sector 3 · Fertilizantes/);
+  assert.match(mapCode, /Sector 4 · Control de Plagas/);
+  assert.match(mapCode, /Sector 5 · Indoor y Herramientas/);
+  assert.match(mapCode, /Sector 6 · Bajo Escalera/);
+
+  // 2. Funciones de Lightbox y navegación
+  assert.match(mapCode, /function openWmsLightbox/);
+  assert.match(mapCode, /function closeWmsLightbox/);
+  assert.match(mapCode, /function openWmsSectorView/);
+  assert.match(mapCode, /function backToWmsSectors/);
+  assert.match(mapCode, /function handleSectorPhotoUpload/);
+
+  // 3. Renderers
+  assert.match(mapCode, /function renderWmsSectorsGrid/);
+  assert.match(mapCode, /function renderWmsSectorDetail/);
+  assert.match(mapCode, /wms-lightbox-modal/);
+  assert.match(mapCode, /wms-sector-card/);
+});
+
+

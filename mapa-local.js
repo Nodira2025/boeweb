@@ -1,6 +1,6 @@
-// BÔ Grow Club — Mapa de Estanterías estilo GBA Pokémon Verde Hoja / FireRed (32-bit RPG)
-// Con la Computadora Central como punto de referencia cardinal (Brújula) para Tienda y Depósito.
-// Soporta mapa limpio por defecto (solo PC Central), creación/eliminación de estantes, auditoría e historial.
+// BÔ Grow Club — Explorador WMS de Ubicaciones Físicas y Plano Jerárquico del Local
+// Navegación en 3 niveles: Sectores -> Muebles/Paredes -> Baldas N1..N6 y Productos
+// Fotos de referencia ampliables (Lightbox), dictado y locución por voz y auditoría completa.
 
 const DEFAULT_STORE_SHELVES = [
   // =========================================================================
@@ -42,6 +42,7 @@ const FLOOR_NAMES = {
   5: '💡 SECTOR 5 · INDOOR Y HERRAMIENTAS (PC AL CENTRO)',
   6: '📦 SECTOR 6 · BAJO ESCALERA (PC AL CENTRO)'
 };
+
 const LEVEL_NAMES = {
   1: 'Nv.1 Piso/Base (Abajo)',
   2: 'Nv.2 Bajo',
@@ -51,16 +52,39 @@ const LEVEL_NAMES = {
   6: 'Nv.6 Tope (Arriba)'
 };
 
+const WMS_SECTOR_DEFS = [
+  { id: 'S1', floor: 1, name: 'Sector 1 · Parafernalia', desc: 'Pipas, bongs, sedas, picadores, encendedores y accesorios boutique', icon: '🌿', defaultImg: 'assets/store-shelf-map-gba.jpg' },
+  { id: 'S2', floor: 2, name: 'Sector 2 · Sustratos', desc: 'Bolsas de tierra, turbas, perlitas, sustratos profesionales y pallets', icon: '🌱', defaultImg: 'assets/store-shelf-map-gba.jpg' },
+  { id: 'S3', floor: 3, name: 'Sector 3 · Fertilizantes', desc: 'Nutrientes, bioestimulantes, enmiendas orgánicas y equipo refrigerado', icon: '🧪', defaultImg: 'assets/store-shelf-map-gba.jpg' },
+  { id: 'S4', floor: 4, name: 'Sector 4 · Control de Plagas', desc: 'Insecticidas, preventivos, fungicidas y fitosanitarios', icon: '🛡️', defaultImg: 'assets/store-shelf-map-gba.jpg' },
+  { id: 'S5', floor: 5, name: 'Sector 5 · Indoor y Herramientas', desc: 'Carpas, iluminación LED, turbinas, tijeras y medidores', icon: '💡', defaultImg: 'assets/store-shelf-map-gba.jpg' },
+  { id: 'S6', floor: 6, name: 'Sector 6 · Bajo Escalera', desc: 'Espacio bajo escalera, reservas y stock pesado en cajas', icon: '📦', defaultImg: 'assets/store-shelf-map-gba.jpg' }
+];
+
+const ZONE_MAP_NAMES = {
+  'S1': 'Sector 1 (Parafernalia)',
+  'S2': 'Sector 2 (Sustratos)',
+  'S3': 'Sector 3 (Fertilizantes)',
+  'S4': 'Control de Plagas',
+  'S5': 'Sector 5 (Indoor y Herramientas)',
+  'S6': 'Sector 6 (Bajo Escalera)',
+  'SEC1': 'Sector 1 (Parafernalia)',
+  'SEC2': 'Sector 2 (Sustratos)',
+  'SEC3': 'Sector 3 (Fertilizantes)',
+  'SEC4': 'Control de Plagas',
+  'SEC5': 'Sector 5 (Indoor y Herramientas)',
+  'SEC6': 'Sector 6 (Bajo Escalera)',
+  'TI': 'Tienda',
+  'DP': 'Depósito'
+};
+
 let storeShelves = structuredClone(DEFAULT_STORE_SHELVES);
 let storeLocationProducts = [];
 let mapHistoryEntries = [];
 let selectedFloorLevel = 1;
-let selectedShelfCode = 'PC-CENTRO';
+let selectedShelfCode = 'P1-E1';
 let selectedInternalLevel = 3;
-let currentViewMode = '2D';
-let activeMapTab = 'interactive'; // 'interactive' | 'illustration' | 'history'
-let mapZoomLevel = 100;
-let isEditMode = false;
+let currentWmsView = 'sectors'; // 'sectors' | 'sector_detail' | 'history' | 'infography'
 let isAddShelfModalOpen = false;
 let storeMapSyncLabel = 'SISTEMA WMS EN LÍNEA';
 
@@ -128,7 +152,7 @@ function exportMapHistoryCSV() {
     if (window.showToast) window.showToast('No hay registros de historial para exportar.');
     return;
   }
-  const headers = ['Fecha/Hora', 'Usuario', 'Acción', 'Título', 'Detalle', 'Estante', 'Piso'];
+  const headers = ['Fecha/Hora', 'Usuario', 'Acción', 'Título', 'Detalle', 'Estante', 'Sector'];
   const rows = history.map(item => [
     new Date(item.timestamp).toLocaleString('es-AR'),
     item.user,
@@ -138,423 +162,173 @@ function exportMapHistoryCSV() {
     item.shelf_code || '-',
     FLOOR_NAMES[item.floor_level] ? FLOOR_NAMES[item.floor_level].split('(')[0].trim() : (item.floor_level === 2 ? 'Depósito' : 'Tienda')
   ]);
-  const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const csvContent = 'data:text/csv;charset=utf-8,﻿' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement('a');
   link.setAttribute('href', encodedUri);
   link.setAttribute('download', `historial_plano_boeweb_${Date.now()}.csv`);
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
 }
 
-function loadSavedStoreLayout() {
-  return structuredClone(DEFAULT_STORE_SHELVES);
+function getSectorCustomPhoto(sectorId) {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem('boeweb_wms_sector_photo_' + sectorId);
+      if (stored) return stored;
+    }
+  } catch (_) {}
+  const def = WMS_SECTOR_DEFS.find(s => s.id === sectorId);
+  return def?.defaultImg || 'assets/store-shelf-map-gba.jpg';
 }
 
-function getLocalShelfPhotos() {
-  return {};
+function saveSectorCustomPhoto(sectorId, photoUrl) {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('boeweb_wms_sector_photo_' + sectorId, photoUrl);
+    }
+  } catch (_) {}
 }
 
-function saveStoreLayout() {
-  window.storeShelves = storeShelves;
-}
-
-let movingShelfId = null;
-
-function normalizeShelf(shelf) {
-  const fallback = DEFAULT_STORE_SHELVES.find(item => item.code === shelf.code) || {};
-  return {
-    ...fallback,
-    ...shelf,
-    zone_code: shelf.zone_code || shelf.zoneCode || fallback.zone_code || String(shelf.code || '').charAt(0),
-    floor_level: Number(shelf.floor_level || shelf.floor || fallback.floor_level || 1),
-    x: Number(shelf.x ?? fallback.x ?? 10),
-    y: Number(shelf.y ?? fallback.y ?? 10),
-    width: Number(shelf.width ?? fallback.width ?? 14),
-    height: Number(shelf.height ?? fallback.height ?? 14),
-    icon: shelf.icon || fallback.icon || '📦',
-    is_anchor: shelf.is_anchor || fallback.is_anchor || false
-  };
-}
-
-function calculateDefaultCoordinatesForShelf(wallCode, floorLevel) {
-  const wallShelves = storeShelves.filter(s => s.floor_level === floorLevel && !s.is_anchor && String(s.code).startsWith(wallCode));
-  const index = wallShelves.length;
-
-  if (wallCode === 'P1') { // Frente / Norte (Top wall)
-    const x = Math.min(78, 6 + (index * 15));
-    return { x, y: 8, width: 13, height: 14, icon: '🪵' };
-  } else if (wallCode === 'P2') { // Fondo / Sur (Bottom wall)
-    const x = Math.min(78, 6 + (index * 15));
-    return { x, y: 78, width: 13, height: 14, icon: '🪵' };
-  } else if (wallCode === 'P3') { // Derecha / Este (Right wall pegada al borde)
-    const y = Math.min(74, 20 + (index * 17));
-    return { x: 88, y, width: 10, height: 15, icon: '🪜' };
-  } else if (wallCode === 'P4') { // Izquierda / Oeste (Left wall pegada al borde)
-    const y = Math.min(74, 20 + (index * 17));
-    return { x: 2, y, width: 10, height: 15, icon: '🪜' };
-  } else { // Isla / Centro
-    const x = Math.min(70, 24 + (index * 16));
-    return { x, y: 58, width: 14, height: 14, icon: '📦' };
+function handleSectorPhotoUpload(event, sectorId) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  try {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      saveSectorCustomPhoto(sectorId, dataUrl);
+      logMapHistoryAction('FOTO_SECTOR', 'Foto de sector actualizada', `Se actualizó la foto de referencia del Sector ${sectorId}`, null, Number(sectorId.replace(/\D/g, '')) || 1);
+      if (window.showToast) window.showToast(`📸 Foto del Sector ${sectorId} guardada.`);
+      rerenderStoreMap();
+    };
+    reader.readAsDataURL(file);
+  } catch (err) {
+    console.error('Error al subir foto de sector:', err);
+    if (window.showToast) window.showToast('No se pudo guardar la foto del sector.');
   }
 }
 
-function ensureShelfExistsForLocation(shelfCode, floorLevel = 1, locationLabel = '') {
-  if (!shelfCode || shelfCode === 'PC-CENTRO') return null;
-  const normalizedCode = String(shelfCode).trim().toUpperCase();
+// Lightbox modal para ampliar fotos a pantalla completa
+function openWmsLightbox(imgUrl, title, subtitle) {
+  if (typeof document === 'undefined') return;
+  closeWmsLightbox();
+
+  const modal = document.createElement('div');
+  modal.id = 'wms-lightbox-modal';
+  modal.className = 'wms-lightbox-backdrop';
+  modal.onclick = (e) => {
+    if (e.target === modal || e.target.classList.contains('wms-lightbox-close')) closeWmsLightbox();
+  };
+  modal.innerHTML = `
+    <div class="wms-lightbox-content">
+      <button type="button" class="wms-lightbox-close" onclick="closeWmsLightbox()" aria-label="Cerrar imagen">&times;</button>
+      <div class="wms-lightbox-header">
+        <h3 style="margin: 0; color: var(--vendor-gold, #c2a246); font-size: 1.15rem; font-weight: 800;">${escapeMapHtml(title || 'Foto de Referencia WMS')}</h3>
+        ${subtitle ? `<small style="color: rgba(246,243,232,0.8);">${escapeMapHtml(subtitle)}</small>` : ''}
+      </div>
+      <div class="wms-lightbox-img-wrapper">
+        <img src="${escapeMapHtml(imgUrl)}" alt="${escapeMapHtml(title || 'Foto')}" class="wms-lightbox-img">
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  document.addEventListener('keydown', handleLightboxEsc);
+}
+
+function closeWmsLightbox() {
+  const modal = document.getElementById('wms-lightbox-modal');
+  if (modal) modal.remove();
+  document.removeEventListener('keydown', handleLightboxEsc);
+}
+
+function handleLightboxEsc(e) {
+  if (e.key === 'Escape') closeWmsLightbox();
+}
+
+function normalizeShelfCode(rawCode) {
+  return String(rawCode || '').trim().toUpperCase();
+}
+
+function getSectorProducts(floorLevel) {
+  const floorNum = Number(floorLevel);
+  const targetSectorId = `S${floorNum}`;
+  const allProducts = Array.isArray(storeLocationProducts) && storeLocationProducts.length > 0
+    ? storeLocationProducts
+    : (typeof window !== 'undefined' && Array.isArray(window.internalCatalogProducts) ? window.internalCatalogProducts : []);
+
+  return allProducts.filter(p => {
+    const pFloor = Number(p.floor_level || p.floor || 0);
+    const pWms = String(p.wms_code || p.location || '').toUpperCase();
+    if (pFloor === floorNum) return true;
+    if (pWms.startsWith(targetSectorId + '-') || pWms.startsWith(`SEC${floorNum}-`)) return true;
+    if (floorNum === 1 && (pWms.startsWith('TI-') || (!pWms && !pFloor))) return true;
+    if (floorNum === 6 && pWms.startsWith('DP-')) return true;
+    return false;
+  });
+}
+
+function getShelfProducts(shelfCode, level = null) {
+  const normalized = normalizeShelfCode(shelfCode);
+  const allProducts = Array.isArray(storeLocationProducts) && storeLocationProducts.length > 0
+    ? storeLocationProducts
+    : (typeof window !== 'undefined' && Array.isArray(window.internalCatalogProducts) ? window.internalCatalogProducts : []);
+
+  return allProducts.filter(product => {
+    const rawCode = String(product.shelf_code || product.shelf || product.wms_code || product.location || '').toUpperCase();
+    const productLevel = Number(product.shelf_level ?? product.level ?? 0);
+    
+    // Parse wms code parts if present
+    const wmsMatch = rawCode.match(/^S\d-([A-Z])-([A-Z0-9]+)-N(\d)-([A-Z])/i);
+    let effectiveShelf = rawCode;
+    let effectiveLevel = productLevel;
+    if (wmsMatch) {
+      effectiveShelf = wmsMatch[2]; // e.g. P1
+      effectiveLevel = Number(wmsMatch[3]) || productLevel;
+    }
+
+    const matchesShelf = rawCode === normalized || effectiveShelf === normalized || rawCode.includes(normalized) || normalized.includes(rawCode);
+    if (!matchesShelf) return false;
+    if (level === null || level === undefined) return true;
+    return Number(effectiveLevel) === Number(level);
+  });
+}
+
+function getShelfUnitCount(shelfCode) {
+  return getShelfProducts(shelfCode).reduce((total, p) => total + Math.max(0, Number(p.stock ?? p.on_hand) || 0), 0);
+}
+
+function calculateDefaultCoordinatesForShelf(wallCode, floorLevel = 1) {
+  return { x: 42, y: 40, width: 16, height: 16 };
+}
+
+function ensureShelfExistsForLocation(shelfCode, floorLevel = 1, options = {}) {
+  const normalizedCode = normalizeShelfCode(shelfCode);
+  if (!normalizedCode || normalizedCode === 'PC-CENTRO') return null;
+
   const existing = storeShelves.find(s => s.code.toUpperCase() === normalizedCode && s.floor_level === floorLevel);
-  return existing || null;
-}
+  if (existing) return existing;
 
-function setStoreMapData(shelves = [], products = [], syncLabel = 'Inventario WMS sincronizado') {
-  storeLocationProducts = Array.isArray(products) ? products : [];
-  storeShelves = structuredClone(DEFAULT_STORE_SHELVES);
-  (Array.isArray(shelves) ? shelves : []).forEach(rawShelf => {
-    if (!rawShelf?.id || !rawShelf?.code) return;
-    const shelf = normalizeShelf(rawShelf);
-    if (!Number.isFinite(Number(rawShelf.x)) || !Number.isFinite(Number(rawShelf.y))) {
-      const wallMatch = String(shelf.code).toUpperCase().match(/P([1-4])/);
-      const coords = calculateDefaultCoordinatesForShelf(wallMatch ? `P${wallMatch[1]}` : 'ISLA', shelf.floor_level);
-      shelf.x = coords.x;
-      shelf.y = coords.y;
-      shelf.width = Number(rawShelf.width) || coords.width;
-      shelf.height = Number(rawShelf.height) || coords.height;
-      shelf.icon = rawShelf.icon || coords.icon;
-    }
-    storeShelves.push(shelf);
-  });
-
-  storeMapSyncLabel = syncLabel;
-  window.storeLocationProducts = storeLocationProducts;
-  window.storeShelves = storeShelves;
-  saveStoreLayout();
-}
-
-function setFloorLevel(level) {
-  selectedFloorLevel = Number(level) || 1;
-  const firstShelf = storeShelves.find(item => item.floor_level === selectedFloorLevel && !item.is_anchor);
-  selectedShelfCode = firstShelf ? firstShelf.code : 'PC-CENTRO';
-  rerenderStoreMap();
-}
-
-function selectShelf(code, internalLevel = null) {
-  const shelf = storeShelves.find(item => item.code === code)
-    || storeShelves.find(item => String(item.code).toUpperCase() === String(code).toUpperCase());
-  if (!shelf) return;
-  selectedShelfCode = shelf.code;
-  selectedFloorLevel = shelf.floor_level;
-  if (internalLevel) selectedInternalLevel = Number(internalLevel);
-  rerenderStoreMap();
-}
-
-function setInternalLevel(level) {
-  selectedInternalLevel = Number(level) || 1;
-  rerenderStoreMap();
-}
-
-function setViewMode(mode) {
-  currentViewMode = mode === '3D' ? '3D' : '2D';
-  rerenderStoreMap();
-}
-
-function adjustZoom(delta) {
-  mapZoomLevel = Math.max(60, Math.min(150, mapZoomLevel + Number(delta || 0)));
-  rerenderStoreMap();
-}
-
-function setMapTab(tab) {
-  activeMapTab = tab;
-  rerenderStoreMap();
-}
-
-function getCanvasTransform() {
-  const scale = `scale(${mapZoomLevel / 100})`;
-  return currentViewMode === '3D' ? `perspective(1000px) rotateX(12deg) ${scale}` : scale;
-}
-
-function rerenderStoreMap() {
-  if (window.renderStoreMapUI) window.renderStoreMapUI(null, null, null, false);
-}
-
-function getShelfProducts(code, internalLevel = null) {
-  const targetCode = String(code || '').toUpperCase().trim();
-  if (!targetCode || targetCode === 'PC-CENTRO') return [];
-
-  return storeLocationProducts.filter(product => {
-    const rawShelf = String(product.shelf_code || '').toUpperCase().trim();
-    // Strict exact matching or normalized wall-shelf matching (e.g. P3-E3)
-    const sameShelf = (rawShelf === targetCode) || 
-                      (rawShelf.replace(/[-_ ]/g, '') === targetCode.replace(/[-_ ]/g, ''));
-    if (!sameShelf) return false;
-    if (internalLevel !== null && internalLevel !== undefined) {
-      const prodLevel = Number(product.shelf_level ?? product.level) || 1;
-      return prodLevel === Number(internalLevel);
-    }
-    return true;
-  });
-}
-
-function getShelfUnitCount(code) {
-  return getShelfProducts(code).reduce((sum, product) => sum + Math.max(0, Number(product.stock) || 0), 0);
-}
-
-function findStoreMapProduct(query) {
-  const normalized = String(query || '').trim().toLocaleLowerCase('es-AR');
-  if (!normalized) return null;
-  const product = storeLocationProducts.find(item => [item.name, item.product_code, item.barcode, item.shelf_code, item.location_label, item.wms_code]
-    .some(value => String(value || '').toLocaleLowerCase('es-AR').includes(normalized)));
-  if (!product) return null;
-  return {
-    product,
-    shelfCode: product.shelf_code,
-    level: Number(product.shelf_level) || 1,
-    floor: Number(product.floor_level) || 1
-  };
-}
-
-function focusStoreMapProduct(productCode) {
-  const match = findStoreMapProduct(productCode);
-  if (!match) return false;
-  selectedShelfCode = match.shelfCode;
-  selectedInternalLevel = match.level;
-  selectedFloorLevel = match.floor;
-  rerenderStoreMap();
-  return true;
-}
-
-function getMapOperationalContext() {
-  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
-  const supabaseClient = window.supabaseClient;
-  if (!window.OperationalApi || !supabaseClient || !context?.isVerified || !['ADMIN', 'SUPERVISOR'].includes(context.role)) {
-    throw new Error('Sólo administración o supervisión pueden modificar ubicaciones centrales.');
-  }
-  return { context, supabaseClient };
-}
-
-async function persistStoreShelf(shelf) {
-  const { context, supabaseClient } = getMapOperationalContext();
-  return window.OperationalApi.upsertInventoryLocation({
-    supabaseClient,
-    authContext: context,
-    location: {
-      id: shelf.id || null,
-      code: shelf.code,
-      name: shelf.name || shelf.code,
-      location_type: shelf.location_type || 'SHELF',
-      is_sellable: shelf.is_sellable !== false,
-      is_default: shelf.is_default === true,
-      metadata: {
-        ...(shelf.metadata || {}),
-        floor_level: Number(shelf.floor_level) || 1,
-        map_x: Number(shelf.x),
-        map_y: Number(shelf.y),
-        map_width: Number(shelf.width),
-        map_height: Number(shelf.height),
-        map_icon: shelf.icon || '📦'
-      }
-    }
-  });
-}
-
-async function moveStoreItem(id, dx, dy) {
-  const shelf = storeShelves.find(item => item.id === id);
-  if (!shelf || shelf.is_anchor) return;
-  const previous = { x: shelf.x, y: shelf.y };
-  shelf.x = Math.max(2, Math.min(88, shelf.x + Number(dx || 0)));
-  shelf.y = Math.max(2, Math.min(84, shelf.y + Number(dy || 0)));
-  try {
-    await persistStoreShelf(shelf);
-    saveStoreLayout();
-    logMapHistoryAction('MOVER_ESTANTE', 'Módulo desplazado', `Estante ${shelf.code} movido a posición (X:${shelf.x}%, Y:${shelf.y}%)`, shelf.code, shelf.floor_level);
-    rerenderStoreMap();
-  } catch (error) {
-    shelf.x = previous.x;
-    shelf.y = previous.y;
-    if (window.showToast) window.showToast(`❌ No se pudo mover la ubicación: ${error.message}`);
-    rerenderStoreMap();
-  }
-}
-
-function deleteStoreShelf(shelfCode) {
-  const shelf = storeShelves.find(item => item.code === shelfCode);
-  if (!shelf) return;
-  if (shelf.is_anchor) {
-    if (window.showToast) window.showToast('⚠️ No se puede eliminar la Terminal Central (punto de ancla cardinal).');
-    return;
-  }
-
-  if (window.showToast) {
-    window.showToast(`🔒 ${shelfCode} es una ubicación central. No se puede borrar ni desvincular stock desde el plano.`);
-  }
-}
-
-async function addNewStoreShelf(floorLevel, wallCode, shelfType, shelfNumber, customName = '') {
-  const typeCodeMap = { 'E': 'E', 'VIT': 'VIT', 'HEL': 'HEL', 'PIS': 'PIS', 'EST': 'EST' };
-  const typePrefix = typeCodeMap[shelfType] || 'E';
-  const fullCode = `${wallCode}-${typePrefix}${shelfNumber}`;
-  
-  const existing = storeShelves.find(s => s.code === fullCode && s.floor_level === Number(floorLevel));
-  if (existing) {
-    if (window.showToast) window.showToast(`⚠️ Ya existe un módulo con el código ${fullCode} en esta sala.`);
-    return false;
-  }
-
-  const wallLabels = {
-    'P1': 'Pared 1 (Frente / Norte)',
-    'P2': 'Pared 2 (Fondo / Sur)',
-    'P3': 'Pared 3 (Derecha / Este)',
-    'P4': 'Pared 4 (Izquierda / Oeste)',
-    'ISLA': 'Isla / Pasillo Central'
-  };
-
-  const coords = calculateDefaultCoordinatesForShelf(wallCode, Number(floorLevel));
-
+  const wallMatch = normalizedCode.match(/^P([1-4])/);
   const newShelf = {
-    id: null,
-    code: fullCode,
-    zone_code: wallCode,
-    name: customName || `${wallLabels[wallCode] || wallCode} · ${fullCode}`,
+    id: 'shelf_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+    code: normalizedCode,
+    zone_code: wallMatch ? `P${wallMatch[1]}` : 'ISLA',
+    name: options.name || `Módulo ${normalizedCode}`,
     floor_level: Number(floorLevel),
-    x: coords.x,
-    y: coords.y,
-    width: coords.width,
-    height: coords.height,
-    icon: coords.icon || '🗄️',
-    is_anchor: false
+    icon: options.icon || (normalizedCode.includes('HEL') ? '❄️' : normalizedCode.includes('VIT') ? '💎' : normalizedCode.includes('PIS') ? '🧱' : '🗄️'),
+    is_anchor: false,
+    x: 42,
+    y: 40,
+    width: 16,
+    height: 16,
+    photo_url: options.photo_url || null
   };
 
-  try {
-    const result = await persistStoreShelf(newShelf);
-    newShelf.id = result.location_id;
-    storeShelves.push(newShelf);
-    saveStoreLayout();
-    selectedShelfCode = fullCode;
-    selectedFloorLevel = Number(floorLevel);
-    logMapHistoryAction('CREAR_ESTANTE', 'Nuevo módulo creado', `Se creó el módulo ${fullCode} en ${wallLabels[wallCode]}`, fullCode, Number(floorLevel));
-    if (window.showToast) window.showToast(`✅ Ubicación central ${fullCode} creada correctamente.`);
-    isAddShelfModalOpen = false;
-    if (typeof window.loadStoreMapData === 'function') await window.loadStoreMapData(true);
-    rerenderStoreMap();
-    return true;
-  } catch (error) {
-    if (window.showToast) window.showToast(`❌ No se pudo crear la ubicación: ${error.message}`);
-    return false;
-  }
+  storeShelves.push(newShelf);
+  logMapHistoryAction('CREAR_ESTANTE', 'Módulo WMS incorporado', `Se creó el módulo ${newShelf.code} en ${FLOOR_NAMES[floorLevel] || 'Sector'}`, newShelf.code, floorLevel);
+  return newShelf;
 }
-
-function clearAllStoreShelves() {
-  if (window.showToast) {
-    window.showToast('🔒 El plano refleja ubicaciones centrales y no puede vaciarse desde el navegador.');
-  }
-}
-
-function toggleStoreLayoutEditMode() {
-  if (!isEditMode) {
-    try {
-      getMapOperationalContext();
-    } catch (error) {
-      if (window.showToast) window.showToast(`🔒 ${error.message}`);
-      return;
-    }
-  }
-  isEditMode = !isEditMode;
-  movingShelfId = null;
-  saveStoreLayout();
-  if (!isEditMode && window.showToast) window.showToast('💾 Cambios guardados en el plano.');
-  rerenderStoreMap();
-}
-
-function handleShelfClickInEditMode(id, code, event) {
-  if (event) event.stopPropagation();
-  const shelf = storeShelves.find(s => s.id === id);
-  if (!shelf || shelf.is_anchor) return;
-
-  if (movingShelfId === id) {
-    movingShelfId = null;
-    if (window.showToast) window.showToast(`Módulo ${code} deseleccionado.`);
-  } else {
-    movingShelfId = id;
-    selectedShelfCode = code;
-    if (window.showToast) window.showToast(`📍 Módulo ${code} seleccionado. Tocá en el plano para ubicarlo.`);
-  }
-  rerenderStoreMap();
-}
-
-async function handleCanvasTapToMove(event) {
-  if (!isEditMode || !movingShelfId) return;
-  if (event.target.closest('.gba-shelf-delete-btn') || event.target.closest('.gba-editor-arrows')) return;
-
-  const canvas = document.getElementById('architectural-map-canvas');
-  if (!canvas) return;
-  const rect = canvas.getBoundingClientRect();
-  const clickX = ((event.clientX - rect.left) / rect.width) * 100;
-  const clickY = ((event.clientY - rect.top) / rect.height) * 100;
-
-  const shelf = storeShelves.find(s => s.id === movingShelfId);
-  if (!shelf || shelf.is_anchor) return;
-
-  const newX = Math.max(2, Math.min(88, Math.round((clickX - (shelf.width / 2)) / 2) * 2));
-  const newY = Math.max(2, Math.min(84, Math.round((clickY - (shelf.height / 2)) / 2) * 2));
-
-  const previous = { x: shelf.x, y: shelf.y };
-  shelf.x = newX;
-  shelf.y = newY;
-  try {
-    await persistStoreShelf(shelf);
-    saveStoreLayout();
-    logMapHistoryAction('MOVER_ESTANTE', 'Módulo reubicado', `Estante ${shelf.code} reposicionado a (X:${newX}%, Y:${newY}%)`, shelf.code, shelf.floor_level);
-    if (window.showToast) window.showToast(`✅ ${shelf.code} posicionado en (X:${newX}%, Y:${newY}%).`);
-    movingShelfId = null;
-    rerenderStoreMap();
-  } catch (error) {
-    shelf.x = previous.x;
-    shelf.y = previous.y;
-    if (window.showToast) window.showToast(`❌ No se pudo mover la ubicación: ${error.message}`);
-    rerenderStoreMap();
-  }
-}
-
-function openAddShelfModal() {
-  try {
-    getMapOperationalContext();
-  } catch (error) {
-    if (window.showToast) window.showToast(`🔒 ${error.message}`);
-    return;
-  }
-  isAddShelfModalOpen = true;
-  rerenderStoreMap();
-}
-
-function closeAddShelfModal() {
-  isAddShelfModalOpen = false;
-  rerenderStoreMap();
-}
-
-function showShelfDetailsModal(code) {
-  const shelf = storeShelves.find(item => item.code === code);
-  if (!shelf) return;
-  const unitCount = getShelfUnitCount(code);
-  const message = `🌿 ${FLOOR_NAMES[shelf.floor_level]} · Estante ${shelf.code} · ${LEVEL_NAMES[selectedInternalLevel] || 'Nivel ' + selectedInternalLevel} · ${unitCount} u.`;
-  if (window.showToast) window.showToast(message);
-}
-
-const ZONE_MAP_NAMES = {
-  'S1': 'Sector 1 (Parafernalia)',
-  'S2': 'Sector 2 (Sustratos)',
-  'S3': 'Sector 3 (Fertilizantes)',
-  'S4': 'Control de Plagas',
-  'S5': 'Sector 5 (Indoor y Herramientas)',
-  'S6': 'Sector 6 (Bajo Escalera)',
-  'SEC1': 'Sector 1 (Parafernalia)',
-  'SEC2': 'Sector 2 (Sustratos)',
-  'SEC3': 'Sector 3 (Fertilizantes)',
-  'SEC4': 'Control de Plagas',
-  'SEC5': 'Sector 5 (Indoor y Herramientas)',
-  'SEC6': 'Sector 6 (Bajo Escalera)',
-  'TI': 'Tienda',
-  'DP': 'Depósito'
-};
 
 function parseLocationCode(code) {
   const raw = String(code || '').trim().toUpperCase();
@@ -623,7 +397,7 @@ function generateDetailedVoicePhrase(info) {
   }
 
   const prodName = info.productName ? `El producto ${info.productName}` : 'El ítem solicitado';
-  const area = info.floorLevel === 2 ? 'el depósito' : 'la tienda';
+  const area = info.areaLabel || (info.floorLevel === 2 ? 'el Sector 2 (Sustratos)' : 'el Sector 1 (Parafernalia)');
   const wallMatch = String(info.wallCode || 'P1').match(/\d/);
   const wallNum = wallMatch ? wallMatch[0] : '1';
 
@@ -633,7 +407,7 @@ function generateDetailedVoicePhrase(info) {
   else if (info.wallCode === 'P2' || info.compassCode === 'A') wallSide = 'la del fondo';
   else if (info.wallCode === 'P1' || info.compassCode === 'F') wallSide = 'la del frente';
 
-  let shelfName = 'góndola 1';
+  let shelfName = 'módulo 1';
   const rawShelf = String(info.shelfCode || 'E1').toUpperCase();
   if (rawShelf.startsWith('HEL')) {
     shelfName = `heladera ${rawShelf.replace(/\D/g, '') || '1'}`;
@@ -678,8 +452,8 @@ function speakLocationVoicePhrase(infoOrText) {
 
     const utterance = new SpeechSynthesisUtterance(phrase);
     utterance.lang = 'es-AR';
-    utterance.rate = 1.38;
-    utterance.pitch = 0.94;
+    utterance.rate = 1.35;
+    utterance.pitch = 0.95;
     const voices = window.speechSynthesis.getVoices();
     const esVoice = voices.find(v => v.lang && (v.lang === 'es-AR' || v.lang.startsWith('es-419') || v.lang === 'es-US' || v.lang.startsWith('es')));
     if (esVoice) utterance.voice = esVoice;
@@ -689,231 +463,330 @@ function speakLocationVoicePhrase(infoOrText) {
   }
 }
 
-function renderShelfBlocks() {
-  const floorShelves = storeShelves.filter(item => item.floor_level === selectedFloorLevel);
-  if (!floorShelves.length) {
-    return `
-      <div class="gba-empty-room">
-        <div>
-          <span style="font-size: 2.2rem; display: block; margin-bottom: 8px;">📐</span>
-          <strong>SALA SIN ESTANTES</strong><br>
-          <small style="color: rgba(246,243,232,0.65);">Hacé clic en '🛠️ EDITAR PLANO' para incorporar módulos de guardado.</small>
-        </div>
-      </div>`;
+function setFloorLevel(floorNum) {
+  selectedFloorLevel = Number(floorNum);
+  currentWmsView = 'sector_detail';
+  rerenderStoreMap();
+}
+
+function openWmsSectorView(floorNum) {
+  selectedFloorLevel = Number(floorNum);
+  currentWmsView = 'sector_detail';
+  rerenderStoreMap();
+}
+
+function backToWmsSectors() {
+  currentWmsView = 'sectors';
+  rerenderStoreMap();
+}
+
+function selectShelf(shelfCode) {
+  selectedShelfCode = normalizeShelfCode(shelfCode);
+  rerenderStoreMap();
+}
+
+function setInternalLevel(levelNum) {
+  selectedInternalLevel = Number(levelNum);
+  rerenderStoreMap();
+}
+
+function setMapTab(tabName) {
+  currentWmsView = tabName === 'interactive' ? 'sectors' : tabName;
+  rerenderStoreMap();
+}
+
+function openAddShelfModal() {
+  isAddShelfModalOpen = true;
+  rerenderStoreMap();
+}
+
+function closeAddShelfModal() {
+  isAddShelfModalOpen = false;
+  rerenderStoreMap();
+}
+
+function addNewStoreShelf(floorLevel, wallCode, typeCode, shelfNum, descriptiveName) {
+  const num = Math.max(1, parseInt(shelfNum, 10) || 1);
+  const code = `${wallCode}-${typeCode}${num}`;
+  
+  const existing = storeShelves.find(s => s.code === code && s.floor_level === Number(floorLevel));
+  if (existing) {
+    if (window.showToast) window.showToast(`⚠️ El módulo ${code} ya existe en esta planta.`);
+    return;
   }
-  return floorShelves.map(shelf => {
-    // Si es la Terminal Central (Brújula)
-    if (shelf.is_anchor) {
-      return `
-        <div class="gba-shelf-wrapper gba-anchor-pc-wrapper" style="left:${shelf.x}%;top:${shelf.y}%;width:${shelf.width}%;height:${shelf.height}%;">
-          <div class="gba-anchor-pc" title="Terminal Central: Punto de Referencia Cardinal de Planta">
-            <div class="gba-pc-radar-ring"></div>
-            <div class="gba-pc-screen">💻</div>
-            <strong class="gba-pc-title">TERMINAL CENTRAL</strong>
-            <small class="gba-pc-sub">BRÚJULA WMS</small>
-            
-            <!-- Flechas Cardinales de Brújula -->
-            <span class="gba-compass-arrow gba-compass-north" title="Pared 1 · Frente / Norte">▲ P1 · FRENTE</span>
-            <span class="gba-compass-arrow gba-compass-south" title="Pared 2 · Fondo / Sur">▼ P2 · FONDO</span>
-            <span class="gba-compass-arrow gba-compass-east" title="Pared 3 · Lateral Derecho / Este">▶ P3 · DERECHA</span>
-            <span class="gba-compass-arrow gba-compass-west" title="Pared 4 · Lateral Izquierdo / Oeste">◀ P4 · IZQUIERDA</span>
-          </div>
-        </div>`;
-    }
 
-    const count = getShelfUnitCount(shelf.code);
-    const selected = shelf.code === selectedShelfCode;
-    const isMoving = isEditMode && movingShelfId === shelf.id;
-    
-    // Capacity indicator calculation
-    let capColor = '#2e7d32'; // Green (>10)
-    let capPercent = Math.min(100, Math.max(6, (count / 30) * 100));
-    if (count === 0) {
-      capColor = '#d32f2f';
-      capPercent = 0;
-    } else if (count < 10) {
-      capColor = '#f57c00';
-    }
+  let icon = '🪵';
+  if (typeCode === 'HEL') icon = '❄️';
+  else if (typeCode === 'VIT') icon = '💎';
+  else if (typeCode === 'PIS') icon = '📦';
+  else if (typeCode === 'EST') icon = '🗄️';
 
-    return `
-      <div class="gba-shelf-wrapper" style="left:${shelf.x}%;top:${shelf.y}%;width:${shelf.width}%;height:${shelf.height}%;">
-        ${isEditMode ? `
-          <button type="button" class="gba-shelf-delete-btn" onclick="deleteStoreShelf('${escapeMapHtml(shelf.code)}')" title="Eliminar estante ${escapeMapHtml(shelf.code)}">✕</button>
-        ` : ''}
-        <button type="button" class="gba-shelf-block ${selected ? 'selected' : ''} ${isMoving ? 'gba-shelf-moving' : ''}" data-zone="${escapeMapHtml(shelf.zone_code)}"
-          onclick="${isEditMode ? `handleShelfClickInEditMode('${escapeMapHtml(shelf.id)}', '${escapeMapHtml(shelf.code)}', event)` : `selectShelf('${escapeMapHtml(shelf.code)}')`}" aria-label="Módulo ${escapeMapHtml(shelf.code)}, ${count} unidades">
-          
-          <div class="gba-shelf-header">
-            <span class="gba-shelf-icon">${shelf.icon || '🗄️'}</span>
-            <strong class="gba-shelf-code">${escapeMapHtml(shelf.code)}</strong>
-          </div>
-          
-          <div class="gba-hp-track" title="${count} unidades">
-            <div class="gba-hp-fill" style="width: ${capPercent}%; background: ${capColor};"></div>
-          </div>
-          
-          <div class="gba-shelf-footer-info">
-            <span class="gba-shelf-count">${count} u.</span>
-            ${isMoving ? '<span class="gba-cursor-tag" style="color:#ffd600;">✋ MOVIENDO</span>' : (selected ? '<span class="gba-cursor-tag">📍 ACTIVO</span>' : '')}
-          </div>
-        </button>
-        ${isEditMode ? `<div class="gba-editor-arrows">
-          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',-3,0)" title="Mover a la izquierda">◀</button>
-          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',3,0)" title="Mover a la derecha">▶</button>
-          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',0,-3)" title="Mover hacia arriba">▲</button>
-          <button type="button" onclick="moveStoreItem('${escapeMapHtml(shelf.id)}',0,3)" title="Mover hacia abajo">▼</button>
-        </div>` : ''}
-      </div>`;
-  }).join('');
+  const newShelf = {
+    id: 'shelf_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+    code,
+    zone_code: wallCode,
+    name: descriptiveName || `Módulo ${code}`,
+    floor_level: Number(floorLevel),
+    icon,
+    is_anchor: false,
+    x: 42,
+    y: 40,
+    width: 16,
+    height: 16
+  };
+
+  storeShelves.push(newShelf);
+  selectedShelfCode = code;
+  selectedFloorLevel = Number(floorLevel);
+  isAddShelfModalOpen = false;
+
+  logMapHistoryAction('CREAR_ESTANTE', 'Módulo incorporado', `Se creó el estante ${code} en ${FLOOR_NAMES[floorLevel]}`, code, Number(floorLevel));
+  if (window.showToast) window.showToast(`✅ Módulo ${code} creado correctamente.`);
+  rerenderStoreMap();
+}
+
+function deleteStoreShelf(shelfCode) {
+  const normalized = normalizeShelfCode(shelfCode);
+  if (normalized === 'PC-CENTRO') {
+    if (window.showToast) window.showToast('La Terminal Central es la brújula y no se puede eliminar.');
+    return;
+  }
+  if (!confirm(`¿Deseás eliminar el módulo ${normalized}?`)) return;
+
+  const count = getShelfUnitCount(normalized);
+  if (count > 0) {
+    if (!confirm(`El módulo ${normalized} contiene ${count} unidades de inventario. ¿Eliminar de todas formas?`)) return;
+  }
+
+  storeShelves = storeShelves.filter(s => !(s.code === normalized && s.floor_level === selectedFloorLevel));
+  logMapHistoryAction('ELIMINAR_ESTANTE', 'Módulo eliminado', `Se eliminó el módulo ${normalized}`, normalized, selectedFloorLevel);
+  if (window.showToast) window.showToast(`🗑️ Módulo ${normalized} eliminado.`);
+  rerenderStoreMap();
+}
+
+function handleShelfPhotoChange(event, shelfCode) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const shelf = storeShelves.find(s => s.code === shelfCode);
+  if (!shelf) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    shelf.photo_url = e.target.result;
+    logMapHistoryAction('FOTO_ESTANTE', 'Foto actualizada', `Se actualizó la foto de ${shelf.code}`, shelf.code, shelf.floor_level);
+    if (window.showToast) window.showToast(`📸 Foto del estante ${shelf.code} guardada.`);
+    rerenderStoreMap();
+  };
+  reader.readAsDataURL(file);
+}
+
+function showShelfDetailsModal(code) {
+  const shelf = storeShelves.find(item => item.code === code);
+  if (!shelf) return;
+  const unitCount = getShelfUnitCount(code);
+  const message = `🌿 ${FLOOR_NAMES[shelf.floor_level]} · Estante ${shelf.code} · ${unitCount} u.`;
+  if (window.showToast) window.showToast(message);
+}
+
+function setStoreMapData(shelves, products, statusLabel) {
+  if (Array.isArray(shelves) && shelves.length > 0) storeShelves = shelves;
+  if (Array.isArray(products)) storeLocationProducts = products;
+  if (statusLabel) storeMapSyncLabel = statusLabel;
+  rerenderStoreMap();
+}
+
+function findStoreMapProduct(query) {
+  if (typeof window !== 'undefined' && window.decodeHumanWmsLocation) {
+    const info = window.decodeHumanWmsLocation(query);
+    if (info && info.hasMatchedProduct) {
+      if (typeof window.renderStoreMapLocationCard === 'function') {
+        window.renderStoreMapLocationCard(info);
+      }
+      speakLocationVoicePhrase(info);
+      return info;
+    }
+  }
+  return null;
+}
+
+function focusStoreMapProduct(queryOrCode) {
+  const info = findStoreMapProduct(queryOrCode);
+  if (info && info.floorLevel) {
+    selectedFloorLevel = info.floorLevel;
+    if (info.shelfCode) selectedShelfCode = info.shelfCode;
+    currentWmsView = 'sector_detail';
+    rerenderStoreMap();
+  }
+  return info;
 }
 
 function renderProductRows(products) {
-  if (!products.length) {
-    return `
-      <div class="gba-bag-empty">
-        <span style="font-size: 1.4rem; display: block; margin-bottom: 6px;">📦</span>
-        No hay productos asignados en este nivel del módulo.<br>
-        <small style="color: var(--color-accent-gold, #c2a246); display: block; margin-top: 6px;">Asigná una ubicación desde el asistente o ajustá el stock.</small>
-      </div>`;
-  }
+  if (!products.length) return '';
   return products.map(product => {
-    const exactPosition = product.shelf_position ? ` · ${escapeMapHtml(product.shelf_position)}` : '';
-    const stockNum = Number(product.stock) || 0;
+    const exactPosition = product.shelf_position ? ` · Posición: ${escapeMapHtml(product.shelf_position)}` : '';
+    const stockNum = Number(product.stock ?? product.on_hand) || 0;
     const stockBadgeClass = stockNum > 5 ? 'gba-badge-ok' : stockNum > 0 ? 'gba-badge-low' : 'gba-badge-zero';
     const stockLabel = stockNum > 5 ? `${stockNum} u.` : stockNum > 0 ? `${stockNum} u. (Bajo)` : '0 u. (Agotado)';
+    const imgUrl = product.image_url || product.image || 'assets/logo.jpg';
     
     return `
-      <article class="gba-item-row" data-product-code="${escapeMapHtml(product.product_code || product.id)}">
-        <div class="gba-item-thumb">
-          ${product.image_url ? `<img src="${escapeMapHtml(product.image_url)}" alt="${escapeMapHtml(product.name || 'Producto')}">` : '<span class="gba-item-icon-ph">🌿</span>'}
+      <article class="wms-product-item-card" data-product-code="${escapeMapHtml(product.product_code || product.id)}">
+        <img src="${escapeMapHtml(imgUrl)}" alt="${escapeMapHtml(product.name || 'Producto')}" class="wms-product-thumb" onclick="openWmsLightbox('${escapeMapHtml(imgUrl)}', '${escapeMapHtml(product.name || 'Producto')}', 'Stock: ${stockLabel}')" title="Hacé clic para ampliar foto">
+        <div style="flex: 1; min-width: 0;">
+          <strong style="display: block; font-size: 0.88rem; color: var(--vendor-forest, #152d24); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeMapHtml(product.name || 'Producto sin nombre')}</strong>
+          <small style="color: #666; font-size: 0.76rem; display: block;">${escapeMapHtml(product.product_code || product.id || 'SKU')} · <span class="gba-stock-pill ${stockBadgeClass}">${stockLabel}</span>${exactPosition}</small>
         </div>
-        <div class="gba-item-info">
-          <strong>${escapeMapHtml(product.name || 'Producto sin nombre')}</strong>
-          <small>${escapeMapHtml(product.product_code || product.id || 'SIN CÓD')} · <span class="gba-stock-pill ${stockBadgeClass}">${stockLabel}</span>${exactPosition}</small>
-        </div>
-        <div style="display: flex; gap: 6px;">
-          <button type="button" class="gba-qr-btn" onclick="if (window.openEditProductLocation) window.openEditProductLocation('${escapeMapHtml(product.product_code || product.id)}'); else if (window.showToast) window.showToast('Asistente de ubicación no disponible.');" title="Reubicar o cambiar nivel en góndola">📍 Reubicar</button>
-          <button type="button" class="gba-qr-btn" onclick="openStockAdjustmentModal('${escapeMapHtml(product.product_code || product.id)}', 'add')" title="Ajustar Stock Físico">📦 Ajustar</button>
-          <button type="button" class="gba-qr-btn" onclick="printProductQrByCode('${escapeMapHtml(product.product_code || product.id)}')" aria-label="Imprimir Etiqueta QR">QR</button>
+        <div style="display: flex; gap: 4px;">
+          <button type="button" class="gba-qr-btn" onclick="if (window.openEditProductLocation) window.openEditProductLocation('${escapeMapHtml(product.product_code || product.id)}');" title="Reubicar">📍 Reubicar</button>
+          <button type="button" class="gba-qr-btn" onclick="printProductQrByCode('${escapeMapHtml(product.product_code || product.id)}')" title="Imprimir QR">QR</button>
         </div>
       </article>`;
   }).join('');
 }
 
-function renderSelectedShelfPanel() {
-  const shelf = storeShelves.find(item => item.code === selectedShelfCode)
-    || storeShelves.find(item => item.floor_level === selectedFloorLevel && !item.is_anchor)
-    || storeShelves.find(item => item.is_anchor);
-  if (!shelf) return '';
-  selectedShelfCode = shelf.code;
-
-  if (shelf.is_anchor) {
-    return `
-      <aside class="gba-inspector-side">
-        <section class="gba-dialog-box">
-          <div class="gba-dialog-banner">
-            <span class="gba-dialog-kicker">TERMINAL CENTRAL DE PLANTA</span>
-            <span class="gba-status-dot"></span>
-          </div>
-          <h3 class="gba-shelf-title">💻 TERMINAL DE CONTROL Y BRÚJULA</h3>
-          <p style="font-size: 0.84rem; color: rgba(246,243,232,0.8); line-height: 1.5; margin: 10px 0 14px 0;">
-            Este es el punto cardinal de referencia operativa. Todas las indicaciones de orientación se determinan situándose frente a esta terminal.
-          </p>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.8rem; color: #a5d6a7; margin-bottom: 14px;">
-            <div style="background: rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 8px; border-left: 3px solid #4caf50;">
-              ▲ <strong>Pared 1:</strong> Frente (Norte)
-            </div>
-            <div style="background: rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 8px; border-left: 3px solid #29b6f6;">
-              ▶ <strong>Pared 3:</strong> Lateral Derecho (Este)
-            </div>
-            <div style="background: rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 8px; border-left: 3px solid #fbc02d;">
-              ▼ <strong>Pared 2:</strong> Fondo / Ingreso (Sur)
-            </div>
-            <div style="background: rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 8px; border-left: 3px solid #ab47bc;">
-              ◀ <strong>Pared 4:</strong> Lateral Izquierdo (Oeste)
-            </div>
-          </div>
-          ${isEditMode ? `
-            <div style="margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">
-              <button type="button" class="gba-action-btn-gold" onclick="openAddShelfModal()" style="width: 100%;">➕ NUEVO MÓDULO</button>
-            </div>
-          ` : ''}
-        </section>
-      </aside>
-    `;
-  }
-
-  const allProducts = getShelfProducts(shelf.code);
-  const visibleProducts = getShelfProducts(shelf.code, selectedInternalLevel);
-  const unitCount = allProducts.reduce((sum, product) => sum + (Number(product.stock) || 0), 0);
-  
-  // 6 Niveles según el diagrama oficial (N1 abajo .. N6 arriba)
-  const levels = [1, 2, 3, 4, 5, 6].map(level => {
-    const lvlUnits = getShelfProducts(shelf.code, level).reduce((sum, item) => sum + (Number(item.stock) || 0), 0);
-    return `
-      <button type="button" class="gba-level-btn ${selectedInternalLevel === level ? 'active' : ''}" onclick="setInternalLevel(${level})">
-        <span class="gba-lvl-num">N${level}</span>
-        <small class="gba-lvl-qty">${lvlUnits}u</small>
-      </button>`;
-  }).join('');
-
+function renderWmsSectorsGrid() {
   return `
-    <aside class="gba-inspector-side">
-      <!-- Inspector Window Box -->
-      <section class="gba-dialog-box" aria-labelledby="map-selected-shelf-title">
-        <div class="gba-dialog-banner">
-          <span class="gba-dialog-kicker">INFORMACIÓN DEL MÓDULO</span>
-          <span class="gba-status-dot"></span>
-        </div>
-        <h3 id="map-selected-shelf-title" class="gba-shelf-title">${escapeMapHtml(shelf.code)} · ${escapeMapHtml(shelf.name)}</h3>
-        <div class="gba-dialog-meta">
-          <span>${escapeMapHtml(FLOOR_NAMES[shelf.floor_level])}</span> · 
-          <strong>${unitCount} UNIDADES EN TOTAL</strong>
-        </div>
+    <div class="wms-sectors-grid">
+      ${WMS_SECTOR_DEFS.map(sector => {
+        const customPhoto = getSectorCustomPhoto(sector.id);
+        const sectorProducts = getSectorProducts(sector.floor);
+        const totalStock = sectorProducts.reduce((sum, p) => sum + (Number(p.stock ?? p.on_hand) || 0), 0);
+        const skuCount = sectorProducts.length;
 
-        <div class="gba-photo-frame">
-          ${shelf.photo_url ? `<img src="${escapeMapHtml(shelf.photo_url)}" alt="Foto del estante ${escapeMapHtml(shelf.code)}">` : '<div class="gba-photo-empty"><span>📷 SIN FOTO DEL MUEBLE</span><small>Subí una foto para facilitar el reconocimiento visual.</small></div>'}
-        </div>
-
-        <div class="gba-photo-buttons">
-          <label class="gba-action-btn-green">
-            ${shelf.photo_url ? '🔄 CAMBIAR FOTO' : '📸 CARGAR FOTO'}
-            <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden onchange="handleShelfPhotoChange(event,'${escapeMapHtml(shelf.code)}')">
-          </label>
-          <button type="button" class="gba-action-btn-gold" onclick="showShelfDetailsModal('${escapeMapHtml(shelf.code)}')">📋 RESUMEN</button>
-        </div>
-
-        ${isEditMode ? `
-          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-            <button type="button" class="gba-action-btn-gold" onclick="openAddShelfModal()" style="flex:1;">➕ NUEVO MÓDULO</button>
-            <button type="button" class="gba-action-btn-green" onclick="deleteStoreShelf('${escapeMapHtml(shelf.code)}')" style="flex:1; background: #c62828; border-color: #ef5350;">🗑️ ELIMINAR</button>
+        return `
+          <div class="wms-sector-card">
+            <div class="wms-sector-banner" onclick="openWmsLightbox('${escapeMapHtml(customPhoto)}', '${escapeMapHtml(sector.name)}', '${skuCount} SKUs · ${totalStock} unidades')">
+              <img src="${escapeMapHtml(customPhoto)}" alt="${escapeMapHtml(sector.name)}">
+              <span class="wms-sector-zoom-badge">🔍 Ampliar Foto</span>
+              <label class="wms-sector-photo-btn" onclick="event.stopPropagation()">
+                📸 Cambiar
+                <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden onchange="handleSectorPhotoUpload(event, '${sector.id}')">
+              </label>
+            </div>
+            <div class="wms-sector-card-body">
+              <div>
+                <h3 class="wms-sector-card-title">${sector.icon} ${escapeMapHtml(sector.name)}</h3>
+                <p class="wms-sector-card-desc">${escapeMapHtml(sector.desc)}</p>
+              </div>
+              <div class="wms-sector-card-footer">
+                <span class="wms-sector-pill">📦 ${skuCount} SKUs · ${totalStock} u.</span>
+                <button type="button" class="wms-sector-action-btn" onclick="openWmsSectorView(${sector.floor})">
+                  Explorar Sector ➔
+                </button>
+              </div>
+            </div>
           </div>
-        ` : ''}
-
-        <div class="gba-levels-row">
-          <div class="gba-levels-label">ALTURA / BALDA (N1 = Abajo, N6 = Arriba):</div>
-          <div class="gba-levels-grid" style="grid-template-columns: repeat(6, 1fr);">${levels}</div>
-        </div>
-      </section>
-
-      <!-- Products in Selected Level Box -->
-      <section class="gba-bag-box" aria-labelledby="map-products-title">
-        <div class="gba-bag-header">
-          <span class="gba-bag-icon">📦</span>
-          <h3 id="map-products-title" class="gba-bag-title">PRODUCTOS EN ${escapeMapHtml(shelf.code)} · N${selectedInternalLevel}</h3>
-        </div>
-        <div class="gba-bag-list">${renderProductRows(visibleProducts)}</div>
-      </section>
-    </aside>`;
+        `;
+      }).join('')}
+    </div>
+  `;
 }
 
-function renderFloorTabs() {
-  return Object.entries(FLOOR_NAMES).map(([floor, name]) => {
-    const floorNum = Number(floor);
-    const active = floorNum === selectedFloorLevel;
-    const shortLabel = name.split('(')[0].trim();
-    return `<button type="button" class="gba-room-btn ${active ? 'active' : ''}" onclick="setFloorLevel(${floorNum})">${shortLabel}</button>`;
-  }).join('');
+function renderWmsSectorDetail() {
+  const sector = WMS_SECTOR_DEFS.find(s => s.floor === selectedFloorLevel) || WMS_SECTOR_DEFS[0];
+  const customPhoto = getSectorCustomPhoto(sector.id);
+  const sectorShelves = storeShelves.filter(s => s.floor_level === selectedFloorLevel && !s.is_anchor);
+  
+  // Si no hay estantes en la lista para este sector, agregamos las 4 paredes por defecto
+  const effectiveShelves = sectorShelves.length > 0 ? sectorShelves : [
+    { code: 'P1-E1', name: 'Pared 1 · Frente (Norte)', icon: '🪵', floor_level: selectedFloorLevel },
+    { code: 'P2-E1', name: 'Pared 2 · Fondo (Sur)', icon: '🪵', floor_level: selectedFloorLevel },
+    { code: 'P3-E1', name: 'Pared 3 · Lateral Derecho (Este)', icon: '🪵', floor_level: selectedFloorLevel },
+    { code: 'P4-E1', name: 'Pared 4 · Lateral Izquierdo (Oeste)', icon: '🪵', floor_level: selectedFloorLevel }
+  ];
+
+  const currentShelf = effectiveShelves.find(s => s.code === selectedShelfCode) || effectiveShelves[0];
+  selectedShelfCode = currentShelf.code;
+
+  return `
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+      
+      <!-- Top Navigation & Breadcrumb -->
+      <div class="wms-explorer-top-bar">
+        <div class="wms-breadcrumb-nav">
+          <button type="button" class="wms-breadcrumb-btn" onclick="backToWmsSectors()">
+            ⬅ Volver a los 6 Sectores
+          </button>
+          <span style="color: var(--vendor-gold, #c2a246); font-weight: 800;">${sector.icon} ${escapeMapHtml(sector.name)}</span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="gba-pad-btn" onclick="openAddShelfModal()" style="background: var(--vendor-forest, #152d24); border-color: var(--vendor-gold, #c2a246);">
+            ➕ Nuevo Módulo
+          </button>
+        </div>
+      </div>
+
+      <!-- Furniture / Walls Selection Grid -->
+      <div>
+        <h4 style="margin: 0 0 12px 0; color: var(--vendor-forest, #152d24); font-size: 1rem; font-weight: 800;">
+          🧱 Paredes y Módulos de Guardado en este Sector:
+        </h4>
+        <div class="wms-furniture-grid">
+          ${effectiveShelves.map(shelf => {
+            const count = getShelfUnitCount(shelf.code);
+            const isSelected = shelf.code === selectedShelfCode;
+
+            return `
+              <div class="wms-furniture-card ${isSelected ? 'active' : ''}" onclick="selectShelf('${escapeMapHtml(shelf.code)}')">
+                <div class="wms-furniture-card-header">
+                  <span class="wms-furniture-code">${escapeMapHtml(shelf.code)}</span>
+                  <span class="gba-stock-pill gba-badge-ok">${count} u.</span>
+                </div>
+                <strong style="color: var(--vendor-forest, #152d24); font-size: 0.95rem; display: block; margin-bottom: 6px;">${shelf.icon || '🗄️'} ${escapeMapHtml(shelf.name || shelf.code)}</strong>
+                <small style="color: #666; display: block;">${isSelected ? '👉 Nivel seleccionado abajo' : 'Tocá para ver baldas y productos'}</small>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Shelf Levels Accordion (Nivel 6 Tope down to Nivel 1 Piso) -->
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h4 style="margin: 0; color: var(--vendor-forest, #152d24); font-size: 1.05rem; font-weight: 800;">
+            🪜 Baldas y Altura de ${escapeMapHtml(currentShelf.name || currentShelf.code)} (N1 Piso a N6 Tope):
+          </h4>
+        </div>
+
+        <div class="wms-levels-container">
+          ${[6, 5, 4, 3, 2, 1].map(lvlNum => {
+            const lvlProducts = getShelfProducts(currentShelf.code, lvlNum);
+            const lvlUnits = lvlProducts.reduce((sum, p) => sum + (Number(p.stock ?? p.on_hand) || 0), 0);
+            const isSelectedLevel = lvlNum === selectedInternalLevel;
+
+            return `
+              <div class="wms-level-row">
+                <div class="wms-level-header" onclick="setInternalLevel(${lvlNum})" style="cursor: pointer;">
+                  <strong>
+                    <span>${lvlNum === 1 ? '🧱' : lvlNum === 6 ? '🔝' : '📦'}</span>
+                    ${LEVEL_NAMES[lvlNum]} · ${lvlProducts.length} productos (${lvlUnits} u.)
+                  </strong>
+                  <span style="font-size: 0.8rem; font-weight: 700; color: var(--vendor-forest, #152d24);">
+                    ${isSelectedLevel ? '▲ Desplegado' : '▼ Ver balda'}
+                  </span>
+                </div>
+                <div class="wms-level-body" ${isSelectedLevel ? '' : 'style="display: none;"'}>
+                  ${lvlProducts.length > 0 ? `
+                    <div class="wms-products-grid">
+                      ${renderProductRows(lvlProducts)}
+                    </div>
+                  ` : `
+                    <div class="wms-empty-slot-card">
+                      <span>🌿 Esta balda está libre y disponible para ubicar productos.</span>
+                      <button type="button" class="wms-empty-slot-btn" onclick="if(window.openLocationAssistant) window.openLocationAssistant();">
+                        ➕ Asignar Producto
+                      </button>
+                    </div>
+                  `}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+    </div>
+  `;
 }
 
 function renderMapHistoryHTML() {
@@ -922,7 +795,7 @@ function renderMapHistoryHTML() {
     <div class="gba-history-container">
       <div class="gba-history-header">
         <div>
-          <h3 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--color-accent-gold, #c2a246);">
+          <h3 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--vendor-gold, #c2a246);">
             📜 HISTORIAL DE AUDITORÍA Y CAMBIOS DEL PLANO
           </h3>
           <small style="color: rgba(246,243,232,0.7); font-size: 0.8rem;">Registro cronológico de creaciones, modificaciones y asignaciones de inventario</small>
@@ -968,7 +841,7 @@ function renderMapHistoryHTML() {
                     <td><strong>${escapeMapHtml(item.user)}</strong></td>
                     <td><span class="gba-history-badge ${badgeClass}">${escapeMapHtml(item.action_label || item.action)}</span></td>
                     <td>${escapeMapHtml(item.details)}</td>
-                    <td><strong style="color: var(--color-accent-gold, #c2a246);">${escapeMapHtml(item.shelf_code || '-')}</strong></td>
+                    <td><strong style="color: var(--vendor-gold, #c2a246);">${escapeMapHtml(item.shelf_code || '-')}</strong></td>
                     <td>${escapeMapHtml(sectorLabel)}</td>
                   </tr>
                 `;
@@ -1039,151 +912,68 @@ function renderAddShelfModalHTML() {
 
 function renderStoreMapHTML(activeZone = null, activeShelf = null, targetLevel = null) {
   if (activeShelf) {
-    const shelf = storeShelves.find(item => item.code === activeShelf)
-      || storeShelves.find(item => String(item.code).toUpperCase() === String(activeShelf).toUpperCase());
-    if (shelf) {
-      selectedShelfCode = shelf.code;
-      selectedFloorLevel = shelf.floor_level;
-    }
+    selectedShelfCode = normalizeShelfCode(activeShelf);
+    currentWmsView = 'sector_detail';
   }
   if (targetLevel) selectedInternalLevel = Number(targetLevel);
-  const floorShelfCount = storeShelves.filter(item => item.floor_level === selectedFloorLevel && !item.is_anchor).length;
-  const totalUnits = storeLocationProducts.reduce((sum, item) => sum + Math.max(0, Number(item.stock) || 0), 0);
-  const currentRoomName = FLOOR_NAMES[selectedFloorLevel] || 'SALÓN TIENDA';
+
+  const totalProducts = Array.isArray(storeLocationProducts) && storeLocationProducts.length > 0
+    ? storeLocationProducts
+    : (typeof window !== 'undefined' && Array.isArray(window.internalCatalogProducts) ? window.internalCatalogProducts : []);
+  const totalUnits = totalProducts.reduce((sum, p) => sum + (Number(p.stock ?? p.on_hand) || 0), 0);
 
   return `
-    <div class="gba-map-shell">
+    <div class="wms-explorer-container">
       
-      <!-- Top Status Header -->
-      <div class="gba-screen-topbar">
-        <div class="gba-topbar-left">
-          <span class="gba-led-light"></span>
-          <span class="gba-title-logo">BÔ GROW CLUB · CONTROL DE PLANTA WMS</span>
-          <span class="gba-version-tag">CAD VIRTUAL</span>
+      <!-- Top Switcher & Stats Header -->
+      <div class="gba-room-selector" style="margin-bottom: 0;">
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <button type="button" class="gba-room-btn ${currentWmsView === 'sectors' || currentWmsView === 'sector_detail' ? 'active' : ''}" onclick="setMapTab('interactive')">
+            🧭 EXPLORADOR DE SECTORES (${WMS_SECTOR_DEFS.length})
+          </button>
+          <button type="button" class="gba-room-btn ${currentWmsView === 'history' ? 'active' : ''}" onclick="setMapTab('history')">
+            📜 AUDITORÍA E HISTORIAL
+          </button>
+          <button type="button" class="gba-room-btn ${currentWmsView === 'infography' ? 'active' : ''}" onclick="setMapTab('infography')">
+            📐 GUÍA DE PLANTA
+          </button>
         </div>
-        <div class="gba-topbar-right">
-          <span class="gba-battery-tag">🧭 TERMINAL AL CENTRO</span>
-          <span class="gba-sync-tag">${escapeMapHtml(storeMapSyncLabel)}</span>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 0.78rem; color: #a5d6a7; font-weight: 800; letter-spacing: 0.5px;">● ${escapeMapHtml(storeMapSyncLabel)}</span>
+          <span style="font-size: 0.78rem; background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 8px; color: #fff;">${totalUnits} unidades totales</span>
         </div>
       </div>
 
-      <!-- Navigation & Controls Header -->
-      <div class="gba-map-toolbar">
-        <div class="gba-room-tabs">
-          ${renderFloorTabs()}
-          <button type="button" class="gba-room-btn ${activeMapTab === 'interactive' ? 'active' : ''}" onclick="setMapTab('interactive')">
-            🗺️ PLANO INTERACTIVO
-          </button>
-          <button type="button" class="gba-room-btn ${activeMapTab === 'illustration' ? 'active' : ''}" onclick="setMapTab('illustration')">
-            🖼️ INFOGRAFÍA OFICIAL
-          </button>
-          <button type="button" class="gba-room-btn ${activeMapTab === 'history' ? 'active' : ''}" onclick="setMapTab('history')">
-            📜 HISTORIAL DE AUDITORÍA
-          </button>
-        </div>
-        <div class="gba-hardware-buttons">
-          <button type="button" class="gba-pad-btn ${isEditMode ? 'active' : ''}" onclick="toggleStoreLayoutEditMode()">${isEditMode ? '💾 GUARDAR PLANO' : '🛠️ EDITAR PLANO'}</button>
-          ${isEditMode ? `
-            <button type="button" class="gba-pad-btn" onclick="openAddShelfModal()" style="background: #2e7d32; color: #fff; border-color: #81c784;">➕ NUEVO MÓDULO</button>
-            <button type="button" class="gba-pad-btn" onclick="clearAllStoreShelves()" style="background: #b71c1c; color: #fff; border-color: #ef5350;">🧹 VACIAR PLANO</button>
-          ` : ''}
-          <button type="button" class="gba-pad-btn ${currentViewMode === '2D' ? 'active' : ''}" onclick="setViewMode('2D')">2D</button>
-          <button type="button" class="gba-pad-btn ${currentViewMode === '3D' ? 'active' : ''}" onclick="setViewMode('3D')">3D</button>
-          <button type="button" class="gba-pad-btn" onclick="adjustZoom(-10)" aria-label="Alejar">🔍−</button>
-          <button type="button" class="gba-pad-btn" onclick="adjustZoom(10)" aria-label="Acercar">🔍+</button>
-        </div>
-      </div>
-
-      ${isEditMode ? `
-        <div class="gba-edit-hint-bar">
-          <span>🛠️ ${movingShelfId ? `👉 Tocá en el plano dónde querés ubicar el módulo seleccionado.` : `Modo Edición activo: tocá un módulo y luego tocá en el plano para moverlo de lugar.`}</span>
-          ${movingShelfId ? `<button type="button" onclick="movingShelfId=null;rerenderStoreMap();" style="background:rgba(0,0,0,0.4);border:1px solid #ffd54f;color:#ffd54f;border-radius:6px;padding:2px 8px;font-size:0.72rem;cursor:pointer;">Cancelar</button>` : ''}
-        </div>
-      ` : ''}
-
-      ${activeMapTab === 'history' ? renderMapHistoryHTML() : activeMapTab === 'illustration' ? `
-        <!-- Vista Ilustrada / Infografía Oficial del Local -->
-        <div style="background: #0f2318; border: 2px solid #2e6b4d; border-radius: 16px; padding: 20px; margin: 12px 0; text-align: center;">
-          <h3 style="color: var(--color-accent-gold, #c2a246); font-size: 1rem; font-weight: 800; margin: 0 0 14px 0;">
-            🧭 SISTEMA DE UBICACIÓN — TERMINAL AL CENTRO COMO BRÚJULA
+      <!-- Main View Content -->
+      ${currentWmsView === 'history' ? renderMapHistoryHTML() : currentWmsView === 'infography' ? `
+        <div style="background: #0f2318; border: 2px solid #2e6b4d; border-radius: 16px; padding: 20px; text-align: center;">
+          <h3 style="color: var(--vendor-gold, #c2a246); font-size: 1rem; font-weight: 800; margin: 0 0 14px 0;">
+            🧭 GUÍA ARQUITECTÓNICA DEL LOCAL (TERMINAL CENTRAL COMO BRÚJULA)
           </h3>
-          <div style="max-width: 860px; margin: 0 auto; border: 2px solid #c2a246; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 32px rgba(0,0,0,0.6);">
-            <img src="assets/store-shelf-map-gba.jpg" alt="Mapa Isométrico con PC Central y Estanterías Pared 1 a 4" style="width: 100%; height: auto; display: block;">
-          </div>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 16px; text-align: left; font-size: 0.85rem; color: #e8f5e9;">
-            <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 10px; border-left: 4px solid #4caf50;">
-              <strong>▲ Frente (Norte):</strong> Pared 1 con vitrinas y estantes principales.
-            </div>
-            <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 10px; border-left: 4px solid #29b6f6;">
-              <strong>▶ Derecha (Este):</strong> Pared 3 con estanterías laterales.
-            </div>
-            <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 10px; border-left: 4px solid #fbc02d;">
-              <strong>▼ Fondo (Sur):</strong> Pared 2 / Zona de ingreso y pallets.
-            </div>
-            <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 10px; border-left: 4px solid #ab47bc;">
-              <strong>◀ Izquierda (Oeste):</strong> Pared 4 con estanterías laterales.
-            </div>
+          <div style="max-width: 860px; margin: 0 auto; border: 2px solid var(--vendor-gold, #c2a246); border-radius: 16px; overflow: hidden; box-shadow: 0 12px 32px rgba(0,0,0,0.6); cursor: pointer;" onclick="openWmsLightbox('assets/store-shelf-map-gba.jpg', 'Guía Arquitectónica del Local', 'Terminal central como brújula')">
+            <img src="assets/store-shelf-map-gba.jpg" alt="Mapa del Local" style="width: 100%; height: auto; display: block;">
           </div>
         </div>
-      ` : `
-        <!-- Main Layout: Modern Architectural Canvas + Inspector -->
-        <div class="gba-main-grid">
-          <div class="gba-screen-viewport">
-            
-            <div id="architectural-map-canvas" class="gba-pokemart-canvas ${isEditMode ? 'edit-active' : ''}" style="transform:${getCanvasTransform()}" onclick="handleCanvasTapToMove(event)">
-              
-              <!-- Wall Perimeter Orientation Labels -->
-              <div class="gba-wall-banner gba-wall-north">PARED 1 · FRENTE (NORTE)</div>
-              <div class="gba-wall-banner gba-wall-south">PARED 2 · FONDO (SUR)</div>
-              <div class="gba-wall-banner gba-wall-east">PARED 3 · DERECHA (ESTE)</div>
-              <div class="gba-wall-banner gba-wall-west">PARED 4 · IZQUIERDA (OESTE)</div>
-
-              <!-- Architectural Grid Floor -->
-              <div class="gba-floor-grid ${selectedFloorLevel === 2 ? 'gba-floor-warehouse' : 'gba-floor-wood'}"></div>
-
-              <!-- Shelf & Compass Anchor Blocks -->
-              ${renderShelfBlocks()}
-            </div>
-          </div>
-
-          <!-- Right Side: Architectural Inspector & Item List -->
-          ${renderSelectedShelfPanel()}
-        </div>
-      `}
-
-      <!-- Bottom Status Bar -->
-      <div class="gba-bottom-hud">
-        <div class="gba-hud-stat">
-          <span>SALA SELECCIONADA:</span>
-          <strong>${escapeMapHtml(currentRoomName)}</strong>
-        </div>
-        <div class="gba-hud-stat">
-          <span>MÓDULOS ACTIVOS:</span>
-          <strong>${floorShelfCount} MÓDULOS</strong>
-        </div>
-        <div class="gba-hud-stat">
-          <span>INVENTARIO TOTAL:</span>
-          <strong>${totalUnits} UNIDADES</strong>
-        </div>
-      </div>
+      ` : currentWmsView === 'sector_detail' ? renderWmsSectorDetail() : renderWmsSectorsGrid()}
 
       <!-- Add Shelf Modal -->
       ${renderAddShelfModalHTML()}
 
-    </div>`;
+    </div>
+  `;
+}
+
+function rerenderStoreMap() {
+  const container = document.getElementById('store-map-render-container');
+  if (container) container.innerHTML = renderStoreMapHTML();
 }
 
 window.renderStoreMapHTML = renderStoreMapHTML;
 window.setStoreMapData = setStoreMapData;
 window.findStoreMapProduct = findStoreMapProduct;
 window.focusStoreMapProduct = focusStoreMapProduct;
-window.toggleStoreLayoutEditMode = toggleStoreLayoutEditMode;
-window.moveStoreItem = moveStoreItem;
-window.handleCanvasTapToMove = handleCanvasTapToMove;
-window.handleShelfClickInEditMode = handleShelfClickInEditMode;
 window.deleteStoreShelf = deleteStoreShelf;
 window.addNewStoreShelf = addNewStoreShelf;
-window.clearAllStoreShelves = clearAllStoreShelves;
 window.openAddShelfModal = openAddShelfModal;
 window.closeAddShelfModal = closeAddShelfModal;
 window.getMapHistory = getMapHistory;
@@ -1194,13 +984,15 @@ window.ensureShelfExistsForLocation = ensureShelfExistsForLocation;
 window.setFloorLevel = setFloorLevel;
 window.selectShelf = selectShelf;
 window.setInternalLevel = setInternalLevel;
-window.setViewMode = setViewMode;
-window.adjustZoom = adjustZoom;
-window.showShelfDetailsModal = showShelfDetailsModal;
 window.setMapTab = setMapTab;
 window.parseLocationCode = parseLocationCode;
 window.formatLocationVoiceText = formatLocationVoiceText;
 window.generateDetailedVoicePhrase = generateDetailedVoicePhrase;
 window.speakLocationVoicePhrase = speakLocationVoicePhrase;
+window.openWmsLightbox = openWmsLightbox;
+window.closeWmsLightbox = closeWmsLightbox;
+window.openWmsSectorView = openWmsSectorView;
+window.backToWmsSectors = backToWmsSectors;
 window.storeLocationProducts = storeLocationProducts;
 window.storeShelves = storeShelves;
+window.WMS_SECTOR_DEFS = WMS_SECTOR_DEFS;

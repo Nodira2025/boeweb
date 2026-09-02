@@ -3559,3 +3559,415 @@
     font-size: 0.95rem;
   }
 }
+
+/* ==========================================================================
+   WMS HIERARCHICAL EXPLORER & LIGHTBOX (NUEVO VISOR DE SECTORES Y MUEBLES)
+   ========================================================================== */
+
+.wms-explorer-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin: 16px 0 32px 0;
+}
+
+.wms-explorer-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: rgba(21, 45, 36, 0.96);
+  border: 1.5px solid var(--vendor-gold, #c2a246);
+  border-radius: 16px;
+  padding: 14px 20px;
+  color: #fff;
+}
+
+.wms-breadcrumb-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.wms-breadcrumb-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(194, 162, 70, 0.4);
+  color: #fff;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.wms-breadcrumb-btn:hover {
+  background: var(--vendor-gold, #c2a246);
+  color: #152d24;
+}
+
+/* Grid de Sectores (Nivel 1) */
+.wms-sectors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.wms-sector-card {
+  background: #ffffff;
+  border: 1.5px solid rgba(194, 162, 70, 0.35);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(21, 45, 36, 0.08);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.wms-sector-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 34px rgba(21, 45, 36, 0.16);
+  border-color: var(--vendor-forest, #152d24);
+}
+
+.wms-sector-banner {
+  position: relative;
+  height: 160px;
+  background: #152d24;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.wms-sector-banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.wms-sector-card:hover .wms-sector-banner img {
+  transform: scale(1.04);
+}
+
+.wms-sector-zoom-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.wms-sector-photo-btn {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(21, 45, 36, 0.88);
+  border: 1px solid var(--vendor-gold, #c2a246);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wms-sector-card-body {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: space-between;
+}
+
+.wms-sector-card-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--vendor-forest, #152d24);
+  margin: 0 0 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wms-sector-card-desc {
+  font-size: 0.84rem;
+  color: #555;
+  margin: 0 0 14px 0;
+  line-height: 1.4;
+}
+
+.wms-sector-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.wms-sector-pill {
+  background: rgba(21, 45, 36, 0.08);
+  color: var(--vendor-forest, #152d24);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.wms-sector-action-btn {
+  background: var(--vendor-forest, #152d24);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.2s ease;
+}
+
+.wms-sector-action-btn:hover {
+  background: #255242;
+}
+
+/* Grid de Muebles / Paredes (Nivel 2) */
+.wms-furniture-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.wms-furniture-card {
+  background: #ffffff;
+  border: 1.5px solid rgba(194, 162, 70, 0.3);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.wms-furniture-card:hover,
+.wms-furniture-card.active {
+  border-color: var(--vendor-forest, #152d24);
+  box-shadow: 0 8px 20px rgba(21, 45, 36, 0.12);
+  background: #fcfbf7;
+}
+
+.wms-furniture-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.wms-furniture-code {
+  font-family: monospace;
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: var(--vendor-forest, #152d24);
+  background: rgba(21, 45, 36, 0.08);
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+/* Acordeón de Baldas y Niveles (Nivel 3) */
+.wms-levels-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.wms-level-row {
+  background: #ffffff;
+  border: 1.5px solid rgba(194, 162, 70, 0.3);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+
+.wms-level-header {
+  background: #f7f4ea;
+  padding: 12px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(194, 162, 70, 0.2);
+}
+
+.wms-level-header strong {
+  color: var(--vendor-forest, #152d24);
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wms-level-body {
+  padding: 16px;
+}
+
+.wms-products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.wms-product-item-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #faf8f2;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 12px;
+  padding: 10px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.wms-product-item-card:hover {
+  background: #fff;
+  border-color: var(--vendor-gold, #c2a246);
+}
+
+.wms-product-thumb {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #eee;
+  cursor: pointer;
+  border: 1px solid rgba(0,0,0,0.1);
+  transition: transform 0.2s ease;
+}
+
+.wms-product-thumb:hover {
+  transform: scale(1.08);
+}
+
+.wms-empty-slot-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: rgba(194, 162, 70, 0.08);
+  border: 1.5px dashed rgba(194, 162, 70, 0.5);
+  border-radius: 12px;
+  color: #6d5119;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.wms-empty-slot-btn {
+  background: var(--vendor-forest, #152d24);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* Lightbox Modal de Pantalla Completa */
+.wms-lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99999999;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: wmsFadeIn 0.2s ease forwards;
+}
+
+.wms-lightbox-content {
+  position: relative;
+  max-width: 900px;
+  width: 100%;
+  max-height: 90vh;
+  background: #152d24;
+  border: 2px solid var(--vendor-gold, #c2a246);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+}
+
+.wms-lightbox-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-size: 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: background 0.2s ease;
+}
+
+.wms-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.wms-lightbox-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(194, 162, 70, 0.3);
+  padding-right: 60px;
+}
+
+.wms-lightbox-img-wrapper {
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0b1813;
+  overflow: auto;
+  max-height: calc(90vh - 80px);
+}
+
+.wms-lightbox-img {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+@keyframes wmsFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
