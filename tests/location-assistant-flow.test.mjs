@@ -164,5 +164,9 @@ test('Location Assistant: Selección masiva, reubicación y edición posterior d
   // 3. Botón Reubicar en el Plano del Local
   assert.match(mapCode, /openEditProductLocation/);
   assert.match(mapCode, /📍 Reubicar/);
+
+  // 4. Fetch de pendientes
+  assert.match(code, /function fetchPendingLocationProducts/);
+  assert.match(code, /function refreshPendingLocationBadge/);
 });
 

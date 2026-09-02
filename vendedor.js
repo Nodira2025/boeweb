@@ -5547,6 +5547,32 @@ function updatePendingLocationIndicators(count) {
   if (quickCopy) quickCopy.textContent = count ? `${count} producto${count === 1 ? '' : 's'} esperando ubicación` : 'No hay productos pendientes';
 }
 
+async function fetchPendingLocationProducts() {
+  if (!supabaseClient) return [];
+  const context = await ensureVendorOperationalSession();
+  if (!context) return [];
+  const { data, error } = await supabaseClient
+    .from('catalog_product_drafts_v2')
+    .select('*')
+    .eq('tenant_id', context.tenantId)
+    .eq('status', 'PENDING_LOCATION')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`No se pudo consultar la cola de ubicación: ${error.message}`);
+  return (data || []).map(hydrateProductDraft);
+}
+
+async function refreshPendingLocationBadge() {
+  try {
+    const products = await fetchPendingLocationProducts();
+    updatePendingLocationIndicators(products.length);
+  } catch (error) {
+    console.warn('No se pudo actualizar el contador de ubicación:', error.message);
+  }
+}
+
+window.fetchPendingLocationProducts = fetchPendingLocationProducts;
+window.refreshPendingLocationBadge = refreshPendingLocationBadge;
+
 function togglePendingLocationSelection(draftId, isChecked) {
   const idStr = String(draftId);
   if (isChecked) {
