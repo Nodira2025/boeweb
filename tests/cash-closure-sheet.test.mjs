@@ -185,3 +185,18 @@ test('5. El cliente envía el arqueo a v3 y rechaza un desglose inconsistente', 
   );
   assert.equal(calls.length, 1, 'un desglose inválido no debe llegar al servidor');
 });
+
+test('6. Migración 019: Excepción de auto-revisión de arqueo para ADMIN preservando Four-Eyes para el resto', () => {
+  const migration019Path = path.join(process.cwd(), 'scripts', 'migrations', '019_admin_cash_self_review.sql');
+  assert.ok(fs.existsSync(migration019Path), 'La migración 019 debe existir físicamente');
+
+  const sql = fs.readFileSync(migration019Path, 'utf8');
+  assert.match(sql, /CREATE OR REPLACE FUNCTION public\.review_cash_closure_v2/);
+  assert.match(sql, /v_closure\.closed_by = v_actor AND NOT v_is_admin/);
+  assert.match(sql, /operational_has_tenant_role\(p_tenant_id, ARRAY\['ADMIN'\]::TEXT\[\]\)/);
+  assert.match(sql, /is_superadmin\(\)/);
+  assert.match(sql, /Auto-aprobado por Administrador titular/);
+  assert.match(sql, /schema_migrations/);
+  assert.match(sql, /'019'/);
+});
+
