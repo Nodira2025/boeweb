@@ -1,0 +1,533 @@
+﻿/* ==========================================================================
+   BÔ GROW CLUB — REPROCAM: CATÁLOGO Y TERMINAL DE CAJA INDEPENDIENTE
+   Mobile-First · Forest #152D24 · Gold #C2A246 · Cream #F7F6F2
+   ========================================================================== */
+
+:root {
+  --rc-bg: #0d1e18;
+  --rc-surface: #152d24;
+  --rc-card: #1b382d;
+  --rc-card-border: rgba(194, 162, 70, 0.25);
+  --rc-gold: #c2a246;
+  --rc-gold-glow: rgba(194, 162, 70, 0.15);
+  --rc-cream: #f7f6f2;
+  --rc-muted: #a2b49f;
+  --rc-danger: #e57373;
+  --rc-success: #81c784;
+  --font-serif: "Cinzel", "Playfair Display", Georgia, serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: var(--rc-bg);
+  color: var(--rc-cream);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header & Top Bar */
+.rc-header {
+  background: var(--rc-surface);
+  border-bottom: 1.5px solid var(--rc-gold);
+  padding: 12px 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.rc-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.rc-brand-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1.5px solid var(--rc-gold);
+  object-fit: cover;
+}
+
+.rc-brand-title {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--rc-cream);
+  letter-spacing: 0.5px;
+}
+
+.rc-brand-subtitle {
+  font-size: 0.72rem;
+  color: var(--rc-gold);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: block;
+}
+
+.rc-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rc-btn-back {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--rc-card-border);
+  color: var(--rc-cream);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  transition: all 0.2s ease;
+}
+
+.rc-btn-back:hover {
+  background: rgba(194, 162, 70, 0.15);
+  border-color: var(--rc-gold);
+}
+
+/* Nav Tabs */
+.rc-tabs-bar {
+  display: flex;
+  background: var(--rc-surface);
+  border-bottom: 1px solid var(--rc-card-border);
+  padding: 4px 8px;
+  gap: 6px;
+}
+
+.rc-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--rc-muted);
+  padding: 12px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  transition: all 0.2s ease;
+}
+
+.rc-tab-btn.is-active {
+  background: var(--rc-card);
+  color: var(--rc-gold);
+  border: 1px solid var(--rc-gold);
+  box-shadow: 0 2px 10px var(--rc-gold-glow);
+}
+
+/* Container */
+.rc-container {
+  flex: 1;
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* Sections */
+.rc-section {
+  display: none;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rc-section.is-active {
+  display: flex;
+}
+
+/* Cards */
+.rc-card {
+  background: var(--rc-card);
+  border: 1.5px solid var(--rc-card-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.rc-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  border-bottom: 1px solid rgba(194, 162, 70, 0.15);
+  padding-bottom: 8px;
+}
+
+.rc-card-title {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  color: var(--rc-gold);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Forms */
+.rc-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 600px) {
+  .rc-form-grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.rc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rc-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--rc-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rc-input {
+  background: #0d1e18;
+  border: 1.5px solid var(--rc-card-border);
+  border-radius: var(--radius-sm);
+  color: var(--rc-cream);
+  font-size: 1rem;
+  padding: 10px 14px;
+  min-height: 48px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.rc-input:focus {
+  border-color: var(--rc-gold);
+  box-shadow: 0 0 0 3px rgba(194, 162, 70, 0.2);
+}
+
+/* Unit Selector Toggle */
+.rc-unit-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  background: #0d1e18;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--rc-card-border);
+}
+
+.rc-unit-btn {
+  background: transparent;
+  border: none;
+  color: var(--rc-muted);
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  min-height: 44px;
+  transition: all 0.2s ease;
+}
+
+.rc-unit-btn.is-active {
+  background: var(--rc-gold);
+  color: var(--rc-surface);
+  box-shadow: 0 2px 8px rgba(194, 162, 70, 0.4);
+}
+
+/* Action Buttons */
+.rc-btn-primary {
+  background: linear-gradient(135deg, #c2a246 0%, #9a7d2e 100%);
+  color: #0d1e18;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 12px 20px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(194, 162, 70, 0.3);
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.rc-btn-primary:active {
+  transform: scale(0.98);
+}
+
+.rc-btn-success {
+  background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+  color: #fff;
+  border: 1px solid #81c784;
+  border-radius: var(--radius-sm);
+  padding: 14px 20px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  cursor: pointer;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(46, 125, 50, 0.3);
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.rc-btn-success:active {
+  transform: scale(0.98);
+}
+
+/* Product Cards Grid */
+.rc-products-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 600px) {
+  .rc-products-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.rc-prod-card {
+  background: var(--rc-surface);
+  border: 1.5px solid var(--rc-card-border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.rc-prod-card:hover {
+  border-color: var(--rc-gold);
+}
+
+.rc-prod-card.is-selected {
+  border-color: var(--rc-gold);
+  background: rgba(194, 162, 70, 0.1);
+  box-shadow: 0 0 0 2px var(--rc-gold);
+}
+
+.rc-prod-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.rc-prod-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--rc-cream);
+  line-height: 1.3;
+}
+
+.rc-badge-unit {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 4px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rc-badge-unit.is-gram {
+  background: rgba(129, 199, 132, 0.15);
+  color: var(--rc-success);
+  border: 1px solid var(--rc-success);
+}
+
+.rc-badge-unit.is-unit {
+  background: rgba(194, 162, 70, 0.15);
+  color: var(--rc-gold);
+  border: 1px solid var(--rc-gold);
+}
+
+.rc-prod-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 4px;
+}
+
+.rc-prod-price {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--rc-gold);
+}
+
+.rc-prod-stock {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--rc-muted);
+}
+
+.rc-prod-stock strong {
+  color: var(--rc-cream);
+}
+
+/* POS Terminal Layout */
+.rc-pos-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .rc-pos-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: flex-start;
+  }
+}
+
+/* Scale & Weight Calculator Box */
+.rc-scale-box {
+  background: #0b1813;
+  border: 2px solid var(--rc-gold);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.6);
+}
+
+.rc-scale-screen {
+  background: #050d0a;
+  border: 1px solid rgba(194, 162, 70, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rc-scale-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--rc-muted);
+  text-transform: uppercase;
+}
+
+.rc-scale-display {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #a5d6a7;
+  letter-spacing: 1px;
+}
+
+/* Quick Gram Buttons */
+.rc-quick-grams {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.rc-quick-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--rc-card-border);
+  color: var(--rc-cream);
+  padding: 10px 4px;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  min-height: 44px;
+  transition: all 0.2s ease;
+}
+
+.rc-quick-btn:hover,
+.rc-quick-btn:active {
+  background: var(--rc-gold);
+  color: var(--rc-surface);
+}
+
+/* Cash Status Bar */
+.rc-cash-status {
+  background: var(--rc-surface);
+  border: 1.5px solid var(--rc-gold);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rc-cash-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--rc-gold);
+}
+
+.rc-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--rc-surface);
+  color: var(--rc-cream);
+  border: 1.5px solid var(--rc-gold);
+  border-radius: var(--radius-md);
+  padding: 12px 20px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  z-index: 999999;
+  display: none;
+  animation: rcToastIn 0.3s ease;
+  max-width: 90vw;
+  text-align: center;
+}
+
+@keyframes rcToastIn {
+  from { opacity: 0; transform: translate(-50%, 15px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}

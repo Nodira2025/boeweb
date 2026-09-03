@@ -1,0 +1,235 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Reprocam · Catálogo & Caja Independiente | BÔ Grow Club</title>
+  <meta name="description" content="Gestión ágil de catálogo especializado por gramos/unidades y terminal de caja independiente para Reprocam.">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="reprocam.css?v=rc_v1">
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header class="rc-header">
+    <a href="vendedor.html" class="rc-brand">
+      <img src="assets/logo.jpg" alt="BÔ Grow Club" class="rc-brand-logo" onerror="this.src='logo.jpg'">
+      <div>
+        <h1 class="rc-brand-title">BÔ REPROCAM</h1>
+        <span class="rc-brand-subtitle">Catálogo & Caja Exclusiva</span>
+      </div>
+    </a>
+    <div class="rc-header-actions">
+      <a href="vendedor.html" class="rc-btn-back" title="Volver al Portal Vendedor General">
+        ‹ Volver al POS
+      </a>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav class="rc-tabs-bar" role="tablist">
+    <button type="button" class="rc-tab-btn is-active" id="tab-btn-catalog" onclick="switchRcTab('catalog')" role="tab" aria-selected="true">
+      📦 Catálogo & Stock
+    </button>
+    <button type="button" class="rc-tab-btn" id="tab-btn-cash" onclick="switchRcTab('cash')" role="tab" aria-selected="false">
+      💰 Caja Reprocam
+    </button>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="rc-container">
+
+    <!-- ================= SECCIÓN 1: CATÁLOGO Y STOCK ================= -->
+    <section id="section-catalog" class="rc-section is-active">
+      
+      <!-- Alta Rápida de Producto -->
+      <article class="rc-card">
+        <header class="rc-card-header">
+          <h2 class="rc-card-title">🌱 Alta Rápida Reprocam</h2>
+        </header>
+        <form id="rc-add-product-form" onsubmit="handleRcAddProduct(event)">
+          <div class="rc-form-grid">
+            
+            <div class="rc-field">
+              <label for="rc-prod-name" class="rc-label">Nombre del producto</label>
+              <input type="text" id="rc-prod-name" class="rc-input" placeholder="Ej: Gorilla Glue BÔ / Semilla Amnesia suelta" required autocomplete="off">
+            </div>
+
+            <div class="rc-field">
+              <label class="rc-label">Tipo de Producto</label>
+              <div class="rc-unit-toggle">
+                <button type="button" class="rc-unit-btn is-active" id="rc-btn-unit-gram" onclick="setRcUnit('g')">
+                  ⚖️ Pesable (Gramos)
+                </button>
+                <button type="button" class="rc-unit-btn" id="rc-btn-unit-unit" onclick="setRcUnit('u')">
+                  📦 Fraccionado (Unidad)
+                </button>
+              </div>
+            </div>
+
+            <div class="rc-form-grid rc-form-grid-2">
+              <div class="rc-field">
+                <label for="rc-prod-price" class="rc-label" id="rc-price-label">Precio por Gramo ($)</label>
+                <input type="number" id="rc-prod-price" class="rc-input" placeholder="Ej: 4500" step="0.01" min="0" required>
+              </div>
+              <div class="rc-field">
+                <label for="rc-prod-stock" class="rc-label" id="rc-stock-label">Stock Total Disponible (Gramos)</label>
+                <input type="number" id="rc-prod-stock" class="rc-input" placeholder="Ej: 50.5" step="0.001" min="0" required>
+              </div>
+            </div>
+
+            <button type="submit" class="rc-btn-primary" id="rc-submit-prod-btn">
+              + Guardar en Reprocam
+            </button>
+          </div>
+        </form>
+      </article>
+
+      <!-- Inventario en Vivo -->
+      <article class="rc-card">
+        <header class="rc-card-header">
+          <h2 class="rc-card-title">📋 Stock Reprocam Disponible</h2>
+          <input type="text" id="rc-search-input" class="rc-input" placeholder="🔍 Buscar producto..." style="max-width: 200px; min-height: 40px; font-size: 0.88rem;" oninput="handleRcSearch(this.value)">
+        </header>
+
+        <div id="rc-products-container" class="rc-products-grid">
+          <!-- Cargado dinámicamente -->
+          <div style="text-align: center; color: var(--rc-muted); padding: 24px; grid-column: 1 / -1;">
+            ⌛ Cargando inventario de Reprocam…
+          </div>
+        </div>
+      </article>
+
+    </section>
+
+    <!-- ================= SECCIÓN 2: CAJA REPROCAM ================= -->
+    <section id="section-cash" class="rc-section">
+      
+      <!-- Estado de la Caja Reprocam -->
+      <div class="rc-cash-status">
+        <div>
+          <span style="font-size: 0.75rem; color: var(--rc-muted); text-transform: uppercase; font-weight: 800; display: block;">Terminal Registradora</span>
+          <strong style="font-size: 1.15rem; color: var(--rc-cream);">Caja Reprocam</strong>
+        </div>
+        <div id="rc-session-badge" class="rc-cash-badge">
+          🟢 Turno Abierto
+        </div>
+      </div>
+
+      <div class="rc-pos-layout">
+        
+        <!-- Mostrador de Pesaje / Venta -->
+        <article class="rc-card">
+          <header class="rc-card-header">
+            <h2 class="rc-card-title">⚖️ Mostrador de Venta</h2>
+          </header>
+
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            
+            <div class="rc-field">
+              <label for="rc-pos-product-select" class="rc-label">Producto Seleccionado</label>
+              <select id="rc-pos-product-select" class="rc-input" onchange="handleRcProductSelected()">
+                <option value="">-- Seleccioná un producto --</option>
+              </select>
+            </div>
+
+            <!-- Balanza Digital / Pantalla de Pesaje -->
+            <div class="rc-scale-box">
+              <div class="rc-scale-screen">
+                <span class="rc-scale-label" id="rc-scale-unit-label">PESO / CANTIDAD:</span>
+                <span class="rc-scale-display" id="rc-scale-value">0.000 g</span>
+              </div>
+
+              <div class="rc-field">
+                <input type="number" id="rc-pos-qty-input" class="rc-input" placeholder="Ingresá la cantidad o gramos" step="0.001" min="0.001" style="font-size: 1.3rem; text-align: center; font-weight: 800;" oninput="updateRcPosCalculation()">
+              </div>
+
+              <!-- Botones Rápidos para Balanza -->
+              <div class="rc-quick-grams" id="rc-quick-grams-panel">
+                <button type="button" class="rc-quick-btn" onclick="setRcQuickGrams(1)">1g</button>
+                <button type="button" class="rc-quick-btn" onclick="setRcQuickGrams(3.5)">3.5g</button>
+                <button type="button" class="rc-quick-btn" onclick="setRcQuickGrams(5)">5g</button>
+                <button type="button" class="rc-quick-btn" onclick="setRcQuickGrams(10)">10g</button>
+              </div>
+            </div>
+
+            <!-- Resumen Total a Cobrar -->
+            <div style="background: rgba(194, 162, 70, 0.1); border: 1.5px solid var(--rc-gold); border-radius: var(--radius-sm); padding: 14px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 700; color: var(--rc-muted); font-size: 0.95rem;">Total a Cobrar:</span>
+              <strong id="rc-pos-total-display" style="font-size: 1.6rem; color: var(--rc-gold);">$0,00</strong>
+            </div>
+
+            <!-- Medio de Pago -->
+            <div class="rc-field">
+              <label class="rc-label">Medio de Pago</label>
+              <div class="rc-unit-toggle">
+                <button type="button" class="rc-unit-btn is-active" id="rc-pay-cash-btn" onclick="setRcPaymentMethod('CASH')">
+                  💵 Efectivo
+                </button>
+                <button type="button" class="rc-unit-btn" id="rc-pay-digital-btn" onclick="setRcPaymentMethod('DIGITAL')">
+                  💳 Transferencia / QR
+                </button>
+              </div>
+            </div>
+
+            <!-- Botón Cobrar -->
+            <button type="button" class="rc-btn-success" id="rc-btn-charge" onclick="executeRcSale()">
+              🚀 Cobrar en Caja Reprocam
+            </button>
+          </div>
+        </article>
+
+        <!-- Arqueo & Cierre de Caja Reprocam -->
+        <article class="rc-card">
+          <header class="rc-card-header">
+            <h2 class="rc-card-title">📊 Arqueo Caja Reprocam</h2>
+          </header>
+
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.92rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">
+              <span style="color: var(--rc-muted);">Fondo Inicial:</span>
+              <strong id="rc-cash-opening-val">$0,00</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.92rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">
+              <span style="color: var(--rc-muted);">Ventas Efectivo Reprocam:</span>
+              <strong id="rc-cash-sales-val" style="color: var(--rc-success);">$0,00</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 1.1rem; padding: 6px 0;">
+              <span style="color: var(--rc-cream); font-weight: 700;">Efectivo Esperado en Caja:</span>
+              <strong id="rc-cash-expected-val" style="color: var(--rc-gold);">$0,00</strong>
+            </div>
+
+            <div id="rc-open-shift-panel" style="display: none; flex-direction: column; gap: 10px; margin-top: 10px;">
+              <label for="rc-opening-amount-input" class="rc-label">Monto de Apertura ($)</label>
+              <input type="number" id="rc-opening-amount-input" class="rc-input" placeholder="Ej: 10000" min="0" step="100">
+              <button type="button" class="rc-btn-primary" onclick="openRcShift()">
+                Abrir Turno Caja Reprocam
+              </button>
+            </div>
+
+            <div id="rc-close-shift-panel" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+              <button type="button" class="rc-btn-primary" style="background: rgba(229,115,115,0.15); border: 1px solid var(--rc-danger); color: var(--rc-danger);" onclick="closeRcShift()">
+                🔒 Cerrar Turno Caja Reprocam
+              </button>
+            </div>
+          </div>
+        </article>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Toast Feedback Notification -->
+  <div id="rc-toast" class="rc-toast" role="alert"></div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="saas-auth.js?v=session_recovery_v3"></script>
+  <script src="reprocam.js?v=rc_v1"></script>
+</body>
+</html>
