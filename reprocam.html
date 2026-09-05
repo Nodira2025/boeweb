@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -23,8 +23,11 @@
       </div>
     </a>
     <div class="rc-header-actions">
+      <button type="button" class="rc-btn-session" id="rc-auth-status-btn" onclick="toggleRcAuthModal()" title="Estado de Sesión">
+        <span id="rc-user-badge">🔒 Iniciar Sesión</span>
+      </button>
       <a href="vendedor.html" class="rc-btn-back" title="Volver al Portal Vendedor General">
-        ‹ Volver al POS
+        ‹ POS
       </a>
     </div>
   </header>
@@ -227,9 +230,46 @@
   <!-- Toast Feedback Notification -->
   <div id="rc-toast" class="rc-toast" role="alert"></div>
 
+  <!-- Modal de Inicio de Sesión Rápido -->
+  <div id="rc-login-modal" class="rc-modal-backdrop" style="display: none;">
+    <div class="rc-modal-content">
+      <div class="rc-card-header">
+        <h3 class="rc-card-title">🔐 Acceso Operativo Reprocam</h3>
+        <button type="button" class="rc-modal-close" onclick="closeRcAuthModal()">✕</button>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--rc-muted); margin-bottom: 12px;">
+        Iniciá sesión como Administrador o Vendedor para dar de alta productos y operar la Caja Reprocam.
+      </p>
+      
+      <!-- Accesos Rápidos -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px;">
+        <button type="button" class="rc-btn-quick-user" onclick="quickFillUser('franco.prueba@boegrowclub.com', 'franco123')">
+          👑 Franco (Admin)
+        </button>
+        <button type="button" class="rc-btn-quick-user" onclick="quickFillUser('rodrigo.prueba@boegrowclub.com', 'rodrigo123')">
+          👤 Rodrigo (Vendedor)
+        </button>
+      </div>
+
+      <form id="rc-login-form" onsubmit="handleRcLogin(event)" style="display: flex; flex-direction: column; gap: 10px;">
+        <div class="rc-field">
+          <label for="rc-login-email" class="rc-label">Correo Electrónico</label>
+          <input type="email" id="rc-login-email" class="rc-input" placeholder="usuario@boegrowclub.com" required>
+        </div>
+        <div class="rc-field">
+          <label for="rc-login-pass" class="rc-label">Contraseña</label>
+          <input type="password" id="rc-login-pass" class="rc-input" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="rc-btn-primary" id="rc-login-submit-btn">
+          Ingresar a Reprocam
+        </button>
+      </form>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="saas-auth.js?v=session_recovery_v3"></script>
-  <script src="reprocam.js?v=rc_v1"></script>
+  <script src="reprocam.js?v=rc_v2"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    BÔ GROW CLUB — REPROCAM: CATÁLOGO Y TERMINAL DE CAJA INDEPENDIENTE
    Mobile-First · Forest #152D24 · Gold #C2A246 · Cream #F7F6F2
    ========================================================================== */
@@ -531,3 +531,81 @@ body {
   from { opacity: 0; transform: translate(-50%, 15px); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
+
+/* Session Button */
+.rc-btn-session {
+  background: rgba(194, 162, 70, 0.12);
+  border: 1.5px solid var(--rc-gold);
+  color: var(--rc-gold);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  transition: all 0.2s ease;
+}
+
+.rc-btn-session:hover {
+  background: var(--rc-gold);
+  color: var(--rc-surface);
+}
+
+/* Modal Backdrop & Content */
+.rc-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.rc-modal-content {
+  background: var(--rc-card);
+  border: 2px solid var(--rc-gold);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+  animation: rcToastIn 0.25s ease;
+}
+
+.rc-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--rc-muted);
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.rc-btn-quick-user {
+  background: #0d1e18;
+  border: 1px solid var(--rc-card-border);
+  color: var(--rc-cream);
+  padding: 8px 6px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 42px;
+}
+
+.rc-btn-quick-user:hover {
+  border-color: var(--rc-gold);
+  color: var(--rc-gold);
+}
+

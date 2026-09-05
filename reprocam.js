@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    BÔ GROW CLUB — REPROCAM: CONTROLADOR DE CATÁLOGO Y TERMINAL DE CAJA
    ========================================================================== */
 
@@ -59,8 +59,90 @@
         console.warn('SaasAuth notice:', err);
       }
     }
+    await updateAuthUI();
     await Promise.all([loadRcRegister(), loadRcProducts()]);
   }
+
+  async function updateAuthUI() {
+    const badge = document.getElementById('rc-user-badge');
+    if (!badge || !supabaseClient) return;
+
+    try {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) {
+        badge.textContent = '🔒 Iniciar Sesión';
+        return;
+      }
+
+      const { data: tu } = await supabaseClient
+        .from('tenant_users')
+        .select('name, role')
+        .eq('user_id', user.id)
+        .eq('tenant_id', TENANT_ID)
+        .maybeSingle();
+
+      const userName = tu?.name || user.email.split('@')[0];
+      const userRole = tu?.role || 'VENDEDOR';
+      badge.textContent = `👤 ${userName} (${userRole})`;
+    } catch (err) {
+      console.warn('Error updating auth UI:', err);
+      badge.textContent = '🔒 Iniciar Sesión';
+    }
+  }
+
+  function toggleRcAuthModal() {
+    const modal = document.getElementById('rc-login-modal');
+    if (!modal) return;
+    modal.style.display = modal.style.display === 'none' || !modal.style.display ? 'flex' : 'none';
+  }
+  window.toggleRcAuthModal = toggleRcAuthModal;
+
+  function closeRcAuthModal() {
+    const modal = document.getElementById('rc-login-modal');
+    if (modal) modal.style.display = 'none';
+  }
+  window.closeRcAuthModal = closeRcAuthModal;
+
+  function quickFillUser(email, pass) {
+    const emailInput = document.getElementById('rc-login-email');
+    const passInput = document.getElementById('rc-login-pass');
+    if (emailInput) emailInput.value = email;
+    if (passInput) passInput.value = pass;
+  }
+  window.quickFillUser = quickFillUser;
+
+  async function handleRcLogin(e) {
+    if (e) e.preventDefault();
+    const email = document.getElementById('rc-login-email')?.value.trim();
+    const password = document.getElementById('rc-login-pass')?.value;
+    const submitBtn = document.getElementById('rc-login-submit-btn');
+
+    if (!email || !password) {
+      showToast('Ingresá correo y contraseña.', true);
+      return;
+    }
+
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+
+      if (window.SaasAuth?.ensureOperationalContext) {
+        await window.SaasAuth.ensureOperationalContext(supabaseClient);
+      }
+
+      closeRcAuthModal();
+      await updateAuthUI();
+      showToast(`🎉 ¡Sesión iniciada correctamente como ${email}!`);
+      await Promise.all([loadRcRegister(), loadRcProducts(), loadRcCashShift()]);
+    } catch (err) {
+      console.error('Error logging in to Reprocam:', err);
+      showToast(`❌ Error de acceso: ${err.message}`, true);
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  }
+  window.handleRcLogin = handleRcLogin;
 
   // --- TABS & UI NAVIGATION ---
   function switchRcTab(tab) {
@@ -266,69 +348,30 @@
       return;
     }
 
+    // 1. Verificar autenticación activa
+    const authUser = (await supabaseClient.auth.getUser())?.data?.user;
+    if (!authUser) {
+      showToast('⚠️ Debés iniciar sesión como Administrador o Vendedor para guardar productos.', true);
+      toggleRcAuthModal();
+      return;
+    }
+
     if (submitBtn) submitBtn.disabled = true;
     try {
-      // 1. Intentar llamar a la RPC upsert_reprocam_product_v2
-      let saved = false;
-      try {
-        const { data: rpcData, error: rpcErr } = await supabaseClient.rpc('upsert_reprocam_product_v2', {
-          p_tenant_id: TENANT_ID,
-          p_name: name,
-          p_price: price,
-          p_stock: stock,
-          p_unit: selectedRcUnit
-        });
-        if (!rpcErr && rpcData?.success) saved = true;
-      } catch (rpcEx) {
-        console.warn('RPC upsert_reprocam_product_v2 notice, fallback to direct insert:', rpcEx);
-      }
+      const { data: rpcData, error: rpcErr } = await supabaseClient.rpc('upsert_reprocam_product_v2', {
+        p_tenant_id: TENANT_ID,
+        p_name: name,
+        p_price: price,
+        p_stock: stock,
+        p_unit: selectedRcUnit
+      });
 
-      // 2. Fallback directo a catalog_products si la RPC aún no fue creada
-      if (!saved) {
-        const sku = 'REP-' + Math.random().toString(36).substring(2, 9).toUpperCase();
-        const { data: newProd, error: insertErr } = await supabaseClient
-          .from('catalog_products')
-          .insert({
-            tenant_id: TENANT_ID,
-            sku: sku,
-            name: name,
-            category: 'REPROCAM',
-            price: price,
-            currency: 'ARS',
-            track_stock: true,
-            metadata: {
-              is_reprocam: true,
-              reprocam_unit: selectedRcUnit,
-              reprocam_stock: stock
-            }
-          })
-          .select()
-          .single();
-
-        if (insertErr) throw insertErr;
-
-        // Intentar registrar el stock en inventory_balances_v2
-        try {
-          const { data: locs } = await supabaseClient
-            .from('inventory_locations_v2')
-            .select('id')
-            .eq('tenant_id', TENANT_ID)
-            .eq('is_default', true)
-            .limit(1);
-
-          const defaultLocId = locs && locs[0] ? locs[0].id : null;
-          if (defaultLocId) {
-            await supabaseClient.from('inventory_balances_v2').upsert({
-              tenant_id: TENANT_ID,
-              product_id: newProd.id,
-              location_id: defaultLocId,
-              on_hand: stock,
-              reserved: 0
-            });
-          }
-        } catch (balErr) {
-          console.warn('Balance fallback insert notice:', balErr);
+      if (rpcErr) {
+        if (rpcErr.code === 'PGRST202' || rpcErr.message?.includes('not find')) {
+          showToast('⚠️ Falta aplicar la migración 020 en el SQL Editor de Supabase para activar la función Reprocam.', true);
+          return;
         }
+        throw rpcErr;
       }
 
       showToast(`✅ "${name}" guardado exitosamente en Reprocam.`);
