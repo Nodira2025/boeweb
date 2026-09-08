@@ -444,6 +444,23 @@
   }
   window.updateRcPosCalculation = updateRcPosCalculation;
 
+  async function getAuthToken() {
+    if (supabaseClient?.auth) {
+      const { data } = await supabaseClient.auth.getSession();
+      if (data?.session?.access_token) return data.session.access_token;
+    }
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const authKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+        if (authKey) {
+          const parsed = JSON.parse(localStorage.getItem(authKey));
+          if (parsed?.access_token) return parsed.access_token;
+        }
+      } catch (_) {}
+    }
+    return '';
+  }
+
   async function executeRcSale() {
     const prodId = productSelect?.value;
     const prod = rcProducts.find(p => p.id === prodId);
@@ -482,37 +499,35 @@
         });
         if (!rpcSaleErr && rpcSale?.success) {
           saleCompleted = true;
+        } else if (rpcSaleErr) {
+          console.warn('record_reprocam_sale_v2 error, falling back:', rpcSaleErr.message);
         }
       } catch (saleRpcEx) {
-        console.warn('record_reprocam_sale_v2 notice, fallback to manual execution:', saleRpcEx);
+        console.warn('record_reprocam_sale_v2 notice, fallback to serverless:', saleRpcEx);
       }
 
-      // 2. Fallback de descuento directo de stock y movimiento de caja
+      // 2. Fallback resiliente vía función serverless
       if (!saleCompleted) {
-        const newStock = Math.max(0, prod.stock - qty);
-        await supabaseClient
-          .from('catalog_products')
-          .update({
-            metadata: {
-              ...(prod.metadata || {}),
-              is_reprocam: true,
-              reprocam_unit: prod.unit,
-              reprocam_stock: newStock
-            }
+        const token = await getAuthToken();
+        const resp = await fetch('/.netlify/functions/reprocam-operations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            action: 'EXECUTE_SALE',
+            tenantId: TENANT_ID,
+            productId: prod.id,
+            quantity: qty,
+            unitPrice: prod.price,
+            paymentMethod: selectedPaymentMethod,
+            notes: `Venta Caja Reprocam (${prod.name})`
           })
-          .eq('tenant_id', TENANT_ID)
-          .eq('id', prod.id);
-
-        // Si hay una sesión de caja Reprocam abierta y se pagó en efectivo, registrar ingreso
-        if (activeRcSession && selectedPaymentMethod === 'CASH') {
-          await supabaseClient.from('cash_movements_v2').insert({
-            tenant_id: TENANT_ID,
-            session_id: activeRcSession.id,
-            direction: 'IN',
-            amount: total,
-            reason: `Venta Reprocam: ${prod.name} (${qty}${prod.unit})`,
-            reference_type: 'SALE'
-          });
+        });
+        const result = await resp.json().catch(() => ({}));
+        if (!resp.ok || result.error) {
+          throw new Error(result.error || 'Error al procesar la venta.');
         }
       }
 
@@ -621,16 +636,44 @@
     }
 
     try {
-      const authUser = (await supabaseClient.auth.getUser())?.data?.user;
-      const { data, error } = await supabaseClient.from('cash_sessions_v2').insert({
-        tenant_id: TENANT_ID,
-        register_id: rcRegister.id,
-        opened_by: authUser?.id || '3855ee23-d46b-41d8-ae82-0cfebd105631',
-        opening_amount: amount,
-        status: 'OPEN'
-      }).select().single();
+      let opened = false;
+      // 1. Intentar RPC nativa
+      try {
+        const { data, error } = await supabaseClient.rpc('open_cash_session_v2', {
+          p_tenant_id: TENANT_ID,
+          p_register_id: rcRegister.id,
+          p_opening_amount: amount
+        });
+        if (!error && data?.session_id) {
+          opened = true;
+        } else if (error) {
+          console.warn('RPC open_cash_session_v2 notice, falling back:', error.message);
+        }
+      } catch (rpcErr) {
+        console.warn('RPC open_cash_session_v2 catch:', rpcErr);
+      }
 
-      if (error) throw error;
+      // 2. Fallback serverless con credenciales de servicio
+      if (!opened) {
+        const token = await getAuthToken();
+        const resp = await fetch('/.netlify/functions/reprocam-operations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            action: 'OPEN_SHIFT',
+            tenantId: TENANT_ID,
+            registerId: rcRegister.id,
+            openingAmount: amount
+          })
+        });
+        const result = await resp.json().catch(() => ({}));
+        if (!resp.ok || result.error) {
+          throw new Error(result.error || 'No se pudo abrir el turno.');
+        }
+      }
 
       showToast(`🟢 Turno de Caja Reprocam abierto con ${formatMoney(amount)}.`);
       if (input) input.value = '';
@@ -647,18 +690,49 @@
     if (!confirm('¿Confirmás el cierre del turno de Caja Reprocam?')) return;
 
     try {
-      const authUser = (await supabaseClient.auth.getUser())?.data?.user;
-      const { error } = await supabaseClient
-        .from('cash_sessions_v2')
-        .update({
-          status: 'CLOSED',
-          closed_by: authUser?.id || activeRcSession.opened_by,
-          closed_at: new Date().toISOString()
-        })
-        .eq('tenant_id', TENANT_ID)
-        .eq('id', activeRcSession.id);
+      const expectedText = expectedValEl?.textContent || '0';
+      const expectedClean = Number(expectedText.replace(/[^0-9,-]/g, '').replace(',', '.')) || 0;
 
-      if (error) throw error;
+      let closed = false;
+      // 1. Intentar RPC nativa
+      try {
+        const { data, error } = await supabaseClient.rpc('submit_cash_closure_v2', {
+          p_tenant_id: TENANT_ID,
+          p_session_id: activeRcSession.id,
+          p_counted: expectedClean,
+          p_notes: 'Cierre de Turno Caja Reprocam'
+        });
+        if (!error && data?.closure_id) {
+          closed = true;
+        } else if (error) {
+          console.warn('RPC submit_cash_closure_v2 notice, falling back:', error.message);
+        }
+      } catch (rpcErr) {
+        console.warn('RPC submit_cash_closure_v2 catch:', rpcErr);
+      }
+
+      // 2. Fallback serverless
+      if (!closed) {
+        const token = await getAuthToken();
+        const resp = await fetch('/.netlify/functions/reprocam-operations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            action: 'CLOSE_SHIFT',
+            tenantId: TENANT_ID,
+            sessionId: activeRcSession.id,
+            countedAmount: expectedClean,
+            notes: 'Cierre de Turno Caja Reprocam'
+          })
+        });
+        const result = await resp.json().catch(() => ({}));
+        if (!resp.ok || result.error) {
+          throw new Error(result.error || 'No se pudo cerrar el turno.');
+        }
+      }
 
       showToast('🔒 Turno de Caja Reprocam cerrado exitosamente.');
       await loadRcCashShift();
