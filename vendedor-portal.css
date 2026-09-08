@@ -817,6 +817,25 @@
     gap: 6px;
   }
 
+  .vendor-nav-group-title {
+    font-size: 0.64rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--vendor-gold);
+    padding: 10px 12px 3px;
+    margin-top: 6px;
+    border-top: 1px solid rgba(194, 162, 70, 0.15);
+    opacity: 0.85;
+    user-select: none;
+  }
+
+  .vendor-nav-group-title:first-of-type {
+    border-top: none;
+    margin-top: 0;
+    padding-top: 2px;
+  }
+
   .vendor-side-nav-item {
     min-height: 48px;
     padding: 0 14px;

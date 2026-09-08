@@ -1250,17 +1250,44 @@
       </div>
 
       <nav class="vendor-side-nav" aria-label="Secciones de trabajo">
+        <!-- SECCIÓN: VENTAS & COBRO -->
+        <span class="vendor-nav-group-title">Ventas & Cobro</span>
         <button type="button" class="vendor-side-nav-item active" data-vendor-tab="home" onclick="switchVendorTab('home')">
           <span class="vendor-side-nav-icon" aria-hidden="true">⌂</span><span>Inicio</span>
         </button>
         <button type="button" class="vendor-side-nav-item vendor-side-nav-featured" data-vendor-tab="pos" onclick="switchVendorTab('pos')" style="color: var(--vendor-forest); font-weight: 800;">
           <span class="vendor-side-nav-icon" aria-hidden="true">🏷️</span><span>Vender producto</span>
         </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="cash" onclick="switchVendorTab('cash')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">$</span><span>Caja & Arqueo</span>
+        </button>
+        <a href="reprocam.html" class="vendor-side-nav-item" style="color: var(--vendor-gold); text-decoration: none;" title="Catálogo y Caja Especializada Reprocam">
+          <span class="vendor-side-nav-icon" aria-hidden="true">🌱</span><span>Reprocam</span>
+        </a>
+
+        <!-- SECCIÓN: CATÁLOGO & PRODUCTOS -->
+        <span class="vendor-nav-group-title">Catálogo & Productos</span>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="internal-catalog" onclick="switchVendorTab('internal-catalog')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">▤</span><span>Catálogo interno</span>
+        </button>
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="catalog" onclick="switchVendorTab('catalog')">
           <span class="vendor-side-nav-icon" aria-hidden="true">▦</span><span>Catálogo B2B</span>
         </button>
-        <button type="button" class="vendor-side-nav-item" data-vendor-tab="internal-catalog" onclick="switchVendorTab('internal-catalog')">
-          <span class="vendor-side-nav-icon" aria-hidden="true">▤</span><span>Catálogo interno</span>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="fast-upload" onclick="switchVendorTab('fast-upload')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">＋</span><span>Ingresar producto</span>
+        </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="drafts-review" onclick="switchVendorTab('drafts-review')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">👑</span><span>Cola de Aprobación</span>
+          <span class="vendor-pending-drafts-count" id="vendor-sidebar-drafts-badge" hidden style="margin-left: auto; background: #c62828; color: white; border-radius: 10px; padding: 2px 6px; font-size: 0.7rem; font-weight: 800;">0</span>
+        </button>
+
+        <!-- SECCIÓN: DEPÓSITO & LOGÍSTICA -->
+        <span class="vendor-nav-group-title">Depósito & Logística</span>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="location-assistant" onclick="switchVendorTab('location-assistant')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">⌖</span><span>Ubicar producto</span>
+        </button>
+        <button type="button" class="vendor-side-nav-item" data-vendor-tab="map" onclick="switchVendorTab('map')">
+          <span class="vendor-side-nav-icon" aria-hidden="true">🗺️</span><span>Estantería</span>
         </button>
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="fulfillments" onclick="switchVendorTab('fulfillments')">
           <span class="vendor-side-nav-icon" aria-hidden="true">🚚</span><span>Entregas & Encargos</span>
@@ -1270,25 +1297,9 @@
           <span class="vendor-side-nav-icon" aria-hidden="true">📦</span><span>Pedidos Web</span>
           <span class="vendor-pending-web-orders-count" id="vendor-sidebar-web-orders-badge" hidden style="margin-left: auto; background: #e53935; color: white; border-radius: 10px; padding: 2px 6px; font-size: 0.7rem; font-weight: 800;">0</span>
         </button>
-        <button type="button" class="vendor-side-nav-item" data-vendor-tab="fast-upload" onclick="switchVendorTab('fast-upload')">
-          <span class="vendor-side-nav-icon" aria-hidden="true">＋</span><span>Ingresar producto</span>
-        </button>
-        <button type="button" class="vendor-side-nav-item" data-vendor-tab="drafts-review" onclick="switchVendorTab('drafts-review')">
-          <span class="vendor-side-nav-icon" aria-hidden="true">👑</span><span>Cola de Aprobación</span>
-          <span class="vendor-pending-drafts-count" id="vendor-sidebar-drafts-badge" hidden style="margin-left: auto; background: #c62828; color: white; border-radius: 10px; padding: 2px 6px; font-size: 0.7rem; font-weight: 800;">0</span>
-        </button>
-        <button type="button" class="vendor-side-nav-item" data-vendor-tab="location-assistant" onclick="switchVendorTab('location-assistant')">
-          <span class="vendor-side-nav-icon" aria-hidden="true">⌖</span><span>Ubicar producto</span>
-        </button>
-        <button type="button" class="vendor-side-nav-item" data-vendor-tab="map" onclick="switchVendorTab('map')">
-          <span class="vendor-side-nav-icon" aria-hidden="true">🗺️</span><span>Estantería</span>
-        </button>
-        <button type="button" class="vendor-side-nav-item" data-vendor-tab="cash" onclick="switchVendorTab('cash')">
-          <span class="vendor-side-nav-icon" aria-hidden="true">$</span><span>Caja & Arqueo</span>
-        </button>
-        <a href="reprocam.html" class="vendor-side-nav-item" style="color: var(--vendor-gold); text-decoration: none;" title="Catálogo y Caja Especializada Reprocam">
-          <span class="vendor-side-nav-icon" aria-hidden="true">🌱</span><span>Reprocam</span>
-        </a>
+
+        <!-- SECCIÓN: CLIENTES & GESTIÓN -->
+        <span class="vendor-nav-group-title">Clientes & Gestión</span>
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="portfolio" onclick="switchVendorTab('portfolio')">
           <span class="vendor-side-nav-icon" aria-hidden="true">♙</span><span>Clientes & CC</span>
         </button>
@@ -1299,6 +1310,9 @@
         <button type="button" class="vendor-side-nav-item" data-vendor-tab="nearby-stores" onclick="switchVendorTab('nearby-stores')">
           <span class="vendor-side-nav-icon" aria-hidden="true">🏪</span><span>Tiendas Cerca</span>
         </button>
+
+        <!-- SECCIÓN: SISTEMA & SAAS -->
+        <span class="vendor-nav-group-title saas-prototype-only">Sistema & SaaS</span>
         <button type="button" class="vendor-side-nav-item saas-prototype-only" data-vendor-tab="migration-center" onclick="switchVendorTab('migration-center')">
           <span class="vendor-side-nav-icon" aria-hidden="true">📥</span><span>Migration Center IA</span>
         </button>
