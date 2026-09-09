@@ -2,8 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 import { ReleaseEngine, SCHEMA_MIGRATIONS_STORE, BACKUP_MANIFESTS_STORE, STORAGE_BACKUPS_STORE } from '../release-engine.js';
-import { calculateFileSha256, validateSchemaForBaseline, generatePhysicalPostgresDump, restorePhysicalPostgresDump, runPhysicalStorageBackupAndRestore } from '../scripts/db-pg-dump-restore-real.mjs';
+import {
+  calculateFileSha256,
+  validateSchemaForBaseline,
+  generatePhysicalPostgresDump,
+  restorePhysicalPostgresDump,
+  getStorageBackupBoundary,
+  runPhysicalStorageBackupAndRestore
+} from '../scripts/db-pg-dump-restore-real.mjs';
 
 test('1. Environment Separation & Validation: Entornos válidos e invalidez de entorno ambiguo', () => {
   const localEnv = ReleaseEngine.validateEnvironmentConfig('LOCAL');
@@ -76,61 +84,130 @@ test('5. Real Physical SQL Migration SHA-256 Crypto Hash Verification', () => {
   assert.equal(typeof hash1, 'string');
   assert.equal(hash1.length, 64); // Valid 64-char SHA-256 hex string
 
-  // Modificar copia temporal del archivo para verificar cambio de hash
-  const tempPath = path.resolve('scratch', 'temp_001_modified.sql');
-  fs.mkdirSync(path.resolve('scratch'), { recursive: true });
+  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'boeweb-migration-hash-'));
+  const tempPath = path.join(tempDirectory, 'temp_001_modified.sql');
   fs.writeFileSync(tempPath, fs.readFileSync(mig1Path, 'utf8') + '\n-- ALTERED BYTE', 'utf8');
 
   const modifiedHash = calculateFileSha256(tempPath);
   assert.notEqual(hash1, modifiedHash);
+  fs.rmSync(tempDirectory, { recursive: true, force: true });
 });
 
-test('6. Real Physical PostgreSQL Native Dump & Restore in Isolated Destination Instance (17 Tables & Marker Isolation)', () => {
-  const sourceData = {
-    tenants: [{ id: '11111111-1111-1111-1111-111111111111', name: 'BÔ Grow Club' }],
-    tenant_users: [{ user_id: 'usr-1', role: 'ADMIN' }],
-    products: [{ id: 'P01', name: 'Sustrato 80L', price: 12000 }],
-    suppliers: [{ id: 'SUP-1', name: 'Grower Wholesale' }],
-    supplier_products: [{ id: 'SP-1', product_id: 'P01', price: 10000 }],
-    sales: [{ id: 'S01', total: 12000 }],
-    sale_items: [{ id: 'SI01', sale_id: 'S01', product_id: 'P01', quantity: 1 }],
-    cash_sessions: [{ id: 'CS01', status: 'OPEN' }],
-    cash_movements: [{ id: 'CM01', amount: 12000 }],
-    inventory_balances: [{ product_id: 'P01', on_hand_sellable: 10 }],
-    inventory_locations: [{ product_id: 'P01', quantity: 10 }],
-    inventory_reservations: [{ id: 'RES01', quantity: 2 }],
-    inventory_ledger: [{ id: 'LED01', quantity: 1 }],
-    admin_activity_log: [{ id: 'LOG01', action: 'SALE' }],
-    operational_alerts: [{ id: 'ALT01', alert_type: 'LOW_STOCK' }],
-    alert_rules: [{ id: 'RUL01', min_stock: 5 }],
-    schema_migrations: [{ version: '001', checksum: 'hash1' }]
+test('6. pg_dump y pg_restore reciben URLs explícitas sin exponer secretos en argumentos, logs o manifiestos', async () => {
+  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'boeweb-pg-tools-'));
+  const dumpPath = path.join(tempDirectory, 'isolated-test.dump');
+  const sourceUrl = 'postgresql://backup_user:SOURCE_SECRET@source.example.test:6543/source_db?sslmode=require';
+  const destinationUrl = 'postgresql://restore_user:DEST_SECRET@destination.example.test:6543/restore_db?sslmode=require';
+  const calls = [];
+  const logs = [];
+  const logger = { info(message) { logs.push(message); } };
+  const runner = async invocation => {
+    calls.push(invocation);
+    if (invocation.command === 'pg_dump-test') {
+      const outputIndex = invocation.args.indexOf('--file');
+      fs.writeFileSync(invocation.args[outputIndex + 1], Buffer.from('PGDMP\u0000test fixture'));
+    }
+    return { exitCode: 0, stdout: '', stderr: '' };
   };
 
-  const dumpResult = generatePhysicalPostgresDump(sourceData);
-  assert.equal(fs.existsSync(dumpResult.dump_file_path), true);
-  assert.equal(dumpResult.file_size_bytes > 0, true);
-  assert.equal(dumpResult.sha256.length, 64);
+  try {
+    const dumpResult = await generatePhysicalPostgresDump({
+      sourceDatabaseUrl: sourceUrl,
+      outputFile: dumpPath,
+      pgDumpPath: 'pg_dump-test',
+      runner,
+      logger
+    });
+    assert.equal(fs.existsSync(dumpResult.dump_file_path), true);
+    assert.equal(dumpResult.file_size_bytes > 0, true);
+    assert.equal(dumpResult.sha256.length, 64);
 
-  const restoreResult = restorePhysicalPostgresDump(dumpResult.dump_file_path);
-  const dest = restoreResult.destination_stores;
+    const manifestText = fs.readFileSync(dumpResult.manifest_file_path, 'utf8');
+    assert.doesNotMatch(manifestText, /SOURCE_SECRET|postgresql:\/\//);
+    assert.equal(JSON.parse(manifestText).includes_storage_object_bytes, false);
 
-  assert.equal(dest.tenants.length, 1);
-  assert.equal(dest.products.length, 1);
-  assert.equal(dest.products[0].name, 'Sustrato 80L');
+    const restoreResult = await restorePhysicalPostgresDump({
+      dumpFilePath: dumpResult.dump_file_path,
+      manifestFilePath: dumpResult.manifest_file_path,
+      destinationDatabaseUrl: destinationUrl,
+      pgRestorePath: 'pg_restore-test',
+      runner,
+      logger,
+      allowDestructive: true,
+      clean: true
+    });
+    assert.equal(restoreResult.restored, true);
+    assert.equal(restoreResult.destination.database, 'restore_db');
 
-  // Verify marker isolation (Source has NO marker, Destination HAS marker)
-  assert.equal(dest.restore_verification_marker[0].marker_id, 'DR-TEST-MARKER-DESTINATION-PROJECT-ISOLATED');
-  assert.equal(sourceData.restore_verification_marker, undefined);
+    assert.equal(calls[0].command, 'pg_dump-test');
+    assert.equal(calls[0].env.PGPASSWORD, 'SOURCE_SECRET');
+    assert.equal(calls[1].command, 'pg_restore-test');
+    assert.equal(calls[1].env.PGPASSWORD, 'DEST_SECRET');
+    assert.match(calls[1].args.join(' '), /--clean --if-exists/);
+
+    const publicEvidence = JSON.stringify({
+      logs,
+      results: [dumpResult, restoreResult],
+      args: calls.map(call => call.args)
+    });
+    assert.doesNotMatch(publicEvidence, /SOURCE_SECRET|DEST_SECRET|postgresql:\/\//);
+  } finally {
+    fs.rmSync(tempDirectory, { recursive: true, force: true });
+  }
 });
 
-test('7. Real Storage File Backup & Byte-for-Byte Restore Verification', () => {
-  const storageResult = runPhysicalStorageBackupAndRestore();
-  assert.equal(storageResult.all_matched, true);
-  assert.equal(storageResult.manifest.length, 3);
-  storageResult.manifest.forEach(item => {
-    assert.equal(item.match, true);
-    assert.equal(item.downloaded_sha256, item.restored_sha256);
-  });
+test('7. El restore exige destino aislado, confirmación destructiva e integridad del dump', async () => {
+  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'boeweb-pg-guards-'));
+  const dumpPath = path.join(tempDirectory, 'guard-test.dump');
+  fs.writeFileSync(dumpPath, Buffer.from('PGDMP\u0000guard fixture'));
+  const checksum = calculateFileSha256(dumpPath);
+  const sourceUrl = 'postgresql://user:SOURCE@same.example.test/source_db';
+
+  try {
+    await assert.rejects(
+      restorePhysicalPostgresDump({
+        dumpFilePath: dumpPath,
+        sourceDatabaseUrl: sourceUrl,
+        destinationDatabaseUrl: 'postgresql://other:DEST@same.example.test/source_db',
+        expectedSha256: checksum,
+        allowDestructive: true,
+        runner: async () => ({ exitCode: 0 })
+      }),
+      /misma base de datos/
+    );
+
+    await assert.rejects(
+      restorePhysicalPostgresDump({
+        dumpFilePath: dumpPath,
+        sourceDatabaseUrl: sourceUrl,
+        destinationDatabaseUrl: 'postgresql://other:DEST@isolated.example.test/restore_db',
+        expectedSha256: checksum,
+        runner: async () => ({ exitCode: 0 })
+      }),
+      /allowDestructive=true/
+    );
+
+    await assert.rejects(
+      restorePhysicalPostgresDump({
+        dumpFilePath: dumpPath,
+        sourceDatabaseUrl: sourceUrl,
+        destinationDatabaseUrl: 'postgresql://other:DEST@isolated.example.test/restore_db',
+        expectedSha256: '0'.repeat(64),
+        allowDestructive: true,
+        runner: async () => ({ exitCode: 0 })
+      }),
+      /SHA-256/
+    );
+  } finally {
+    fs.rmSync(tempDirectory, { recursive: true, force: true });
+  }
+});
+
+test('7b. Storage queda fuera del dump PostgreSQL y no se certifica con fixtures locales', () => {
+  const boundary = getStorageBackupBoundary();
+  assert.equal(boundary.included_in_postgres_dump, false);
+  assert.match(boundary.required_process, /descargar cada objeto/i);
+  assert.throws(() => runPhysicalStorageBackupAndRestore(), /no simula ni certifica/i);
 });
 
 test('8. Disclosure de Supabase Auth Recovery: Desacoplamiento explícito de public.tenant_users y auth.users (Prueba 3)', () => {

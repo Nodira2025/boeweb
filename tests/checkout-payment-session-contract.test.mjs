@@ -21,5 +21,5 @@ test('017 conserva permisos cerrados y queda registrada en el verificador', () =
   assert.match(migration, /REVOKE ALL ON FUNCTION public\.checkout_sale_v3[\s\S]*FROM PUBLIC, anon/);
   assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.checkout_sale_v3[\s\S]*TO authenticated, service_role/);
   assert.match(migration, /VALUES\s*\(\s*'017',\s*'checkout_payment_session_contract'/);
-  assert.match(verifier, /Array\.from\(\{ length: 18 \}/);
+  assert.match(verifier, /Array\.from\(\{ length: 25 \}/);
 });

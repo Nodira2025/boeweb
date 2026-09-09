@@ -1,5 +1,11 @@
 # AUDITORÍA DE INFRAESTRUCTURA DE DISASTER RECOVERY FASE 15.3
 
+> **EVIDENCIA HISTÓRICA INVALIDADA (2026-09-09).** Los identificadores, hashes,
+> tiempos y resultados enumerados debajo no cuentan con artefactos verificables
+> producidos por `pg_dump`, `pg_restore`, Supabase Storage o Netlify. No utilizar
+> este archivo como prueba de recuperación. El procedimiento vigente está en
+> `BACKUP_AND_RETENTION_POLICY.md`.
+
 ## 1. NATIVE POSTGRESQL BACKUP (Prueba 1)
 
 - **SOURCE PROJECT/DB:** Supabase PostgreSQL Remote Instance / Local PG (`public` schema)

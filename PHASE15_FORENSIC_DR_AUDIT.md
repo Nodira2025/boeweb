@@ -1,5 +1,10 @@
 # AUDITORÍA FORENSE FASE 15.2 — BACKUP, RESTORE Y ROLLBACK REALES
 
+> **EVIDENCIA HISTÓRICA INVALIDADA (2026-09-09).** Aunque este documento reconoce
+> simulaciones anteriores, el supuesto dump seguía siendo una serialización de
+> fixtures y la prueba de Storage copiaba archivos locales. No hubo conexión ni
+> restauración comprobada contra infraestructura Supabase/PostgreSQL aislada.
+
 ## 1. EXPLICACIÓN TRANSPARENTE DE LOS TIEMPOS (2ms / 3ms / 1ms)
 
 - **BACKUP 2ms WAS:** `SIMULATION / MANIFEST GENERATION IN MEMORY`

@@ -1,5 +1,10 @@
 # CERTIFICACIÓN FINAL FASE 15 — RELEASE ENGINEERING, BACKUP, ROLLBACK Y DISASTER RECOVERY
 
+> **CERTIFICACIÓN REVOCADA (2026-09-09).** La evidencia subyacente utilizó
+> simulaciones y no demuestra una restauración real de PostgreSQL, Storage o
+> Supabase Auth. El sistema no debe declararse certificado hasta completar y
+> documentar un simulacro real en un destino aislado.
+
 ## 1. Declaración de Certificación de la Fase 15
 
 **ESTADO: FASE 15 — RELEASE ENGINEERING, DEPLOY, BACKUPS, ROLLBACK Y DISASTER RECOVERY CERTIFICADO AL 100%.**

@@ -1,5 +1,9 @@
 # INFORME DE AUDITORÍA EMPÍRICA FASE 15.1 — RELEASE ENGINEERING & DISASTER RECOVERY
 
+> **EVIDENCIA HISTÓRICA INVALIDADA (2026-09-09).** Las mediciones de milisegundos
+> y los resultados declarados como reales correspondían a fixtures/arrays. No
+> prueban backup, restore, Storage ni rollback de infraestructura real.
+
 ## 1. Demostración Empírica del Backup y Restore Drill de PostgreSQL (Prueba 1)
 
 - **¿Ejecuta restauración PostgreSQL real?:** **YES** (Dump lógico estructurado y restauración en tablas aisladas).
