@@ -51,6 +51,7 @@ class SaasAuthEngine {
     this.tenantUsers = [];
     this.activeTenantProfile = null;
     this.operationalContextRefresh = null;
+    this.contextRevision = 0;
   }
 
   getTenantContext() {
@@ -94,9 +95,33 @@ class SaasAuthEngine {
     );
   }
 
+  async hasMatchingSupabaseSession(client, expectedUserId) {
+    if (!client?.auth || typeof client.auth.getSession !== 'function') return false;
+    try {
+      const { data, error } = await client.auth.getSession();
+      const activeSession = data?.session;
+      return Boolean(
+        !error
+        && activeSession?.access_token
+        && activeSession.user?.id === expectedUserId
+      );
+    } catch (error) {
+      console.warn('No se pudo comprobar la vigencia de la sesión Supabase:', error);
+      return false;
+    }
+  }
+
   async ensureOperationalContext(client, { forceRefresh = false } = {}) {
     const currentContext = this.getTenantContext();
-    if (!forceRefresh && this.isOperationalContextReady(currentContext)) return currentContext;
+    if (!forceRefresh && this.isOperationalContextReady(currentContext)) {
+      const contextRevision = this.contextRevision;
+      const sessionMatches = await this.hasMatchingSupabaseSession(client, currentContext.userId);
+      if (contextRevision !== this.contextRevision) {
+        return await this.ensureOperationalContext(client);
+      }
+      if (sessionMatches) return currentContext;
+      this.resetVerifiedContext();
+    }
     if (!client?.auth || typeof client.auth.getUser !== 'function') return null;
 
     // Varias vistas pueden pedir la sesión al mismo tiempo al abrir el portal.
@@ -186,6 +211,7 @@ class SaasAuthEngine {
       this.userRole = isSuperadmin ? 'SUPERADMIN' : (SAAS_ROLES[membership.role] ? membership.role : 'VENDEDOR');
       this.verifiedSession = true;
       this.tenantUsers = tenantUsers;
+      this.contextRevision += 1;
       return true;
     } catch (error) {
       console.error('No se pudo validar la sesion SaaS:', error);
@@ -204,6 +230,7 @@ class SaasAuthEngine {
     const tenant = SAAS_TENANTS.find(item => item.id === newTenantId || item.slug === newTenantId);
     if (!tenant) return false;
     this.activeTenantId = tenant.id;
+    this.contextRevision += 1;
     return true;
   }
 
@@ -234,6 +261,7 @@ class SaasAuthEngine {
     this.verifiedSession = false;
     this.tenantUsers = [];
     this.activeTenantProfile = null;
+    this.contextRevision += 1;
   }
 
   logout() {

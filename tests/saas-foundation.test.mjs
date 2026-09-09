@@ -107,6 +107,111 @@ test('SaaS Session: no convierte una sesión inexistente en acceso operativo', a
   assert.equal(SaasAuth.getTenantContext().isVerified, false);
 });
 
+test('SaaS Session: invalida el contexto cacheado cuando la sesión real desaparece', async () => {
+  SaasAuth.logout();
+  const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const membership = {
+    tenant_id: SAAS_TENANTS[0].id,
+    user_id: userId,
+    email: 'operador@example.com',
+    name: 'Operador Test',
+    role: 'VENDEDOR',
+    active: true
+  };
+  let signedIn = true;
+  const query = {
+    select() { return this; },
+    eq() { return this; },
+    limit() { return this; },
+    async maybeSingle() { return { data: membership, error: null }; }
+  };
+  const client = {
+    auth: {
+      async getSession() {
+        return signedIn
+          ? { data: { session: { access_token: 'token-test', user: { id: userId } } }, error: null }
+          : { data: { session: null }, error: null };
+      },
+      async getUser() {
+        return signedIn
+          ? { data: { user: { id: userId, email: membership.email } }, error: null }
+          : { data: { user: null }, error: { message: 'No session' } };
+      }
+    },
+    from() { return query; }
+  };
+
+  assert.equal(await SaasAuth.hydrateFromSupabase(client), true);
+  assert.equal(SaasAuth.getTenantContext().isVerified, true);
+
+  signedIn = false;
+  assert.equal(await SaasAuth.ensureOperationalContext(client), null);
+  assert.equal(SaasAuth.getTenantContext().isVerified, false);
+  assert.equal(SaasAuth.getTenantContext().userId, null);
+});
+
+test('SaaS Session: no devuelve una identidad anterior si el usuario cambia durante la validación', async () => {
+  SaasAuth.logout();
+  const firstUser = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'primero@example.com' };
+  const secondUser = { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', email: 'segundo@example.com' };
+  const memberships = new Map([
+    [firstUser.id, {
+      tenant_id: SAAS_TENANTS[0].id,
+      user_id: firstUser.id,
+      email: firstUser.email,
+      name: 'Primer Operador',
+      role: 'VENDEDOR',
+      active: true
+    }],
+    [secondUser.id, {
+      tenant_id: SAAS_TENANTS[0].id,
+      user_id: secondUser.id,
+      email: secondUser.email,
+      name: 'Segundo Operador',
+      role: 'VENDEDOR',
+      active: true
+    }]
+  ]);
+  let activeUser = firstUser;
+  let releaseFirstSessionCheck;
+  let delayNextSessionCheck = false;
+  const firstSessionGate = new Promise(resolve => { releaseFirstSessionCheck = resolve; });
+  const query = {
+    select() { return this; },
+    eq() { return this; },
+    limit() { return this; },
+    async maybeSingle() { return { data: memberships.get(activeUser.id), error: null }; }
+  };
+  const client = {
+    auth: {
+      async getSession() {
+        const sessionUser = activeUser;
+        if (delayNextSessionCheck) {
+          delayNextSessionCheck = false;
+          await firstSessionGate;
+        }
+        return { data: { session: { access_token: 'token-test', user: sessionUser } }, error: null };
+      },
+      async getUser() {
+        return { data: { user: activeUser }, error: null };
+      }
+    },
+    from() { return query; }
+  };
+
+  assert.equal(await SaasAuth.hydrateFromSupabase(client), true);
+  delayNextSessionCheck = true;
+  const contextValidation = SaasAuth.ensureOperationalContext(client);
+
+  activeUser = secondUser;
+  assert.equal(await SaasAuth.hydrateFromSupabase(client), true);
+  releaseFirstSessionCheck();
+
+  const validatedContext = await contextValidation;
+  assert.equal(validatedContext?.userId, secondUser.id);
+  assert.equal(SaasAuth.getTenantContext().userId, secondUser.id);
+});
+
 test('SaaS Roles: una membresía validada por Supabase recibe solo sus permisos', async () => {
   const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const membership = {

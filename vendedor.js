@@ -1476,7 +1476,7 @@ function switchVendorTab(tab) {
     const cashDashboard = document.getElementById('cash-classic-dashboard');
     if (cashDashboard) cashDashboard.style.display = 'grid';
     renderCashSectionUI();
-    Promise.all([refreshCanonicalCashSection(), loadPosRegisters()])
+    refreshCashWorkspace()
       .catch(error => console.error('No se pudo actualizar la caja central:', error));
   } else if (tab === 'map' || tab === 'estanteria') {
     if (mapSection) {
@@ -3283,7 +3283,7 @@ async function addCashMovement(event) {
       descEl.value = '';
       descEl.focus();
     }
-    await Promise.all([refreshCanonicalCashSection(), loadPosRegisters()]);
+    await refreshCashWorkspace();
     if (window.showToast) window.showToast(`Movimiento de ${formatCashCurrency(amount)} confirmado.`);
   } catch (error) {
     console.error('No se confirmó el movimiento de caja:', error);
@@ -3580,7 +3580,7 @@ async function performShiftClosure() {
       cashBreakdown: hasCashBreakdown ? cashBreakdownResult.breakdown : {},
       notes: notesEl?.value.trim() || ''
     });
-    await Promise.all([refreshCanonicalCashSection(), loadPosRegisters()]);
+    await refreshCashWorkspace();
     downloadCashBackup('json');
     const difference = Number(closure?.difference || 0);
     if (window.showToast) window.showToast(`Caja cerrada y enviada a supervisión. Diferencia: ${formatCashCurrency(difference)}.`);
@@ -6842,45 +6842,64 @@ function goBackLocationAssistant() {
   renderLocationAssistant();
 }
 
-async function refreshPendingDraftsBadge() {
+let pendingDraftsBadgeRefresh = null;
+
+function updatePendingDraftsBadges(count) {
   const badge = document.getElementById('drafts-pending-count-badge');
   const homeBadge = document.getElementById('drafts-pending-count-home-badge');
   const sidebarBadge = document.getElementById('vendor-sidebar-drafts-badge');
   const catalogCount = document.getElementById('drafts-pending-catalog-count');
+  const safeCount = Math.max(0, Number(count) || 0);
 
-  try {
-    let count = 0;
-    if (supabaseClient) {
-      const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
-      const { count: c, error } = await supabaseClient
-        .from('catalog_product_drafts_v2')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', context?.tenantId || '')
-        .eq('status', 'PENDING_REVIEW');
-      if (!error && Number.isFinite(c)) count = c;
-    }
-
-    if (badge) {
-      badge.textContent = count;
-      badge.style.display = count > 0 ? 'inline-block' : 'none';
-    }
-    if (homeBadge) {
-      homeBadge.textContent = `${count} pend.`;
-      homeBadge.style.display = count > 0 ? 'inline-block' : 'none';
-    }
-    if (sidebarBadge) {
-      sidebarBadge.textContent = count;
-      sidebarBadge.hidden = count === 0;
-      sidebarBadge.style.display = count > 0 ? 'inline-block' : 'none';
-    }
-    if (catalogCount) {
-      catalogCount.textContent = count;
-      catalogCount.style.display = count > 0 ? 'inline-block' : 'none';
-    }
-    return count;
-  } catch (_) {
-    return 0;
+  if (badge) {
+    badge.textContent = safeCount;
+    badge.style.display = safeCount > 0 ? 'inline-block' : 'none';
   }
+  if (homeBadge) {
+    homeBadge.textContent = `${safeCount} pend.`;
+    homeBadge.style.display = safeCount > 0 ? 'inline-block' : 'none';
+  }
+  if (sidebarBadge) {
+    sidebarBadge.textContent = safeCount;
+    sidebarBadge.hidden = safeCount === 0;
+    sidebarBadge.style.display = safeCount > 0 ? 'inline-block' : 'none';
+  }
+  if (catalogCount) {
+    catalogCount.textContent = safeCount;
+    catalogCount.style.display = safeCount > 0 ? 'inline-block' : 'none';
+  }
+}
+
+async function refreshPendingDraftsBadgeOnce() {
+  try {
+    const context = await ensureVendorOperationalSession();
+    if (!supabaseClient || !context) {
+      updatePendingDraftsBadges(0);
+      return 0;
+    }
+
+    const { count: resultCount, error } = await supabaseClient
+      .from('catalog_product_drafts_v2')
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', context.tenantId)
+      .eq('status', 'PENDING_REVIEW');
+    if (error) throw error;
+
+    const count = Number.isFinite(resultCount) ? resultCount : 0;
+    updatePendingDraftsBadges(count);
+    return count;
+  } catch (error) {
+    console.warn('No se pudo actualizar el contador de borradores:', error.message || error);
+    updatePendingDraftsBadges(0);
+    return 0;
+  } finally {
+    pendingDraftsBadgeRefresh = null;
+  }
+}
+
+async function refreshPendingDraftsBadge() {
+  if (!pendingDraftsBadgeRefresh) pendingDraftsBadgeRefresh = refreshPendingDraftsBadgeOnce();
+  return await pendingDraftsBadgeRefresh;
 }
 window.refreshPendingDraftsBadge = refreshPendingDraftsBadge;
 
@@ -6989,7 +7008,7 @@ async function loadPendingProductDrafts() {
       const context = await ensureVendorOperationalSession();
       if (!context) {
         pendingDraftCache.clear();
-        refreshPendingDraftsBadge();
+        updatePendingDraftsBadges(0);
         renderPendingDraftsList([]);
         return;
       }
@@ -7000,16 +7019,15 @@ async function loadPendingProductDrafts() {
         .eq('status', 'PENDING_REVIEW')
         .order('created_at', { ascending: false });
 
-      if (!error && Array.isArray(data)) {
-        drafts = data;
-      }
+      if (error) throw error;
+      if (Array.isArray(data)) drafts = data;
     }
 
     const normalizedDrafts = (drafts || []).map(hydrateProductDraft);
     pendingDraftCache.clear();
     normalizedDrafts.forEach(draft => pendingDraftCache.set(draft.id, draft));
     
-    refreshPendingDraftsBadge();
+    updatePendingDraftsBadges(normalizedDrafts.length);
     renderPendingDraftsList(normalizedDrafts);
 
   } catch (err) {
@@ -7711,6 +7729,15 @@ function mapCanonicalCashMovement(movement) {
   };
 }
 
+function canInspectTeamCashSessions(context) {
+  return ['ADMIN', 'SUPERVISOR', 'SUPERADMIN'].includes(String(context?.role || '').toUpperCase());
+}
+
+async function refreshCashWorkspace() {
+  await loadPosRegisters();
+  return await refreshCanonicalCashSection();
+}
+
 async function loadCanonicalCashClosureHistory() {
   const list = document.getElementById('cash-closure-history-list');
   const count = document.getElementById('cash-closure-history-count');
@@ -7788,8 +7815,8 @@ async function loadCanonicalCashClosureHistory() {
 }
 
 async function refreshCanonicalCashSection() {
-  const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
-  if (!supabaseClient || !context?.isVerified || !context.tenantId) {
+  const context = await ensureVendorOperationalSession();
+  if (!supabaseClient || !context) {
     canonicalCashView = { ...getEmptyCashData(), closed: true, authorityUnavailable: true };
     renderCashSectionUI();
     return canonicalCashView;
@@ -7808,6 +7835,7 @@ async function refreshCanonicalCashSection() {
       .order('opened_at', { ascending: false })
       .limit(1);
     if (selectedRegisterId) sessionQuery = sessionQuery.eq('register_id', selectedRegisterId);
+    if (!canInspectTeamCashSessions(context)) sessionQuery = sessionQuery.eq('opened_by', context.userId);
     const { data: session, error: sessionError } = await sessionQuery.maybeSingle();
     if (sessionError) throw sessionError;
 
@@ -10713,25 +10741,39 @@ async function loadPosRegisters() {
       ...register,
       session: openByRegister.get(register.id) || null
     }));
+    const previousRegisterId = select.value;
+    const canInspectTeamCash = canInspectTeamCashSessions(context);
+    const isOwnSession = register => register.session?.opened_by === context.userId;
+    const isSelectable = register => !register.session || isOwnSession(register) || canInspectTeamCash;
     select.innerHTML = '<option value="">-- Seleccionar caja --</option>' + registers.map(register => {
-      const sessionLabel = register.session ? 'abierta' : 'cerrada';
-      return `<option value="${escapeStockHtml(register.id)}" data-session-id="${escapeStockHtml(register.session?.id || '')}">${escapeStockHtml(register.name || register.code)} · ${sessionLabel}</option>`;
+      const occupiedByOther = Boolean(register.session) && !isOwnSession(register) && !canInspectTeamCash;
+      const sessionLabel = occupiedByOther ? 'ocupada por otro usuario' : (register.session ? 'abierta' : 'cerrada');
+      return `<option value="${escapeStockHtml(register.id)}" data-session-id="${escapeStockHtml(register.session?.id || '')}" ${occupiedByOther ? 'disabled' : ''}>${escapeStockHtml(register.name || register.code)} · ${sessionLabel}</option>`;
     }).join('');
-    const preferred = registers.find(register => register.session?.opened_by === context.userId)
-      || registers.find(register => register.session)
-      || registers[0];
+    const preferred = registers.find(register => register.id === previousRegisterId && isSelectable(register))
+      || registers.find(isOwnSession)
+      || (canInspectTeamCash ? registers.find(register => register.session) : null)
+      || registers.find(register => !register.session)
+      || (canInspectTeamCash ? registers[0] : null);
     if (preferred) select.value = preferred.id;
-    select.disabled = registers.length === 0;
+    select.disabled = registers.length === 0 || (!canInspectTeamCash && !registers.some(isSelectable));
     if (status) {
       status.textContent = preferred?.session
         ? `Turno abierto desde ${new Date(preferred.session.opened_at).toLocaleString('es-AR')}.`
-        : 'La caja seleccionada no tiene un turno abierto; abrilo desde Caja & Arqueo antes de cobrar efectivo.';
+        : (preferred
+          ? 'La caja seleccionada no tiene un turno abierto; abrilo desde Caja & Arqueo antes de cobrar efectivo.'
+          : 'Todas las cajas disponibles tienen un turno abierto por otro usuario.');
     }
-    select.onchange = () => {
+    select.onchange = async () => {
       const selected = registers.find(register => register.id === select.value);
       if (status) status.textContent = selected?.session
         ? `Turno abierto desde ${new Date(selected.session.opened_at).toLocaleString('es-AR')}.`
         : 'Esta caja no tiene un turno abierto.';
+      try {
+        await refreshCanonicalCashSection();
+      } catch (error) {
+        console.error('No se pudo actualizar la caja seleccionada:', error);
+      }
     };
     return registers;
   } catch (error) {
@@ -17074,7 +17116,7 @@ async function handleRecordCcPaymentSubmit(event) {
       notes: note || 'Pago a cuenta',
       idempotencyKey: `ar-payment:${authContext.userId}:${globalThis.crypto?.randomUUID?.() || Date.now()}`
     });
-    await Promise.all([loadCanonicalCurrentAccounts(), refreshCanonicalCashSection(), loadPosRegisters()]);
+    await Promise.all([loadCanonicalCurrentAccounts(), refreshCashWorkspace()]);
     const refreshedAccount = getCurrentAccounts().find(item => item.id === ccId);
     const paymentMovement = refreshedAccount?.ledger?.find(item => String(item.id) === String(result.entry_id));
     const receiptNumber = paymentMovement?.documentNumber || null;
