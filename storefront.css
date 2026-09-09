@@ -5,14 +5,21 @@
    ========================================================================== */
 
 :root {
-  --bo-forest: #152d24;
-  --bo-forest-soft: #24483a;
-  --bo-leaf: #7ea642;
-  --bo-leaf-dark: #3e5f1f;
-  --bo-gold: #c2a246;
-  --bo-gold-soft: #e4d7a9;
+  --bo-brand-primary: var(--color-primary, #152d24);
+  --bo-brand-accent: var(--color-accent-gold, #c2a246);
+  --bo-brand-text: var(--color-text-main, #152d24);
+  --bo-brand-action: var(--color-success, #7ea642);
+  /* Keep structural surfaces dark even when a tenant chooses a pale primary. */
+  --bo-forest: color-mix(in srgb, var(--bo-brand-primary) 38%, #08130e);
+  --bo-forest-soft: color-mix(in srgb, var(--bo-brand-primary) 30%, #152d24);
+  --bo-leaf: var(--bo-brand-action);
+  --bo-leaf-dark: color-mix(in srgb, var(--bo-brand-action) 66%, #08130e);
+  --bo-gold: var(--bo-brand-accent);
+  --bo-gold-soft: color-mix(in srgb, var(--bo-brand-accent) 42%, #f6f3e8);
+  --bo-on-accent: #152d24;
   --bo-earth: #6b4e2e;
   --bo-cream: #f6f3e8;
+  --bo-canvas: #f6f3e8;
   --bo-paper: #fffdf6;
   --bo-ink: #152d24;
   --bo-muted: #617066;
@@ -26,7 +33,7 @@
 
 [data-theme="dark"] {
   --bo-paper: #13271f;
-  --bo-cream: #0e211a;
+  --bo-canvas: #0e211a;
   --bo-ink: #f6f3e8;
   --bo-muted: #bdc9bf;
   --bo-line: rgba(246, 243, 232, 0.14);
@@ -40,9 +47,9 @@ html {
 }
 
 body {
-  background: var(--bo-cream) !important;
+  background: var(--bo-canvas) !important;
   color: var(--bo-ink) !important;
-  font-family: "Montserrat", "Outfit", sans-serif !important;
+  font-family: var(--font-sans, "Montserrat", "Outfit", sans-serif) !important;
   padding-bottom: 0 !important;
 }
 
@@ -250,7 +257,7 @@ textarea:focus-visible {
   align-items: center !important;
   border: 1px solid var(--bo-line) !important;
   border-radius: 999px !important;
-  background: var(--bo-cream) !important;
+  background: var(--bo-canvas) !important;
   box-shadow: none !important;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -350,7 +357,7 @@ textarea:focus-visible {
   min-width: 18px !important;
   height: 18px !important;
   background: var(--bo-gold) !important;
-  color: var(--bo-forest) !important;
+  color: var(--bo-on-accent) !important;
   border: 2px solid var(--bo-forest) !important;
   font-size: 0.63rem !important;
 }
@@ -375,7 +382,7 @@ textarea:focus-visible {
 .more-menu-item {
   min-height: 58px !important;
   border-radius: var(--bo-radius-sm) !important;
-  background: var(--bo-cream) !important;
+  background: var(--bo-canvas) !important;
   color: var(--bo-ink) !important;
 }
 
@@ -441,8 +448,13 @@ textarea:focus-visible {
   padding: clamp(34px, 4vw, 48px) 24px !important;
   overflow: hidden;
   background:
-    radial-gradient(circle at 78% 20%, rgba(194, 162, 70, 0.2), transparent 30%),
-    linear-gradient(135deg, var(--bo-forest) 0%, #1f4435 66%, #31543c 100%) !important;
+    radial-gradient(circle at 78% 20%, color-mix(in srgb, var(--bo-gold) 20%, transparent), transparent 30%),
+    linear-gradient(
+      135deg,
+      var(--bo-forest) 0%,
+      color-mix(in srgb, var(--bo-forest) 84%, var(--bo-leaf)) 66%,
+      color-mix(in srgb, var(--bo-forest) 72%, var(--bo-leaf)) 100%
+    ) !important;
   color: var(--bo-cream);
 }
 
@@ -507,7 +519,7 @@ textarea:focus-visible {
 }
 
 .hero-title .highlight-gold {
-  color: var(--bo-gold) !important;
+  color: var(--bo-gold-soft) !important;
   font-family: "Playfair Display", serif !important;
   font-style: italic;
   font-weight: 500;
@@ -539,7 +551,7 @@ textarea:focus-visible {
 
 .hero-actions .btn-primary {
   background: var(--bo-gold) !important;
-  color: var(--bo-forest) !important;
+  color: var(--bo-on-accent) !important;
   border-color: var(--bo-gold) !important;
   box-shadow: none !important;
 }
@@ -632,7 +644,7 @@ textarea:focus-visible {
 }
 
 .service-number {
-  color: var(--bo-gold);
+  color: var(--bo-gold-soft);
   font-family: "Cinzel", serif;
   font-size: 0.72rem;
 }
@@ -787,7 +799,7 @@ textarea:focus-visible {
 
 #catalog-sidebar .category-list .category-btn:hover {
   border-color: var(--bo-line) !important;
-  background: var(--bo-cream) !important;
+  background: var(--bo-canvas) !important;
   color: var(--bo-leaf-dark) !important;
 }
 
@@ -812,14 +824,14 @@ textarea:focus-visible {
   min-height: 42px;
   border: 1px solid var(--bo-line) !important;
   border-radius: 10px !important;
-  background: var(--bo-cream) !important;
+  background: var(--bo-canvas) !important;
   color: var(--bo-ink) !important;
 }
 
 .price-preset-btn {
   min-height: 38px;
   border-color: var(--bo-line) !important;
-  background: var(--bo-cream) !important;
+  background: var(--bo-canvas) !important;
   color: var(--bo-muted) !important;
 }
 
@@ -851,7 +863,7 @@ textarea:focus-visible {
   gap: 7px;
   border: 1px solid var(--bo-line) !important;
   border-radius: 999px !important;
-  background: var(--bo-cream) !important;
+  background: var(--bo-canvas) !important;
   color: var(--bo-ink) !important;
   box-shadow: none !important;
   font-size: 0.76rem;
@@ -887,7 +899,7 @@ textarea:focus-visible {
   padding: 0 34px 0 12px !important;
   border: 1px solid var(--bo-line) !important;
   border-radius: 10px !important;
-  background-color: var(--bo-cream) !important;
+  background-color: var(--bo-canvas) !important;
   color: var(--bo-ink) !important;
   font-size: 0.76rem !important;
 }
@@ -1324,7 +1336,7 @@ textarea:focus-visible {
 .cart-drawer-footer {
   padding: 22px 24px 24px !important;
   border-top: 1px solid var(--bo-line) !important;
-  background: var(--bo-cream) !important;
+  background: var(--bo-canvas) !important;
 }
 
 .cart-totals,
@@ -1406,7 +1418,7 @@ textarea:focus-visible {
   min-height: 48px !important;
   border: 1px solid var(--bo-line) !important;
   border-radius: 12px !important;
-  background: var(--bo-cream) !important;
+  background: var(--bo-canvas) !important;
   color: var(--bo-ink) !important;
 }
 
@@ -1559,7 +1571,7 @@ textarea:focus-visible {
 .mobile-filter-drawer .category-list .category-btn {
   min-height: 44px !important;
   border: 1px solid var(--bo-line) !important;
-  background: var(--bo-cream) !important;
+  background: var(--bo-canvas) !important;
   color: var(--bo-muted) !important;
 }
 
@@ -1573,7 +1585,7 @@ textarea:focus-visible {
 .mobile-filter-drawer-footer {
   padding: 12px 14px !important;
   border-top: 1px solid var(--bo-line) !important;
-  background: var(--bo-cream) !important;
+  background: var(--bo-canvas) !important;
 }
 
 .btn-apply-mobile-filters {
@@ -1623,7 +1635,7 @@ textarea:focus-visible {
 .footer-team-access:focus-visible {
   border-color: var(--bo-gold);
   background: var(--bo-gold);
-  color: var(--bo-forest) !important;
+  color: var(--bo-on-accent) !important;
   outline: none;
 }
 
@@ -1984,7 +1996,7 @@ textarea:focus-visible {
     top: -6px !important;
     right: -10px !important;
     background: var(--bo-gold) !important;
-    color: var(--bo-forest) !important;
+    color: var(--bo-on-accent) !important;
   }
 
   .cart-drawer,
@@ -2084,5 +2096,215 @@ textarea:focus-visible {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==========================================================================
+   Storefront refinement — clearer buying flow, accessible controls and
+   white-label typography. Kept here as the final public-facing layer.
+   ========================================================================== */
+
+.brand-title,
+.hero-title,
+.hero-title .highlight-gold,
+.hero-service-brand strong,
+.service-number,
+.facet-main-title,
+.product-card-price,
+.utility-card h2,
+.cart-drawer-title,
+#checkout-modal .modal-header h2,
+.product-detail-title,
+.product-detail-price,
+.mobile-filter-drawer-header h3 {
+  font-family: var(--font-display, var(--font-serif, "Playfair Display", serif)) !important;
+}
+
+.product-card-title {
+  font-family: var(--font-sans, "Montserrat", "Outfit", sans-serif) !important;
+}
+
+.hero-benefit-action {
+  min-height: 50px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--bo-gold-soft);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--bo-gold) 55%, transparent);
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.hero-benefit-action:hover {
+  color: var(--bo-gold);
+  background: rgba(246, 243, 232, 0.07);
+}
+
+.hero-benefit-action .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.home-category-strip {
+  scroll-snap-type: x proximity;
+  overscroll-behavior-inline: contain;
+}
+
+.home-category-btn.category-btn {
+  scroll-snap-align: start;
+}
+
+.product-card:focus-within {
+  border-color: var(--bo-gold) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bo-gold) 22%, transparent), var(--bo-shadow-sm) !important;
+}
+
+/* Opacity alone leaves invisible dialogs reachable from the keyboard. */
+.modal-backdrop:not(.active):not(#web-order-receipt-modal) {
+  visibility: hidden;
+}
+
+.modal-backdrop.active {
+  visibility: visible;
+}
+
+.close-modal-btn,
+.more-menu-close,
+.clear-search-btn,
+.remove-coupon-btn,
+.close-mobile-filter-btn {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.price-preset-btn,
+.facet-check-item {
+  min-height: 44px;
+}
+
+/* The legacy contact cards used a fixed white surface in dark mode. */
+.contact-subtitle,
+.contact-card:not(.highlight) p {
+  color: var(--bo-muted) !important;
+}
+
+.contact-card:not(.highlight) {
+  background: color-mix(in srgb, var(--bo-paper) 96%, transparent) !important;
+  border-color: var(--bo-line) !important;
+  color: var(--bo-ink) !important;
+}
+
+.contact-card:not(.highlight) h3 {
+  color: var(--bo-ink) !important;
+}
+
+.contact-card:not(.highlight) .contact-card-badge {
+  background: color-mix(in srgb, var(--bo-leaf) 12%, transparent) !important;
+  color: var(--bo-ink) !important;
+}
+
+@media (max-width: 900px) {
+  .catalog-header-controls {
+    position: sticky;
+    top: 128px;
+    z-index: 80;
+    background: color-mix(in srgb, var(--bo-paper) 94%, transparent) !important;
+    box-shadow: 0 10px 28px rgba(21, 45, 36, 0.09) !important;
+    backdrop-filter: blur(16px);
+  }
+
+  #sort-select {
+    width: min(42vw, 150px) !important;
+    min-width: 128px !important;
+    padding: 0 32px 0 10px !important;
+    color: var(--bo-ink) !important;
+    background-position: right 10px center !important;
+  }
+
+  .hero-proof {
+    width: 100%;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px !important;
+  }
+
+  .hero-proof span {
+    min-height: 58px;
+    padding: 9px 8px;
+    display: flex !important;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
+    border: 1px solid rgba(246, 243, 232, 0.13);
+    border-radius: 12px;
+    background: rgba(246, 243, 232, 0.055);
+    line-height: 1.25;
+  }
+
+  .hero-proof strong {
+    font-size: 0.69rem;
+  }
+
+  .floating-wheel-trigger,
+  #floating-wheel-btn {
+    display: none !important;
+  }
+
+  .product-card-title {
+    font-size: 0.8rem !important;
+    line-height: 1.38 !important;
+  }
+
+  .product-card-price {
+    font-size: 0.9rem !important;
+  }
+
+  .stock-tag,
+  .product-card-category,
+  .product-card-weight-badge {
+    font-size: 0.66rem !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .hero-actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hero-actions .btn-primary {
+    grid-column: 1 / -1;
+  }
+
+  .hero-actions .btn-secondary {
+    display: inline-flex !important;
+  }
+
+  .hero-actions .btn-secondary,
+  .hero-benefit-action {
+    width: 100%;
+    min-height: 44px !important;
+    padding: 0 10px !important;
+    font-size: 0.68rem !important;
+  }
+
+  .hero-proof span:last-child {
+    display: flex !important;
+  }
+
+  .results-count {
+    font-size: 0.7rem !important;
   }
 }

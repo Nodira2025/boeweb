@@ -3,6 +3,48 @@
    ========================================================================== */
 
 (function () {
+  function getRelativeLuminance(hexColor) {
+    const rawHex = String(hexColor || '').trim().replace(/^#/, '');
+    const expandedHex = rawHex.length === 3
+      ? rawHex.split('').map(character => `${character}${character}`).join('')
+      : rawHex;
+    if (!/^[0-9a-f]{6}$/i.test(expandedHex)) return 0;
+    const channels = [0, 2, 4].map(index => parseInt(expandedHex.slice(index, index + 2), 16) / 255);
+    const linear = channels.map(channel => (
+      channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+    ));
+    return (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2]);
+  }
+
+  function getReadableForeground(hexColor) {
+    const rawHex = String(hexColor || '').trim().replace(/^#/, '');
+    const expandedHex = rawHex.length === 3
+      ? rawHex.split('').map(character => `${character}${character}`).join('')
+      : rawHex;
+    if (!/^[0-9a-f]{6}$/i.test(expandedHex)) return '#152D24';
+    const backgroundLuminance = getRelativeLuminance(expandedHex);
+    const darkContrast = (backgroundLuminance + 0.05) / (getRelativeLuminance('152D24') + 0.05);
+    const lightContrast = (getRelativeLuminance('F6F3E8') + 0.05) / (backgroundLuminance + 0.05);
+    const preferredForeground = darkContrast >= lightContrast ? '#152D24' : '#F6F3E8';
+    if (Math.max(darkContrast, lightContrast) >= 4.5) return preferredForeground;
+
+    const blackContrast = (backgroundLuminance + 0.05) / 0.05;
+    const whiteContrast = 1.05 / (backgroundLuminance + 0.05);
+    return blackContrast >= whiteContrast ? '#000000' : '#FFFFFF';
+  }
+
+  function getAccessibleTextColor(preferredColor, surfaceColor) {
+    const preferred = String(preferredColor || '').trim();
+    if (/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(preferred)) {
+      const preferredLuminance = getRelativeLuminance(preferred);
+      const surfaceLuminance = getRelativeLuminance(surfaceColor);
+      const contrast = (Math.max(preferredLuminance, surfaceLuminance) + 0.05)
+        / (Math.min(preferredLuminance, surfaceLuminance) + 0.05);
+      if (contrast >= 4.5) return preferred;
+    }
+    return getReadableForeground(surfaceColor);
+  }
+
   function getBrandProfile() {
     try {
       const custom = localStorage.getItem('boeweb_tenant_profile_published');
@@ -33,6 +75,7 @@
     if (brand.primary_color) {
       root.style.setProperty('--color-primary', brand.primary_color);
       root.style.setProperty('--color-brand-primary', brand.primary_color);
+      root.style.setProperty('--bo-brand-primary', brand.primary_color);
       root.style.setProperty('--vendor-forest', brand.primary_color);
       root.style.setProperty('--vendor-forest-soft', `${brand.primary_color}ee`);
       root.style.setProperty('--vendor-leaf', brand.accent_color || `${brand.primary_color}bb`);
@@ -45,6 +88,8 @@
     if (brand.accent_color) {
       root.style.setProperty('--color-accent-gold', brand.accent_color);
       root.style.setProperty('--color-brand-accent', brand.accent_color);
+      root.style.setProperty('--bo-brand-accent', brand.accent_color);
+      root.style.setProperty('--bo-on-accent', getReadableForeground(brand.accent_color));
       root.style.setProperty('--vendor-gold', brand.accent_color);
       root.style.setProperty('--vendor-gold-soft', `${brand.accent_color}cc`);
       root.style.setProperty('--cash-gold', brand.accent_color);
@@ -52,13 +97,17 @@
       root.style.setProperty('--shadow-gold', `0 0 14px ${brand.accent_color}66`);
     }
     if (brand.text_color) {
-      root.style.setProperty('--color-text-main', brand.text_color);
-      root.style.setProperty('--vendor-ink', brand.text_color);
-      root.style.setProperty('--cash-ink', brand.text_color);
-      root.style.setProperty('--color-neutral-dark', brand.text_color);
+      const surfaceColor = root.getAttribute('data-theme') === 'dark' ? '#0E211A' : '#F6F3E8';
+      const accessibleTextColor = getAccessibleTextColor(brand.text_color, surfaceColor);
+      root.style.setProperty('--color-text-main', accessibleTextColor);
+      root.style.setProperty('--bo-brand-text', brand.text_color);
+      root.style.setProperty('--vendor-ink', accessibleTextColor);
+      root.style.setProperty('--cash-ink', accessibleTextColor);
+      root.style.setProperty('--color-neutral-dark', accessibleTextColor);
     }
     if (brand.action_color) {
       root.style.setProperty('--color-success', brand.action_color);
+      root.style.setProperty('--bo-brand-action', brand.action_color);
       root.style.setProperty('--vendor-leaf', brand.action_color);
     }
 

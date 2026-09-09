@@ -26,9 +26,9 @@
 
   <!-- Stylesheet -->
   <link rel="stylesheet" href="index.css?v=white_label_v2">
-  <link rel="stylesheet" href="storefront.css?v=white_label_v2">
-  <script src="app-config.js?v=config_v2"></script>
-  <script src="theme.js?v=white_label_v2"></script>
+  <link rel="stylesheet" href="storefront.css?v=purchase_clarity_v1">
+  <script src="app-config.js?v=white_label_contrast_v1"></script>
+  <script src="theme.js?v=white_label_contrast_v1"></script>
 </head>
 <body>
 
@@ -48,13 +48,13 @@
   <!-- Header Navigation -->
   <header class="main-header">
     <div class="header-container">
-      <div class="header-logo-area">
+      <a href="#home" class="header-logo-area" aria-label="Volver al inicio de BÔ Grow Club">
         <img src="assets/logo.jpg" alt="BO growclub Logo" class="brand-logo" id="brand-logo-img">
         <div class="brand-text">
           <span class="brand-title">BO</span>
           <span class="brand-subtitle">growclub</span>
         </div>
-      </div>
+      </a>
 
       <form class="search-form header-search-form" id="search-form" onsubmit="event.preventDefault();" role="search">
         <div class="search-input-wrapper">
@@ -89,7 +89,7 @@
               <circle cx="20" cy="21" r="1"></circle>
               <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
             </svg>
-            <span class="cart-badge" id="cart-count">0</span>
+            <span class="cart-badge" id="cart-count" role="status" aria-live="polite" aria-atomic="true" aria-label="Productos en el carrito">0</span>
           </div>
           <span>Mi Carrito</span>
         </button>
@@ -107,7 +107,7 @@
         <div class="nav-more-menu-dropdown" id="nav-more-menu-dropdown">
           <div class="more-menu-header">
             <span class="more-menu-title">Secciones BÔ Grow Club</span>
-            <button class="more-menu-close" onclick="closeNavMoreMenu()">&times;</button>
+            <button class="more-menu-close" onclick="closeNavMoreMenu()" aria-label="Cerrar menú de secciones">&times;</button>
           </div>
           <div class="more-menu-grid">
             <button class="more-menu-item" onclick="closeNavMoreMenu(); document.getElementById('academy-trigger')?.click();">
@@ -155,23 +155,24 @@
     <div class="zen-leaves-container" id="zen-leaves-container"></div>
     <div class="hero-container">
       <div class="hero-content">
-        <span class="hero-eyebrow">Growshop boutique · Tucumán</span>
-        <h1 class="hero-title">Todo para cultivar<br><span class="highlight-gold">con equilibrio.</span></h1>
-        <p class="hero-description">Productos seleccionados, asesoramiento humano y herramientas para acompañar cada etapa de tu cultivo.</p>
+        <span class="hero-eyebrow">Growshop en Tucumán · Stock propio y a pedido</span>
+        <h1 class="hero-title">Elegí hoy.<br><span class="highlight-gold">Sabé cuándo llega.</span></h1>
+        <p class="hero-description">Un solo catálogo con productos disponibles en el local y opciones de proveedores. Vas a ver el plazo antes de agregar cada producto.</p>
         <div class="hero-actions">
-          <a href="#catalog-section" class="btn btn-primary">Explorar la tienda</a>
-          <button class="btn btn-secondary" id="wheel-trigger-hero">
+          <a href="#catalog-section" class="btn btn-primary">Ver catálogo y plazos</a>
+          <a href="https://wa.me/5493813023185" class="btn btn-secondary hero-whatsapp-cta" data-app-brand-whatsapp-cta target="_blank" rel="noopener" aria-label="Hablar con un asesor por WhatsApp">Hablar con un asesor</a>
+          <button class="hero-benefit-action" id="wheel-trigger-hero" type="button">
             <svg class="icon lotus-icon-btn" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zm0-1.5c-4.694 0-8.5-3.806-8.5-8.5s3.806-8.5 8.5-8.5 8.5 3.806 8.5 8.5-3.806 8.5-8.5 8.5zm-1.5-6.5c0-.828.672-1.5 1.5-1.5s1.5 0 1.5 1.5v2c0 .828-.672 1.5-1.5 1.5s-1.5-.672-1.5-1.5v-2z"></path>
               <path d="M12 5.5c-1.5 0-3 1.5-3 3.5s1.5 3 3 5c1.5-2 3-3 3-5s-1.5-3.5-3-3.5zm0 5c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"></path>
             </svg>
-            Beneficio del día
+            Beneficio de hoy
           </button>
         </div>
         <div class="hero-proof" aria-label="Beneficios de la tienda">
-          <span><strong>+2.200</strong> productos</span>
-          <span><strong>Retiro</strong> en el local</span>
-          <span><strong>Asesoría</strong> personalizada</span>
+          <span><strong>Stock real</strong> del local</span>
+          <span><strong>Plazo visible</strong> por producto</span>
+          <span><strong>Asesoría humana</strong> antes de pagar</span>
         </div>
       </div>
       <aside class="hero-visual hero-service-card" aria-label="Servicios BÔ Grow Club">
@@ -180,9 +181,9 @@
           <div><span>Tu ecosistema BÔ</span><strong>Cultivo, comunidad y bienestar.</strong></div>
         </div>
         <div class="hero-service-list">
-          <div><span class="service-number">01</span><p><strong>Elegí con confianza</strong><small>Catálogo ordenado y stock visible.</small></p></div>
-          <div><span class="service-number">02</span><p><strong>Sumá beneficios</strong><small>Club BÔ, semillas y descuentos.</small></p></div>
-          <div><span class="service-number">03</span><p><strong>Retirá o coordiná envío</strong><small>Finalización simple por WhatsApp.</small></p></div>
+          <div><span class="service-number">01</span><p><strong>Disponible hoy</strong><small>Stock propio listo para retirar o coordinar.</small></p></div>
+          <div><span class="service-number">02</span><p><strong>Opciones de proveedores</strong><small>Productos nacionales con espera informada.</small></p></div>
+          <div><span class="service-number">03</span><p><strong>Compra acompañada</strong><small>Confirmamos cada pedido antes de avanzar.</small></p></div>
         </div>
       </aside>
     </div>
@@ -330,7 +331,7 @@
             <span id="mobile-filter-count-badge" class="mobile-filter-count-badge" style="display: none;">0</span>
           </button>
 
-          <div class="results-count">
+          <div class="results-count" role="status" aria-live="polite" aria-atomic="true">
             Mostrando <span id="displayed-count">0</span> de <span id="total-count">0</span> productos
           </div>
 
@@ -545,7 +546,7 @@
         </svg>
         <span>Descuento aplicado: <strong id="applied-coupon-code">CODE</strong> (<span id="applied-coupon-desc">10% Off</span>)</span>
       </div>
-      <button class="remove-coupon-btn" id="remove-coupon-btn">&times;</button>
+      <button class="remove-coupon-btn" id="remove-coupon-btn" aria-label="Quitar cupón aplicado">&times;</button>
     </div>
 
     <div class="cart-drawer-body">
@@ -1121,7 +1122,7 @@
           <circle cx="20" cy="21" r="1"></circle>
           <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
         </svg>
-        <span class="mobile-cart-badge" id="mobile-cart-count">0</span>
+        <span class="mobile-cart-badge" id="mobile-cart-count" aria-hidden="true">0</span>
       </div>
       <span>Carrito</span>
     </button>
@@ -1130,7 +1131,7 @@
   <!-- Modal 1: Club Register / Login -->
   <div class="modal-backdrop" id="club-auth-modal">
     <div class="modal-card auth-modal-card">
-      <button class="close-modal-btn" id="close-club-auth-btn">&times;</button>
+      <button class="close-modal-btn" id="close-club-auth-btn" aria-label="Cerrar acceso al Club BÔ">&times;</button>
       <div class="auth-modal-header" style="text-align: center; margin-bottom: 15px;">
         <div class="auth-logo" style="margin-bottom: 8px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 40px; height: 40px; color: var(--color-accent-gold); display: inline-block;">
@@ -1206,7 +1207,7 @@
   <!-- Modal 2: VIP Member Portal Dashboard -->
   <div class="modal-backdrop" id="club-portal-modal">
     <div class="modal-card portal-modal-card">
-      <button class="close-modal-btn" id="close-club-portal-btn">&times;</button>
+      <button class="close-modal-btn" id="close-club-portal-btn" aria-label="Cerrar portal del Club BÔ">&times;</button>
       
       <div class="portal-header">
         <div class="portal-profile-area">
@@ -1508,7 +1509,7 @@
   <!-- Modal 3: Printable VIP Certificate -->
   <div class="modal-backdrop" id="academy-certificate-modal">
     <div class="modal-card cert-modal-card">
-      <button class="close-modal-btn" id="close-cert-btn">&times;</button>
+      <button class="close-modal-btn" id="close-cert-btn" aria-label="Cerrar certificado">&times;</button>
       
       <div class="certificate-paper" id="printable-certificate">
         <div class="cert-border-outer">
@@ -1567,6 +1568,9 @@
       <button class="btn btn-primary btn-apply-mobile-filters" onclick="applyMobileFilterDrawer()" style="width: 100%; font-weight: 800; padding: 14px; font-size: 1.05rem;">
         Ver Resultados (<span id="mobile-apply-count">0</span>)
       </button>
+    </div>
+  </div>
+
   <!-- WEB ORDER PRE-PURCHASE RECEIPT MODAL -->
   <div class="modal-backdrop" id="web-order-receipt-modal" style="display: none;">
     <div class="modal-card" style="max-width: 540px; border-color: var(--color-accent-gold); box-shadow: 0 16px 48px rgba(0,0,0,0.7); max-height: 94vh; display: flex; flex-direction: column; overflow: hidden; padding: 0;">

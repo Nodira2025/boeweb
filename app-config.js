@@ -18,6 +18,51 @@
   const SECRET_KEY_PATTERN = /token|secret|password|passcode|private.?key|credential/i;
   const SECRET_VALUE_PATTERN = /^(?:bearer\s+[A-Za-z0-9._~-]{16,}|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/i;
 
+  function getRelativeLuminance(hexColor) {
+    const rawHex = String(hexColor || '').trim().replace(/^#/, '');
+    const expandedHex = rawHex.length === 3
+      ? rawHex.split('').map(character => `${character}${character}`).join('')
+      : rawHex;
+    if (!/^[0-9a-f]{6}$/i.test(expandedHex)) return 0;
+    const channels = [0, 2, 4].map(index => parseInt(expandedHex.slice(index, index + 2), 16) / 255);
+    const linear = channels.map(channel => (
+      channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+    ));
+    return (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2]);
+  }
+
+  function getReadableForeground(backgroundColor) {
+    const backgroundLuminance = getRelativeLuminance(backgroundColor);
+    const dark = '#152D24';
+    const light = '#F6F3E8';
+    const darkContrast = (backgroundLuminance + 0.05) / (getRelativeLuminance(dark) + 0.05);
+    const lightContrast = (getRelativeLuminance(light) + 0.05) / (backgroundLuminance + 0.05);
+    const preferredForeground = darkContrast >= lightContrast ? dark : light;
+    if (Math.max(darkContrast, lightContrast) >= 4.5) return preferredForeground;
+
+    // Mid-tone tenant accents sometimes need absolute black/white to reach WCAG AA.
+    const blackContrast = (backgroundLuminance + 0.05) / 0.05;
+    const whiteContrast = 1.05 / (backgroundLuminance + 0.05);
+    return blackContrast >= whiteContrast ? '#000000' : '#FFFFFF';
+  }
+
+  function getContrastRatio(firstColor, secondColor) {
+    const firstLuminance = getRelativeLuminance(firstColor);
+    const secondLuminance = getRelativeLuminance(secondColor);
+    const lighter = Math.max(firstLuminance, secondLuminance);
+    const darker = Math.min(firstLuminance, secondLuminance);
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+
+  function getAccessibleTextColor(preferredColor, surfaceColor) {
+    const normalizedPreferred = String(preferredColor || '').trim();
+    if (/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(normalizedPreferred)
+      && getContrastRatio(normalizedPreferred, surfaceColor) >= 4.5) {
+      return normalizedPreferred;
+    }
+    return getReadableForeground(surfaceColor);
+  }
+
   const DEFAULT_CONFIG_SOURCE = {
     schemaVersion: CONFIG_SCHEMA_VERSION,
     tenantId: DEFAULT_TENANT_ID,
@@ -586,6 +631,9 @@
     const root = rootElement || globalScope.document?.documentElement;
     if (!root?.style?.setProperty) return normalized;
     const visuals = normalized.brand.visuals;
+    const activeTheme = root.getAttribute?.('data-theme') || 'light';
+    const surfaceColor = activeTheme === 'dark' ? '#0E211A' : '#F6F3E8';
+    const accessibleTextColor = getAccessibleTextColor(visuals.textColor, surfaceColor);
     const variables = {
       '--app-brand-primary': visuals.primaryColor,
       '--app-brand-accent': visuals.accentColor,
@@ -595,8 +643,14 @@
       '--app-font-heading': visuals.headingFont,
       '--color-primary': visuals.primaryColor,
       '--color-accent-gold': visuals.accentColor,
-      '--color-text-main': visuals.textColor,
+      '--color-text-main': accessibleTextColor,
+      '--bo-brand-primary': visuals.primaryColor,
+      '--bo-brand-accent': visuals.accentColor,
+      '--bo-brand-text': visuals.textColor,
+      '--bo-brand-action': visuals.actionColor,
+      '--bo-on-accent': getReadableForeground(visuals.accentColor),
       '--font-sans': visuals.fontFamily,
+      '--font-serif': visuals.headingFont,
       '--font-display': visuals.headingFont
     };
     Object.entries(variables).forEach(([name, value]) => root.style.setProperty(name, value));
@@ -624,8 +678,10 @@
       element.textContent = texts.slogan;
     });
     const whatsappDigits = texts.whatsapp.replace(/\D/g, '');
-    documentRef.querySelectorAll('[data-app-brand-whatsapp]').forEach(whatsappLink => {
-      whatsappLink.textContent = texts.whatsapp;
+    documentRef.querySelectorAll('[data-app-brand-whatsapp], [data-app-brand-whatsapp-cta]').forEach(whatsappLink => {
+      if (whatsappLink.hasAttribute('data-app-brand-whatsapp')) {
+        whatsappLink.textContent = texts.whatsapp;
+      }
       whatsappLink.href = whatsappDigits ? `https://wa.me/${whatsappDigits}` : '#';
     });
     documentRef.querySelectorAll('[data-app-contact-row="whatsapp"]').forEach(whatsappRow => {
