@@ -25,6 +25,13 @@ test('024 agrega un vínculo tenant-safe entre todo pago y su turno operativo', 
 
 test('el backfill sólo asigna pagos digitales cuando existe un único turno compatible', () => {
   const sql = compact(migration);
+  const disableAt = sql.indexOf('disable trigger sale_payments_v2_append_only_v2');
+  const firstBackfillAt = sql.indexOf('update public.sale_payments_v2 set operational_session_id');
+  const enableAt = sql.indexOf('enable trigger sale_payments_v2_append_only_v2');
+
+  assert.ok(disableAt >= 0, 'la migración debe suspender el guard append-only');
+  assert.ok(firstBackfillAt > disableAt, 'el guard debe suspenderse antes del backfill');
+  assert.ok(enableAt > firstBackfillAt, 'el guard debe restaurarse después del backfill');
   assert.match(sql, /payment\.created_at >= session_row\.opened_at/);
   assert.match(sql, /payment\.created_at <= coalesce\(session_row\.closed_at, 'infinity'::timestamptz\)/);
   assert.match(sql, /session_matches\.match_count = 1/);

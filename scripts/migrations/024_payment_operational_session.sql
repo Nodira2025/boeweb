@@ -45,6 +45,13 @@ CREATE INDEX IF NOT EXISTS sale_payments_v2_operational_session_idx
   ON public.sale_payments_v2 (tenant_id, operational_session_id, created_at)
   WHERE operational_session_id IS NOT NULL;
 
+-- La tabla es append-only durante la operación normal. Esta migración necesita
+-- completar una nueva referencia derivada en filas históricas; se suspende sólo
+-- el trigger que impide UPDATE y se lo restaura dentro de la misma transacción.
+-- Si cualquier sentencia falla, PostgreSQL revierte también este cambio de estado.
+ALTER TABLE public.sale_payments_v2
+  DISABLE TRIGGER sale_payments_v2_append_only_v2;
+
 -- El vínculo físico existente es inequívoco para pagos y devoluciones CASH.
 UPDATE public.sale_payments_v2
 SET operational_session_id = cash_session_id
@@ -91,6 +98,9 @@ WHERE reversal.operational_session_id IS NULL
   AND reversal.transaction_type IN ('VOID', 'REFUND')
   AND reversal.metadata->>'original_payment_id' = original.id::text
   AND original.operational_session_id IS NOT NULL;
+
+ALTER TABLE public.sale_payments_v2
+  ENABLE TRIGGER sale_payments_v2_append_only_v2;
 
 -- checkout_sale_v3 ya bloquea y valida v_session_id. Se amplía únicamente la
 -- inserción de sale_payments_v2 para persistir ese mismo turno en todo medio.
