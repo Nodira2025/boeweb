@@ -15,7 +15,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="index.css?v=white_label_v2">
-  <script src="theme.js?v=white_label_v2"></script>
+  <script src="app-config.js?v=canonical_theme_v1"></script>
+  <script src="theme.js?v=canonical_theme_v1"></script>
   
   <style>
     :root {
@@ -36,7 +37,7 @@
       height: 100vh;
       background-color: var(--tv-bg-dark);
       color: #fff;
-      font-family: 'Outfit', sans-serif;
+      font-family: var(--font-sans);
       overflow: hidden;
       user-select: none;
       -webkit-user-select: none;
@@ -92,7 +93,7 @@
 
     .tv-brand-title {
       margin: 0;
-      font-family: 'Playfair Display', serif;
+      font-family: var(--font-display);
       color: var(--tv-accent-gold);
       font-size: 1.8rem;
       letter-spacing: 1px;
@@ -218,7 +219,7 @@
     }
 
     .tv-ad-title {
-      font-family: 'Playfair Display', serif;
+      font-family: var(--font-display);
       font-size: 2.4rem;
       color: var(--tv-accent-gold);
       margin: 0 0 12px 0;
@@ -290,7 +291,7 @@
     }
 
     .tv-qr-title {
-      font-family: 'Playfair Display', serif;
+      font-family: var(--font-display);
       color: var(--tv-accent-gold);
       font-size: 1.8rem;
       margin: 0 0 8px 0;

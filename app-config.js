@@ -63,6 +63,44 @@
     return getReadableForeground(surfaceColor);
   }
 
+  function mixColors(firstColor, secondColor, amount) {
+    const channels = color => color.slice(1).match(/../g).map(value => parseInt(value, 16));
+    const first = channels(firstColor);
+    const second = channels(secondColor);
+    return '#' + first.map((value, index) => Math.round(value * amount + second[index] * (1 - amount))
+      .toString(16).padStart(2, '0')).join('');
+  }
+
+  function createThemeTokens(visuals, mode = 'light') {
+    const dark = mode === 'dark';
+    const primary = visuals.primaryColor;
+    const accent = visuals.accentColor;
+    const background = dark ? mixColors(primary, '#101114', 0.16) : mixColors(primary, '#faf9f5', 0.025);
+    const surface = dark ? mixColors(primary, '#1b1d22', 0.18) : '#fffefb';
+    const elevated = dark ? mixColors(primary, '#252830', 0.2) : mixColors(primary, '#ffffff', 0.04);
+    const strong = getRelativeLuminance(primary) > 0.16 ? mixColors(primary, '#101114', 0.45) : primary;
+    const ink = getAccessibleTextColor(visuals.textColor, background);
+    return {
+      '--theme-bg': background,
+      '--theme-surface': surface,
+      '--theme-elevated': elevated,
+      '--theme-ink': ink,
+      '--theme-muted': getAccessibleTextColor(mixColors(ink, surface, 0.75), surface),
+      '--theme-line': mixColors(ink, surface, 0.22),
+      '--theme-strong': strong,
+      '--theme-strong-soft': mixColors(strong, '#000000', 0.82),
+      '--theme-on-strong': getReadableForeground(strong),
+      '--theme-accent': accent,
+      '--theme-accent-soft': mixColors(accent, '#ffffff', 0.38),
+      '--theme-accent-ink': getAccessibleTextColor(accent, surface),
+      '--theme-on-accent': getReadableForeground(accent),
+      '--theme-primary-ink': getAccessibleTextColor(primary, surface),
+      '--theme-action': visuals.actionColor,
+      '--theme-on-action': getReadableForeground(visuals.actionColor),
+      '--theme-action-ink': getAccessibleTextColor(visuals.actionColor, surface)
+    };
+  }
+
   const DEFAULT_CONFIG_SOURCE = {
     schemaVersion: CONFIG_SCHEMA_VERSION,
     tenantId: DEFAULT_TENANT_ID,
@@ -71,6 +109,7 @@
     updatedAt: null,
     publishedAt: null,
     brand: {
+      verticalCode: 'growshop',
       visuals: {
         logoUrl: 'assets/logo.jpg',
         faviconUrl: 'assets/logo.jpg',
@@ -300,6 +339,9 @@
       updatedAt: typeof sanitized.updatedAt === 'string' ? sanitized.updatedAt : null,
       publishedAt: typeof sanitized.publishedAt === 'string' ? sanitized.publishedAt : null,
       brand: {
+        // Presentation preference only; operational permissions still use the tenant record.
+        verticalCode: cleanEnum(brand.verticalCode || sanitized.vertical_code,
+          ['growshop', 'ferreteria', 'repuestos', 'indumentaria'], defaults.brand.verticalCode),
         visuals: {
           logoUrl: cleanAssetUrl(visuals.logoUrl || sanitized.logo_url, defaults.brand.visuals.logoUrl),
           faviconUrl: cleanAssetUrl(visuals.faviconUrl || sanitized.favicon_url, defaults.brand.visuals.faviconUrl),
@@ -556,6 +598,8 @@
       const safeStage = VALID_STAGES.has(stage) ? stage : 'published';
       const remote = await readRemote(safeStage);
       if (remote.config) {
+        const newer = parseCachedConfig(storage, createStorageKey(tenantId, safeStage), tenantId);
+        if (newer && newer.revision > remote.config.revision) return newer;
         storage.setItem(createStorageKey(tenantId, safeStage), JSON.stringify(remote.config));
         return remote.config;
       }
@@ -632,9 +676,10 @@
     if (!root?.style?.setProperty) return normalized;
     const visuals = normalized.brand.visuals;
     const activeTheme = root.getAttribute?.('data-theme') || 'light';
-    const surfaceColor = activeTheme === 'dark' ? '#0E211A' : '#F6F3E8';
-    const accessibleTextColor = getAccessibleTextColor(visuals.textColor, surfaceColor);
+    const tokens = createThemeTokens(visuals, activeTheme);
+    const accessibleTextColor = tokens['--theme-ink'];
     const variables = {
+      ...tokens,
       '--app-brand-primary': visuals.primaryColor,
       '--app-brand-accent': visuals.accentColor,
       '--app-brand-text': visuals.textColor,
@@ -653,23 +698,94 @@
       '--font-serif': visuals.headingFont,
       '--font-display': visuals.headingFont
     };
+    const aliases = {
+      '--color-bg': '--theme-bg', '--color-card-bg': '--theme-surface',
+      '--color-card-bg-alt': '--theme-elevated', '--color-surface-glass': '--theme-surface',
+      '--color-text-muted': '--theme-muted', '--color-border-subtle': '--theme-line',
+      '--color-border-accent': '--theme-accent', '--color-neutral-dark': '--theme-ink',
+      '--color-neutral-light': '--theme-bg', '--color-neutral-stone': '--theme-elevated',
+      '--color-b2b-bg': '--theme-bg', '--color-b2b-card': '--theme-surface', '--color-b2b-border': '--theme-line',
+      '--color-primary-light': '--theme-action', '--color-success': '--theme-action',
+      '--color-accent-gold-dark': '--theme-accent-ink', '--color-earth-brown': '--theme-primary-ink',
+      '--bo-forest': '--theme-strong', '--bo-forest-soft': '--theme-strong-soft',
+      '--bo-canvas': '--theme-bg', '--bo-paper': '--theme-surface', '--bo-ink': '--theme-ink',
+      '--bo-muted': '--theme-muted', '--bo-line': '--theme-line', '--bo-cream': '--theme-on-strong',
+      '--rc-bg': '--theme-bg', '--rc-surface': '--theme-surface', '--rc-card': '--theme-elevated',
+      '--rc-card-border': '--theme-line', '--rc-gold': '--theme-accent', '--rc-cream': '--theme-ink',
+      '--rc-muted': '--theme-muted', '--tv-accent-green': '--theme-action', '--tv-accent-gold': '--theme-accent',
+      '--tv-bg-dark': '--theme-strong-soft', '--tv-card-bg': '--theme-strong'
+    };
+    for (const prefix of ['vendor', 'cash']) {
+      Object.assign(aliases, {
+        [`--${prefix}-forest`]: '--theme-strong', [`--${prefix}-forest-soft`]: '--theme-strong-soft',
+        [`--${prefix}-gold`]: '--theme-accent', [`--${prefix}-gold-soft`]: '--theme-accent-soft',
+        [`--${prefix}-leaf`]: '--theme-action', [`--${prefix}-leaf-dark`]: '--theme-action-ink',
+        [`--${prefix}-paper`]: '--theme-surface', [`--${prefix}-ink`]: '--theme-ink',
+        [`--${prefix}-muted`]: '--theme-muted', [`--${prefix}-line`]: '--theme-line',
+        [`--${prefix}-cream`]: '--theme-bg', [`--${prefix}-earth`]: '--theme-accent-ink'
+      });
+    }
+    Object.entries(aliases).forEach(([name, token]) => { variables[name] = tokens[token]; });
     Object.entries(variables).forEach(([name, value]) => root.style.setProperty(name, value));
+    root.setAttribute?.('data-brand-theme', 'canonical');
     applyBrandContent(normalized, root.ownerDocument || globalScope.document);
     return normalized;
+  }
+
+  function loadBrandFonts(visuals, documentRef) {
+    if (!documentRef?.head?.appendChild || !documentRef.createElement) return;
+    const families = [...new Set([visuals.fontFamily, visuals.headingFont])]
+      .filter(family => SAFE_FONT_FAMILIES.has(family))
+      .map(family => family.split("'")[1]);
+    const existingLinks = [...documentRef.querySelectorAll('link[rel="stylesheet"]')]
+      .filter(link => !link.hasAttribute('data-brand-fonts'));
+    const missing = families.filter(family => !existingLinks.some(link =>
+      (link.href || '').replace(/\+/g, ' ').includes(`family=${family}:`)));
+    if (!missing.length) return;
+    const href = 'https://fonts.googleapis.com/css2?' + missing.map(family =>
+      `family=${family.replace(/ /g, '+')}:wght@400;500;600;700;800`).join('&') + '&display=swap';
+    let link = documentRef.querySelector('link[data-brand-fonts]');
+    if (!link) {
+      link = documentRef.createElement('link');
+      link.rel = 'stylesheet';
+      link.setAttribute('data-brand-fonts', '');
+      documentRef.head.appendChild(link);
+    }
+    if (link.href !== href) link.href = href;
   }
 
   function applyBrandContent(config, documentRef = globalScope.document) {
     if (!documentRef?.querySelectorAll) return normalizeConfig(config);
     const normalized = normalizeConfig(config);
     const { visuals, texts } = normalized.brand;
-    documentRef.querySelectorAll('#brand-logo-img, .brand-logo, .b2b-logo-img, [data-app-brand-logo]')
+    loadBrandFonts(visuals, documentRef);
+    documentRef.querySelectorAll('#brand-logo-img, .brand-logo, .b2b-logo-img, .vendor-sidebar-brand img, .vendor-login-brand img, .footer-logo-img, .hero-service-brand img, .tablet-header img, .tv-header img, .perfil-header img, .rc-brand-logo, [data-app-brand-logo]')
       .forEach(image => {
         if (image.tagName !== 'IMG') return;
         image.src = visuals.logoUrl;
         image.alt = `${texts.name} — logo`;
       });
-    documentRef.querySelectorAll('.saas-brand-name-display, [data-app-brand-name]')
+    documentRef.querySelectorAll('.saas-brand-name-display, .vendor-sidebar-brand strong, .vendor-login-brand strong, #saas-active-tenant-name, .footer-logo span, .footer-brand-info h3, .tablet-header h2, .tv-brand-title, .perfil-header-title h2, [data-app-brand-name]')
       .forEach(element => { element.textContent = texts.name; });
+    const brandedLabels = {
+      '.vendor-home-eyebrow': `Centro operativo · ${texts.name}`,
+      '.vendor-sidebar-version': `${texts.name} · Centro operativo`,
+      '.pos-ticket-subtitle': `${texts.name} · Mostrador POS`,
+      '#cash-title, #vendor-home-cash-title': `Caja · ${texts.name}`,
+      '.rc-brand-title': `${texts.name} · Reprocam`,
+      '.hero-service-brand span': `Tu tienda ${texts.name}`
+    };
+    Object.entries(brandedLabels).forEach(([selector, label]) => {
+      documentRef.querySelectorAll(selector).forEach(element => { element.textContent = label; });
+    });
+    documentRef.querySelectorAll('.hero-service-brand strong').forEach(element => { element.textContent = texts.slogan; });
+    documentRef.querySelectorAll('.hero-eyebrow').forEach(element => { element.textContent = texts.slogan || texts.name; });
+    documentRef.querySelectorAll('.vendor-login-brand, .header-logo-area').forEach(element => {
+      element.setAttribute('aria-label', `Volver al inicio de ${texts.name}`);
+    });
+    for (const [key, value] of Object.entries({ product: texts.productTerm, vendor: texts.vendorTerm, warehouse: texts.warehouseTerm })) {
+      documentRef.querySelectorAll(`.saas-term-${key}`).forEach(element => { element.textContent = value; });
+    }
     const headerTitle = documentRef.querySelector('.brand-title');
     const headerSubtitle = documentRef.querySelector('.brand-subtitle');
     if (headerTitle) headerTitle.textContent = texts.name;
@@ -726,6 +842,14 @@
     return DEFAULT_TENANT_ID;
   }
 
+  function getPresentationConfig(tenantId = resolveTenantId()) {
+    const id = normalizeTenantId(tenantId);
+    const cached = parseCachedConfig(resolveStorage(), createStorageKey(id, 'published'), id);
+    if (activeConfig.tenantId === id && activeConfig.status === 'published'
+      && activeConfig.revision > (cached?.revision || 0)) return clone(activeConfig);
+    return cached || normalizeConfig({ tenantId: id });
+  }
+
   async function bootstrap(options = {}) {
     const tenantId = normalizeTenantId(options.tenantId || resolveTenantId());
     const repository = createRepository({ ...options, tenantId });
@@ -744,6 +868,9 @@
     createRepository,
     applyCssVariables,
     applyBrandContent,
+    createThemeTokens,
+    getReadableForeground,
+    getPresentationConfig,
     resolveTenantId,
     getActiveTenantId: resolveTenantId,
     get,

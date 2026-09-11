@@ -37,7 +37,7 @@
   --cash-shadow: 0 20px 55px rgba(21, 45, 36, 0.1);
   min-height: 100vh;
   background:
-    radial-gradient(circle at 92% 6%, rgba(194, 162, 70, 0.09), transparent 28rem),
+    radial-gradient(circle at 92% 6%, color-mix(in srgb, var(--theme-accent) 9%, transparent), transparent 28rem),
     var(--vendor-cream);
   color: var(--vendor-ink);
   color-scheme: light;
@@ -62,11 +62,11 @@
   gap: 28px;
   overflow: hidden;
   position: relative;
-  border: 1px solid rgba(194, 162, 70, 0.38);
+  border: 1px solid color-mix(in srgb, var(--theme-accent) 38%, transparent);
   border-radius: 24px;
-  background: linear-gradient(118deg, var(--vendor-paper) 0%, #f8f3e5 72%, #efe5cc 100%);
+  background: linear-gradient(118deg, var(--vendor-paper) 0%, var(--theme-elevated) 72%, var(--theme-elevated) 100%);
   color: var(--vendor-ink);
-  box-shadow: 0 14px 38px rgba(107, 78, 46, 0.08);
+  box-shadow: 0 14px 38px color-mix(in srgb, var(--theme-accent) 8%, transparent);
 }
 
 .vendor-home-hero::after {
@@ -76,9 +76,9 @@
   position: absolute;
   right: -74px;
   top: -152px;
-  border: 1px solid rgba(126, 166, 66, 0.19);
+  border: 1px solid color-mix(in srgb, var(--theme-action) 19%, transparent);
   border-radius: 50%;
-  box-shadow: 0 0 0 55px rgba(194, 162, 70, 0.045), 0 0 0 110px rgba(194, 162, 70, 0.025);
+  box-shadow: 0 0 0 55px color-mix(in srgb, var(--theme-accent) 4.5%, transparent), 0 0 0 110px color-mix(in srgb, var(--theme-accent) 2.5%, transparent);
   pointer-events: none;
 }
 
@@ -100,7 +100,7 @@
 .vendor-home-hero h2 {
   margin: 7px 0 6px;
   color: var(--vendor-forest);
-  font-family: "Playfair Display", serif;
+  font-family: var(--font-display);
   font-size: clamp(2rem, 3vw, 3.35rem);
   font-weight: 700;
   letter-spacing: -0.035em;
@@ -130,11 +130,11 @@
   width: 68px;
   height: 68px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--vendor-forest, #152d24) 0%, #1e4537 100%);
+  background: linear-gradient(135deg, var(--vendor-forest, #152d24) 0%, var(--theme-strong-soft) 100%);
   border: 2.5px solid var(--vendor-gold, #c2a246);
   box-shadow: 0 4px 18px rgba(21, 45, 36, 0.22);
   color: var(--vendor-gold, #c2a246);
-  font-family: "Playfair Display", serif;
+  font-family: var(--font-display);
   font-size: 1.85rem;
   font-weight: 700;
   display: grid;
@@ -230,9 +230,9 @@
   height: 46px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(126, 166, 66, 0.2);
+  border: 1px solid color-mix(in srgb, var(--theme-action) 20%, transparent);
   border-radius: 50%;
-  background: rgba(126, 166, 66, 0.1);
+  background: color-mix(in srgb, var(--theme-action) 10%, transparent);
   color: var(--vendor-forest);
   font-size: 1.15rem;
   font-weight: 800;
@@ -256,7 +256,7 @@
   display: block;
   overflow: hidden;
   color: var(--vendor-ink);
-  font-family: "Playfair Display", serif;
+  font-family: var(--font-display);
   font-size: clamp(1.28rem, 1.7vw, 1.85rem);
   line-height: 1.1;
   text-overflow: ellipsis;
@@ -287,7 +287,7 @@
 
 .vendor-home-cash-card {
   background:
-    linear-gradient(90deg, rgba(126, 166, 66, 0.06), transparent 45%),
+    linear-gradient(90deg, color-mix(in srgb, var(--theme-action) 6%, transparent), transparent 45%),
     var(--vendor-paper);
 }
 
@@ -302,7 +302,7 @@
 .vendor-section-heading h3 {
   margin: 4px 0 0;
   color: var(--vendor-ink);
-  font-family: "Playfair Display", serif;
+  font-family: var(--font-display);
   font-size: 1.45rem;
 }
 
@@ -313,7 +313,7 @@
   align-items: center;
   gap: 7px;
   border-radius: 999px;
-  background: rgba(126, 166, 66, 0.12);
+  background: color-mix(in srgb, var(--theme-action) 12%, transparent);
   color: #365b25;
   font-size: 0.7rem;
   font-weight: 800;
@@ -328,7 +328,7 @@
 }
 
 .vendor-shift-pill[data-status="closed"] {
-  background: rgba(107, 78, 46, 0.1);
+  background: color-mix(in srgb, var(--theme-accent) 10%, transparent);
   color: var(--vendor-earth, #6b4e2e);
 }
 
@@ -352,7 +352,7 @@
   margin-top: 3px;
   display: block;
   color: var(--vendor-forest);
-  font-family: "Playfair Display", serif;
+  font-family: var(--font-display);
   font-size: clamp(2.2rem, 4vw, 3.65rem);
   line-height: 1;
 }
@@ -366,7 +366,7 @@
 .vendor-home-cash-actions button {
   min-height: 46px;
   padding: 0 14px;
-  border: 1px solid rgba(194, 162, 70, 0.48);
+  border: 1px solid color-mix(in srgb, var(--theme-accent) 48%, transparent);
   border-radius: 12px;
   background: transparent;
   color: var(--vendor-ink);
@@ -440,7 +440,7 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: rgba(126, 166, 66, 0.1);
+  background: color-mix(in srgb, var(--theme-action) 10%, transparent);
 }
 
 .vendor-home-quick-action strong,
@@ -511,7 +511,7 @@
 .vendor-flow-card:focus-visible,
 .vendor-dashboard-home .vendor-launchpad-card:hover,
 .vendor-dashboard-home .vendor-launchpad-card:focus-visible {
-  border-color: rgba(194, 162, 70, 0.9) !important;
+  border-color: color-mix(in srgb, var(--theme-accent) 90%, transparent) !important;
   box-shadow: 0 12px 28px rgba(21, 45, 36, 0.12) !important;
   transform: translateY(-3px) !important;
   outline: none;
@@ -537,7 +537,7 @@
   color: var(--vendor-gold);
   font-size: 0.8rem;
   font-weight: 800;
-  border: 1px solid rgba(194, 162, 70, 0.4);
+  border: 1px solid color-mix(in srgb, var(--theme-accent) 40%, transparent);
 }
 
 .vendor-flow-icon {
@@ -623,14 +623,14 @@
 #vendedor-portal-app .cash-hero {
   border-bottom: 1px solid var(--cash-line);
   background:
-    radial-gradient(circle at 88% 18%, rgba(194, 162, 70, 0.13), transparent 30%),
-    linear-gradient(135deg, var(--vendor-paper) 0%, #f1ead7 100%);
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--theme-accent) 13%, transparent), transparent 30%),
+    linear-gradient(135deg, var(--vendor-paper) 0%, var(--theme-elevated) 100%);
   color: var(--vendor-ink);
 }
 
 #vendedor-portal-app .cash-hero::after {
-  border-color: rgba(126, 166, 66, 0.18);
-  box-shadow: 0 0 0 55px rgba(194, 162, 70, 0.035), 0 0 0 110px rgba(194, 162, 70, 0.02);
+  border-color: color-mix(in srgb, var(--theme-action) 18%, transparent);
+  box-shadow: 0 0 0 55px color-mix(in srgb, var(--theme-accent) 3.5%, transparent), 0 0 0 110px color-mix(in srgb, var(--theme-accent) 2%, transparent);
 }
 
 #vendedor-portal-app .cash-eyebrow,
@@ -665,10 +665,10 @@
 }
 
 #vendedor-portal-app .cash-balance-card {
-  border-color: rgba(194, 162, 70, 0.58);
+  border-color: color-mix(in srgb, var(--theme-accent) 58%, transparent);
   background:
-    radial-gradient(circle at 90% 20%, rgba(194, 162, 70, 0.14), transparent 34%),
-    #f0e8d5;
+    radial-gradient(circle at 90% 20%, color-mix(in srgb, var(--theme-accent) 14%, transparent), transparent 34%),
+    var(--theme-elevated);
   color: var(--vendor-ink);
 }
 
@@ -694,10 +694,10 @@
 }
 
 #vendedor-portal-app .cash-backup-panel {
-  border-color: rgba(194, 162, 70, 0.42);
+  border-color: color-mix(in srgb, var(--theme-accent) 42%, transparent);
   background:
-    radial-gradient(circle at 100% 0%, rgba(194, 162, 70, 0.13), transparent 38%),
-    #f3eddd;
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--theme-accent) 13%, transparent), transparent 38%),
+    var(--theme-elevated);
   color: var(--vendor-ink);
 }
 
@@ -727,9 +727,9 @@
     inset: 0 auto 0 0;
     z-index: 1100;
     overflow-y: auto;
-    border-right: 1px solid rgba(194, 162, 70, 0.28);
+    border-right: 1px solid color-mix(in srgb, var(--theme-accent) 28%, transparent);
     background:
-      radial-gradient(circle at 15% 84%, rgba(126, 166, 66, 0.12), transparent 12rem),
+      radial-gradient(circle at 15% 84%, color-mix(in srgb, var(--theme-action) 12%, transparent), transparent 12rem),
       var(--vendor-forest);
     color: var(--vendor-cream);
   }
@@ -745,7 +745,7 @@
   .vendor-sidebar-brand img {
     width: 52px;
     height: 52px;
-    border: 1px solid rgba(194, 162, 70, 0.65);
+    border: 1px solid color-mix(in srgb, var(--theme-accent) 65%, transparent);
     border-radius: 14px;
     object-fit: cover;
   }
@@ -756,7 +756,7 @@
   }
 
   .vendor-sidebar-brand strong {
-    font-family: "Playfair Display", serif;
+    font-family: var(--font-display);
     font-size: 1.03rem;
   }
 
@@ -789,7 +789,7 @@
     border: 1px solid var(--vendor-gold);
     border-radius: 50%;
     color: var(--vendor-gold-soft);
-    font-family: "Playfair Display", serif;
+    font-family: var(--font-display);
     font-size: 1.1rem;
   }
 
@@ -825,7 +825,7 @@
     color: var(--vendor-gold);
     padding: 10px 12px 3px;
     margin-top: 6px;
-    border-top: 1px solid rgba(194, 162, 70, 0.15);
+    border-top: 1px solid color-mix(in srgb, var(--theme-accent) 15%, transparent);
     opacity: 0.85;
     user-select: none;
   }
@@ -862,8 +862,8 @@
   }
 
   .vendor-side-nav-item.active {
-    border-color: rgba(194, 162, 70, 0.72);
-    background: linear-gradient(100deg, #b69031, #d2b34f);
+    border-color: color-mix(in srgb, var(--theme-accent) 72%, transparent);
+    background: linear-gradient(100deg, var(--theme-accent), var(--theme-accent));
     color: var(--vendor-forest);
   }
 
@@ -990,7 +990,7 @@
     display: inline-flex !important;
     align-items: center;
     gap: 6px;
-    background: rgba(194, 162, 70, 0.14) !important;
+    background: color-mix(in srgb, var(--theme-accent) 14%, transparent) !important;
     border: 1.5px solid var(--vendor-gold) !important;
     color: var(--vendor-ink) !important;
     padding: 6px 12px !important;
@@ -1016,14 +1016,14 @@
     gap: 5px !important;
     cursor: pointer;
     text-decoration: none;
-    border: 1.5px solid rgba(194, 162, 70, 0.45) !important;
-    background: rgba(194, 162, 70, 0.1) !important;
+    border: 1.5px solid color-mix(in srgb, var(--theme-accent) 45%, transparent) !important;
+    background: color-mix(in srgb, var(--theme-accent) 10%, transparent) !important;
     color: var(--vendor-ink) !important;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   #vendedor-portal-app .vendor-nav-action-btn:hover {
-    background: rgba(194, 162, 70, 0.22) !important;
+    background: color-mix(in srgb, var(--theme-accent) 22%, transparent) !important;
     border-color: var(--vendor-gold) !important;
     transform: translateY(-1px);
   }
@@ -1045,8 +1045,8 @@
     font-size: 0.74rem;
     font-weight: 700;
     border-radius: 10px;
-    border: 1px solid rgba(194, 162, 70, 0.35);
-    background: rgba(194, 162, 70, 0.12);
+    border: 1px solid color-mix(in srgb, var(--theme-accent) 35%, transparent);
+    background: color-mix(in srgb, var(--theme-accent) 12%, transparent);
     color: var(--vendor-gold-soft);
     cursor: pointer;
     display: inline-flex;
@@ -1057,7 +1057,7 @@
   }
 
   .vendor-sidebar-action-btn:hover {
-    background: rgba(194, 162, 70, 0.25);
+    background: color-mix(in srgb, var(--theme-accent) 25%, transparent);
     border-color: var(--vendor-gold);
   }
 
@@ -1246,7 +1246,7 @@
 
 [data-theme="dark"] .vendor-mobile-bottom-nav {
   background: #0f2019;
-  border-top-color: rgba(194, 162, 70, 0.35);
+  border-top-color: color-mix(in srgb, var(--theme-accent) 35%, transparent);
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.4);
 }
 
@@ -1377,7 +1377,7 @@
 
 .vendor-sheet-op-btn:hover,
 .vendor-sheet-op-btn:active {
-  background: rgba(194, 162, 70, 0.12);
+  background: color-mix(in srgb, var(--theme-accent) 12%, transparent);
   border-color: var(--color-accent-gold, #c2a246);
   transform: translateY(-1px);
 }
@@ -1409,7 +1409,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: rgba(194, 162, 70, 0.12);
+  background: color-mix(in srgb, var(--theme-accent) 12%, transparent);
   border: 1.5px solid var(--color-accent-gold, #c2a246);
   color: var(--color-text-main, #152d24);
   cursor: pointer;
@@ -1417,7 +1417,7 @@
 }
 
 .vendor-nav-icon-btn:hover {
-  background: rgba(194, 162, 70, 0.25);
+  background: color-mix(in srgb, var(--theme-accent) 25%, transparent);
   transform: scale(1.05);
 }
 
@@ -1486,7 +1486,7 @@
 }
 
 .vendor-notif-item:hover {
-  background: rgba(194, 162, 70, 0.12);
+  background: color-mix(in srgb, var(--theme-accent) 12%, transparent);
   border-color: var(--color-accent-gold);
 }
 

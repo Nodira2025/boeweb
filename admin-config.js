@@ -631,7 +631,7 @@ function updateBrandLivePreview() {
   if (previewBadge) previewBadge.textContent = termProduct;
   if (previewBtn) {
     previewBtn.style.background = accentColor;
-    previewBtn.style.color = textColor;
+    previewBtn.style.color = window.AppConfig.getReadableForeground(accentColor);
   }
   if (previewSamplePrice) {
     previewSamplePrice.style.color = actionColor;
@@ -681,6 +681,8 @@ function updateBrandLivePreview() {
       }
     }
   }
+  if (previewName) previewName.style.color = window.AppConfig.getReadableForeground(primaryColor);
+  if (previewSlogan) previewSlogan.style.color = window.AppConfig.getReadableForeground(primaryColor);
 }
 
 function appConfigToLegacyBrand(config) {
@@ -690,6 +692,7 @@ function appConfigToLegacyBrand(config) {
   const hero = normalized.brand.hero;
   return {
     tenant_id: normalized.tenantId,
+    vertical_code: normalized.brand.verticalCode,
     brand_name: texts.name,
     slogan: texts.slogan,
     primary_color: visuals.primaryColor,
@@ -755,6 +758,7 @@ function collectFutureAppConfig(brandProfile = collectLegacyBrandProfile()) {
   return window.AppConfig.normalizeConfig({
     tenantId: getAdminTenantId(),
     brand: {
+      verticalCode: brandProfile.vertical_code,
       visuals: {
         logoUrl: brandProfile.logo_url,
         faviconUrl: brandProfile.favicon_url,

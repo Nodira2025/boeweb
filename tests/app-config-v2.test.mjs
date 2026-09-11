@@ -19,7 +19,7 @@ const expectedShape = {
     'brand', 'catalog', 'payments', 'publishedAt', 'revision', 'rules', 'schemaVersion',
     'status', 'tenantId', 'updatedAt'
   ],
-  brand: ['hero', 'texts', 'visuals'],
+  brand: ['hero', 'texts', 'verticalCode', 'visuals'],
   hero: ['enabled', 'slides'],
   heroSlide: [
     'ctaText', 'durationSeconds', 'id', 'mediaUrl', 'overlayEnabled', 'subtitle',
@@ -333,7 +333,8 @@ test('panel admin integra estilos/config/auth y expone Visuales, Textos, Catálo
   const adminScript = html.search(/<script\s+[^>]*src=["']admin-config\.js/i);
 
   assert.match(html, /<link\s+[^>]*href=["']app-config\.css/i);
-  assert.ok(authScript >= 0 && configScript > authScript && adminScript > configScript, 'auth y config deben cargar antes del controlador admin');
+  assert.ok(authScript >= 0 && configScript >= 0 && adminScript > authScript && adminScript > configScript, 'auth y config deben cargar antes del controlador admin');
+  assert.ok(configScript < html.search(/<script\s+[^>]*src=["']theme\.js/i), 'el tema consume AppConfig desde el inicio');
   assert.match(html, /id=["']admin-dashboard-content["'][^>]*style=["'][^"']*display\s*:\s*none/i);
   for (const sectionId of ['app-config-visuals', 'app-config-texts', 'app-config-catalog', 'app-config-rules', 'app-config-pos']) {
     assert.match(html, new RegExp(`id=["']${sectionId}["']`, 'i'));

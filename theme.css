@@ -1,0 +1,299 @@
+/* Shared presentation layer. Status colors (errors, warnings, stock) retain their meaning. */
+html[data-brand-theme] body {
+  background: var(--theme-bg) !important;
+  color: var(--theme-ink);
+  font-family: var(--font-sans) !important;
+}
+
+html[data-brand-theme] #vendedor-portal-app {
+  /* Local legacy tokens must not shadow the published theme inherited from html. */
+  --color-bg: var(--theme-bg);
+  --color-b2b-bg: var(--theme-bg);
+  --color-card-bg: var(--theme-surface);
+  --color-b2b-card: var(--theme-surface);
+  --color-card-bg-alt: var(--theme-elevated);
+  --color-text-main: var(--theme-ink);
+  --color-text-muted: var(--theme-muted);
+  --color-neutral-dark: var(--theme-ink);
+  --color-neutral-light: var(--theme-bg);
+  --color-neutral-stone: var(--theme-elevated);
+  --color-border-subtle: var(--theme-line);
+  --color-b2b-border: var(--theme-line);
+  --color-surface-glass: var(--theme-surface);
+  --cash-cream: var(--theme-bg);
+  --cash-paper: var(--theme-surface);
+  --cash-ink: var(--theme-ink);
+  --cash-muted: var(--theme-muted);
+  --cash-line: var(--theme-line);
+  background: var(--theme-bg);
+  color: var(--theme-ink);
+  color-scheme: normal;
+}
+
+html[data-brand-theme][data-theme="dark"] { color-scheme: dark; }
+html[data-brand-theme][data-theme="light"] { color-scheme: light; }
+
+html[data-brand-theme] :is(.vendor-home-hero, .vendor-home-kpi, .vendor-home-panel,
+  .vendor-flow-card, .vendor-flow-card-v2, .vendor-quick-op-card, .vendor-operations-sheet-card,
+  .vendor-sheet-op-btn, .vendor-mobile-bottom-nav, .vendor-login-shell, .vendor-login-form-panel) {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-line) !important;
+  color: var(--theme-ink) !important;
+}
+
+html[data-brand-theme] :is(.vendor-home-hero, .vendor-login-screen) {
+  background: linear-gradient(120deg, var(--theme-surface), var(--theme-elevated)) !important;
+  color: var(--theme-ink);
+}
+
+html[data-brand-theme] :is(.vendor-home-hero h2, .vendor-flow-card strong, .vendor-flow-card h3,
+  .vendor-flow-card-v2 h3, .vendor-welcome-subtitle, .vendor-login-brand, .vendor-login-form-panel h1,
+  .vendor-home-secondary-action, .vendor-home-kpi-icon, .vendor-quick-op-info strong) {
+  color: var(--theme-ink) !important;
+}
+
+html[data-brand-theme] :is(.vendor-home-eyebrow, .vendor-section-eyebrow) {
+  color: var(--theme-accent-ink);
+}
+
+html[data-brand-theme] :is(.vendor-home-secondary-action, .b2b-search-input,
+  .vendor-login-form-panel input, .vendor-mobile-nav-item) {
+  background: var(--theme-elevated) !important;
+  color: var(--theme-ink) !important;
+  border-color: var(--theme-line) !important;
+}
+
+html[data-brand-theme] :is(.vendor-desktop-sidebar, .vendor-welcome-avatar,
+  .vendor-flow-card.featured, .vendor-flow-card-v2.featured, .vendor-flow-card-primary) {
+  background: var(--theme-strong) !important;
+  color: var(--theme-on-strong) !important;
+}
+
+html[data-brand-theme] :is(.vendor-sidebar-brand, .vendor-sidebar-profile strong,
+  .vendor-sidebar-profile small, .vendor-side-nav-item, .vendor-sidebar-tool-link,
+  .vendor-flow-card.featured strong, .vendor-flow-card.featured h3, .vendor-flow-card-primary h3) {
+  color: var(--theme-on-strong) !important;
+}
+
+html[data-brand-theme] :is(.vendor-sidebar-brand small, .vendor-sidebar-version,
+  .vendor-nav-group-title, .vendor-sidebar-avatar, .vendor-welcome-avatar) {
+  color: var(--theme-accent-soft) !important;
+}
+
+html[data-brand-theme] :is(.vendor-side-nav-item.active, .vendor-home-primary-action,
+  .btn-admin-save, .app-config-action-primary, .admin-page-nav-item[aria-current="page"]) {
+  background: var(--theme-accent) !important;
+  border-color: var(--theme-accent) !important;
+  color: var(--theme-on-accent) !important;
+}
+
+html[data-brand-theme] :is(.vendor-home-hero h2, .vendor-home-kpi strong, .vendor-sidebar-brand strong,
+  .vendor-welcome-avatar, .vendor-sidebar-avatar, .vendor-login-form-panel h1, .vendor-login-brand strong,
+  .cash-hero h2, .cash-panel h3, .cash-kpi strong, .rc-brand-title) {
+  font-family: var(--font-display) !important;
+}
+
+html[data-brand-theme] #vendedor-portal-app :is(.cash-hero, .cash-panel, .cash-form-section,
+  .cash-method-card, .cash-sheet-panel, .cash-close-panel) {
+  background: var(--theme-surface);
+  color: var(--theme-ink);
+  border-color: var(--theme-line);
+}
+
+html[data-brand-theme] #vendedor-portal-app :is(.cash-hero h2, .cash-panel h3,
+  .cash-panel-step, .cash-method-card strong, .cash-sheet-panel h3) {
+  color: var(--theme-ink);
+}
+
+html[data-brand-theme] #vendedor-portal-app :is(.cash-eyebrow, .cash-balance-card span) {
+  color: var(--theme-accent-ink);
+}
+html[data-brand-theme] #vendedor-portal-app :is(.cash-balance-card strong,
+  .cash-icon-btn, .pos-mode-switcher-nav) {
+  color: var(--theme-ink) !important;
+}
+html[data-brand-theme] #vendedor-portal-app :is(.cash-date-pill, .cash-status-badge) {
+  background: var(--theme-elevated);
+  color: var(--theme-ink);
+  border-color: var(--theme-line);
+}
+html[data-brand-theme] #vendedor-portal-app :is(.cash-primary-btn, .cash-secondary-btn) {
+  background: var(--theme-accent);
+  color: var(--theme-on-accent);
+}
+
+html[data-brand-theme] :is(.cash-shell button, .cash-shell input, .cash-shell select, .cash-shell textarea) {
+  font-family: var(--font-sans);
+}
+
+html[data-brand-theme] :is(.vendor-home-kpi-icon, .vendor-home-hero::after) {
+  border-color: var(--theme-line);
+  background-color: var(--theme-elevated);
+}
+
+/* The admin used its own permanent green background, independent of light/dark mode. */
+html[data-brand-theme] :is(.admin-card, .admin-page-header, .app-config-panel, .admin-access-card) {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-line);
+  color: var(--theme-ink);
+}
+
+html[data-brand-theme] :is(.admin-page-nav, .admin-access-gate, .admin-input,
+  .app-config-field input, .app-config-field select, .app-config-nav button, .app-config-nav a, .toggle-row) {
+  background: var(--theme-elevated) !important;
+  border-color: var(--theme-line);
+  color: var(--theme-ink);
+}
+
+html[data-brand-theme] #admin-dashboard-content .main-header {
+  background: var(--theme-surface) !important;
+  color: var(--theme-ink);
+}
+
+html[data-brand-theme] :is(.app-config-shell, .app-config-title, .app-config-status,
+  .app-config-action, .app-config-message, .admin-page-header h1, .admin-page-nav-item,
+  .admin-page-save-state, .app-config-field label, .app-config-toggle strong) {
+  color: var(--theme-ink);
+}
+
+html[data-brand-theme] :is(.app-config-eyebrow, .app-config-panel h3, .app-config-panel legend,
+  .admin-card-title, .admin-label, .admin-access-card h1) {
+  color: var(--theme-accent-ink);
+}
+
+html[data-brand-theme] :is(.admin-card-subtitle, .app-config-copy, .app-config-panel p,
+  .admin-access-card p, .admin-page-header p) {
+  color: var(--theme-muted);
+}
+
+html[data-brand-theme] :is(.admin-page-save-state, .app-config-status) {
+  border-color: var(--theme-line);
+  background: var(--theme-elevated);
+}
+
+html[data-brand-theme] .admin-page-save-state[data-state="error"] {
+  border-color: #c95649;
+}
+
+html[data-brand-theme] .theme-toggle-btn {
+  background: var(--theme-surface) !important;
+  color: var(--theme-ink) !important;
+  border-color: var(--theme-line) !important;
+}
+
+html[data-brand-theme] :is(.header-logo-area, .brand-title) { color: var(--theme-primary-ink); }
+html[data-brand-theme] .desktop-nav-link:is(:hover, .active) { color: var(--theme-ink); }
+
+html[data-brand-theme] .cash-hero:not(#vendedor-portal-app .cash-hero) {
+  color: var(--theme-on-strong);
+  background: var(--theme-strong);
+}
+
+html[data-brand-theme] .rc-brand-title { color: var(--theme-accent-ink); }
+
+html[data-brand-theme] #vendedor-portal-app .vendor-side-nav-item.active {
+  color: var(--theme-on-accent) !important;
+}
+
+html[data-brand-theme] #vendedor-portal-app .theme-toggle-btn {
+  background: var(--theme-surface) !important;
+  color: var(--theme-ink) !important;
+  border-color: var(--theme-line) !important;
+}
+
+html[data-brand-theme] :is(.vendor-flow-card small, .vendor-flow-card-v2 small,
+  .vendor-flow-card p, .vendor-flow-card-v2 p, .vendor-quick-op-info small) {
+  color: var(--theme-muted) !important;
+}
+
+html[data-brand-theme] #admin-dashboard-content .main-header .btn-secondary {
+  color: var(--theme-primary-ink) !important;
+  border-color: var(--theme-line) !important;
+}
+
+html[data-brand-theme] .admin-input::placeholder { color: var(--theme-muted); opacity: 1; }
+html[data-brand-theme] .toggle-row strong { color: var(--theme-ink) !important; }
+html[data-brand-theme] .toggle-row > div > span { color: var(--theme-muted) !important; }
+html[data-brand-theme] .admin-card :is(.admin-label, small):not(#brand-preview-canvas *) {
+  color: var(--theme-accent-ink) !important;
+}
+html[data-brand-theme] .admin-card label:has(#hero-slider-active-toggle) {
+  background: var(--theme-surface) !important;
+  color: var(--theme-ink) !important;
+}
+html[data-brand-theme] .admin-card button[onclick^="addHeroSlide"] {
+  color: var(--theme-ink) !important;
+  background: var(--theme-surface);
+}
+
+html[data-brand-theme] .vendor-flow-desc { color: var(--theme-muted); }
+html[data-brand-theme] .vendor-flow-card.vendor-flow-card-featured {
+  background: var(--theme-strong) !important;
+  border-color: var(--theme-accent) !important;
+}
+html[data-brand-theme] .vendor-flow-card-featured .vendor-flow-title {
+  color: var(--theme-on-strong) !important;
+}
+html[data-brand-theme] .vendor-flow-card-featured .vendor-flow-desc {
+  color: var(--theme-on-strong) !important;
+}
+
+/* Auxiliary screens keep their own layout while sharing the published palette. */
+html[data-brand-theme] :is(.tv-ambient-bg, .tablet-viewport, .hero-vip-banner) {
+  background: linear-gradient(135deg, var(--theme-strong), var(--theme-strong-soft));
+  color: var(--theme-on-strong);
+}
+html[data-brand-theme] :is(.tv-header, .tablet-header, .coffee-card, .game-card) {
+  background: var(--theme-strong);
+  border-color: var(--theme-line);
+  color: var(--theme-on-strong);
+}
+html[data-brand-theme] .main-header { background: var(--theme-surface) !important; }
+html[data-brand-theme] :is(.main-header .btn-secondary, .perfil-header-title h2) {
+  color: var(--theme-primary-ink) !important;
+  border-color: var(--theme-line) !important;
+}
+html[data-brand-theme] :is(.coffee-card-title, .coffee-card-desc, .tablet-header h2, .tv-brand-title) {
+  color: var(--theme-on-strong) !important;
+}
+html[data-brand-theme] :is(.coffee-hero h1, .coffee-hero p, .contact-title, .contact-subtitle) {
+  color: var(--theme-ink);
+}
+
+html[data-brand-theme] :is(.rc-btn-primary, .rc-unit-btn.is-active, .rc-quick-btn:hover, .rc-quick-btn:active) {
+  background: var(--theme-accent);
+  color: var(--theme-on-accent);
+}
+
+html[data-brand-theme] :is(.vendor-login-field label, .vendor-login-brand strong) {
+  color: var(--theme-ink);
+}
+html[data-brand-theme] :is(.vendor-login-heading p, .vendor-login-heading > span,
+  .vendor-login-brand small, .vendor-login-help, .vendor-login-profile-copy small) {
+  color: var(--theme-muted);
+}
+html[data-brand-theme] .vendor-nav-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--theme-line);
+  background: var(--theme-surface);
+  color: var(--theme-ink);
+}
+html[data-brand-theme] .vendor-nav-action-btn[hidden] { display: none !important; }
+
+@media (max-width: 700px) {
+  html[data-brand-theme] #vendedor-portal-app .b2b-logo-area { flex-wrap: wrap; gap: 10px; }
+  html[data-brand-theme] #vendedor-portal-app .b2b-logo-area > a { width: 100%; }
+  html[data-brand-theme] #vendedor-portal-app .b2b-logo-area > div:not(.saas-prototype-only) {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  html[data-brand-theme] #active-vendor-display-name { max-width: 120px; overflow: hidden; }
+}

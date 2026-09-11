@@ -1,316 +1,135 @@
-/* ==========================================================================
-   BÔ GrowClub / SaaS Platform — Universal White-Label & Theme Engine
-   ========================================================================== */
-
+/* Published AppConfig is the single presentation source for every portal. */
 (function () {
-  function getRelativeLuminance(hexColor) {
-    const rawHex = String(hexColor || '').trim().replace(/^#/, '');
-    const expandedHex = rawHex.length === 3
-      ? rawHex.split('').map(character => `${character}${character}`).join('')
-      : rawHex;
-    if (!/^[0-9a-f]{6}$/i.test(expandedHex)) return 0;
-    const channels = [0, 2, 4].map(index => parseInt(expandedHex.slice(index, index + 2), 16) / 255);
-    const linear = channels.map(channel => (
-      channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
-    ));
-    return (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2]);
+  'use strict';
+
+  const root = document.documentElement;
+  let refreshTask = null;
+  let refreshTenant = null;
+  let refreshGeneration = 0;
+  let lastRefresh = 0;
+  let presentationClient = null;
+
+  function readMode() {
+    try { return localStorage.getItem('boeweb_theme') === 'dark' ? 'dark' : 'light'; }
+    catch (error) { return 'light'; }
   }
 
-  function getReadableForeground(hexColor) {
-    const rawHex = String(hexColor || '').trim().replace(/^#/, '');
-    const expandedHex = rawHex.length === 3
-      ? rawHex.split('').map(character => `${character}${character}`).join('')
-      : rawHex;
-    if (!/^[0-9a-f]{6}$/i.test(expandedHex)) return '#152D24';
-    const backgroundLuminance = getRelativeLuminance(expandedHex);
-    const darkContrast = (backgroundLuminance + 0.05) / (getRelativeLuminance('152D24') + 0.05);
-    const lightContrast = (getRelativeLuminance('F6F3E8') + 0.05) / (backgroundLuminance + 0.05);
-    const preferredForeground = darkContrast >= lightContrast ? '#152D24' : '#F6F3E8';
-    if (Math.max(darkContrast, lightContrast) >= 4.5) return preferredForeground;
-
-    const blackContrast = (backgroundLuminance + 0.05) / 0.05;
-    const whiteContrast = 1.05 / (backgroundLuminance + 0.05);
-    return blackContrast >= whiteContrast ? '#000000' : '#FFFFFF';
+  function applyBrandIdentity(config) {
+    if (!window.AppConfig) return;
+    const tenantId = window.AppConfig.resolveTenantId();
+    const current = window.AppConfig.get();
+    const draft = current.tenantId === tenantId && current.status === 'draft' ? current : null;
+    const candidate = config?.brand && config.tenantId === tenantId
+      ? config : (draft || window.AppConfig.getPresentationConfig(tenantId));
+    window.AppConfig.applyCssVariables(candidate);
   }
 
-  function getAccessibleTextColor(preferredColor, surfaceColor) {
-    const preferred = String(preferredColor || '').trim();
-    if (/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(preferred)) {
-      const preferredLuminance = getRelativeLuminance(preferred);
-      const surfaceLuminance = getRelativeLuminance(surfaceColor);
-      const contrast = (Math.max(preferredLuminance, surfaceLuminance) + 0.05)
-        / (Math.min(preferredLuminance, surfaceLuminance) + 0.05);
-      if (contrast >= 4.5) return preferred;
-    }
-    return getReadableForeground(surfaceColor);
-  }
-
-  function getBrandProfile() {
-    try {
-      const custom = localStorage.getItem('boeweb_tenant_profile_published');
-      if (custom) {
-        const parsed = JSON.parse(custom);
-        if (parsed && (parsed.brand_name || parsed.primary_color)) {
-          return parsed;
-        }
-      }
-    } catch (_) {}
-
-    try {
-      if (typeof TENANT_PROFILES_CACHE !== 'undefined' && TENANT_PROFILES_CACHE['11111111-1111-1111-1111-111111111111']) {
-        return TENANT_PROFILES_CACHE['11111111-1111-1111-1111-111111111111'];
-      }
-    } catch (_) {}
-
-    return null;
-  }
-
-  function applyBrandIdentity() {
-    const brand = getBrandProfile();
-    if (!brand) return;
-
-    const root = document.documentElement;
-
-    // 1. Inyectar variables de color de marca (degradados y tonos derivados)
-    if (brand.primary_color) {
-      root.style.setProperty('--color-primary', brand.primary_color);
-      root.style.setProperty('--color-brand-primary', brand.primary_color);
-      root.style.setProperty('--bo-brand-primary', brand.primary_color);
-      root.style.setProperty('--vendor-forest', brand.primary_color);
-      root.style.setProperty('--vendor-forest-soft', `${brand.primary_color}ee`);
-      root.style.setProperty('--vendor-leaf', brand.accent_color || `${brand.primary_color}bb`);
-      root.style.setProperty('--color-border-accent', brand.primary_color);
-      root.style.setProperty('--color-primary-light', `${brand.primary_color}dd`);
-      root.style.setProperty('--cash-forest', brand.primary_color);
-      root.style.setProperty('--cash-ink', brand.primary_color);
-      root.style.setProperty('--tv-accent-green', brand.primary_color);
-    }
-    if (brand.accent_color) {
-      root.style.setProperty('--color-accent-gold', brand.accent_color);
-      root.style.setProperty('--color-brand-accent', brand.accent_color);
-      root.style.setProperty('--bo-brand-accent', brand.accent_color);
-      root.style.setProperty('--bo-on-accent', getReadableForeground(brand.accent_color));
-      root.style.setProperty('--vendor-gold', brand.accent_color);
-      root.style.setProperty('--vendor-gold-soft', `${brand.accent_color}cc`);
-      root.style.setProperty('--cash-gold', brand.accent_color);
-      root.style.setProperty('--tv-accent-gold', brand.accent_color);
-      root.style.setProperty('--shadow-gold', `0 0 14px ${brand.accent_color}66`);
-    }
-    if (brand.text_color) {
-      const surfaceColor = root.getAttribute('data-theme') === 'dark' ? '#0E211A' : '#F6F3E8';
-      const accessibleTextColor = getAccessibleTextColor(brand.text_color, surfaceColor);
-      root.style.setProperty('--color-text-main', accessibleTextColor);
-      root.style.setProperty('--bo-brand-text', brand.text_color);
-      root.style.setProperty('--vendor-ink', accessibleTextColor);
-      root.style.setProperty('--cash-ink', accessibleTextColor);
-      root.style.setProperty('--color-neutral-dark', accessibleTextColor);
-    }
-    if (brand.action_color) {
-      root.style.setProperty('--color-success', brand.action_color);
-      root.style.setProperty('--bo-brand-action', brand.action_color);
-      root.style.setProperty('--vendor-leaf', brand.action_color);
-    }
-
-    // 1.1 Inyectar tipografías configuradas
-    if (brand.font_family) {
-      root.style.setProperty('--font-sans', brand.font_family);
-      if (document.body) {
-        document.body.style.fontFamily = brand.font_family;
-      }
-    }
-    if (brand.font_headings) {
-      root.style.setProperty('--font-serif', brand.font_headings);
-      root.style.setProperty('--font-display', brand.font_headings);
-    }
-
-    // 2. Actualizar textos de marca en todos los portales y dispositivos
-    if (brand.brand_name) {
-      // Header brand title & logos
-      document.querySelectorAll('.brand-title, .saas-brand-name-display, #header-brand-name, .b2b-logo-text h1, #saas-active-tenant-name, .tablet-header h2, .tv-header h1').forEach(el => {
-        el.textContent = brand.brand_name;
-      });
-
-      // Vendor eyebrows and sidebar versions
-      document.querySelectorAll('.vendor-home-eyebrow').forEach(el => {
-        el.textContent = `Centro operativo · ${brand.brand_name}`;
-      });
-      document.querySelectorAll('.vendor-sidebar-version').forEach(el => {
-        el.textContent = `${brand.brand_name} · Centro operativo`;
-      });
-      document.querySelectorAll('.vendor-login-brand').forEach(el => {
-        el.textContent = brand.brand_name;
-      });
-
-      // Footer logo text
-      document.querySelectorAll('.footer-logo span, .footer-brand-info h3').forEach(el => {
-        el.textContent = brand.brand_name;
-      });
-
-      // Footer description
-      document.querySelectorAll('.footer-brand-desc').forEach(el => {
-        el.textContent = `${brand.brand_name} — ${brand.slogan || 'Estudio Comercial & Catálogo Exclusivo'}. ${brand.address ? `Visitanos en ${brand.address}.` : ''}`;
-      });
-
-      // Hero service text
-      document.querySelectorAll('.hero-service-brand span').forEach(el => {
-        el.textContent = `Tu tienda ${brand.brand_name}`;
-      });
-
-      // Document title si no estamos en admin-config
-      if (!window.location.pathname.includes('admin-config')) {
-        document.title = `${brand.brand_name} · ${brand.slogan || 'Tienda Oficial'}`;
-      }
-    }
-
-    // Subtítulo / Eslogan
-    if (brand.slogan !== undefined) {
-      document.querySelectorAll('.brand-subtitle').forEach(el => {
-        if (brand.slogan) {
-          el.textContent = brand.slogan;
-          el.style.display = '';
-        } else {
-          el.textContent = '';
-          el.style.display = 'none';
-        }
-      });
-
-      document.querySelectorAll('.hero-eyebrow').forEach(el => {
-        if (brand.slogan) {
-          el.textContent = `${brand.slogan} ${brand.address ? `· ${brand.address}` : ''}`;
-        }
-      });
-
-      document.querySelectorAll('.hero-service-brand strong').forEach(el => {
-        if (brand.slogan) el.textContent = brand.slogan;
-      });
-    }
-
-    // 3. Actualizar logos de marca
-    if (brand.logo_url) {
-      document.querySelectorAll('img.brand-logo, img.main-brand-logo, #brand-logo-img, .footer-logo-img, .hero-service-brand img, .b2b-logo-img, .tablet-logo img, .tv-header img').forEach(el => {
-        el.src = brand.logo_url;
-        if (brand.brand_name) el.alt = brand.brand_name;
-      });
-    }
-
-    // 4. Actualizar favicon si está definido
-    if (brand.favicon_url || brand.logo_url) {
-      const favUrl = brand.favicon_url || brand.logo_url;
-      let link = document.querySelector("link[rel~='icon']");
-      if (!link) {
-        link = document.createElement('link');
-        link.rel = 'icon';
-        document.head.appendChild(link);
-      }
-      link.href = favUrl;
-    }
-
-    // 5. Actualizar terminología
-    if (brand.terminology) {
-      if (brand.terminology.product) {
-        document.querySelectorAll('.saas-term-product').forEach(el => { el.textContent = brand.terminology.product; });
-      }
-      if (brand.terminology.vendor) {
-        document.querySelectorAll('.saas-term-vendor').forEach(el => { el.textContent = brand.terminology.vendor; });
-      }
-      if (brand.terminology.warehouse) {
-        document.querySelectorAll('.saas-term-warehouse').forEach(el => { el.textContent = brand.terminology.warehouse; });
-      }
-    }
-
-    // 6. Actualizar enlaces de contacto (WhatsApp, Instagram, Dirección)
-    if (brand.whatsapp_phone) {
-      const cleanPhone = String(brand.whatsapp_phone).replace(/\D/g, '');
-      if (cleanPhone) {
-        document.querySelectorAll('a[href*="wa.me"], a.whatsapp-float-btn').forEach(el => {
-          el.href = `https://wa.me/${cleanPhone}?text=Hola!%20Quiero%20hacer%20una%20consulta%20en%20${encodeURIComponent(brand.brand_name || 'la tienda')}`;
-        });
-        document.querySelectorAll('.footer-contact-info a[href*="wa.me"]').forEach(el => {
-          el.textContent = brand.whatsapp_phone;
-        });
-      }
-    }
-
-    if (brand.instagram_url) {
-      document.querySelectorAll('.footer-contact-info a[href*="instagram"]').forEach(el => {
-        const cleanHandle = brand.instagram_url.startsWith('@') ? brand.instagram_url.slice(1) : brand.instagram_url.replace(/https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/$/, '');
-        el.href = `https://www.instagram.com/${cleanHandle}/`;
-        el.textContent = brand.instagram_url.startsWith('@') ? brand.instagram_url : `@${cleanHandle}`;
-      });
-    }
-
-    if (brand.address) {
-      document.querySelectorAll('.footer-contact-info a[href*="google.com/search"]').forEach(el => {
-        el.textContent = brand.address;
-        el.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(brand.address)}`;
-      });
-    }
-
-    // 7. Ocultar enlaces o módulos de BÔ Coffee si existen en el DOM
-    document.querySelectorAll('a[href*="coffee.html"], .vendor-flow-card[href*="coffee"], [data-feature="coffee"]').forEach(el => {
-      el.style.display = 'none';
+  function applyTheme(mode) {
+    const currentConfig = window.AppConfig?.get();
+    root.setAttribute('data-theme', mode === 'dark' ? 'dark' : 'light');
+    applyBrandIdentity(currentConfig?.revision > 0 || currentConfig?.status === 'draft' ? currentConfig : null);
+    document.querySelectorAll('.theme-toggle-btn').forEach(button => {
+      button.textContent = mode === 'dark' ? '☀️ Modo Claro' : '🌙 Modo Oscuro';
+      button.title = mode === 'dark' ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro';
     });
+  }
 
-    // 8. Inicializar o actualizar Hero Slider si está presente
-    if (typeof window.initHeroSlider === 'function') {
-      window.initHeroSlider();
+  function resolveConfigClient() {
+    if (window.boeSupabaseClient || window.supabaseClient) return window.boeSupabaseClient || window.supabaseClient;
+    // Older entry points expose a global lexical binding rather than a window property.
+    try { if (typeof supabaseClient !== 'undefined' && supabaseClient?.from) return supabaseClient; }
+    catch (error) { /* An entry-point declaration may still be in its temporal dead zone. */ }
+    if (!presentationClient && window.supabase?.createClient) {
+      presentationClient = window.supabase.createClient(
+        'https://sxbhrgvizqylnfcqzhin.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4YmhyZ3ZpenF5bG5mY3F6aGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMjM1MzEsImV4cCI6MjA5Njg5OTUzMX0.UUOwXsHXKNCjlJKdxMUlAuCtNAnNWgAroBwMlWAdTag',
+        { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+      );
     }
+    return presentationClient;
   }
 
-  function applyTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    const btns = document.querySelectorAll('.theme-toggle-btn');
-    btns.forEach(function (btn) {
-      if (theme === 'dark') {
-        btn.innerHTML = '☀️ Modo Claro';
-        btn.title = 'Cambiar a Modo Claro';
-        btn.style.borderColor = 'var(--color-accent-gold)';
-        btn.style.color = 'var(--color-accent-gold)';
-      } else {
-        btn.innerHTML = '🌙 Modo Oscuro';
-        btn.title = 'Cambiar a Modo Oscuro';
-        btn.style.borderColor = 'var(--color-primary)';
-        btn.style.color = 'var(--color-primary)';
+  async function refreshPublishedTheme(options = {}) {
+    if (!window.AppConfig) return null;
+    const tenantId = window.AppConfig.resolveTenantId();
+    if (refreshTask && refreshTenant === tenantId) return refreshTask;
+    if (!options.force && refreshTenant === tenantId && Date.now() - lastRefresh < 15000) {
+      return window.AppConfig.getPresentationConfig(tenantId);
+    }
+    refreshTenant = tenantId;
+    const generation = ++refreshGeneration;
+    refreshTask = (async () => {
+      try {
+        const client = resolveConfigClient();
+        const repository = window.AppConfig.createRepository({ tenantId, supabaseClient: client });
+        const remote = await repository.loadPublished();
+        if (generation !== refreshGeneration || tenantId !== window.AppConfig.resolveTenantId()) return null;
+        // A slower read must not replace a newer publication received from another tab.
+        const cached = window.AppConfig.getPresentationConfig(tenantId);
+        const config = cached.revision > remote.revision ? cached : remote;
+        const editingDraft = window.location.pathname.includes('admin-config') && window.AppConfig.get('status') === 'draft';
+        if (!editingDraft) {
+          applyBrandIdentity(config);
+          window.boeStorefrontAppConfig = config;
+          window.dispatchEvent(new CustomEvent('boeweb_app_config_loaded', { detail: config }));
+        }
+        lastRefresh = Date.now();
+        return config;
+      } catch (error) {
+        console.warn('No se pudo actualizar la apariencia publicada.', error);
+        return null;
+      } finally {
+        if (generation === refreshGeneration) refreshTask = null;
       }
-    });
-    applyBrandIdentity();
+    })();
+    return refreshTask;
   }
 
-  function initZenTheme() {
-    const savedTheme = localStorage.getItem('boeweb_theme') || 'light';
-    applyTheme(savedTheme);
-    applyBrandIdentity();
-  }
+  function initZenTheme() { applyTheme(readMode()); }
 
   function toggleTheme() {
-    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-    localStorage.setItem('boeweb_theme', newTheme);
-    applyTheme(newTheme);
-    if (window.showToast) {
-      window.showToast(newTheme === 'dark' ? '🌙 Modo Oscuro Activado' : '☀️ Modo Claro Activado');
-    }
+    const mode = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem('boeweb_theme', mode); }
+    catch (error) { console.warn('La preferencia de modo se conservará solo en esta página.', error); }
+    applyTheme(mode);
   }
 
-  // Execute immediately to prevent flash
+  if (!document.querySelector('link[data-brand-theme-styles]')) {
+    const stylesheet = document.createElement('link');
+    stylesheet.rel = 'stylesheet';
+    stylesheet.href = 'theme.css?v=canonical_theme_v1';
+    stylesheet.setAttribute('data-brand-theme-styles', '');
+    document.head.appendChild(stylesheet);
+  }
   initZenTheme();
-
-  // Re-run on document lifecycle stages
-  document.addEventListener('DOMContentLoaded', initZenTheme);
-  window.addEventListener('load', applyBrandIdentity);
-
-  // Synchronize across tabs or on live update events
-  window.addEventListener('storage', function (e) {
-    if (e.key && (e.key === 'boeweb_tenant_profile_published' || e.key === 'boeweb_theme')) {
-      initZenTheme();
-    }
-  });
-
-  window.addEventListener('boeweb_brand_updated', function () {
+  document.addEventListener('DOMContentLoaded', () => {
     applyBrandIdentity();
+    // Allow the page's own client initialization to finish before selecting the reader.
+    setTimeout(() => { void refreshPublishedTheme({ force: true }); }, 0);
   });
+  window.addEventListener('load', () => { applyBrandIdentity(); });
+  window.addEventListener('focus', () => { void refreshPublishedTheme(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void refreshPublishedTheme();
+  });
+  window.addEventListener('storage', event => {
+    if (!window.AppConfig) return;
+    if (event.key === 'boeweb_theme') { initZenTheme(); return; }
+    const key = window.AppConfig.createStorageKey(window.AppConfig.resolveTenantId(), 'published');
+    if (event.key !== key) return;
+    try {
+      const config = event.newValue ? JSON.parse(event.newValue) : null;
+      if (config?.tenantId !== window.AppConfig.resolveTenantId() || config.status !== 'published') return;
+      if (config.revision < window.AppConfig.get('revision', 0)) return;
+      applyBrandIdentity(config);
+      window.boeStorefrontAppConfig = config;
+      window.dispatchEvent(new CustomEvent('boeweb_app_config_loaded', { detail: config }));
+    } catch (error) { console.warn('Se ignoró una notificación de tema inválida.', error); }
+  });
+  window.addEventListener('boeweb_brand_updated', event => { applyBrandIdentity(event.detail); });
 
   window.initZenTheme = initZenTheme;
   window.toggleTheme = toggleTheme;
   window.applyBrandIdentity = applyBrandIdentity;
+  window.refreshPublishedTheme = refreshPublishedTheme;
 })();

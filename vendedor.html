@@ -17,7 +17,8 @@
 
   <!-- Base Stylesheet (Retail) -->
   <link rel="stylesheet" href="index.css?v=white_label_v2">
-  <script src="theme.js?v=white_label_v2"></script>
+  <script src="app-config.js?v=canonical_theme_v1"></script>
+  <script src="theme.js?v=canonical_theme_v1"></script>
   
   <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1029,8 +1030,8 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="vendedor-caja.css?v=white_label_v2">
-  <link rel="stylesheet" href="vendedor-portal.css?v=white_label_v2">
+  <link rel="stylesheet" href="vendedor-caja.css?v=canonical_theme_v1">
+  <link rel="stylesheet" href="vendedor-portal.css?v=canonical_theme_v1">
   <link rel="stylesheet" href="vendedor-stock.css?v=white_label_v7_toolbar_v1">
   <style id="vendor-rescue-critical-styles">
     .saas-prototype-only,
@@ -1144,7 +1145,7 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="vendedor-login.css?v=white_label_v2">
+  <link rel="stylesheet" href="vendedor-login.css?v=canonical_theme_v1">
 </head>
 <body>
 
@@ -1715,7 +1716,7 @@
       <header class="stock-entry-hero" style="background: var(--color-card-bg); border-bottom: 2px solid var(--color-accent-gold); padding: 20px; border-radius: 16px; margin-bottom: 20px;">
         <div>
           <span class="stock-entry-eyebrow" style="color: var(--color-accent-gold); font-weight: 800; text-transform: uppercase;">Venta de Mostrador · Catálogo Interno de la Tienda</span>
-          <h2 id="pos-workspace-title" style="margin: 4px 0 8px 0; font-family: 'Playfair Display', serif;">🏷️ Vender un producto</h2>
+          <h2 id="pos-workspace-title" style="margin: 4px 0 8px 0; font-family: var(--font-display);">🏷️ Vender un producto</h2>
           <p style="margin: 0; opacity: 0.85; font-size: 0.9rem;">Escanear con pistola lectora de código de barras, buscar con el teclado en tiempo real o usar dictado por voz para vender productos propios de la tienda.</p>
         </div>
         <button type="button" class="stock-entry-close" onclick="switchVendorTab('home')" aria-label="Volver al inicio">×</button>
@@ -1823,7 +1824,7 @@
             <section id="pos-express-item-modal" style="display: none; margin-top: 12px; padding: 2px;" aria-labelledby="pos-express-panel-title">
               <div class="wms-modal-card" style="background: var(--color-card-bg); border: 1.5px solid var(--color-accent-gold); border-radius: 16px; width: 100%; padding: 20px; box-sizing: border-box; box-shadow: var(--shadow-md); position: relative;">
                 <button type="button" class="cash-secondary-btn" onclick="closePosExpressItemModal()" style="position: absolute; right: 14px; top: 12px; min-height: 44px;">Ocultar</button>
-                <h3 id="pos-express-panel-title" style="margin: 0 0 6px 0; padding-right: 90px; font-family: 'Playfair Display', serif; font-size: 1.25rem; color: var(--color-text-main);">⚡ Venta Rápida / Ítem Libre</h3>
+                <h3 id="pos-express-panel-title" style="margin: 0 0 6px 0; padding-right: 90px; font-family: var(--font-display); font-size: 1.25rem; color: var(--color-text-main);">⚡ Venta Rápida / Ítem Libre</h3>
                 <p style="margin: 0 0 16px 0; font-size: 0.82rem; color: var(--color-text-muted);">Cobrá inmediatamente un producto recién llegado sin trabar la atención.</p>
                 
                 <form id="pos-express-item-form" onsubmit="handlePosExpressItemSubmit(event)">
@@ -3620,7 +3621,7 @@
 
           <div style="margin-bottom: 16px;">
             <label style="display: block; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--color-text-muted); margin-bottom: 4px;">Observaciones / Guía de Envío (Opcional):</label>
-            <textarea id="fulfillments-modal-notes-input" rows="2" placeholder="Ej: Llega el viernes con el pedido B2B..." style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--color-border-subtle); font-size: 0.85rem; font-family: inherit; box-sizing: border-box;"></textarea>
+            <textarea id="fulfillments-modal-notes-input" rows="2" placeholder="Ej: Llega el viernes con el pedido B2B..." style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--color-border-subtle); font-size: 0.85rem; font-family: var(--font-sans); box-sizing: border-box;"></textarea>
           </div>
 
           <div style="display: flex; gap: 10px; justify-content: flex-end;">
@@ -4779,7 +4780,7 @@
           <span style="font-size: 1.8rem; background: rgba(194,162,70,0.15); padding: 6px 10px; border-radius: 12px; border: 1px solid rgba(194,162,70,0.4);">🛡️</span>
           <div>
             <div style="display: flex; align-items: center; gap: 8px;">
-              <h3 style="margin: 0; font-size: 1.25rem; color: #c2a246; font-weight: 800; font-family: 'Cinzel', serif;">Centro de Auditoría & Seguridad</h3>
+              <h3 style="margin: 0; font-size: 1.25rem; color: #c2a246; font-weight: 800; font-family: var(--font-display);">Centro de Auditoría & Seguridad</h3>
               <span style="background: #c62828; color: #fff; font-size: 0.68rem; font-weight: 800; padding: 2px 8px; border-radius: 8px; letter-spacing: 0.08em; text-transform: uppercase;">Solo Administradores</span>
             </div>
             <small style="color: rgba(247,246,242,0.75); font-size: 0.8rem;">Historial inmutable de eliminaciones de productos, anulaciones de caja, mermas y áreas sensibles</small>
@@ -4938,9 +4939,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="mapa-local.js?v=gba_leafgreen_v11"></script>
   <script src="saas-auth.js?v=session_recovery_v4"></script>
-  <script src="app-config.js?v=config_v3"></script>
   <script src="business-verticals.js?v=verticals_v1"></script>
-  <script src="tenant-theme.js?v=theme_v1"></script>
+  <script src="tenant-theme.js?v=canonical_theme_v1"></script>
   <script src="migration-ai.js?v=migration_v1"></script>
   <script src="migration-rollback.js?v=migration_v1"></script>
   <script src="migration-center.js?v=migration_v1"></script>

@@ -42,6 +42,16 @@ const TENANT_PROFILES_CACHE = {
 
 class TenantThemeManager {
   getProfile(tenantId) {
+    if (typeof window !== 'undefined' && window.AppConfig) {
+      const config = window.AppConfig.getPresentationConfig(tenantId || window.AppConfig.resolveTenantId());
+      const { visuals, texts } = config.brand;
+      return {
+        tenant_id: config.tenantId, brand_name: texts.name, slogan: texts.slogan, vertical_code: config.brand.verticalCode,
+        primary_color: visuals.primaryColor, accent_color: visuals.accentColor,
+        logo_url: visuals.logoUrl, favicon_url: visuals.faviconUrl,
+        terminology: { product: texts.productTerm, vendor: texts.vendorTerm, warehouse: texts.warehouseTerm }
+      };
+    }
     if (!tenantId || tenantId === '11111111-1111-1111-1111-111111111111') {
       try {
         if (typeof localStorage !== 'undefined') {
@@ -80,6 +90,12 @@ class TenantThemeManager {
 
   applyTenantTheme(tenantId) {
     if (typeof document === 'undefined') return;
+    if (typeof window !== 'undefined' && window.AppConfig) {
+      if (tenantId !== window.AppConfig.resolveTenantId()) return;
+      window.AppConfig.applyCssVariables(window.AppConfig.getPresentationConfig(tenantId));
+      if (window.refreshPublishedTheme) void window.refreshPublishedTheme();
+      return;
+    }
     this.resetActiveTheme(); // Limpieza total de residuales
 
     const profile = this.getProfile(tenantId);

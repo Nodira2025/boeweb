@@ -48,6 +48,7 @@ const PUBLIC_ROOT_FILES = [
   'tenant-onboarding.js',
   'tenant-theme.js',
   'theme.js',
+  'theme.css',
   'tv.html',
   'tv.js',
   'vendedor-caja.css',
