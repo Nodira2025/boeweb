@@ -620,6 +620,16 @@
     });
   }
 
+  async function updateWmsSector({ supabaseClient, authContext, sector }) {
+    const { tenantId } = requireOperationalContext(supabaseClient, authContext);
+    return invokeOperationalRpc(supabaseClient, 'update_wms_sector_v2', {
+      p_tenant_id: tenantId, p_code: sector.id, p_name: String(sector.name || '').trim(),
+      p_description: String(sector.desc || '').trim(), p_sort_order: Number(sector.sortOrder),
+      p_expected_revision: Number(sector.revision), p_photo_action: sector.photoAction || 'keep',
+      p_photo_path: sector.photoPath || null
+    });
+  }
+
   async function upsertInventoryLocation({ supabaseClient, authContext, location }) {
     const { tenantId } = requireOperationalContext(supabaseClient, authContext);
     const locationId = location?.id ? normalizeUuid(location.id) : null;
@@ -1074,6 +1084,7 @@
     upsertExternalCatalogOffer,
     upsertExternalCatalogSource,
     upsertInventoryLocation,
+    updateWmsSector,
     voidSale
   });
 

@@ -56,7 +56,10 @@ const PUBLIC_ROOT_FILES = [
   'vendedor-portal.css',
   'vendedor-stock.css',
   'vendedor.html',
-  'vendedor.js'
+  'vendedor.js',
+  'wms-map.css',
+  'wms-sectors.js',
+  'wms-sector-editor.js'
 ];
 
 function copyPublicFile(relativePath) {

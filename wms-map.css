@@ -1,0 +1,95 @@
+/* The map uses the published palette; photographs keep their original colors. */
+html[data-brand-theme] #store-map-section {
+  color: var(--theme-ink);
+  font-family: var(--font-sans);
+  padding-bottom: 90px;
+}
+#store-map-section :is(button, input, select, textarea) { font: inherit; }
+#store-map-section button { min-height: 44px; cursor: pointer; }
+#store-map-section button:disabled { cursor: wait; opacity: .65; }
+#store-map-section :is(button, input, textarea, select):focus-visible {
+  outline: 3px solid var(--theme-accent-ink); outline-offset: 3px;
+}
+#store-map-section :is(.store-map-workspace-header, .gba-room-selector, .wms-explorer-top-bar,
+  .wms-sector-card, .wms-furniture-card, .wms-sector-wall-group, .wms-wall-group-header,
+  .wms-level-row, .wms-level-body, .wms-sector-pending-tray, .wms-sector-pending-card,
+  .wms-empty-slot-card, .wms-sector-editor) {
+  background: var(--theme-surface);
+  border: 1px solid var(--theme-line);
+  color: var(--theme-ink);
+  box-shadow: none;
+}
+#store-map-section :is(.wms-sector-card-title, .wms-sector-pill, .wms-furniture-code,
+  .wms-level-subheading, .wms-wall-group-header h4, .wms-furniture-card strong,
+  .wms-level-header, .wms-level-header span, .wms-breadcrumb-nav > div > span) {
+  color: var(--theme-ink) !important;
+}
+#store-map-section :is(.wms-sector-card-desc, .wms-sector-stats, .wms-wall-group-header small,
+  .wms-editor-photo p, .wms-sector-editor > p) { color: var(--theme-muted) !important; }
+#store-map-section .wms-sector-stats { font-size: .8rem; margin: 12px 0 0; line-height: 1.5; }
+#store-map-section :is(.wms-sector-pill, .wms-furniture-code, .wms-level-subheading, .wms-level-header) { background: var(--theme-elevated); }
+#store-map-section :is(.gba-room-btn, .gba-pad-btn, .wms-breadcrumb-btn, .wms-sector-editor button) {
+  background: var(--theme-elevated); color: var(--theme-ink); border: 1px solid var(--theme-line);
+  border-radius: 10px; padding: 10px 14px;
+}
+#store-map-section :is(.gba-room-btn.active, .wms-sector-action-btn, .wms-sector-save) {
+  background: var(--theme-accent) !important; color: var(--theme-on-accent) !important;
+  border-color: var(--theme-accent);
+}
+#store-map-section .gba-room-selector { display: flex; flex-wrap: wrap; gap: 16px; padding: 18px; border-radius: 16px; }
+#store-map-section .gba-room-selector > div { flex-wrap: wrap; }
+#store-map-section .gba-room-selector span { color: var(--theme-muted) !important; }
+#store-map-section .wms-total-summary { font-size: .85rem; line-height: 1.5; }
+#store-map-section .wms-sectors-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+#store-map-section .wms-sector-card-footer { flex-wrap: wrap; gap: 10px; border-color: var(--theme-line); }
+#store-map-section .wms-sector-banner { height: 205px; background: var(--theme-elevated); }
+#store-map-section .wms-sector-photo-open { width: 100%; height: 100%; display: block; padding: 0; border: 0; background: transparent; }
+#store-map-section .wms-sector-photo-open img { object-fit: cover; }
+#store-map-section .wms-sector-photo-btn {
+  background: var(--theme-strong); color: var(--theme-on-strong);
+  border: 1px solid var(--theme-line); padding: 10px 14px; min-height: 44px;
+}
+#store-map-section .wms-photo-placeholder {
+  display: flex; min-height: 150px; height: 100%; align-items: center; justify-content: center;
+  flex-direction: column; gap: 8px; background: var(--theme-elevated); color: var(--theme-muted);
+  text-align: center; padding: 16px 16px 54px; box-sizing: border-box;
+}
+#store-map-section .wms-photo-placeholder strong { font-size: 2.2rem; color: var(--theme-primary-ink); font-family: var(--font-display); }
+#store-map-section .wms-map-warning { background: var(--theme-elevated); color: var(--theme-ink); border-left: 4px solid var(--theme-accent); padding: 14px; border-radius: 8px; }
+#store-map-section .wms-sector-editor { border-radius: 18px; padding: 24px; border-color: var(--theme-accent); }
+#store-map-section .wms-sector-editor header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+#store-map-section .wms-sector-editor h3 { font-family: var(--font-display); margin: 5px 0; font-size: 1.5rem; }
+#store-map-section .wms-editor-eyebrow { text-transform: uppercase; font-size: .75rem; letter-spacing: .08em; color: var(--theme-accent-ink); font-weight: 700; }
+#store-map-section .wms-sector-editor fieldset { border: 0; padding: 0; margin: 20px 0 0; min-width: 0; }
+#store-map-section .wms-editor-fields { display: grid; grid-template-columns: minmax(0, 1fr) 100px; gap: 16px; }
+#store-map-section .wms-editor-fields label { display: flex; flex-direction: column; gap: 8px; font-size: .85rem; font-weight: 600; }
+#store-map-section .wms-editor-fields input, #store-map-section .wms-editor-fields textarea {
+  width: 100%; min-width: 0; box-sizing: border-box; min-height: 44px; border-radius: 8px;
+  padding: 10px 12px; background: var(--theme-elevated); color: var(--theme-ink); border: 1px solid var(--theme-line);
+}
+#store-map-section .wms-editor-description { grid-column: 1 / -1; }
+#store-map-section .wms-editor-photo { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; margin-top: 22px; align-items: center; }
+#store-map-section .wms-editor-photo img { width: 100%; max-height: 180px; object-fit: contain; border-radius: 12px; }
+#store-map-section .wms-editor-photo-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+#store-map-section .wms-file-choice { position: relative; overflow: hidden; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; padding: 10px 14px; border: 1px solid var(--theme-line); border-radius: 10px; background: var(--theme-elevated); }
+#store-map-section .wms-file-choice input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
+#store-map-section .wms-file-choice:focus-within { outline: 3px solid var(--theme-accent-ink); }
+#store-map-section .wms-editor-message { min-height: 1.4em; color: var(--theme-ink); }
+#store-map-section .wms-sector-detail-photo { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; color: var(--theme-muted); }
+#store-map-section .wms-sector-detail-photo > button { padding: 0; background: none; border: 0; }
+#store-map-section .wms-sector-detail-photo img { display: block; width: 200px; max-height: 140px; object-fit: cover; border-radius: 12px; }
+#store-map-section :is(.wms-product-item-card, .wms-shelf-inspector, .wms-map-guide, .gba-history-container) {
+  background: var(--theme-surface) !important; color: var(--theme-ink); border-color: var(--theme-line) !important;
+}
+#store-map-section :is(.wms-product-item-card strong, .wms-product-item-card small,
+  .wms-shelf-inspector strong, .wms-shelf-inspector small, .wms-empty-slot-card strong, .wms-empty-slot-card p) {
+  color: var(--theme-ink) !important;
+}
+#store-map-section .wms-shelf-inspector-header { background: var(--theme-elevated) !important; }
+@media (max-width: 600px) {
+  #store-map-section .wms-sector-editor { padding: 16px; }
+  #store-map-section .wms-editor-photo { grid-template-columns: minmax(0, 1fr); }
+  #store-map-section .wms-sector-editor header { align-items: start; }
+  #store-map-section .wms-sector-save { width: 100%; }
+  #store-map-section .wms-sector-card-body { padding: 16px; }
+}

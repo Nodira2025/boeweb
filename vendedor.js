@@ -1948,13 +1948,14 @@ async function loadStoreMapData(forceReload = false) {
   if (storeMapDataLoading || (storeMapDataLoaded && !forceReload)) return;
   storeMapDataLoading = true;
   try {
+    if (window.WmsSectors) await window.WmsSectors.load({ force: forceReload });
     await loadWmsInventoryData(forceReload);
     if (wmsDataLoadError) throw new Error(wmsDataLoadError);
     const shelves = getWmsModules().map(module => ({
       id: module.id,
       code: module.code,
       name: module.sector_name,
-      floor_level: Number(module.metadata?.floor_level) || (String(module.code).startsWith('DP') ? 2 : 1),
+      floor_level: window.WmsSectors.resolveFloor({ wms_code: module.code, location_metadata: module.metadata }),
       x: Number(module.metadata?.map_x) || undefined,
       y: Number(module.metadata?.map_y) || undefined,
       width: Number(module.metadata?.map_width) || undefined,
@@ -1969,7 +1970,7 @@ async function loadStoreMapData(forceReload = false) {
 
     const productLocations = getWmsLocations().map(location => ({
       ...location,
-      floor_level: Number(location.location_metadata?.floor_level) || (String(location.module_code).startsWith('DP') ? 2 : 1),
+      floor_level: window.WmsSectors.resolveFloor(location),
       shelf_code: location.module_code,
       shelf_level: location.human_level,
       stock: location.quantity,
@@ -1979,15 +1980,17 @@ async function loadStoreMapData(forceReload = false) {
 
     // Cargar e integrar borradores que ya tienen asignado un Sector o Góndola
     let draftLocations = [];
+    let draftsUnavailable = false;
     try {
       const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
       if (supabaseClient && context?.tenantId) {
-        const { data: drafts } = await supabaseClient
+        const { data: drafts, error: draftsError } = await supabaseClient
           .from('catalog_product_drafts_v2')
           .select('*')
           .eq('tenant_id', context.tenantId)
           .in('status', ['PENDING_LOCATION', 'PENDING_REVIEW'])
           .order('created_at', { ascending: false });
+        if (draftsError) throw draftsError;
 
         if (Array.isArray(drafts)) {
           draftLocations = drafts.map(d => {
@@ -1995,13 +1998,7 @@ async function loadStoreMapData(forceReload = false) {
             const locData = d.location_data || {};
             const meta = locData.metadata || hyd.metadata || {};
             const wmsCode = locData.code || hyd.wms_code || hyd.shelf_code || '';
-            const floor = Number(meta.floor_level || hyd.floor_level) || (
-              wmsCode.startsWith('S6') || wmsCode.startsWith('DP') ? 6 :
-              wmsCode.startsWith('S5') ? 5 :
-              wmsCode.startsWith('S4') ? 4 :
-              wmsCode.startsWith('S3') ? 3 :
-              wmsCode.startsWith('S2') ? 2 : 1
-            );
+            const floor = window.WmsSectors.resolveFloor({ wms_code: wmsCode, floor_level: meta.floor_level || d.floor_level });
             return {
               id: hyd.id,
               draft_id: hyd.id,
@@ -2015,8 +2012,8 @@ async function loadStoreMapData(forceReload = false) {
               floor_level: floor,
               shelf_code: locData.code || hyd.shelf_code || 'GENERAL',
               shelf_level: meta.shelf_level || hyd.shelf_level || null,
-              location_label: locData.name || hyd.location_label || `Sector ${floor} (Borrador)`,
-              wms_code: wmsCode || `S${floor}-GENERAL`,
+              location_label: locData.name || hyd.location_label || (floor ? `Sector ${floor} (Borrador)` : 'Sin sector asignado'),
+              wms_code: wmsCode || (floor ? `S${floor}-GENERAL` : 'GENERAL'),
               is_draft: true,
               is_sector_only: Boolean(locData.metadata?.is_sector_only || wmsCode.endsWith('-GENERAL') || wmsCode === 'GENERAL' || !wmsCode)
             };
@@ -2024,21 +2021,17 @@ async function loadStoreMapData(forceReload = false) {
         }
       }
     } catch (draftErr) {
+      draftsUnavailable = true;
       console.warn('Error al cargar borradores en el mapa WMS:', draftErr);
     }
 
-    const combinedLocations = [...productLocations];
-    const existingCodes = new Set(productLocations.map(p => String(p.product_code || p.sku || p.id).toUpperCase()));
-    draftLocations.forEach(d => {
-      const code = String(d.product_code || d.sku || d.id).toUpperCase();
-      if (!existingCodes.has(code)) {
-        combinedLocations.push(d);
-        existingCodes.add(code);
-      }
-    });
+    // Draft quantities are displayed separately, never counted as confirmed stock.
+    const combinedLocations = [...productLocations, ...draftLocations];
 
     if (window.setStoreMapData) {
-      window.setStoreMapData(shelves, combinedLocations, 'Inventario central y borradores sincronizados');
+      window.setStoreMapData(shelves, combinedLocations, draftsUnavailable
+        ? 'Inventario confirmado actualizado · pendientes no disponibles'
+        : 'Inventario confirmado y pendientes actualizados');
     }
     storeMapDataLoaded = true;
   } catch (error) {
@@ -3905,6 +3898,13 @@ const LOCATION_ZONE_OPTIONS = [
   { id: 'S5', label: '💡 Sector 5 (Indoor y Herramientas)', help: 'Carpas, iluminación LED, turbinas y herramientas (PC al centro)', prefix: 'S5', floor_level: 5 },
   { id: 'S6', label: '📦 Sector 6 (Bajo Escalera)', help: 'Espacio bajo escalera, reservas y stock pesado (PC al centro)', prefix: 'S6', floor_level: 6 }
 ];
+window.addEventListener('boeweb_wms_sectors_updated', () => {
+  window.WmsSectors?.list().forEach(sector => {
+    const option = LOCATION_ZONE_OPTIONS.find(item => item.id === sector.id);
+    if (option) { option.label = sector.name; option.help = sector.desc; }
+    ZONE_NOUN_LABELS[sector.id] = `el sector ${sector.name}`;
+  });
+});
 
 const ZONE_NOUN_LABELS = {
   'S1': 'el Sector 1 (Parafernalia)',
@@ -6249,7 +6249,8 @@ function renderLocationAssistant() {
     content.innerHTML = renderPendingLocationList();
   } else if (step === 'zone') {
     if (title) title.textContent = 'Paso 1: Elegí el sector del local';
-    content.innerHTML = renderLocationChoiceCards('1. Elegí el sector', '¿En qué sector del local está ubicado? (Todos tienen la PC al centro)', LOCATION_ZONE_OPTIONS, 'chooseLocationAssistantZone');
+    const orderedZones = window.WmsSectors?.list().map(sector => LOCATION_ZONE_OPTIONS.find(option => option.id === sector.id)).filter(Boolean) || LOCATION_ZONE_OPTIONS;
+    content.innerHTML = renderLocationChoiceCards('1. Elegí el sector', '¿En qué sector del local está ubicado? (Todos tienen la PC al centro)', orderedZones, 'chooseLocationAssistantZone');
   } else if (step === 'type') {
     if (title) title.textContent = 'Paso 2: ¿Dónde lo guardaste? (Tipo de ubicación)';
     content.innerHTML = renderLocationChoiceCards('2. Elegí el tipo de ubicación', '¿Dónde lo guardaste? (Estante, Heladera, Vitrina, Góndola o Piso)', LOCATION_TYPE_OPTIONS, 'chooseLocationAssistantType');
@@ -9181,7 +9182,15 @@ function mapCanonicalWmsData(locations, balances, products, ledgerEntries, count
   }));
 }
 
+let wmsDataLoadTask = null;
 async function loadWmsInventoryData(forceReload = false) {
+  if (wmsDataLoadTask) return wmsDataLoadTask;
+  wmsDataLoadTask = readWmsInventoryData(forceReload);
+  try { return await wmsDataLoadTask; }
+  finally { wmsDataLoadTask = null; }
+}
+
+async function readWmsInventoryData(forceReload = false) {
   if (wmsDataLoading || (wmsDataLoaded && !forceReload)) return getWmsLocations();
   const context = typeof SaasAuth !== 'undefined' ? SaasAuth.getTenantContext() : null;
   if (!supabaseClient || !context?.isVerified || !context.tenantId) {
@@ -9192,7 +9201,6 @@ async function loadWmsInventoryData(forceReload = false) {
     window.__canonicalWmsProductLocations = [];
     wmsDataLoadError = 'Iniciá sesión para consultar el inventario físico.';
     renderWmsModulesGrid();
-    void loadWmsInventoryData(true);
     return [];
   }
 

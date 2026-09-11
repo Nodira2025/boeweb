@@ -60,6 +60,15 @@ const WMS_SECTOR_DEFS = [
   { id: 'S5', floor: 5, name: 'Sector 5 · Indoor y Herramientas', desc: 'Carpas, iluminación LED, turbinas, tijeras y medidores', icon: '💡', defaultImg: 'assets/store-shelf-map-gba.jpg' },
   { id: 'S6', floor: 6, name: 'Sector 6 · Bajo Escalera', desc: 'Espacio bajo escalera, reservas y stock pesado en cajas', icon: '📦', defaultImg: 'assets/store-shelf-map-gba.jpg' }
 ];
+window.WmsSectors?.configure(WMS_SECTOR_DEFS);
+
+function getWmsSectorDefinitions() {
+  return window.WmsSectors ? window.WmsSectors.list() : WMS_SECTOR_DEFS;
+}
+
+function getMapStats(records) {
+  return window.WmsSectors.summarize(records);
+}
 
 const ZONE_MAP_NAMES = {
   'S1': 'Sector 1 (Parafernalia)',
@@ -174,41 +183,19 @@ function exportMapHistoryCSV() {
 }
 
 function getSectorCustomPhoto(sectorId) {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem('boeweb_wms_sector_photo_' + sectorId);
-      if (stored) return stored;
-    }
-  } catch (_) {}
-  const def = WMS_SECTOR_DEFS.find(s => s.id === sectorId);
-  return def?.defaultImg || 'assets/store-shelf-map-gba.jpg';
+  return window.WmsSectors?.get(sectorId)?.photoUrl || null;
 }
 
-function saveSectorCustomPhoto(sectorId, photoUrl) {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('boeweb_wms_sector_photo_' + sectorId, photoUrl);
-    }
-  } catch (_) {}
+function openSectorPhoto(sectorId) {
+  const sector = window.WmsSectors?.get(sectorId);
+  if (sector?.photoUrl) openWmsLightbox(sector.photoUrl, sector.name, 'Foto de referencia del sector');
 }
 
-function handleSectorPhotoUpload(event, sectorId) {
-  const file = event.target.files && event.target.files[0];
-  if (!file) return;
+async function handleSectorPhotoUpload(event, sectorId) {
   try {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target.result;
-      saveSectorCustomPhoto(sectorId, dataUrl);
-      logMapHistoryAction('FOTO_SECTOR', 'Foto de sector actualizada', `Se actualizó la foto de referencia del Sector ${sectorId}`, null, Number(sectorId.replace(/\D/g, '')) || 1);
-      if (window.showToast) window.showToast(`📸 Foto del Sector ${sectorId} guardada.`);
-      rerenderStoreMap();
-    };
-    reader.readAsDataURL(file);
-  } catch (err) {
-    console.error('Error al subir foto de sector:', err);
-    if (window.showToast) window.showToast('No se pudo guardar la foto del sector.');
-  }
+    await window.WmsSectorEditor.open(sectorId);
+    await window.WmsSectorEditor.selectPhoto(event);
+  } catch (error) { window.showToast?.(error.message); }
 }
 
 // Lightbox modal para ampliar fotos a pantalla completa
@@ -372,39 +359,14 @@ function getCleanWallOrModuleInfo(rawCode) {
 
 function getSectorProducts(floorLevel) {
   const floorNum = Number(floorLevel);
-  const targetSectorId = `S${floorNum}`;
-  const storeLocs = Array.isArray(storeLocationProducts) ? storeLocationProducts : [];
-  const catalogLocs = (typeof window !== 'undefined' && Array.isArray(window.internalCatalogProducts)) ? window.internalCatalogProducts : [];
-  const canonicalLocs = (typeof window !== 'undefined' && Array.isArray(window.__canonicalWmsProductLocations)) ? window.__canonicalWmsProductLocations : [];
-
-  const combined = [...storeLocs];
-  const seen = new Set(storeLocs.map(p => String(p.product_code || p.sku || p.id).toUpperCase()));
-  
-  [...catalogLocs, ...canonicalLocs].forEach(p => {
-    if (!p) return;
-    const key = String(p.product_code || p.sku || p.id).toUpperCase();
-    if (!seen.has(key)) {
-      combined.push(p);
-      seen.add(key);
-    }
-  });
-
-  return combined.filter(p => {
-    const pFloor = Number(p.floor_level || p.floor || 0);
-    const pWms = String(p.wms_code || p.location || p.shelf_code || '').toUpperCase();
-    if (pFloor === floorNum) return true;
-    if (pWms.startsWith(targetSectorId + '-') || pWms.startsWith(`SEC${floorNum}-`)) return true;
-    if (floorNum === 1 && (pWms.startsWith('TI-') || (!pWms && !pFloor))) return true;
-    if (floorNum === 6 && pWms.startsWith('DP-')) return true;
-    return false;
-  });
+  // No catalog fallback: commercial stock is not a physical location.
+  return storeLocationProducts.filter(product => window.WmsSectors.resolveFloor(product) === floorNum);
 }
 
 function getShelfProducts(shelfCode, level = null) {
   const normalized = normalizeShelfCode(shelfCode);
-  const allProducts = Array.isArray(storeLocationProducts) && storeLocationProducts.length > 0
-    ? storeLocationProducts
-    : (typeof window !== 'undefined' && Array.isArray(window.internalCatalogProducts) ? window.internalCatalogProducts : []);
+  if (!normalized) return [];
+  const allProducts = getSectorProducts(selectedFloorLevel).filter(product => !product.is_draft);
 
   return allProducts.filter(product => {
     const rawCode = String(product.shelf_code || product.shelf || product.wms_code || product.location || '').toUpperCase();
@@ -418,7 +380,7 @@ function getShelfProducts(shelfCode, level = null) {
       effectiveLevel = Number(wmsMatch[3]) || productLevel;
     }
 
-    const matchesShelf = rawCode === normalized || effectiveShelf === normalized || rawCode.includes(normalized) || normalized.includes(rawCode);
+    const matchesShelf = rawCode === normalized || effectiveShelf === normalized || `-${rawCode}-`.includes(`-${normalized}-`);
     if (!matchesShelf) return false;
     if (level === null || level === undefined) return true;
     return Number(effectiveLevel) === Number(level);
@@ -712,8 +674,10 @@ function showShelfDetailsModal(code) {
 }
 
 function setStoreMapData(shelves, products, statusLabel) {
-  if (Array.isArray(shelves) && shelves.length > 0) storeShelves = shelves;
+  if (Array.isArray(shelves)) storeShelves = shelves;
   if (Array.isArray(products)) storeLocationProducts = products;
+  window.storeShelves = storeShelves;
+  window.storeLocationProducts = storeLocationProducts;
   if (statusLabel) storeMapSyncLabel = statusLabel;
   rerenderStoreMap();
 }
@@ -784,21 +748,18 @@ function renderProductCardsList(products) {
 function renderWmsSectorsGrid() {
   return `
     <div class="wms-sectors-grid">
-      ${WMS_SECTOR_DEFS.map(sector => {
+      ${getWmsSectorDefinitions().map(sector => {
         const customPhoto = getSectorCustomPhoto(sector.id);
         const sectorProducts = getSectorProducts(sector.floor);
-        const totalStock = sectorProducts.reduce((sum, p) => sum + (Number(p.stock ?? p.on_hand) || 0), 0);
-        const skuCount = sectorProducts.length;
+        const stats = getMapStats(sectorProducts);
 
         return `
-          <div class="wms-sector-card">
-            <div class="wms-sector-banner" onclick="openWmsLightbox('${escapeMapHtml(customPhoto)}', '${escapeMapHtml(sector.name)}', '${skuCount} SKUs · ${totalStock} unidades')">
-              <img src="${escapeMapHtml(customPhoto)}" alt="${escapeMapHtml(sector.name)}">
-              <span class="wms-sector-zoom-badge">🔍 Ampliar Foto</span>
-              <label class="wms-sector-photo-btn" onclick="event.stopPropagation()">
-                📸 Cambiar Foto
-                <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden onchange="handleSectorPhotoUpload(event, '${sector.id}')">
-              </label>
+          <article class="wms-sector-card">
+            <div class="wms-sector-banner">
+              ${customPhoto ? `<button type="button" class="wms-sector-photo-open" data-sector-photo="${sector.id}" onclick="openSectorPhoto('${sector.id}')" aria-label="Ampliar foto de ${escapeMapHtml(sector.name)}">
+                <img src="${escapeMapHtml(customPhoto)}" alt="${escapeMapHtml(sector.name)}" loading="lazy">
+                <span class="wms-sector-zoom-badge">Ampliar foto</span></button>` : `<div class="wms-photo-placeholder"><strong>${sector.id}</strong><span>${sector.photoUnavailable ? 'Foto temporalmente no disponible' : 'Agregá una foto real del sector'}</span></div>`}
+              ${window.WmsSectors.canEdit() ? `<button type="button" class="wms-sector-photo-btn" onclick="WmsSectorEditor.open('${sector.id}')">Editar sector y foto</button>` : ''}
             </div>
             <div class="wms-sector-card-body">
               <div>
@@ -806,13 +767,14 @@ function renderWmsSectorsGrid() {
                 <p class="wms-sector-card-desc">${escapeMapHtml(sector.desc)}</p>
               </div>
               <div class="wms-sector-card-footer">
-                <span class="wms-sector-pill">📦 ${skuCount} productos · ${totalStock} u.</span>
+                <span class="wms-sector-pill">${stats.products} ${stats.products === 1 ? 'producto' : 'productos'} · ${stats.units} u.</span>
                 <button type="button" class="wms-sector-action-btn" onclick="openWmsSectorView(${sector.floor})">
                   Explorar Sector ➔
                 </button>
               </div>
+              <p class="wms-sector-stats">${stats.locations} ${stats.locations === 1 ? 'ubicación ocupada' : 'ubicaciones ocupadas'} · ${stats.pending} ${stats.pending === 1 ? 'pendiente' : 'pendientes'} de aprobación</p>
             </div>
-          </div>
+          </article>
         `;
       }).join('')}
     </div>
@@ -820,18 +782,18 @@ function renderWmsSectorsGrid() {
 }
 
 function renderWmsSectorDetail() {
-  const sector = WMS_SECTOR_DEFS.find(s => s.floor === selectedFloorLevel) || WMS_SECTOR_DEFS[0];
+  const sector = getWmsSectorDefinitions().find(s => s.floor === selectedFloorLevel) || WMS_SECTOR_DEFS[0];
   const customPhoto = getSectorCustomPhoto(sector.id);
   const sectorProducts = getSectorProducts(sector.floor);
-  const totalStock = sectorProducts.reduce((sum, p) => sum + (Number(p.stock ?? p.on_hand) || 0), 0);
+  const stats = getMapStats(sectorProducts);
 
   const isPendingSectorOnly = (p) => {
     const rawLoc = String(p.wms_code || p.shelf_code || p.location || '').toUpperCase();
-    return rawLoc.endsWith('-GENERAL') || rawLoc === 'GENERAL' || p.is_sector_only === true || (!rawLoc.includes('P1') && !rawLoc.includes('P2') && !rawLoc.includes('P3') && !rawLoc.includes('P4') && !rawLoc.includes('HEL') && !rawLoc.includes('VIT') && !rawLoc.includes('PIS'));
+    return rawLoc.endsWith('-GENERAL') || rawLoc === 'GENERAL' || p.is_sector_only === true || !rawLoc;
   };
 
-  const sectorPendingProducts = sectorProducts.filter(isPendingSectorOnly);
-  const positionedProducts = sectorProducts.filter(p => !isPendingSectorOnly(p));
+  const sectorPendingProducts = sectorProducts.filter(p => p.is_draft || isPendingSectorOnly(p));
+  const positionedProducts = sectorProducts.filter(p => !p.is_draft && !isPendingSectorOnly(p));
 
   // Group positioned products by Wall / Module code
   const wallGroups = new Map();
@@ -861,7 +823,7 @@ function renderWmsSectorDetail() {
             <span style="color: var(--vendor-gold, #c2a246); font-weight: 800; font-size: 1.05rem;">
               ${sector.icon} ${escapeMapHtml(sector.name)}
             </span>
-            <span class="gba-stock-pill gba-badge-ok">${sectorProducts.length} productos · ${totalStock} u.</span>
+            <span class="gba-stock-pill gba-badge-ok">${stats.products} productos · ${stats.units} u. · ${stats.pending} por aprobar</span>
           </div>
         </div>
         <div style="display: flex; gap: 8px;">
@@ -872,6 +834,10 @@ function renderWmsSectorDetail() {
       </div>
 
       <!-- BANDEJA DE PENDIENTES DEL SECTOR (Productos en Sector general sin balda) -->
+      <div class="wms-sector-detail-photo">
+        ${customPhoto ? `<button type="button" onclick="openSectorPhoto('${sector.id}')" aria-label="Ampliar foto del sector"><img src="${escapeMapHtml(customPhoto)}" alt="${escapeMapHtml(sector.name)}"></button>` : ''}
+        <div><p>${escapeMapHtml(sector.desc)}</p>${window.WmsSectors.canEdit() ? `<button type="button" class="gba-pad-btn" onclick="WmsSectorEditor.open('${sector.id}')">Editar este sector</button>` : ''}</div>
+      </div>
       ${sectorPendingProducts.length > 0 ? `
         <section class="wms-sector-pending-tray">
           <div class="wms-sector-pending-tray-header">
@@ -879,7 +845,7 @@ function renderWmsSectorDetail() {
               <span style="font-size: 1.4rem;">⚠️</span>
               <div>
                 <strong style="color: #6d4c13; font-size: 0.98rem; display: block;">
-                  ${sectorPendingProducts.length} producto${sectorPendingProducts.length === 1 ? '' : 's'} en este Sector sin góndola o balda asignada
+                  ${sectorPendingProducts.length} registro${sectorPendingProducts.length === 1 ? '' : 's'} por aprobar o por completar su ubicación
                 </strong>
                 <small style="color: #8c6a28; font-size: 0.78rem;">
                   Podés seleccionarlos en bloque para asignarles Pared, Góndola y Balda.
@@ -989,8 +955,8 @@ function renderWmsSectorDetail() {
       ` : '')}
 
       <!-- Collapsible Full Inspector for Empty Shelves & Levels N1 to N6 -->
-      <div style="background: #ffffff; border: 1.5px solid rgba(194, 162, 70, 0.35); border-radius: 16px; overflow: hidden; margin-top: 8px;">
-        <div style="padding: 14px 18px; background: #faf7ee; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleFullShelvesInspector()">
+      <div class="wms-shelf-inspector" style="border: 1.5px solid; border-radius: 16px; overflow: hidden; margin-top: 8px;">
+        <div class="wms-shelf-inspector-header" style="padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleFullShelvesInspector()">
           <div style="display: flex; align-items: center; gap: 8px;">
             <span style="font-size: 1.1rem;">📐</span>
             <strong style="color: var(--vendor-forest, #152d24); font-size: 0.95rem;">
@@ -1071,9 +1037,9 @@ function renderMapHistoryHTML() {
       <div class="gba-history-header">
         <div>
           <h3 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--vendor-gold, #c2a246);">
-            📜 HISTORIAL DE AUDITORÍA Y CAMBIOS DEL PLANO
+            📜 ACTIVIDAD DE ESTA SESIÓN
           </h3>
-          <small style="color: rgba(246,243,232,0.7); font-size: 0.8rem;">Registro cronológico de creaciones, modificaciones y asignaciones de inventario</small>
+          <small style="color: var(--theme-muted); font-size: 0.8rem;">Esta lista se reinicia al recargar. Los cambios de sectores se registran por separado en la auditoría central.</small>
         </div>
         <div style="display: flex; gap: 8px;">
           <button type="button" class="gba-pad-btn" onclick="exportMapHistoryCSV()">📥 EXPORTAR CSV</button>
@@ -1193,10 +1159,9 @@ function renderStoreMapHTML(activeZone = null, activeShelf = null, targetLevel =
   }
   if (targetLevel) selectedInternalLevel = Number(targetLevel);
 
-  const totalProducts = Array.isArray(storeLocationProducts) && storeLocationProducts.length > 0
-    ? storeLocationProducts
-    : (typeof window !== 'undefined' && Array.isArray(window.internalCatalogProducts) ? window.internalCatalogProducts : []);
-  const totalUnits = totalProducts.reduce((sum, p) => sum + (Number(p.stock ?? p.on_hand) || 0), 0);
+  const stats = getMapStats(storeLocationProducts);
+  const presentationError = window.WmsSectors.status().error;
+  const unassigned = storeLocationProducts.filter(product => !window.WmsSectors.resolveFloor(product));
 
   return `
     <div class="wms-explorer-container">
@@ -1208,7 +1173,7 @@ function renderStoreMapHTML(activeZone = null, activeShelf = null, targetLevel =
             🧭 EXPLORADOR DE SECTORES (${WMS_SECTOR_DEFS.length})
           </button>
           <button type="button" class="gba-room-btn ${currentWmsView === 'history' ? 'active' : ''}" onclick="setMapTab('history')">
-            📜 AUDITORÍA E HISTORIAL
+            📜 ACTIVIDAD DE ESTA SESIÓN
           </button>
           <button type="button" class="gba-room-btn ${currentWmsView === 'infography' ? 'active' : ''}" onclick="setMapTab('infography')">
             📐 GUÍA DE PLANTA
@@ -1216,13 +1181,18 @@ function renderStoreMapHTML(activeZone = null, activeShelf = null, targetLevel =
         </div>
         <div style="display: flex; align-items: center; gap: 12px;">
           <span style="font-size: 0.78rem; color: #a5d6a7; font-weight: 800; letter-spacing: 0.5px;">● ${escapeMapHtml(storeMapSyncLabel)}</span>
-          <span style="font-size: 0.78rem; background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 8px; color: #fff;">${totalUnits} unidades totales</span>
+          <span class="wms-total-summary">${stats.products} ${stats.products === 1 ? 'producto' : 'productos'} · ${stats.units} unidades confirmadas · ${stats.pending} por aprobar</span>
+          <button type="button" class="gba-room-btn" onclick="refreshWmsMapPresentation()">Actualizar mapa</button>
         </div>
       </div>
 
+      ${presentationError ? `<p class="wms-map-warning" role="status">${escapeMapHtml(presentationError)}</p>` : ''}
+      ${unassigned.length ? `<p class="wms-map-warning">${unassigned.length} registros sin sector identificado. No se asignan automáticamente al Sector 1.</p>` : ''}
+      ${window.WmsSectorEditor?.markup() || ''}
+
       <!-- Main View Content -->
       ${currentWmsView === 'history' ? renderMapHistoryHTML() : currentWmsView === 'infography' ? `
-        <div style="background: #0f2318; border: 2px solid #2e6b4d; border-radius: 16px; padding: 20px; text-align: center;">
+        <div class="wms-map-guide" style="border: 2px solid; border-radius: 16px; padding: 20px; text-align: center;">
           <h3 style="color: var(--vendor-gold, #c2a246); font-size: 1rem; font-weight: 800; margin: 0 0 14px 0;">
             🧭 GUÍA ARQUITECTÓNICA DEL LOCAL (TERMINAL CENTRAL COMO BRÚJULA)
           </h3>
@@ -1243,6 +1213,28 @@ function rerenderStoreMap() {
   const container = document.getElementById('store-map-render-container');
   if (container) container.innerHTML = renderStoreMapHTML();
 }
+
+async function refreshWmsMapPresentation() {
+  if (window.WmsSectorEditor?.isOpen()) {
+    window.showToast?.('Guardá o cancelá la edición antes de actualizar el mapa.');
+    return;
+  }
+  try {
+    await window.WmsSectors.load({ force: true });
+    if (window.loadStoreMapData) await window.loadStoreMapData(true);
+    rerenderStoreMap();
+  } catch (error) { window.showToast?.(`No se pudo actualizar: ${error.message}`); }
+}
+
+window.addEventListener?.('boeweb_wms_sectors_updated', () => {
+  getWmsSectorDefinitions().forEach(sector => {
+    FLOOR_NAMES[sector.floor] = sector.name;
+    ZONE_MAP_NAMES[sector.id] = sector.name;
+    ZONE_MAP_NAMES[`SEC${sector.floor}`] = sector.name;
+  });
+  if (!window.WmsSectorEditor?.isOpen()) rerenderStoreMap();
+});
+window.rerenderStoreMap = rerenderStoreMap;
 
 window.renderStoreMapHTML = renderStoreMapHTML;
 window.setStoreMapData = setStoreMapData;
