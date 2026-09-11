@@ -9,6 +9,7 @@
   let currentSlideIndex = 0;
   let slideTimer = null;
   let isPaused = false;
+  let renderedSignature = null;
   let touchStartX = 0;
   let touchEndX = 0;
 
@@ -56,13 +57,17 @@
   }
 
   function initHeroSlider() {
-    if (slideTimer) clearTimeout(slideTimer);
-    slideTimer = null;
-    isPaused = false;
     const heroSection = document.getElementById('home');
     if (!heroSection) return;
 
     const { isActive, slides, brand } = getHeroConfig();
+    const signature = JSON.stringify({ isActive, slides, brand });
+    // Duplicate load/storage notifications must not restart a video or the user's pause state.
+    if (isActive && renderedSignature === signature && heroSection.querySelector('.hero-slider-wrapper')) return;
+    renderedSignature = isActive ? signature : null;
+    if (slideTimer) clearTimeout(slideTimer);
+    slideTimer = null;
+    isPaused = false;
 
     // The textual introduction and multimedia are independent, configurable parts of the portada.
     if (!isActive || slides.length === 0) {

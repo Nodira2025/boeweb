@@ -180,6 +180,10 @@ test('slider lifecycle respects the latest publication, media visibility, pause 
   assert.equal(timers.size, 1);
   controls.get('.hero-slider-pause').click();
   assert.equal(timers.size, 0);
+  events.get('boeweb_app_config_loaded')();
+  assert.equal(slides[0].inert, true, 'an unchanged publication preserves the selected image');
+  assert.equal(controls.get('.hero-slider-pause').attributes['aria-pressed'], 'true');
+  assert.equal(timers.size, 0);
   config.brand.hero.slides = [config.brand.hero.slides[1]];
   config.brand.hero.slides[0].title = 'Nueva publicación';
   events.get('boeweb_app_config_loaded')();
