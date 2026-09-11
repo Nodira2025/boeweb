@@ -90,6 +90,7 @@ function pagedClient(rows, { cap = 200, failAt = Infinity } = {}) {
   const calls = [];
   return {
     calls,
+    auth: { getSession: async () => ({ data: { session: { access_token: 'test-session' } } }) },
     from(table) {
       const call = { table, order: [] };
       calls.push(call);
@@ -118,12 +119,30 @@ test('pagina más de 1000 filas con un límite de servidor menor y conserva tena
   await assert.rejects(exporter.readPages(pagedClient(rows, { failAt: 200 }), 'tenant-a', 'products', '*', ['id']), /fallo de red/);
 });
 
-test('rechaza roles no administrativos antes de consultar y carga solo las fuentes elegidas', async () => {
+function externalFetcher(rows = [], { failAt = Infinity } = {}) {
+  return async (url, request) => {
+    assert.equal(url, '/.netlify/functions/inventory-export');
+    assert.equal(request.headers.Authorization, 'Bearer test-session');
+    const { tenantId, resource, offset } = JSON.parse(request.body);
+    assert.equal(tenantId, context.tenantId);
+    assert.ok(['sources', 'offers'].includes(resource));
+    if (offset >= failAt) return Response.json({ error: 'fallo de servidor' }, { status: 503 });
+    const page = rows.slice(offset, offset + 200);
+    return Response.json({ rows: page, nextOffset: offset + page.length < rows.length ? offset + page.length : null });
+  };
+}
+
+test('rechaza roles no administrativos y exporta externos sin leer tablas protegidas desde el navegador', async () => {
   const client = pagedClient([]);
   await assert.rejects(exporter.fetchData(client, { ...context, role: 'VENDEDOR' }), /administrativa/);
   assert.equal(client.calls.length, 0);
-  await exporter.fetchData(client, context, 'b2b');
-  assert.deepEqual(client.calls.map(call => call.table), ['external_catalog_sources_v2', 'external_catalog_offers_v2']);
+  const rows = Array.from({ length: 1201 }, (_, id) => ({ id }));
+  const data = await exporter.fetchData(client, context, 'b2b', externalFetcher(rows));
+  assert.deepEqual(data.offers, rows);
+  assert.equal(client.calls.length, 0);
+  await assert.rejects(exporter.fetchData(client, context, 'local', externalFetcher(rows, { failAt: 200 })), /fallo de servidor/);
+  client.auth.getSession = async () => ({ data: { session: null } });
+  await assert.rejects(exporter.fetchData(client, context, 'all', externalFetcher()), /sesión expiró/);
 });
 
 test('la descarga informa errores, no entrega archivos parciales y permite reintentar', async () => {
@@ -134,6 +153,8 @@ test('la descarga informa errores, no entrega archivos parciales y permite reint
   globalThis.XLSX = { ...XLSX, writeFile: () => { downloads += 1; } };
   const auth = { hydrateFromSupabase: async () => true, getTenantContext: () => context };
   const originalError = console.error;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = externalFetcher();
   console.error = () => {};
   try {
     await exporter.download({ client: pagedClient([{}], { failAt: 0 }), auth, button });
@@ -144,6 +165,12 @@ test('la descarga informa errores, no entrega archivos parciales y permite reint
     await exporter.download({ client: pagedClient([]), auth, button });
     assert.equal(downloads, 1);
     assert.match(status.textContent, /Excel generado/);
+    globalThis.fetch = externalFetcher([{}, {}, {}], { failAt: 0 });
+    await exporter.download({ client: pagedClient([]), auth, button });
+    assert.equal(downloads, 1);
+    assert.match(status.textContent, /fallo de servidor/);
+    assert.equal(button.disabled, false);
+    globalThis.fetch = externalFetcher();
     let reads = 0;
     const switchingAuth = { ...auth, getTenantContext: () => (++reads === 1 ? context : { ...context, tenantId: 'other' }) };
     await exporter.download({ client: pagedClient([]), auth: switchingAuth, button });
@@ -151,6 +178,7 @@ test('la descarga informa errores, no entrega archivos parciales y permite reint
     assert.match(status.textContent, /sesión cambió/);
   } finally {
     console.error = originalError;
+    globalThis.fetch = originalFetch;
     delete globalThis.document;
     delete globalThis.XLSX;
   }

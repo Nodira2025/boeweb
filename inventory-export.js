@@ -4,9 +4,7 @@
   const SOURCES = [
     ['products', 'catalog_products', 'id,sku,barcode,name,category,price,cost_price,currency,active,track_stock,metadata,updated_at', ['id']],
     ['balances', 'inventory_balances_v2', 'product_id,location_id,on_hand,reserved,available,updated_at', ['product_id', 'location_id']],
-    ['locations', 'inventory_locations_v2', 'id,code,name,location_type,parent_location_id,is_sellable,active,metadata', ['id']],
-    ['sources', 'external_catalog_sources_v2', 'id,source_type,name,contact_info,estimated_days,active,metadata', ['id']],
-    ['offers', 'external_catalog_offers_v2', 'id,source_id,external_sku,name,category,cost_price,retail_price,available_units,active,metadata,updated_at', ['id']]
+    ['locations', 'inventory_locations_v2', 'id,code,name,location_type,parent_location_id,is_sellable,active,metadata', ['id']]
   ];
   let busy = false;
 
@@ -39,14 +37,41 @@
     }
   }
 
-  async function fetchData(client, context, scope = 'all') {
+  async function readExternalPages(client, context, resource, fetcher) {
+    try {
+      const { data, error } = await client.auth.getSession();
+      if (error || !data?.session?.access_token) throw new Error('La sesión expiró. Volvé a iniciar sesión para exportar.');
+      const rows = [];
+      let offset = 0;
+      while (offset < 1000000) {
+        const response = await fetcher('/.netlify/functions/inventory-export', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session.access_token}` },
+          body: JSON.stringify({ tenantId: context.tenantId, resource, offset })
+        });
+        const page = await response.json();
+        if (!response.ok) throw new Error(page.error || 'No se pudo consultar el catálogo externo.');
+        if (!Array.isArray(page.rows)) throw new Error('Respuesta de exportación inválida.');
+        rows.push(...page.rows);
+        if (page.nextOffset === null) return rows;
+        if (!Number.isSafeInteger(page.nextOffset) || page.nextOffset !== offset + page.rows.length || page.nextOffset <= offset) {
+          throw new Error('La lectura del catálogo quedó incompleta.');
+        }
+        offset = page.nextOffset;
+      }
+      throw new Error('El catálogo supera el límite de exportación.');
+    } catch (error) { throw error; }
+  }
+
+  async function fetchData(client, context, scope = 'all', fetcher = root.fetch?.bind(root)) {
     assertAdmin(context);
     try {
-      const selected = SOURCES.filter(([key]) => scope === 'all'
-        || (['b2b', 'local'].includes(scope) ? ['sources', 'offers'].includes(key) : ['products', 'balances', 'locations'].includes(key)));
+      const selected = ['b2b', 'local'].includes(scope) ? [] : SOURCES.slice();
+      if (['all', 'b2b', 'local'].includes(scope)) selected.push(['sources'], ['offers']);
       const results = await Promise.allSettled(selected.map(async ([key, table, columns, order]) => {
         try {
-          return [key, await readPages(client, context.tenantId, table, columns, order)];
+          // External tables prohibit direct browser reads; the endpoint verifies admin membership on every page.
+          return [key, table ? await readPages(client, context.tenantId, table, columns, order)
+            : await readExternalPages(client, context, key, fetcher)];
         } catch (error) { throw error; }
       }));
       const failure = results.find(result => result.status === 'rejected');
