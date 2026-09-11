@@ -99,7 +99,7 @@ test('selected brand fonts are loaded on auxiliary pages without adding duplicat
   assert.match(links[0].href, /family=Playfair\+Display:wght/);
 });
 
-test('a slow older remote read cannot overwrite a newer publication in cache', async () => {
+test('an arbitrary local revision written during a read cannot override the server', async () => {
   const browser = createBrowser();
   const latest = brand(browser.api, 12);
   let release;
@@ -109,8 +109,35 @@ test('a slow older remote read cannot overwrite a newer publication in cache', a
   const loading = repository.loadPublished();
   browser.storage.set(browser.api.createStorageKey(tenantA), JSON.stringify(latest));
   release({ data: { tenant_id: tenantA, stage: 'published', revision: 3, config_json: brand(browser.api, 3) } });
-  assert.equal((await loading).revision, 12);
-  assert.equal(JSON.parse(browser.storage.get(browser.api.createStorageKey(tenantA))).revision, 12);
+  assert.equal((await loading).revision, 3);
+  assert.equal(JSON.parse(browser.storage.get(browser.api.createStorageKey(tenantA))).revision, 3);
+});
+
+test('the central theme replaces an inflated cached revision on screen and after load/mode changes', async () => {
+  const browser = createBrowser();
+  browser.storage.set(browser.api.createStorageKey(tenantA), JSON.stringify(brand(browser.api, 9999)));
+  const actual = browser.api.normalizeConfig({ tenantId: tenantA, revision: 9, brand: { texts: { name: 'BÔ central' } } });
+  browser.window.supabaseClient = { from() { return { select() { return this; }, eq() { return this; },
+    async maybeSingle() { return { data: { tenant_id: tenantA, stage: 'published', revision: 9, config_json: actual } }; } }; } };
+  browser.start();
+  assert.equal(browser.api.get('revision'), 9999);
+  await browser.window.refreshPublishedTheme({ force: true });
+  browser.window.dispatchEvent({ type: 'load' });
+  browser.window.toggleTheme();
+  assert.equal(browser.api.get('revision'), 9);
+  assert.equal(browser.api.get('brand.texts.name'), 'BÔ central');
+  assert.equal(browser.window.TenantTheme.getProfile(tenantA).brand_name, 'BÔ central');
+});
+
+test('cross-tab updates do not replace the appearance of an admin editing a draft', () => {
+  const browser = createBrowser();
+  browser.start();
+  browser.window.boeAdminConfigEditing = true;
+  const draft = { ...brand(browser.api, 6), status: 'draft' };
+  browser.api.applyCssVariables(draft);
+  browser.window.dispatchEvent({ type: 'storage', key: browser.api.createStorageKey(tenantA), newValue: JSON.stringify(brand(browser.api, 8)) });
+  assert.equal(browser.api.get('status'), 'draft');
+  assert.equal(browser.api.get('revision'), 6);
 });
 
 test('a response from the previous tenant is not applied after the active tenant changes', async () => {

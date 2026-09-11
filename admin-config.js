@@ -14,6 +14,8 @@ let heroSliderActive = true;
 let adminTenantContext = null;
 let appConfigRepository = null;
 let appConfigDirtyTrackingReady = false;
+let adminConfigBusy = false;
+const busyControls = new Map();
 const DEFAULT_ADMIN_TENANT_ID = '11111111-1111-1111-1111-111111111111';
 const ADMIN_CONFIG_PAGES = Object.freeze({
   marca: {
@@ -125,13 +127,15 @@ async function authorizeAdminSession() {
     appConfigRepository = window.AppConfig?.createRepository({
       tenantId: context.tenantId,
       supabaseClient,
-      requireRemoteWrites: true
+      requireRemoteWrites: true,
+      requireRemoteReads: true
     }) || null;
 
     document.getElementById('admin-login-modal').hidden = true;
     document.getElementById('admin-login-modal').style.display = 'none';
+    setAdminConfigBusy(true);
     document.getElementById('admin-dashboard-content').style.display = 'block';
-    await Promise.all([loadAdminConfig(), loadBrandConfig()]);
+    await loadCentralAdminConfig();
   } catch (error) {
     adminTenantContext = null;
     const gate = document.getElementById('admin-login-modal');
@@ -143,6 +147,7 @@ async function authorizeAdminSession() {
     if (dashboard) dashboard.style.display = 'none';
     setAdminAuthStatus(error.message || 'No se pudo verificar la sesión.', true);
   } finally {
+    setAdminConfigBusy(false);
     if (checkButton) checkButton.disabled = false;
   }
 }
@@ -176,13 +181,25 @@ async function handleAdminSessionLogin(event) {
   }
 }
 
-async function loadAdminConfig() {
+async function loadCentralAdminConfig() {
+  // All sections edit the same publication; capture draft and published baselines before enabling saves.
+  const repository = window.AppConfig.createRepository({
+    tenantId: getAdminTenantId(), supabaseClient, requireRemoteWrites: true, requireRemoteReads: true
+  });
+  const published = await repository.loadPublished();
+  await repository.loadDraft();
+  appConfigRepository = repository;
+  window.boeAdminConfigEditing = true;
+  await Promise.all([loadAdminConfig(published), loadBrandConfig(published)]);
+}
+
+async function loadAdminConfig(config = null) {
   let payments = window.AppConfig?.DEFAULT_CONFIG.payments;
   try {
     if (!appConfigRepository || !window.AppConfig) throw new Error('AppConfig no está disponible.');
-    const publishedConfig = await appConfigRepository.loadPublished();
+    const publishedConfig = config || await appConfigRepository.loadPublished();
     payments = publishedConfig.payments;
-    if (publishedConfig.revision === 0) {
+    if (!config && publishedConfig.revision === 0) {
       const legacy = readLegacyPaymentConfig();
       if (Object.keys(legacy).length) {
         payments = window.AppConfig.normalizeConfig(legacy, { tenantId: getAdminTenantId() }).payments;
@@ -202,9 +219,8 @@ async function loadAdminConfig() {
   document.getElementById('bank-alias').value = payments.bankTransfer.alias;
 }
 
-async function loadBrandConfig() {
+async function loadBrandConfig(managedConfig = null) {
   let brand = null;
-  let managedConfig = null;
   try {
     brand = JSON.parse(localStorage.getItem('boeweb_tenant_profile_published') || 'null');
   } catch (_) {}
@@ -215,8 +231,8 @@ async function loadBrandConfig() {
 
   if (appConfigRepository) {
     try {
-      managedConfig = await appConfigRepository.loadPublished();
-      if (managedConfig.revision > 0) brand = appConfigToLegacyBrand(managedConfig);
+      managedConfig = managedConfig || await appConfigRepository.loadPublished();
+      brand = appConfigToLegacyBrand(managedConfig);
     } catch (error) {
       console.warn('No se pudo cargar la configuración versionada; se mantiene el perfil compatible.', error);
     }
@@ -301,21 +317,18 @@ async function loadBrandConfig() {
 
   // Load hero slides & state
   try {
-    const savedSlides = localStorage.getItem('boeweb_hero_slides');
-    if (managedConfig?.revision > 0 && brand?.hero_slides && Array.isArray(brand.hero_slides)) {
-      heroSlidesState = brand.hero_slides;
-    } else if (savedSlides) {
-      heroSlidesState = JSON.parse(savedSlides);
-    } else if (brand?.hero_slides && Array.isArray(brand.hero_slides)) {
+    if (managedConfig && brand?.hero_slides && Array.isArray(brand.hero_slides)) {
       heroSlidesState = brand.hero_slides;
     } else {
-      heroSlidesState = [...DEFAULT_HERO_SLIDES];
+      const savedSlides = localStorage.getItem('boeweb_hero_slides');
+      heroSlidesState = savedSlides ? JSON.parse(savedSlides)
+        : (Array.isArray(brand?.hero_slides) ? brand.hero_slides : [...DEFAULT_HERO_SLIDES]);
     }
   } catch (_) {
     heroSlidesState = [...DEFAULT_HERO_SLIDES];
   }
 
-  heroSliderActive = managedConfig?.revision > 0
+  heroSliderActive = managedConfig
     ? managedConfig.brand.hero.enabled
     : brand?.hero_slider_active !== false;
   const toggleSlider = document.getElementById('hero-slider-active-toggle');
@@ -885,28 +898,12 @@ function loadFutureAppConfigControls(config) {
 
 function initializeAppConfigDirtyTracking() {
   if (appConfigDirtyTrackingReady) return;
-  const selectors = [
-    '#future-config input',
-    '#future-config select',
-    '#brand-name-input',
-    '#brand-slogan-input',
-    '#brand-vertical-select',
-    '#brand-font-family',
-    '#brand-font-headings',
-    '#brand-primary-color',
-    '#brand-accent-color',
-    '#brand-text-color',
-    '#brand-action-color',
-    '#brand-whatsapp-input',
-    '#brand-instagram-input',
-    '#brand-address-input',
-    '#brand-term-product',
-    '#brand-term-vendor',
-    '#brand-term-warehouse'
-  ];
-  document.querySelectorAll(selectors.join(',')).forEach(control => {
-    control.addEventListener('input', () => updateAppConfigStatus('Cambios sin guardar'));
-    control.addEventListener('change', () => updateAppConfigStatus('Cambios sin guardar'));
+  // Delegation includes payment fields and banner controls added after the initial render.
+  const dashboard = document.getElementById('admin-dashboard-content');
+  ['input', 'change'].forEach(eventName => {
+    dashboard?.addEventListener(eventName, () => {
+      if (!adminConfigBusy) updateAppConfigStatus('Cambios sin guardar');
+    });
   });
   appConfigDirtyTrackingReady = true;
 }
@@ -922,7 +919,48 @@ function updateAppConfigStatus(message, isError = false) {
   }
   if (detail) {
     detail.textContent = message;
-    detail.style.color = isError ? '#F6F3E8' : '#C2A246';
+    detail.style.color = 'var(--theme-ink)';
+  }
+}
+
+function setAdminConfigBusy(busy) {
+  adminConfigBusy = busy;
+  const dashboard = document.getElementById('admin-dashboard-content');
+  dashboard?.setAttribute('aria-busy', String(busy));
+  if (busy) {
+    document.querySelectorAll('#admin-dashboard-content input, #admin-dashboard-content select, #admin-dashboard-content textarea, #admin-dashboard-content button').forEach(control => {
+      busyControls.set(control, control.disabled);
+      control.disabled = true;
+    });
+  } else {
+    busyControls.forEach((disabled, control) => { control.disabled = disabled; });
+    busyControls.clear();
+  }
+}
+
+function handleConfigSaveError(error, fallback) {
+  updateAppConfigStatus(error.code === 'CONFIG_CONFLICT'
+    ? 'Hay cambios en otra sesión · guardado detenido' : (error.message || fallback), true);
+  if (error.code === 'CONFIG_CONFLICT') {
+    const conflict = document.getElementById('admin-config-conflict');
+    if (conflict) {
+      conflict.hidden = false;
+      conflict.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+}
+
+async function reloadCentralAdminConfig() {
+  if (adminConfigBusy) return;
+  setAdminConfigBusy(true);
+  try {
+    ensureAdministrativeContext();
+    await loadCentralAdminConfig();
+    document.getElementById('admin-config-conflict').hidden = true;
+  } catch (error) {
+    handleConfigSaveError(error, 'No se pudo cargar la publicación actual. Tus campos se conservan.');
+  } finally {
+    setAdminConfigBusy(false);
   }
 }
 
@@ -979,12 +1017,15 @@ function initializeAdminConfigPages() {
 
 function ensureAdministrativeContext() {
   const context = window.SaasAuth?.getTenantContext?.();
-  if (!adminTenantContext || !context?.isVerified || !['ADMIN', 'SUPERADMIN'].includes(context.role)) {
+  if (!adminTenantContext || !context?.isVerified || !['ADMIN', 'SUPERADMIN'].includes(context.role)
+    || context.tenantId !== adminTenantContext.tenantId) {
     throw new Error('La sesión administrativa dejó de ser válida. Volvé a verificarla.');
   }
 }
 
 async function saveFutureAppConfigDraft() {
+  if (adminConfigBusy) return;
+  setAdminConfigBusy(true);
   try {
     ensureAdministrativeContext();
     if (!appConfigRepository) throw new Error('El repositorio de configuración no está disponible.');
@@ -993,7 +1034,9 @@ async function saveFutureAppConfigDraft() {
     loadFutureAppConfigControls(result.config);
     updateAppConfigStatus(`Borrador sincronizado · revisión ${result.config.revision}`);
   } catch (error) {
-    updateAppConfigStatus(error.message || 'No se pudo guardar el borrador.', true);
+    handleConfigSaveError(error, 'No se pudo guardar el borrador.');
+  } finally {
+    setAdminConfigBusy(false);
   }
 }
 
@@ -1002,21 +1045,25 @@ async function publishFutureAppConfig() {
 }
 
 async function saveAdminConfig() {
+  if (adminConfigBusy) return;
+  setAdminConfigBusy(true);
   try {
     ensureAdministrativeContext();
     if (!appConfigRepository) throw new Error('El repositorio de configuración no está disponible.');
     updateAppConfigStatus('Publicando configuración…');
 
     const brandProfile = collectLegacyBrandProfile();
-    const draftResult = await appConfigRepository.saveDraft(collectFutureAppConfig(brandProfile));
-    const publishResult = await appConfigRepository.publish(draftResult.config);
+    // One conditional write: a rejected publication must not alter the shared draft either.
+    const publishResult = await appConfigRepository.publish(collectFutureAppConfig(brandProfile));
     const publishedConfig = publishResult.config;
     clearLegacyPaymentConfig();
     window.AppConfig.applyCssVariables(publishedConfig);
     window.dispatchEvent(new CustomEvent('boeweb_brand_updated', { detail: publishedConfig }));
 
     loadFutureAppConfigControls(publishedConfig);
-    updateAppConfigStatus(`Configuración publicada y sincronizada · revisión ${publishedConfig.revision}`);
+    document.getElementById('admin-config-conflict').hidden = true;
+    const cacheNotice = publishResult.cacheStored === false ? ' · Sin copia local: comprobá la conexión al volver a abrir' : '';
+    updateAppConfigStatus(`Configuración publicada y sincronizada · revisión ${publishedConfig.revision}${cacheNotice}`);
 
     const saveMsg = document.getElementById('admin-save-msg');
     if (saveMsg) {
@@ -1024,7 +1071,9 @@ async function saveAdminConfig() {
       setTimeout(() => { saveMsg.style.display = 'none'; }, 3500);
     }
   } catch (error) {
-    updateAppConfigStatus(error.message || 'No se pudo publicar la configuración.', true);
+    handleConfigSaveError(error, 'No se pudo publicar la configuración.');
+  } finally {
+    setAdminConfigBusy(false);
   }
 }
 
@@ -1034,6 +1083,7 @@ window.handleAdminSessionLogin = handleAdminSessionLogin;
 window.loadAdminConfig = loadAdminConfig;
 window.loadBrandConfig = loadBrandConfig;
 window.saveAdminConfig = saveAdminConfig;
+window.reloadCentralAdminConfig = reloadCentralAdminConfig;
 window.saveFutureAppConfigDraft = saveFutureAppConfigDraft;
 window.publishFutureAppConfig = publishFutureAppConfig;
 window.focusBrandConfig = focusBrandConfig;

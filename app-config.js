@@ -531,7 +531,33 @@
     } catch (error) {
       // Storage can be disabled by privacy settings. The in-memory fallback is intentionally non-authoritative.
     }
-    return createMemoryStorage();
+    return fallbackStorage;
+  }
+
+  const fallbackStorage = createMemoryStorage();
+  // Only server-confirmed snapshots arbitrate in-flight reads. Local revision numbers are not authority.
+  const confirmedSnapshots = new WeakMap();
+
+  function confirmedState(storage, key) {
+    if (!confirmedSnapshots.has(storage)) confirmedSnapshots.set(storage, new Map());
+    const states = confirmedSnapshots.get(storage);
+    if (!states.has(key)) states.set(key, { sequence: 0, confirmedAt: 0, config: null });
+    return states.get(key);
+  }
+
+  function cacheConfig(storage, key, config) {
+    try {
+      storage.setItem(key, JSON.stringify(config));
+      return true;
+    } catch (error) {
+      // A full/disabled browser cache must not turn a successful central publication into a failure.
+      return false;
+    }
+  }
+
+  function removeCachedConfig(storage, key) {
+    try { storage.removeItem(key); }
+    catch (error) { /* The central configuration remains available without local storage. */ }
   }
 
   function parseCachedConfig(storage, key, tenantId) {
@@ -539,7 +565,7 @@
       const raw = storage.getItem(key);
       return raw ? normalizeConfig(JSON.parse(raw), { tenantId }) : null;
     } catch (error) {
-      storage.removeItem(key);
+      removeCachedConfig(storage, key);
       return null;
     }
   }
@@ -549,34 +575,62 @@
     const storage = resolveStorage(options.storage);
     const supabaseClient = options.supabaseClient || null;
     const requireRemoteWrites = options.requireRemoteWrites === true;
+    const requireRemoteReads = options.requireRemoteReads === true;
     const tableName = cleanText(options.tableName, 'tenant_app_config', 80);
+    const rowColumns = 'tenant_id,stage,config_json,revision,updated_at,published_at';
+    const baselines = new Map();
+    const stateFor = stage => confirmedState(storage, `${tableName}:${createStorageKey(tenantId, stage)}`);
+
+    function fromRow(data) {
+      return data?.config_json ? normalizeConfig({
+        ...data.config_json,
+        tenantId: data.tenant_id,
+        status: data.stage,
+        revision: data.revision,
+        updatedAt: data.updated_at,
+        publishedAt: data.published_at
+      }, { tenantId }) : null;
+    }
+
+    function conflictError() {
+      const error = new Error('Otra sesión cambió la configuración central. No se sobrescribió. Tus cambios siguen en el formulario; revisá la publicación actual antes de volver a guardar.');
+      error.code = 'CONFIG_CONFLICT';
+      return error;
+    }
+
+    function remember(stage, config, observation) {
+      const state = stateFor(stage);
+      baselines.set(stage, clone(config));
+      if (observation === undefined && state.config?.revision > config.revision) {
+        // A delayed write response may arrive after another session's newer publication was read.
+        return cacheConfig(storage, createStorageKey(tenantId, stage), state.config);
+      }
+      state.confirmedAt = observation ?? ++state.sequence;
+      state.config = clone(config);
+      return cacheConfig(storage, createStorageKey(tenantId, stage), config);
+    }
 
     async function readRemote(stage) {
       if (!supabaseClient?.from) return { config: null, error: null };
       try {
         const { data, error } = await supabaseClient
           .from(tableName)
-          .select('tenant_id,stage,config_json,revision,updated_at,published_at')
+          .select(rowColumns)
           .eq('tenant_id', tenantId)
           .eq('stage', stage)
           .maybeSingle();
         if (error) return { config: null, error };
-        const remoteConfig = data?.config_json ? normalizeConfig({
-          ...data.config_json,
-          tenantId: data.tenant_id,
-          status: data.stage,
-          revision: data.revision,
-          updatedAt: data.updated_at,
-          publishedAt: data.published_at
-        }, { tenantId }) : null;
-        return { config: remoteConfig, error: null };
+        return { config: fromRow(data), error: null };
       } catch (error) {
         return { config: null, error };
       }
     }
 
-    async function writeRemote(stage, config) {
+    async function writeRemote(stage, config, expectedRevision) {
       if (!supabaseClient?.from) return { remoteSynced: false, remoteError: null };
+      if (expectedRevision === undefined) {
+        return { remoteSynced: false, remoteError: new Error('No se pudo verificar la configuración central. Volvé a cargarla antes de guardar.') };
+      }
       try {
         const payload = {
           tenant_id: tenantId,
@@ -587,8 +641,16 @@
           updated_at: config.updatedAt,
           published_at: config.publishedAt
         };
-        const { error } = await supabaseClient.from(tableName).upsert(payload, { onConflict: 'tenant_id,stage' });
-        return { remoteSynced: !error, remoteError: error || null };
+        // Compare-and-set runs atomically in Postgres, under the existing tenant/admin policies.
+        const query = expectedRevision === 0
+          ? supabaseClient.from(tableName).insert(payload)
+          : supabaseClient.from(tableName).update(payload)
+            .eq('tenant_id', tenantId).eq('stage', stage).eq('revision', expectedRevision);
+        const { data, error } = await query.select(rowColumns).maybeSingle();
+        if (error?.code === '23505' || (!error && !data)) {
+          return { remoteSynced: false, remoteError: conflictError() };
+        }
+        return { remoteSynced: !error, remoteError: error || null, confirmedConfig: fromRow(data) };
       } catch (error) {
         return { remoteSynced: false, remoteError: error };
       }
@@ -596,66 +658,61 @@
 
     async function load(stage = 'published') {
       const safeStage = VALID_STAGES.has(stage) ? stage : 'published';
+      const state = stateFor(safeStage);
+      const observation = ++state.sequence;
       const remote = await readRemote(safeStage);
-      if (remote.config) {
-        const newer = parseCachedConfig(storage, createStorageKey(tenantId, safeStage), tenantId);
-        if (newer && newer.revision > remote.config.revision) return newer;
-        storage.setItem(createStorageKey(tenantId, safeStage), JSON.stringify(remote.config));
-        return remote.config;
+      if (!remote.error && supabaseClient?.from) {
+        // A confirmed write/read completed after this request started: keep that newer observation.
+        const config = state.confirmedAt > observation && state.config
+          ? clone(state.config) : (remote.config || normalizeConfig({ tenantId, status: safeStage }));
+        remember(safeStage, config, Math.max(observation, state.confirmedAt));
+        return config;
       }
+      if (requireRemoteReads) throw new Error('No se pudo consultar la configuración central. Comprobá la conexión y volvé a verificar la sesión.');
+      if (state.config) return clone(state.config);
       const cached = parseCachedConfig(storage, createStorageKey(tenantId, safeStage), tenantId);
       return cached || normalizeConfig({ tenantId, status: safeStage });
     }
 
-    async function saveDraft(input) {
-      const current = await load('draft');
+    async function save(stage, input) {
+      const current = baselines.get(stage) || await load(stage);
       const timestamp = new Date().toISOString();
       const config = normalizeConfig({
         ...input,
         tenantId,
-        status: 'draft',
-        revision: Math.max(current.revision, Number(input?.revision) || 0) + 1,
+        status: stage,
+        revision: (supabaseClient?.from ? current.revision : Math.max(current.revision, Number(input?.revision) || 0)) + 1,
         updatedAt: timestamp,
-        publishedAt: null
+        publishedAt: stage === 'published' ? timestamp : null
       }, { tenantId });
       const validation = validateConfig(config);
       if (!validation.valid) throw new Error(validation.errors.map(error => error.message).join(' '));
-      const remoteResult = await writeRemote('draft', config);
+      const remoteResult = await writeRemote(stage, config, baselines.get(stage)?.revision);
+      if (remoteResult.remoteError?.code === 'CONFIG_CONFLICT') throw remoteResult.remoteError;
       if (requireRemoteWrites && !remoteResult.remoteSynced) {
-        throw new Error(remoteResult.remoteError?.message || 'No se pudo guardar el borrador en la configuración central.');
+        throw new Error(remoteResult.remoteError?.message || 'No se pudo guardar en la configuración central.');
       }
-      storage.setItem(createStorageKey(tenantId, 'draft'), JSON.stringify(config));
-      return { config, ...remoteResult };
+      const savedConfig = remoteResult.confirmedConfig || config;
+      const cacheStored = remoteResult.remoteSynced
+        ? remember(stage, savedConfig) : cacheConfig(storage, createStorageKey(tenantId, stage), savedConfig);
+      return { ...remoteResult, config: clone(savedConfig), cacheStored };
+    }
+
+    async function saveDraft(input) {
+      return save('draft', input);
     }
 
     async function publish(input) {
       const source = input || await load('draft');
-      const current = await load('published');
-      const timestamp = new Date().toISOString();
-      const config = normalizeConfig({
-        ...source,
-        tenantId,
-        status: 'published',
-        revision: Math.max(current.revision, Number(source?.revision) || 0) + 1,
-        updatedAt: timestamp,
-        publishedAt: timestamp
-      }, { tenantId });
-      const validation = validateConfig(config);
-      if (!validation.valid) throw new Error(validation.errors.map(error => error.message).join(' '));
-      const remoteResult = await writeRemote('published', config);
-      if (requireRemoteWrites && !remoteResult.remoteSynced) {
-        throw new Error(remoteResult.remoteError?.message || 'No se pudo publicar la configuración central.');
-      }
-      storage.setItem(createStorageKey(tenantId, 'published'), JSON.stringify(config));
-      return { config, ...remoteResult };
+      return save('published', source);
     }
 
     function clearCache(stage) {
       if (VALID_STAGES.has(stage)) {
-        storage.removeItem(createStorageKey(tenantId, stage));
+        removeCachedConfig(storage, createStorageKey(tenantId, stage));
         return;
       }
-      VALID_STAGES.forEach(cacheStage => storage.removeItem(createStorageKey(tenantId, cacheStage)));
+      VALID_STAGES.forEach(cacheStage => removeCachedConfig(storage, createStorageKey(tenantId, cacheStage)));
     }
 
     return {
@@ -844,6 +901,8 @@
 
   function getPresentationConfig(tenantId = resolveTenantId()) {
     const id = normalizeTenantId(tenantId);
+    const confirmed = confirmedState(resolveStorage(), `tenant_app_config:${createStorageKey(id, 'published')}`).config;
+    if (confirmed) return clone(confirmed);
     const cached = parseCachedConfig(resolveStorage(), createStorageKey(id, 'published'), id);
     if (activeConfig.tenantId === id && activeConfig.status === 'published'
       && activeConfig.revision > (cached?.revision || 0)) return clone(activeConfig);

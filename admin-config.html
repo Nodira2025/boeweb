@@ -16,9 +16,9 @@
   
   <!-- Stylesheet -->
   <link rel="stylesheet" href="index.css?v=white_label_v2">
-  <link rel="stylesheet" href="app-config.css?v=config_v2">
-  <script src="app-config.js?v=canonical_theme_v1"></script>
-  <script src="theme.js?v=canonical_theme_v1"></script>
+  <link rel="stylesheet" href="app-config.css?v=central_publication_v2">
+  <script src="app-config.js?v=central_publication_v2"></script>
+  <script src="theme.js?v=central_publication_v2"></script>
   
   <style>
     body {
@@ -196,7 +196,13 @@
           <h1 id="admin-page-title">Marca e identidad</h1>
           <p id="admin-page-description">Personalizá la apariencia, los textos y la identidad comercial.</p>
         </div>
-        <span class="admin-page-save-state" id="admin-page-save-state">Configuración publicada</span>
+        <span class="admin-page-save-state" id="admin-page-save-state" role="status" aria-live="polite">Verificando publicación central…</span>
+      </section>
+
+      <section id="admin-config-conflict" class="admin-config-conflict" aria-labelledby="admin-config-conflict-title" hidden>
+        <h2 id="admin-config-conflict-title">La configuración cambió en otra sesión</h2>
+        <p>No sobrescribimos esos cambios. Lo que escribiste sigue en el formulario: podés revisarlo y copiarlo antes de cargar la publicación actual.</p>
+        <button type="button" class="app-config-action" onclick="reloadCentralAdminConfig()">Descartar mis cambios y cargar publicación actual</button>
       </section>
 
       <nav class="admin-page-nav" aria-label="Páginas del centro de configuración">
@@ -711,6 +717,6 @@
   <script src="business-verticals.js"></script>
   <script src="tenant-theme.js?v=canonical_theme_v1"></script>
   <script src="saas-auth.js?v=auth_v1"></script>
-  <script src="admin-config.js?v=canonical_theme_v1"></script>
+  <script src="admin-config.js?v=central_publication_v2"></script>
 </body>
 </html>

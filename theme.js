@@ -52,7 +52,7 @@
   async function refreshPublishedTheme(options = {}) {
     if (!window.AppConfig) return null;
     const tenantId = window.AppConfig.resolveTenantId();
-    if (refreshTask && refreshTenant === tenantId) return refreshTask;
+    if (refreshTask && refreshTenant === tenantId && !options.force) return refreshTask;
     if (!options.force && refreshTenant === tenantId && Date.now() - lastRefresh < 15000) {
       return window.AppConfig.getPresentationConfig(tenantId);
     }
@@ -62,16 +62,15 @@
       try {
         const client = resolveConfigClient();
         const repository = window.AppConfig.createRepository({ tenantId, supabaseClient: client });
-        const remote = await repository.loadPublished();
+        const config = await repository.loadPublished();
         if (generation !== refreshGeneration || tenantId !== window.AppConfig.resolveTenantId()) return null;
-        // A slower read must not replace a newer publication received from another tab.
-        const cached = window.AppConfig.getPresentationConfig(tenantId);
-        const config = cached.revision > remote.revision ? cached : remote;
-        const editingDraft = window.location.pathname.includes('admin-config') && window.AppConfig.get('status') === 'draft';
+        const editingDraft = window.location.pathname.includes('admin-config')
+          && (window.boeAdminConfigEditing || window.AppConfig.get('status') === 'draft');
         if (!editingDraft) {
+          const changed = JSON.stringify(window.boeStorefrontAppConfig) !== JSON.stringify(config);
           applyBrandIdentity(config);
           window.boeStorefrontAppConfig = config;
-          window.dispatchEvent(new CustomEvent('boeweb_app_config_loaded', { detail: config }));
+          if (changed) window.dispatchEvent(new CustomEvent('boeweb_app_config_loaded', { detail: config }));
         }
         lastRefresh = Date.now();
         return config;
@@ -109,6 +108,9 @@
   });
   window.addEventListener('load', () => { applyBrandIdentity(); });
   window.addEventListener('focus', () => { void refreshPublishedTheme(); });
+  window.setInterval?.(() => {
+    if (document.visibilityState === 'visible') void refreshPublishedTheme();
+  }, 60000);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') void refreshPublishedTheme();
   });
@@ -120,10 +122,13 @@
     try {
       const config = event.newValue ? JSON.parse(event.newValue) : null;
       if (config?.tenantId !== window.AppConfig.resolveTenantId() || config.status !== 'published') return;
-      if (config.revision < window.AppConfig.get('revision', 0)) return;
-      applyBrandIdentity(config);
-      window.boeStorefrontAppConfig = config;
-      window.dispatchEvent(new CustomEvent('boeweb_app_config_loaded', { detail: config }));
+      if (!window.boeAdminConfigEditing && config.revision >= window.AppConfig.get('revision', 0)) {
+        applyBrandIdentity(config);
+        window.boeStorefrontAppConfig = config;
+        window.dispatchEvent(new CustomEvent('boeweb_app_config_loaded', { detail: config }));
+      }
+      // Notifications are hints; verify centrally even when a legacy tab writes an inflated revision.
+      void refreshPublishedTheme({ force: true });
     } catch (error) { console.warn('Se ignoró una notificación de tema inválida.', error); }
   });
   window.addEventListener('boeweb_brand_updated', event => { applyBrandIdentity(event.detail); });
