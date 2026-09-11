@@ -18,6 +18,10 @@ let adminConfigBusy = false;
 const busyControls = new Map();
 const DEFAULT_ADMIN_TENANT_ID = '11111111-1111-1111-1111-111111111111';
 const ADMIN_CONFIG_PAGES = Object.freeze({
+  inventarios: {
+    title: 'Inventarios y Excel',
+    description: 'Descargá el stock propio, los catálogos B2B y de locales, y el detalle de ubicaciones.'
+  },
   marca: {
     title: 'Marca e identidad',
     description: 'Personalizá la apariencia, los textos y la identidad comercial.'
@@ -186,6 +190,7 @@ async function handleAdminSessionLogin(event) {
 }
 
 async function loadCentralAdminConfig() {
+  try {
   // All sections edit the same publication; capture draft and published baselines before enabling saves.
   const repository = window.AppConfig.createRepository({
     tenantId: getAdminTenantId(), supabaseClient, requireRemoteWrites: true, requireRemoteReads: true
@@ -195,6 +200,10 @@ async function loadCentralAdminConfig() {
   appConfigRepository = repository;
   window.boeAdminConfigEditing = true;
   await Promise.all([loadAdminConfig(published), loadBrandConfig(published)]);
+  } catch (error) {
+    console.error('No se pudo leer la publicación administrativa.', error);
+    throw error;
+  }
 }
 
 async function loadAdminConfig(config = null) {
@@ -210,6 +219,7 @@ async function loadAdminConfig(config = null) {
       }
     }
   } catch (error) {
+    if (!payments) throw error;
     console.warn('No se pudo cargar la configuración pública de pagos; se usan valores seguros.', error);
   }
 
@@ -223,11 +233,13 @@ async function loadAdminConfig(config = null) {
   document.getElementById('bank-alias').value = payments.bankTransfer.alias;
 }
 
-async function loadBrandConfig(managedConfig = null) {
+async function resolveAdminBrand(managedConfig) {
   let brand = null;
   try {
     brand = JSON.parse(localStorage.getItem('boeweb_tenant_profile_published') || 'null');
-  } catch (_) {}
+  } catch (_) {
+    // Storage may be blocked or contain stale JSON; the central publication and defaults remain available.
+  }
 
   if (!brand && typeof TENANT_PROFILES_CACHE !== 'undefined') {
     brand = TENANT_PROFILES_CACHE[getAdminTenantId()];
@@ -242,83 +254,35 @@ async function loadBrandConfig(managedConfig = null) {
     }
   }
 
-  // Fallback defaults
-  const bName = brand?.brand_name || 'BÔ Grow Club';
-  const bSlogan = brand?.slogan || 'Espacio Zen para Cultivo Premium';
-  const bVertical = brand?.vertical_code || 'growshop';
-  const bPrimary = brand?.primary_color || '#152D24';
-  const bAccent = brand?.accent_color || '#C2A246';
-  const bTextColor = brand?.text_color || '#152D24';
-  const bActionColor = brand?.action_color || '#2E7D32';
-  const bFontFamily = brand?.font_family || "'Outfit', sans-serif";
-  const bFontHeadings = brand?.font_headings || "'Playfair Display', serif";
-  const bLogo = brand?.logo_url || 'assets/logo.jpg';
-  const bTermProduct = brand?.terminology?.product || 'Producto Botánico';
-  const bTermVendor = brand?.terminology?.vendor || 'Asesor de Cultivo';
-  const bTermWarehouse = brand?.terminology?.warehouse || 'Depósito Principal';
-  const bWhatsapp = brand?.whatsapp_phone || '';
-  const bInstagram = brand?.instagram_url || '';
-  const bAddress = brand?.address || '';
+  return { brand, managedConfig };
+}
 
-  // Set values to DOM
-  const nameEl = document.getElementById('brand-name-input');
-  if (nameEl) nameEl.value = bName;
+function populateAdminBrandInputs(brand) {
+  const values = {
+    'brand-name-input': brand?.brand_name || 'BÔ Grow Club',
+    'brand-slogan-input': brand?.slogan || 'Espacio Zen para Cultivo Premium',
+    'brand-vertical-select': brand?.vertical_code || 'growshop',
+    'brand-font-family': brand?.font_family || "'Outfit', sans-serif",
+    'brand-font-headings': brand?.font_headings || "'Playfair Display', serif",
+    'brand-term-product': brand?.terminology?.product || 'Producto Botánico',
+    'brand-term-vendor': brand?.terminology?.vendor || 'Asesor de Cultivo',
+    'brand-term-warehouse': brand?.terminology?.warehouse || 'Depósito Principal',
+    'brand-whatsapp-input': brand?.whatsapp_phone || '',
+    'brand-instagram-input': brand?.instagram_url || '',
+    'brand-address-input': brand?.address || ''
+  };
+  for (const [id, value] of Object.entries(values)) setControlValue(id, value);
+  const colors = { primary: brand?.primary_color || '#152D24', accent: brand?.accent_color || '#C2A246',
+    text: brand?.text_color || '#152D24', action: brand?.action_color || '#2E7D32' };
+  for (const [key, color] of Object.entries(colors)) {
+    setControlValue('brand-' + key + '-color', color);
+    setControlValue('brand-' + key + '-color-hex', color);
+  }
+  currentBrandLogoDataUrl = brand?.logo_url || 'assets/logo.jpg';
+  setControlValue('brand-logo-preview-img', currentBrandLogoDataUrl, 'src');
+}
 
-  const sloganEl = document.getElementById('brand-slogan-input');
-  if (sloganEl) sloganEl.value = bSlogan;
-
-  const verticalEl = document.getElementById('brand-vertical-select');
-  if (verticalEl) verticalEl.value = bVertical;
-
-  const fontFamEl = document.getElementById('brand-font-family');
-  if (fontFamEl) fontFamEl.value = bFontFamily;
-
-  const fontHeadEl = document.getElementById('brand-font-headings');
-  if (fontHeadEl) fontHeadEl.value = bFontHeadings;
-
-  const primColorEl = document.getElementById('brand-primary-color');
-  const primHexEl = document.getElementById('brand-primary-color-hex');
-  if (primColorEl) primColorEl.value = bPrimary;
-  if (primHexEl) primHexEl.value = bPrimary;
-
-  const accColorEl = document.getElementById('brand-accent-color');
-  const accHexEl = document.getElementById('brand-accent-color-hex');
-  if (accColorEl) accColorEl.value = bAccent;
-  if (accHexEl) accHexEl.value = bAccent;
-
-  const textColEl = document.getElementById('brand-text-color');
-  const textHexEl = document.getElementById('brand-text-color-hex');
-  if (textColEl) textColEl.value = bTextColor;
-  if (textHexEl) textHexEl.value = bTextColor;
-
-  const actColEl = document.getElementById('brand-action-color');
-  const actHexEl = document.getElementById('brand-action-color-hex');
-  if (actColEl) actColEl.value = bActionColor;
-  if (actHexEl) actHexEl.value = bActionColor;
-
-  const termProdEl = document.getElementById('brand-term-product');
-  if (termProdEl) termProdEl.value = bTermProduct;
-
-  const termVendEl = document.getElementById('brand-term-vendor');
-  if (termVendEl) termVendEl.value = bTermVendor;
-
-  const termWhEl = document.getElementById('brand-term-warehouse');
-  if (termWhEl) termWhEl.value = bTermWarehouse;
-
-  const waEl = document.getElementById('brand-whatsapp-input');
-  if (waEl) waEl.value = bWhatsapp;
-
-  const igEl = document.getElementById('brand-instagram-input');
-  if (igEl) igEl.value = bInstagram;
-
-  const addrEl = document.getElementById('brand-address-input');
-  if (addrEl) addrEl.value = bAddress;
-
-  const logoImgEl = document.getElementById('brand-logo-preview-img');
-  if (logoImgEl) logoImgEl.src = bLogo;
-
-  currentBrandLogoDataUrl = bLogo;
-
+function loadAdminHeroState(brand, managedConfig) {
   // Load hero slides & state
   try {
     if (managedConfig && brand?.hero_slides && Array.isArray(brand.hero_slides)) {
@@ -338,55 +302,39 @@ async function loadBrandConfig(managedConfig = null) {
   const toggleSlider = document.getElementById('hero-slider-active-toggle');
   if (toggleSlider) toggleSlider.checked = heroSliderActive;
 
-  renderHeroSlidesManager();
-  loadSiteContentControls(managedConfig || window.AppConfig.normalizeConfig());
-  updateBrandLivePreview();
-  loadFutureAppConfigControls(managedConfig || window.AppConfig?.normalizeConfig(brand || {}, { tenantId: getAdminTenantId() }));
+}
+
+async function loadBrandConfig(managedConfig = null) {
+  try {
+    const resolved = await resolveAdminBrand(managedConfig);
+    const brand = resolved.brand;
+    managedConfig = resolved.managedConfig;
+    populateAdminBrandInputs(brand);
+    loadAdminHeroState(brand, managedConfig);
+    renderHeroSlidesManager();
+    loadSiteContentControls(managedConfig || window.AppConfig.normalizeConfig());
+    updateBrandLivePreview();
+    loadFutureAppConfigControls(managedConfig || window.AppConfig?.normalizeConfig(brand || {}, { tenantId: getAdminTenantId() }));
+  } catch (error) {
+    console.error('No se pudo cargar el formulario de marca.', error);
+    throw error;
+  }
 }
 
 function applyBrandColorPreset(primaryColor, accentColor, verticalCode, sampleName = '', sampleSlogan = '', textColor = '#152D24', actionColor = '#2E7D32', fontFamily = "'Outfit', sans-serif", fontHeadings = "'Playfair Display', serif") {
-  const primColorEl = document.getElementById('brand-primary-color');
-  const primHexEl = document.getElementById('brand-primary-color-hex');
-  if (primColorEl) primColorEl.value = primaryColor;
-  if (primHexEl) primHexEl.value = primaryColor;
-
-  const accColorEl = document.getElementById('brand-accent-color');
-  const accHexEl = document.getElementById('brand-accent-color-hex');
-  if (accColorEl) accColorEl.value = accentColor;
-  if (accHexEl) accHexEl.value = accentColor;
-
-  const textColEl = document.getElementById('brand-text-color');
-  const textHexEl = document.getElementById('brand-text-color-hex');
-  if (textColEl) textColEl.value = textColor;
-  if (textHexEl) textHexEl.value = textColor;
-
-  const actColEl = document.getElementById('brand-action-color');
-  const actHexEl = document.getElementById('brand-action-color-hex');
-  if (actColEl) actColEl.value = actionColor;
-  if (actHexEl) actHexEl.value = actionColor;
-
-  const fontFamEl = document.getElementById('brand-font-family');
-  if (fontFamEl && fontFamily) fontFamEl.value = fontFamily;
-
-  const fontHeadEl = document.getElementById('brand-font-headings');
-  if (fontHeadEl && fontHeadings) fontHeadEl.value = fontHeadings;
-
-  const verticalEl = document.getElementById('brand-vertical-select');
-  if (verticalEl && verticalCode) {
-    verticalEl.value = verticalCode;
+  const colors = { primary: primaryColor, accent: accentColor, text: textColor, action: actionColor };
+  for (const [key, color] of Object.entries(colors)) {
+    setControlValue('brand-' + key + '-color', color);
+    setControlValue('brand-' + key + '-color-hex', color);
+  }
+  if (fontFamily) setControlValue('brand-font-family', fontFamily);
+  if (fontHeadings) setControlValue('brand-font-headings', fontHeadings);
+  if (verticalCode && document.getElementById('brand-vertical-select')) {
+    setControlValue('brand-vertical-select', verticalCode);
     handleBrandVerticalChange(verticalCode);
   }
-
-  if (sampleName) {
-    const nameEl = document.getElementById('brand-name-input');
-    if (nameEl) nameEl.value = sampleName;
-  }
-
-  if (sampleSlogan) {
-    const sloganEl = document.getElementById('brand-slogan-input');
-    if (sloganEl) sloganEl.value = sampleSlogan;
-  }
-
+  if (sampleName) setControlValue('brand-name-input', sampleName);
+  if (sampleSlogan) setControlValue('brand-slogan-input', sampleSlogan);
   updateBrandLivePreview();
 }
 
@@ -602,7 +550,10 @@ function renderHeroSlidesManager() {
     return;
   }
 
-  container.innerHTML = heroSlidesState.map((source, idx) => {
+  container.innerHTML = heroSlidesState.map(renderHeroSlideCard).join('');
+}
+
+function renderHeroSlideCard(source, idx) {
     const slide = { ...source };
     ['media_url', 'title', 'subtitle', 'target_url', 'cta_text'].forEach(key => { slide[key] = escapeAdminHtml(source[key]); });
     const isVideo = slide.type === 'video';
@@ -623,16 +574,25 @@ function renderHeroSlidesManager() {
         </div>
 
         <div class="hero-editor-grid">
-          <!-- Tipo y Archivo / URL -->
+${renderHeroMediaFields(slide, idx, isVideo)}
+${renderHeroTextFields(slide, idx, isVideo)}
+${renderHeroDestinationFields(slide, idx, isVideo)}
+        </div>
+      </div>
+`;
+}
+
+function renderHeroMediaFields(slide, idx, isVideo) {
+  return `          <!-- Tipo y Archivo / URL -->
           <div>
-            <label class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Tipo de Contenido:</label>
-            <select aria-label="Banner ${idx + 1}: tipo" class="admin-input" style="font-weight: 700; margin-bottom: 10px;" onchange="updateHeroSlide(${idx}, 'type', this.value); renderHeroSlidesManager();">
+            <label for="hero-type-${idx}" class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Tipo de Contenido:</label>
+            <select id="hero-type-${idx}" aria-label="Banner ${idx + 1}: tipo" class="admin-input" style="font-weight: 700; margin-bottom: 10px;" onchange="updateHeroSlide(${idx}, 'type', this.value); renderHeroSlidesManager();">
               <option value="image" ${slide.type === 'image' ? 'selected' : ''}>🖼️ Imagen (PNG / JPG / WebP)</option>
               <option value="video" ${slide.type === 'video' ? 'selected' : ''}>🎬 Video (YouTube / MP4 / WebM)</option>
             </select>
 
-            <label class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">URL o Archivo Multimedia:</label>
-            <input aria-label="Banner ${idx + 1}: recurso" type="text" class="admin-input" value="${slide.media_url || ''}" placeholder="${isVideo ? 'https://youtu.be/... o https://.../video.mp4' : 'URL HTTPS de la imagen'}" oninput="updateHeroSlide(${idx}, 'media_url', this.value)" style="margin-bottom: 8px;">
+            <label for="hero-media-${idx}" class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">URL o Archivo Multimedia:</label>
+            <input id="hero-media-${idx}" aria-label="Banner ${idx + 1}: recurso" type="text" class="admin-input" value="${slide.media_url || ''}" placeholder="${isVideo ? 'https://youtu.be/... o https://.../video.mp4' : 'URL HTTPS de la imagen'}" oninput="updateHeroSlide(${idx}, 'media_url', this.value)" style="margin-bottom: 8px;">
             
             ${!isVideo ? `
               <div style="display: flex; align-items: center; gap: 8px;">
@@ -645,40 +605,51 @@ function renderHeroSlidesManager() {
             `}
           </div>
 
-          <!-- Textos y CTA -->
-          <div>
-            <label class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Título del Banner (Opcional):</label>
-            <input aria-label="Banner ${idx + 1}: título" type="text" maxlength="140" class="admin-input" value="${slide.title || ''}" placeholder="Ej: Gran Oferta de Temporada" oninput="updateHeroSlide(${idx}, 'title', this.value)" style="margin-bottom: 8px;">
+`;
+}
 
-            <label class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Subtítulo / Bajada:</label>
-            <input aria-label="Banner ${idx + 1}: subtítulo" type="text" maxlength="240" class="admin-input" value="${slide.subtitle || ''}" placeholder="Ej: Hasta 30% OFF en productos seleccionados" oninput="updateHeroSlide(${idx}, 'subtitle', this.value)">
+function renderHeroTextFields(slide, idx, isVideo) {
+  return `          <!-- Textos y CTA -->
+          <div>
+            <label for="hero-title-${idx}" class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Título del Banner (Opcional):</label>
+            <input id="hero-title-${idx}" aria-label="Banner ${idx + 1}: título" type="text" maxlength="140" class="admin-input" value="${slide.title || ''}" placeholder="Ej: Gran Oferta de Temporada" oninput="updateHeroSlide(${idx}, 'title', this.value)" style="margin-bottom: 8px;">
+
+            <label for="hero-subtitle-${idx}" class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Subtítulo / Bajada:</label>
+            <input id="hero-subtitle-${idx}" aria-label="Banner ${idx + 1}: subtítulo" type="text" maxlength="240" class="admin-input" value="${slide.subtitle || ''}" placeholder="Ej: Hasta 30% OFF en productos seleccionados" oninput="updateHeroSlide(${idx}, 'subtitle', this.value)">
           </div>
 
-          <!-- Redirección y Tiempo -->
+`;
+}
+
+function renderHeroDestinationFields(slide, idx, isVideo) {
+  return `          <!-- Redirección y Tiempo -->
           <div>
-            <label class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Enlace de Destino al Tocar / Clic:</label>
-            <input aria-label="Banner ${idx + 1}: destino" type="text" class="admin-input" value="${slide.target_url || ''}" placeholder="Ej: #catalog-section, link de WhatsApp o web" oninput="updateHeroSlide(${idx}, 'target_url', this.value)" style="margin-bottom: 8px;">
+            <label for="hero-target-${idx}" class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Enlace de Destino al Tocar / Clic:</label>
+            <input id="hero-target-${idx}" aria-label="Banner ${idx + 1}: destino" type="text" class="admin-input" value="${slide.target_url || ''}" placeholder="Ej: #catalog-section, link de WhatsApp o web" oninput="updateHeroSlide(${idx}, 'target_url', this.value)" style="margin-bottom: 8px;">
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
               <div>
-                <label class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Texto del Botón:</label>
-                <input aria-label="Banner ${idx + 1}: botón" type="text" maxlength="60" class="admin-input" value="${slide.cta_text || 'Ver'}" placeholder="Ej: Ver" oninput="updateHeroSlide(${idx}, 'cta_text', this.value)">
+                <label for="hero-cta-${idx}" class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Texto del Botón:</label>
+                <input id="hero-cta-${idx}" aria-label="Banner ${idx + 1}: botón" type="text" maxlength="60" class="admin-input" value="${slide.cta_text || 'Ver'}" placeholder="Ej: Ver" oninput="updateHeroSlide(${idx}, 'cta_text', this.value)">
               </div>
               <div>
-                <label class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Tiempo en Foco (seg):</label>
-                <input aria-label="Banner ${idx + 1}: duración" type="number" min="2" max="60" class="admin-input" value="${slide.duration_seconds || 5}" oninput="updateHeroSlide(${idx}, 'duration_seconds', parseInt(this.value) || 5)">
+                <label for="hero-duration-${idx}" class="admin-label" style="font-size: 0.8rem; margin-bottom: 4px;">Tiempo en Foco (seg):</label>
+                <input id="hero-duration-${idx}" aria-label="Banner ${idx + 1}: duración" type="number" min="2" max="60" class="admin-input" value="${slide.duration_seconds || 5}" oninput="updateHeroSlide(${idx}, 'duration_seconds', parseInt(this.value) || 5)">
               </div>
             </div>
-            <label class="app-config-toggle"><strong>Sombra detrás del texto</strong><input type="checkbox" ${source.overlay_enabled !== false ? 'checked' : ''} onchange="updateHeroSlide(${idx}, 'overlay_enabled', this.checked)"></label>
+            <label class="app-config-toggle"><strong>Sombra detrás del texto</strong><input type="checkbox" ${slide.overlay_enabled !== false ? 'checked' : ''} onchange="updateHeroSlide(${idx}, 'overlay_enabled', this.checked)"></label>
           </div>
-        </div>
-      </div>
-    `;
-  }).join('');
+`;
 }
+
 
 function updateBrandLivePreview() {
   if (appConfigDirtyTrackingReady && !adminConfigBusy) updateAppConfigStatus('Cambios sin guardar');
+  const { name, slogan } = updateAdminBrandPreviewDetails();
+  updateAdminHeroPreview(name, slogan);
+}
+
+function collectAdminPreviewValues() {
   const name = document.getElementById('brand-name-input')?.value.trim() || 'BÔ Grow Club';
   const slogan = document.getElementById('brand-slogan-input')?.value.trim() || 'Espacio Zen para Cultivo Premium';
   const primaryColor = document.getElementById('brand-primary-color')?.value || '#152D24';
@@ -690,44 +661,38 @@ function updateBrandLivePreview() {
   const termProduct = document.getElementById('brand-term-product')?.value.trim() || 'Producto Botánico';
   const whatsapp = document.getElementById('brand-whatsapp-input')?.value.trim() || '+5493816123456';
 
-  const previewCanvas = document.getElementById('brand-preview-canvas');
-  const previewBar = document.getElementById('preview-header-bar');
-  const previewName = document.getElementById('preview-brand-name');
-  const previewSlogan = document.getElementById('preview-brand-slogan');
-  const previewBtn = document.getElementById('preview-sample-btn');
-  const previewBadge = document.getElementById('preview-term-product-badge');
-  const previewThumb = document.getElementById('preview-logo-thumb');
-  const previewWhatsappText = document.getElementById('preview-whatsapp-text');
-  const previewContactBox = document.getElementById('preview-contact-box');
-  const previewSamplePrice = document.getElementById('preview-sample-price');
+  return { name, slogan, primaryColor, accentColor, actionColor, fontFamily, fontHeadings, termProduct, whatsapp };
+}
 
-  if (previewCanvas) {
-    previewCanvas.style.fontFamily = fontFamily;
+function applyAdminPreviewStyles(values) {
+  const { primaryColor, accentColor, actionColor, fontFamily, fontHeadings } = values;
+  const foreground = window.AppConfig.getReadableForeground(primaryColor);
+  const styles = {
+    'brand-preview-canvas': { fontFamily },
+    'preview-header-bar': { background: primaryColor },
+    'preview-brand-name': { fontFamily: fontHeadings, color: foreground },
+    'preview-brand-slogan': { color: foreground },
+    'preview-sample-btn': { background: accentColor, color: window.AppConfig.getReadableForeground(accentColor) },
+    'preview-sample-price': { color: actionColor },
+    'preview-contact-box': { borderColor: actionColor }
+  };
+  for (const [id, style] of Object.entries(styles)) {
+    const element = document.getElementById(id);
+    if (element) Object.assign(element.style, style);
   }
-  if (previewBar) previewBar.style.background = primaryColor;
-  if (previewName) {
-    previewName.textContent = name;
-    previewName.style.fontFamily = fontHeadings;
-  }
-  if (previewSlogan) previewSlogan.textContent = slogan;
-  if (previewBadge) previewBadge.textContent = termProduct;
-  if (previewBtn) {
-    previewBtn.style.background = accentColor;
-    previewBtn.style.color = window.AppConfig.getReadableForeground(accentColor);
-  }
-  if (previewSamplePrice) {
-    previewSamplePrice.style.color = actionColor;
-  }
-  if (previewContactBox) {
-    previewContactBox.style.borderColor = actionColor;
-  }
-  if (previewThumb && currentBrandLogoDataUrl) {
-    previewThumb.src = currentBrandLogoDataUrl;
-  }
-  if (previewWhatsappText) {
-    previewWhatsappText.textContent = `💬 WhatsApp: ${whatsapp}`;
-  }
+}
 
+function updateAdminBrandPreviewDetails() {
+  const values = collectAdminPreviewValues();
+  applyAdminPreviewStyles(values);
+  const texts = { 'preview-brand-name': values.name, 'preview-brand-slogan': values.slogan,
+    'preview-term-product-badge': values.termProduct, 'preview-whatsapp-text': '💬 WhatsApp: ' + values.whatsapp };
+  for (const [id, value] of Object.entries(texts)) setControlValue(id, value, 'textContent');
+  if (currentBrandLogoDataUrl) setControlValue('preview-logo-thumb', currentBrandLogoDataUrl, 'src');
+  return values;
+}
+
+function updateAdminHeroPreview(name, slogan) {
   // Update Hero Banner preview
   const bannerBox = document.getElementById('preview-hero-banner-box');
   const bannerImg = document.getElementById('preview-hero-banner-img');
@@ -767,8 +732,6 @@ function updateBrandLivePreview() {
       }
     }
   }
-  if (previewName) previewName.style.color = window.AppConfig.getReadableForeground(primaryColor);
-  if (previewSlogan) previewSlogan.style.color = window.AppConfig.getReadableForeground(primaryColor);
 }
 
 function appConfigToLegacyBrand(config) {
@@ -844,7 +807,15 @@ function collectFutureAppConfig(brandProfile = collectLegacyBrandProfile()) {
   validateAdminHero();
   return window.AppConfig.normalizeConfig({
     tenantId: getAdminTenantId(),
-    brand: {
+    brand: collectAdminBrand(brandProfile),
+    payments: collectAdminPayments(),
+    catalog: collectAdminCatalog(),
+    rules: collectAdminRules()
+  }, { tenantId: getAdminTenantId() });
+}
+
+function collectAdminBrand(brandProfile) {
+  return {
       verticalCode: brandProfile.vertical_code,
       visuals: {
         logoUrl: brandProfile.logo_url,
@@ -883,8 +854,11 @@ function collectFutureAppConfig(brandProfile = collectLegacyBrandProfile()) {
           overlayEnabled: slide.overlay_enabled !== false
         }))
       }
-    },
-    payments: {
+    };
+}
+
+function collectAdminPayments() {
+  return {
       mercadoPago: {
         enabled: document.getElementById('mp-active-toggle')?.checked,
         publicKey: document.getElementById('mp-public-key')?.value.trim()
@@ -896,16 +870,22 @@ function collectFutureAppConfig(brandProfile = collectLegacyBrandProfile()) {
         cbu: document.getElementById('bank-cbu')?.value.trim(),
         alias: document.getElementById('bank-alias')?.value.trim()
       }
-    },
-    catalog: {
+    };
+}
+
+function collectAdminCatalog() {
+  return {
       source: document.getElementById('app-catalog-source')?.value,
       visibility: document.getElementById('app-catalog-visibility')?.value,
       showOutOfStock: document.getElementById('app-catalog-show-out')?.checked,
       allowBackorders: document.getElementById('app-catalog-backorders')?.checked,
       currency: document.getElementById('app-catalog-currency')?.value.trim().toUpperCase(),
       lowStockThreshold: document.getElementById('app-catalog-low-stock')?.value
-    },
-    rules: {
+    };
+}
+
+function collectAdminRules() {
+  return {
       sales: {
         allowVendorAdjustments: document.getElementById('app-rule-vendor-adjustments')?.checked,
         maxDiscountPercent: document.getElementById('app-rule-max-discount')?.value,
@@ -935,8 +915,7 @@ function collectFutureAppConfig(brandProfile = collectLegacyBrandProfile()) {
         parkedTicketsEnabled: document.getElementById('app-pos-parked-tickets')?.checked,
         printDuplicateReceipts: document.getElementById('app-pos-print-duplicates')?.checked
       }
-    }
-  }, { tenantId: getAdminTenantId() });
+    };
 }
 
 function setControlValue(id, value, property = 'value') {
@@ -978,7 +957,8 @@ function initializeAppConfigDirtyTracking() {
   // Delegation includes payment fields and banner controls added after the initial render.
   const dashboard = document.getElementById('admin-dashboard-content');
   ['input', 'change'].forEach(eventName => {
-    dashboard?.addEventListener(eventName, () => {
+    dashboard?.addEventListener(eventName, event => {
+      if (event.target.closest('[data-admin-page="inventarios"]')) return;
       if (!adminConfigBusy) updateAppConfigStatus('Cambios sin guardar');
     });
   });
@@ -1071,6 +1051,8 @@ function navigateAdminConfigPage(pageName, options = {}) {
   });
   const title = document.getElementById('admin-page-title');
   const description = document.getElementById('admin-page-description');
+  const saveActions = document.getElementById('admin-general-save-actions');
+  if (saveActions) saveActions.hidden = page === 'inventarios';
   if (title) title.textContent = metadata.title;
   if (description) description.textContent = metadata.description;
 
@@ -1117,8 +1099,8 @@ async function saveFutureAppConfigDraft() {
   }
 }
 
-async function publishFutureAppConfig() {
-  await saveAdminConfig();
+function publishFutureAppConfig() {
+  return saveAdminConfig();
 }
 
 async function saveAdminConfig() {
@@ -1174,10 +1156,13 @@ window.handleBrandVerticalChange = handleBrandVerticalChange;
 window.handleBrandLogoFileSelect = handleBrandLogoFileSelect;
 window.applyBrandColorPreset = applyBrandColorPreset;
 
-document.addEventListener('DOMContentLoaded', () => {
-  initializeAdminConfigPages();
-  authorizeAdminSession().catch(error => setAdminAuthStatus(error.message || 'No se pudo verificar la sesión.', true));
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    initializeAdminConfigPages();
+    await authorizeAdminSession();
+  } catch (error) {
+    setAdminAuthStatus(error.message || 'No se pudo verificar la sesión.', true);
+  }
 });
-
 
 

@@ -20,6 +20,7 @@ const PUBLIC_ROOT_FILES = [
   'index.css',
   'index.html',
   'index.js',
+  'inventory-export.js',
   'mapa-local.js',
   'memberPortal.js',
   'mercadopago-checkout.js',
@@ -71,6 +72,7 @@ function copyPublicFile(relativePath) {
 }
 
 function buildStaticSite() {
+  require('./prepare-inventory-vendor.js')();
   fs.rmSync(outputDir, { recursive: true, force: true });
   fs.mkdirSync(outputDir, { recursive: true });
   PUBLIC_ROOT_FILES.forEach(copyPublicFile);

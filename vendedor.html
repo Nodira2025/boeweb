@@ -2638,6 +2638,8 @@
           <p>Productos ingresados por la tienda. Este catálogo es independiente del Catálogo B2B y de los proveedores externos.</p>
         </div>
         <div class="internal-catalog-hero-actions" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <button type="button" class="internal-catalog-add" data-admin-config-link hidden style="min-height: 44px;" onclick="InventoryExport.download({ client: supabaseClient, auth: window.SaasAuth, button: this })">Descargar inventarios en Excel</button>
+          <a href="admin-config.html#inventarios" data-admin-config-link hidden>Elegir inventario a exportar</a>
           <button type="button" onclick="switchVendorTab('drafts-review')" style="background: rgba(194,162,70,0.2); border: 1.5px solid #c2a246; color: #5c3b1e; font-weight: 800; padding: 8px 14px; border-radius: 10px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
             👑 Cola de Aprobación <span id="drafts-pending-catalog-count" style="background: #c62828; color: #fff; border-radius: 8px; padding: 1px 6px; font-size: 0.72rem; display: none;">0</span>
           </button>
@@ -2686,6 +2688,7 @@
       </div>
 
       <div id="internal-catalog-status" class="stock-ai-status" role="status" aria-live="polite" hidden></div>
+      <p id="inventory-export-status" role="status" aria-live="polite"></p>
       <div id="internal-catalog-layout" class="internal-catalog-layout">
         <div id="internal-catalog-grid" class="internal-catalog-grid" aria-live="polite"></div>
 
@@ -4955,6 +4958,8 @@
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
   <script src="admin-operations-console.js?v=admin_v12"></script>
   <script src="store-catalog.js?v=catalog_scope_v1"></script>
+  <script src="assets/vendor/sheetjs/xlsx-0.20.3.min.js"></script>
+  <script src="inventory-export.js?v=1"></script>
   <script src="vendedor.js?v=cash_workspace_v13_session_guard_v1_sector_publication_v1_catalog_scope_v1"></script>
 </body>
 </html>

@@ -206,6 +206,9 @@
       </section>
 
       <nav class="admin-page-nav" aria-label="Páginas del centro de configuración">
+        <button type="button" class="admin-page-nav-item" data-admin-page-target="inventarios">
+          <span aria-hidden="true">↓</span><span>Inventarios y Excel</span>
+        </button>
         <button type="button" class="admin-page-nav-item" data-admin-page-target="marca" aria-current="page">
           <span aria-hidden="true">✦</span><span>Marca</span>
         </button>
@@ -220,6 +223,22 @@
         </button>
       </nav>
       
+      <section class="admin-card" data-admin-page="inventarios" hidden aria-labelledby="inventory-export-title">
+        <h2 class="admin-card-title" id="inventory-export-title">Exportar inventarios a Excel</h2>
+        <p class="admin-card-subtitle">Descargá todos los registros del inventario elegido, con hojas separadas y filtros en Excel. Incluye productos activos e inactivos, identificados por estado.</p>
+        <label class="admin-label" for="inventory-export-scope">Inventario a descargar</label>
+        <select id="inventory-export-scope" class="admin-input" style="min-height: 44px; margin-bottom: 16px; font-family: inherit;">
+          <option value="all">Todos los inventarios</option>
+          <option value="own">Stock propio y ubicaciones</option>
+          <option value="b2b">Catálogo B2B</option>
+          <option value="local">Catálogo de locales</option>
+          <option value="locations">Ubicaciones físicas</option>
+        </select>
+        <p class="admin-card-subtitle">Incluye SKU, código de barras, categoría, marca, cantidades, reservas, precios y costos. También ubicación, nivel y sector; proveedor o local, dirección y entrega estimada cuando estén cargados. La disponibilidad externa se informa por separado del stock propio.</p>
+        <button type="button" class="app-config-action app-config-action-primary" style="min-height: 44px;" onclick="InventoryExport.download({ client: supabaseClient, auth: window.SaasAuth, button: this, scope: document.getElementById('inventory-export-scope').value })">Descargar Excel (.xlsx)</button>
+        <p id="inventory-export-status" role="status" aria-live="polite"></p>
+      </section>
+
       <!-- Contenido público editable desde una única publicación central. -->
       <section class="admin-card site-content-editor" data-admin-page="sitio" hidden aria-labelledby="site-content-title" oninput="updateSiteContentPreview()">
         <h2 id="site-content-title">Un solo contenido para tu tienda</h2>
@@ -732,7 +751,7 @@
       </div>
 
       <!-- Submit Action -->
-      <div style="margin-bottom: 60px;">
+      <div id="admin-general-save-actions" style="margin-bottom: 60px;">
         <button type="button" onclick="saveAdminConfig()" class="btn-admin-save">Publicar configuración general e identidad de marca</button>
         <p id="admin-save-msg" style="text-align: center; color: #25D366; font-weight: 600; margin-top: 12px; display: none;">
           ✓ ¡Configuración guardada con éxito!
@@ -745,6 +764,9 @@
   <script src="business-verticals.js"></script>
   <script src="tenant-theme.js?v=canonical_theme_v1"></script>
   <script src="saas-auth.js?v=auth_v1"></script>
-  <script src="admin-config.js?v=site_content_v1"></script>
+  <script src="admin-config.js?v=inventory_export_v1"></script>
+  <script src="store-catalog.js?v=catalog_scope_v1"></script>
+  <script src="assets/vendor/sheetjs/xlsx-0.20.3.min.js"></script>
+  <script src="inventory-export.js?v=1"></script>
 </body>
 </html>
