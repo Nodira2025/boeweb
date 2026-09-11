@@ -19,7 +19,7 @@ const expectedShape = {
     'brand', 'catalog', 'payments', 'publishedAt', 'revision', 'rules', 'schemaVersion',
     'status', 'tenantId', 'updatedAt'
   ],
-  brand: ['hero', 'texts', 'verticalCode', 'visuals'],
+  brand: ['content', 'hero', 'texts', 'verticalCode', 'visuals'],
   hero: ['enabled', 'slides'],
   heroSlide: [
     'ctaText', 'durationSeconds', 'id', 'mediaUrl', 'overlayEnabled', 'subtitle',
@@ -30,7 +30,7 @@ const expectedShape = {
     'logoUrl', 'primaryColor', 'textColor'
   ],
   texts: [
-    'address', 'instagram', 'name', 'productTerm', 'slogan', 'vendorTerm',
+    'address', 'facebookUrl', 'instagram', 'mapsUrl', 'name', 'productTerm', 'slogan', 'vendorTerm',
     'warehouseTerm', 'whatsapp'
   ],
   catalog: [
@@ -424,7 +424,7 @@ test('storefront, vendedor y admin cargan AppConfig y no operan la tabla legacy 
   assert.doesNotMatch(browserSources, /\.from\s*\(\s*['"]store_config['"]\s*\)/);
   assert.match(fs.readFileSync(path.resolve('app-config.js'), 'utf8'), /['"]tenant_app_config['"]/);
   const hero = fs.readFileSync(path.resolve('hero-slider.js'), 'utf8');
-  assert.match(hero, /boeStorefrontAppConfig/);
+  assert.match(hero, /AppConfig\.getPresentationConfig\(\)/);
   assert.match(hero, /boeweb_app_config_loaded/);
   assert.match(hero, /brand\.hero/);
   assert.match(hero, /escapeHeroHtml/);

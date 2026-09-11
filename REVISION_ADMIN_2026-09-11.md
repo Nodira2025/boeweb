@@ -23,7 +23,7 @@ La base tenía cuatro proveedores nacionales activos, 7.215 ofertas activas con 
 
 | Área | Controles actuales | Límite real |
 | --- | --- | --- |
-| Identidad | Nombre, eslogan, logo, colores, tipografías, términos y contactos | Todavía hay textos y enlaces fijos en varias secciones. Cambiar el rubro no transforma todos los contenidos. |
+| Identidad y sitio | Nombre, eslogan, logo, colores, tipografías, contactos y 21 textos de portada, servicios, contacto y pie | El contenido completo de Club, Academia y pacientes no está incluido en este editor. Cambiar el rubro no transforma todos los módulos. |
 | Catálogo | Unificado / sólo interno / deshabilitado; público / miembros / privado; agotados y pedidos sin stock | “Sólo miembros” oculta la tienda pública, pero no crea por sí solo un catálogo exclusivo para miembros. |
 | Operación | Límites de descuentos, clientes para crédito, tolerancia de caja | Hay reglas obligatorias que no conviene convertir en interruptores: trazabilidad, pertenencia a empresa y consistencia de saldos. |
 | Mostrador | Escaneo directo, billetes rápidos, ventas en espera y duplicados | Son preferencias del mostrador, no configuración completa de cada caja. |
@@ -32,7 +32,7 @@ La base tenía cuatro proveedores nacionales activos, 7.215 ofertas activas con 
 ## Mejoras recomendadas, en orden
 
 1. **Publicación global confiable — corrección implementada.** Supabase prevalece sobre revisiones locales infladas; las respuestas tardías no pisan una confirmación más reciente. Admin carga todas las secciones desde la misma publicación y guarda sólo si la revisión central sigue siendo la que se abrió. Si otro administrador publicó, conserva el formulario y ofrece descartar explícitamente los cambios para cargar la versión actual. Publicar ya no modifica el borrador como paso previo. La base ya tiene historial en `tenant_configurations`; siguen pendientes una pantalla de comparación y restauración. Es necesario recargar las pestañas antiguas para usar el guardado protegido.
-2. **Portada y contenido del sitio.** Un editor único para encabezado, descripción, contacto, enlaces, pie y secciones visibles, con vista previa móvil/escritorio. El video guardado durante la revisión era un enlace de YouTube y el reproductor actual usa un elemento de video para archivos directos; por eso falla. Validar el tipo de recurso y ofrecer integración explícita de YouTube, o pedir MP4/WebM. Revisar también la carga de imágenes de banners: no depender de contenido embebido en la configuración.
+2. **Portada y contenido del sitio — editor implementado.** La pestaña “Sitio web” permite editar 21 textos, mostrar/ocultar portada y contacto, y configurar enlaces de mapa y Facebook. Incluye vista previa textual sin publicar y accesos a contactos/banners de Marca. Los botones de contacto y comprobantes de la tienda usan el WhatsApp publicado. El reproductor reconoce YouTube y archivos MP4/WebM. Pendientes: vista previa completa de cada tamaño dentro del admin, edición de módulos adicionales y biblioteca de archivos en Storage; las imágenes subidas siguen embebidas en la configuración, ahora limitadas a PNG/JPG/WebP de 500 KB por imagen.
 3. **Proveedores y publicación comercial.** Administrar visibilidad por proveedor/categoría, precio de venta, margen, plazo estimado, fecha de actualización y datos vencidos. Vista previa antes de publicar una importación. Conservar separados stock propio y disponibilidad del proveedor. La carga pública ya recorre páginas; para crecer conviene búsqueda y filtros del lado del servidor en vez de descargar todo al iniciar.
 4. **Encargos con seguimiento.** Para que los nacionales entren al carrito y a Pedidos hace falta extender el contrato del pedido web, su precio autoritativo y la contabilización: producto/oferta de origen, confirmación del proveedor, plazo acordado, seña o pago, compra al proveedor, recepción y entrega. El cobro actual busca productos propios; mostrar una oferta no la vuelve cobrable. Empezaría por presupuesto/encargo pendiente de aprobación humana.
 5. **Cajas y sucursales.** Un listado administrativo de cajas, su área y ubicación, quién puede abrirlas, turno actual, cierres y diferencias. La caja general debe mostrar claramente el área seleccionada. Si se desea un informe consolidado, debe ser una vista explícita, no una mezcla implícita de cajas.
@@ -43,17 +43,31 @@ La base tenía cuatro proveedores nacionales activos, 7.215 ofertas activas con 
 
 - El umbral de stock bajo existe en admin, pero la tienda aún usa cinco unidades en varios contadores y etiquetas.
 - La moneda editable no convierte automáticamente precios, caja ni importes externos; las ofertas externas existentes se presentan en ARS.
-- Los textos de cultivo, enlaces de contacto y módulos como pacientes/club siguen teniendo partes fijas. Un selector de rubro no equivale a activar/desactivar módulos completos.
+- Algunos textos y módulos como pacientes/club siguen teniendo partes fijas. Los contactos principales de la tienda sí se centralizaron. Un selector de rubro no equivale a activar/desactivar módulos completos.
 - Los métodos de pago requieren comprobación integral. Esta revisión no creó pagos, créditos, ventas ni mensajes a clientes.
 
 ## Diseño y recurso gráfico
 
 Se siguió la guía de diseño del proyecto para contraste, controles táctiles e integración sin ventanas intrusivas nuevas. El logo utilizado está en `assets/pulso-developer-logo.png`; es una versión sobre blanco del adjunto, preparada con la herramienta integrada de imágenes. Instrucción de edición: cambiar únicamente el fondo negro a blanco, conservar símbolo, proporciones, colores y los textos “PULSO” y “Transformar procesos para crecer”.
 
-La recomendación es consolidar **Configuración general** con identidad/contenido, proveedores/catálogo, cajas, usuarios/permisos, pagos y estado del sistema. Con la corrección de publicación implementada, el próximo paso es contenido global; después, el flujo completo de encargos nacionales.
+La recomendación es consolidar **Configuración general** con identidad/contenido, proveedores/catálogo, cajas, usuarios/permisos, pagos y estado del sistema. Con publicación y contenido principal implementados, el próximo paso comercial es administrar la publicación de proveedores y el flujo completo de encargos nacionales.
 
 ## Verificación de la corrección de publicación
 
 El paquete específico de esta corrección pasó **433 pruebas** y la compilación, aislado de los cambios pendientes de otras tareas.
 
 Se probaron lecturas simultáneas y fuera de orden, publicaciones concurrentes, creación inicial, borradores independientes, caché llena/bloqueada, funcionamiento sin conexión y aislamiento de empresa. Se comprobó el flujo de conflicto → conservación del formulario → recarga explícita → guardado correcto en un panel local con datos simulados, y se revisó visualmente el aviso a 395 px sin desbordamiento horizontal. No se publicaron configuraciones de prueba en la tienda real ni se cambió la estructura de Supabase. Las pantallas visibles consultan la publicación cada minuto y al volver a la pestaña; sin conexión pueden mostrar la última copia disponible, pero el admin exige lectura central antes de habilitar la edición.
+
+## Contenido, contactos y multimedia
+
+El paquete aislado de esta entrega pasó **443 pruebas** y la compilación. El conjunto de trabajo compartido pasó 460 pruebas; los cambios ajenos a esta entrega se conservaron sin incluirlos en su publicación.
+
+- Acceso: `admin-config.html#sitio`. Los cambios se publican con el mismo guardado protegido; no necesitan una nueva tabla ni migración.
+- Los enlaces vacíos se ocultan. WhatsApp requiere entre 8 y 15 dígitos; Instagram admite usuario o enlace de perfil; mapa/Facebook requieren HTTPS. No se conservan teléfonos de ejemplo como destino alternativo.
+- El problema de YouTube era tratar una página de reproducción como archivo de video. Se incorporó un iframe específico, sin reproducción automática y sin rotar mientras está seleccionado; al pasar de banner se descarga el reproductor anterior. Hay un enlace “Ver en YouTube” como alternativa. El formato y tamaño del reproductor siguen la [documentación oficial de YouTube](https://developers.google.com/youtube/player_parameters). La disponibilidad y el permiso de inserción dependen del propietario del video.
+- Las imágenes tienen validación de formato y tamaño. Los textos de banners se escapan al renderizar el editor; los textos generales se asignan como texto, no como HTML. No se implementó una biblioteca de archivos ni compresión automática.
+- Controles táctiles de 44 px y navegación en una fila separada, siguiendo la guía de diseño del proyecto. El crédito PULSO permanece sobre blanco.
+- Pruebas locales en navegador: edición/publicación/recarga de texto y mapa; ocultar contacto; rechazo de URL de video incorrecta sin guardar; enlaces unificados; pausa y cambio de banner; editor y portada sin desbordamiento a 390 px. Un video público de prueba reprodujo en Chrome. El navegador integrado no cargó el iframe externo, por lo que no se usó para confirmar reproducción.
+- Una futura política CSP debe permitir `frame-src https://www.youtube-nocookie.com` además de sus fuentes locales. Esta entrega no publica el bloque de cabeceras de seguridad pendiente de otra tarea.
+
+No se publicaron textos de prueba ni se alteraron precios, ventas, pagos, movimientos de caja o la configuración central real durante estas verificaciones.

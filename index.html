@@ -26,8 +26,8 @@
 
   <!-- Stylesheet -->
   <link rel="stylesheet" href="index.css?v=white_label_v2">
-  <link rel="stylesheet" href="storefront.css?v=purchase_clarity_v2_catalog_scope">
-  <script src="app-config.js?v=central_publication_v2"></script>
+  <link rel="stylesheet" href="storefront.css?v=site_content_v1">
+  <script src="app-config.js?v=site_content_v1"></script>
   <script src="theme.js?v=central_publication_v2"></script>
 </head>
 <body>
@@ -150,17 +150,17 @@
   </header>
 
   <!-- Hero Section -->
-  <section class="hero-section" id="home">
+  <section class="hero-section" id="home" data-site-section="home">
     <!-- Zen 420 Floating Leaves Container -->
     <div class="zen-leaves-container" id="zen-leaves-container"></div>
     <div class="hero-container">
       <div class="hero-content">
         <span class="hero-eyebrow">Growshop en Tucumán · Stock propio y a pedido</span>
-        <h1 class="hero-title">Elegí hoy.<br><span class="highlight-gold">Sabé cuándo llega.</span></h1>
-        <p class="hero-description">Un solo catálogo con productos disponibles en el local y opciones de proveedores. Vas a ver el plazo antes de agregar cada producto.</p>
+        <h1 class="hero-title"><span data-site-text="homeTitle">Elegí hoy.</span><br><span class="highlight-gold" data-site-text="homeHighlight">Sabé cuándo llega.</span></h1>
+        <p class="hero-description" data-site-text="homeDescription">Un solo catálogo con productos disponibles en el local y opciones de proveedores. Vas a ver el plazo antes de agregar cada producto.</p>
         <div class="hero-actions">
-          <a href="#catalog-section" class="btn btn-primary">Ver catálogo y plazos</a>
-          <a href="https://wa.me/5493813023185" class="btn btn-secondary hero-whatsapp-cta" data-app-brand-whatsapp-cta target="_blank" rel="noopener" aria-label="Hablar con un asesor por WhatsApp">Hablar con un asesor</a>
+          <a href="#catalog-section" class="btn btn-primary" data-site-text="homeCta">Ver catálogo y plazos</a>
+          <a href="#" class="btn btn-secondary hero-whatsapp-cta" data-app-brand-whatsapp-cta target="_blank" rel="noopener" aria-label="Hablar con un asesor por WhatsApp">Hablar con un asesor</a>
           <button class="hero-benefit-action" id="wheel-trigger-hero" type="button">
             <svg class="icon lotus-icon-btn" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zm0-1.5c-4.694 0-8.5-3.806-8.5-8.5s3.806-8.5 8.5-8.5 8.5 3.806 8.5 8.5-3.806 8.5-8.5 8.5zm-1.5-6.5c0-.828.672-1.5 1.5-1.5s1.5 0 1.5 1.5v2c0 .828-.672 1.5-1.5 1.5s-1.5-.672-1.5-1.5v-2z"></path>
@@ -181,9 +181,9 @@
           <div><span>Tu ecosistema BÔ</span><strong>Cultivo, comunidad y bienestar.</strong></div>
         </div>
         <div class="hero-service-list">
-          <div><span class="service-number">01</span><p><strong>Disponible hoy</strong><small>Stock propio listo para retirar o coordinar.</small></p></div>
-          <div><span class="service-number">02</span><p><strong>Opciones de proveedores</strong><small>Productos nacionales con espera informada.</small></p></div>
-          <div><span class="service-number">03</span><p><strong>Compra acompañada</strong><small>Confirmamos cada pedido antes de avanzar.</small></p></div>
+          <div><span class="service-number">01</span><p><strong data-site-text="service1Title">Disponible hoy</strong><small data-site-text="service1Text">Stock propio listo para retirar o coordinar.</small></p></div>
+          <div><span class="service-number">02</span><p><strong data-site-text="service2Title">Opciones de proveedores</strong><small data-site-text="service2Text">Productos nacionales con espera informada.</small></p></div>
+          <div><span class="service-number">03</span><p><strong data-site-text="service3Title">Compra acompañada</strong><small data-site-text="service3Text">Confirmamos cada pedido antes de avanzar.</small></p></div>
         </div>
       </aside>
     </div>
@@ -409,7 +409,7 @@
             <li><span aria-hidden="true">✓</span> Retiro en Tucumán</li>
             <li><span aria-hidden="true">✓</span> Asesoría por WhatsApp</li>
           </ul>
-          <a href="https://wa.me/5493813023185" target="_blank" rel="noopener">Consultar a un asesor</a>
+          <a data-app-brand-whatsapp-cta href="#" target="_blank" rel="noopener">Consultar a un asesor</a>
         </section>
       </aside>
 
@@ -940,16 +940,16 @@
   </button>
 
   <!-- Contact & Community Section -->
-  <section class="contact-section" id="contact-section">
+  <section class="contact-section" id="contact-section" data-site-section="contact">
     <div class="contact-bg-glow"></div>
     <div class="contact-container">
       <div class="contact-header">
         <div class="contact-badge">
           <span class="badge-dot"></span>
-          <span>ESPACIO ZEN & ATENCIÓN PERSONALIZADA</span>
+          <span data-site-text="contactEyebrow">Atención personalizada</span>
         </div>
-        <h2 class="contact-title">Estudio de Cultivo & Comunidad</h2>
-        <p class="contact-subtitle">Conectá con el santuario BÔ growclub. Te esperamos en nuestro estudio privado o a través de nuestros canales directos.</p>
+        <h2 class="contact-title" data-site-text="contactTitle">Estudio de Cultivo & Comunidad</h2>
+        <p class="contact-subtitle" data-site-text="contactDescription">Conectá con el santuario BÔ growclub. Te esperamos en nuestro estudio privado o a través de nuestros canales directos.</p>
       </div>
       
       <div class="contact-grid">
@@ -967,9 +967,9 @@
             </div>
             <div class="icon-ring"></div>
           </div>
-          <h3>Estudio Privado</h3>
-          <p>Ubicado en el corazón de Tucumán, nuestro estudio te ofrece asesoramiento presencial personalizado para llevar tu cultivo al máximo nivel.</p>
-          <a href="https://www.google.com/search?q=growshop&oq=growshop&gs_lcrp=EgZjaHJvbWUqCAgAEEUYJxg7MggIABBFGCcYOzIKCAEQABiSAxiABDINCAIQABiSAxiABBiKBTIHCAMQABiABDIHCAQQABiABDIHCAUQABiABDIHCAYQABiABDINCAcQLhivARjHARiABDIHCAgQABiABDIHCAkQABiABNIBCDYxODdqMGo3qAIAsAIA&sourceid=chrome&source=chrome.ob&ie=UTF-8#sv=CAwS_wEKBmxjbF9wdhIxCgNwdnESKkNnMHZaeTh4TVd0aWQzQmtkekkzSWc0S0NHZHliM2R6YUc5d0VBSVlBdxKKAQoDbHFpEoIBQ2dobmNtOTNjMmh2Y0VqSDJObTZxN0dBZ0FoYURCQUFJZ2huY205M2MyaHZjSklCRG1OaGJtNWhZbWx6WDNOMGIzSmxtZ0VrUTJoa1JGTlZhRTVOUnpsdVV6QldTbEV3Um01VFZWSTJUa2RXZUU1dVJtNVNVa0ZDLWdFRUNHUVFNURISCgN0YnMSC2xyZjohM3NJQUU9Eg0KAXESCGdyb3dzaG9wGhJsb2NhbC1wbGFjZS12aWV3ZXIYCiCNheXIBA" target="_blank" rel="noopener" class="btn btn-secondary contact-card-btn">
+          <h3 data-site-text="locationTitle">Nuestro local</h3>
+          <p data-site-text="locationDescription">Ubicado en el corazón de Tucumán, nuestro estudio te ofrece asesoramiento presencial personalizado para llevar tu cultivo al máximo nivel.</p>
+          <a href="#" data-app-brand-maps-cta target="_blank" rel="noopener" class="btn btn-secondary contact-card-btn">
             <span>Ubicación en Google Maps</span>
             <svg class="btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
           </a>
@@ -988,9 +988,9 @@
             </div>
             <div class="icon-ring golden"></div>
           </div>
-          <h3>Asesoramiento WhatsApp</h3>
-          <p>¿Dudas sobre nutrientes, iluminación o genéticas? Escribinos directo y coordinamos tu pedido o consulta al instante.</p>
-          <a href="https://wa.me/5493813023185" target="_blank" rel="noopener" class="btn btn-primary contact-card-btn whatsapp-cta">
+          <h3 data-site-text="whatsappTitle">Asesoramiento WhatsApp</h3>
+          <p data-site-text="whatsappDescription">¿Dudas sobre nutrientes, iluminación o genéticas? Escribinos directo y coordinamos tu pedido o consulta al instante.</p>
+          <a data-app-brand-whatsapp-cta href="#" target="_blank" rel="noopener" class="btn btn-primary contact-card-btn whatsapp-cta">
             <svg class="icon-ws" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
             <span>Chatear por WhatsApp</span>
           </a>
@@ -1012,16 +1012,16 @@
             </div>
             <div class="icon-ring"></div>
           </div>
-          <h3>Comunidad BÔ</h3>
-          <p>Sumate a nuestras redes para participar de sorteos mensuales, ver guías de cultivo en video y formar parte de la comunidad.</p>
+          <h3 data-site-text="communityTitle">Nuestra comunidad</h3>
+          <p data-site-text="communityDescription">Sumate a nuestras redes para participar de sorteos mensuales, ver guías de cultivo en video y formar parte de la comunidad.</p>
           <div class="contact-social-buttons">
-            <a href="https://www.instagram.com/bo.growclub/" target="_blank" rel="noopener" class="social-btn instagram-btn">
+            <a href="#" data-app-brand-instagram-cta target="_blank" rel="noopener" class="social-btn instagram-btn">
               <svg class="social-icon-svg" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
               </svg>
               <span>Instagram</span>
             </a>
-            <a href="https://www.facebook.com/p/BO-growclub-61579315981629/" target="_blank" rel="noopener" class="social-btn facebook-btn">
+            <a href="#" data-app-brand-facebook-cta target="_blank" rel="noopener" class="social-btn facebook-btn">
               <svg class="social-icon-svg" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
               </svg>
@@ -1041,7 +1041,7 @@
           <img src="assets/logo.jpg" alt="BO growclub Logo" class="brand-logo footer-logo-img">
           <span>BO growclub</span>
         </div>
-        <p class="footer-brand-desc">BÔ growclub - Estudio de Cultivo Privado & Accesorios Exclusivos. Tu grow shop espiritual y premium. Ofrecemos las mejores herramientas y genéticas para que tu cultivo crezca en armonía física y espiritual.</p>
+        <p class="footer-brand-desc" data-site-text="footerDescription">BÔ growclub - Estudio de Cultivo Privado & Accesorios Exclusivos. Tu grow shop espiritual y premium. Ofrecemos las mejores herramientas y genéticas para que tu cultivo crezca en armonía física y espiritual.</p>
       </div>
 
       <div class="footer-links">
@@ -1061,7 +1061,7 @@
     </div>
     
     <div class="footer-bottom">
-      <div class="footer-zen-quote">
+      <div class="footer-zen-quote" data-site-text="footerNote">
         "El que cuida una planta, cuida su propia mente."
       </div>
       <a href="vendedor.html" class="footer-team-access">Acceso del equipo</a>
@@ -1394,7 +1394,7 @@
               <span style="background: var(--color-accent-gold); color: #0f1e18; font-weight: 900; padding: 2px 10px; border-radius: 10px; font-size: 0.75rem;">+150 SEMILLAS</span>
             </div>
             <p style="font-size: 0.82rem; color: var(--color-neutral-stone-dark); margin-bottom: 10px;">
-              1. Hacé clic en ir al Instagram <a href="https://www.instagram.com/bo.growclub/" target="_blank" style="color: var(--color-accent-gold-dark); font-weight: 700;">@bo.growclub</a>.<br>
+              1. Hacé clic en ir al Instagram <a href="#" data-app-brand-instagram target="_blank" style="color: var(--color-accent-gold-dark); font-weight: 700;">Instagram</a>.<br>
               2. Deja un comentario incluyendo tu código único: <strong id="mission-ig-code" style="color: var(--color-primary); font-size: 0.95rem;">#BO-8492</strong>.
             </p>
             <button class="btn btn-primary" onclick="verifyInstagramCommentMission()" id="btn-verify-ig-comment" style="padding: 8px 16px; font-size: 0.85rem;">🔍 VERIFICAR COMENTARIO AUTOMÁTICO</button>
@@ -1420,7 +1420,7 @@
               <span style="background: #25D366; color: #fff; font-weight: 900; padding: 2px 10px; border-radius: 10px; font-size: 0.75rem;">+150 SEMILLAS</span>
             </div>
             <p style="font-size: 0.82rem; color: var(--color-neutral-stone-dark); margin-bottom: 10px;">Formá parte de nuestro canal exclusivo de lanzamientos, cosechas y descuentos sorpresa en WhatsApp.</p>
-            <a href="https://wa.me/5493813023185?text=UNIRME_COMUNIDAD_VIP_BO" target="_blank" class="btn btn-secondary" onclick="verifyWhatsAppMission()" style="border-color: #25D366; color: #25D366; font-size: 0.85rem; text-decoration: none; display: inline-block;">🟢 Unirse & Reclamar +150 Semillas</a>
+            <a data-whatsapp-message="UNIRME_COMUNIDAD_VIP_BO" data-app-brand-whatsapp-cta href="#" target="_blank" class="btn btn-secondary" onclick="verifyWhatsAppMission()" style="border-color: #25D366; color: #25D366; font-size: 0.85rem; text-decoration: none; display: inline-block;">🟢 Unirse & Reclamar +150 Semillas</a>
           </div>
 
           <!-- Misión 4: TikTok / Facebook -->
@@ -1430,7 +1430,7 @@
               <span style="background: var(--color-accent-gold); color: #0f1e18; font-weight: 900; padding: 2px 10px; border-radius: 10px; font-size: 0.75rem;">+100 SEMILLAS</span>
             </div>
             <p style="font-size: 0.82rem; color: var(--color-neutral-stone-dark); margin-bottom: 10px;">Sumate a nuestra página de Facebook para participar en eventos presenciales y ver clips de la Academia.</p>
-            <a href="https://www.facebook.com/p/BO-growclub-61579315981629/" target="_blank" onclick="verifyFacebookMission()" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.85rem; text-decoration: none; display: inline-block;">▶️ Ir a Facebook & Reclamar +100 Semillas</a>
+            <a href="#" data-app-brand-facebook-cta target="_blank" onclick="verifyFacebookMission()" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.85rem; text-decoration: none; display: inline-block;">▶️ Ir a Facebook & Reclamar +100 Semillas</a>
           </div>
 
         </div>
@@ -1669,8 +1669,8 @@
   <script src="public-order-api.js?v=orders_v2"></script>
   <script src="mercadopago-checkout.js?v=1.0"></script>
   <script src="store-catalog.js?v=catalog_scope_v1"></script>
-  <script src="index.js?v=security_v4_catalog_scope_v1"></script>
-  <script src="hero-slider.js?v=white_label_v2"></script>
+  <script src="index.js?v=site_content_v1"></script>
+  <script src="hero-slider.js?v=site_content_v1"></script>
   <script src="memberPortal.js?v=2.4"></script>
   <script src="academy.js?v=2.4"></script>
   <script src="drbo.js?v=2.5"></script>

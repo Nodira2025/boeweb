@@ -50,7 +50,7 @@ test('contacto y copyright del storefront provienen de AppConfig', () => {
     assert.match(storefrontHtml, new RegExp(selector));
     assert.match(appConfig, new RegExp(selector));
   }
-  assert.match(appConfig, /https:\/\/wa\.me\/\$\{whatsappDigits\}/);
+  assert.match(appConfig, /getWhatsappUrl\(whatsappLink\.getAttribute/);
   assert.match(appConfig, /instagramUrl/);
   assert.match(appConfig, /element\.textContent = `© \$\{new Date\(\)\.getFullYear\(\)\} \$\{texts\.name\}/);
   const utility = storefrontHtml.slice(storefrontHtml.indexOf('<div class="brand-utility-bar"'), storefrontHtml.indexOf('<!-- Header Navigation -->'));

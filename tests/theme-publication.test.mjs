@@ -22,7 +22,7 @@ function createBrowser() {
     localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
     addEventListener(name, callback) { const callbacks = listeners.get(name) || []; callbacks.push(callback); listeners.set(name, callbacks); },
     dispatchEvent(event) { for (const callback of listeners.get(event.type) || []) callback(event); } };
-  const sandbox = vm.createContext({ window, document, localStorage: window.localStorage, console, setTimeout() {},
+  const sandbox = vm.createContext({ window, document, localStorage: window.localStorage, console, URL, setTimeout() {},
     CustomEvent: class { constructor(type, options = {}) { this.type = type; this.detail = options.detail; } } });
   vm.runInContext(sources[0], sandbox);
   return { window, storage, values, sandbox, api: window.AppConfig,

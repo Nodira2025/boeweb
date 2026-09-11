@@ -1397,8 +1397,7 @@ document.addEventListener('DOMContentLoaded', () => {
       bankMsg += `🏷️ *Alias:* ${bankAlias}\n\n`;
       bankMsg += `Al realizar la transferencia, envianos el comprobante por WhatsApp.`;
 
-      const waPhone = "5493813023185";
-      const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(bankMsg)}`;
+      const waUrl = window.AppConfig.getWhatsappUrl(bankMsg);
       
       // La reserva de stock ya fue realizada atómicamente por create_public_order_v2.
       newOrder.stock_deducted = true;
@@ -1411,7 +1410,7 @@ document.addEventListener('DOMContentLoaded', () => {
       closeCheckout();
       
       // Abrir WhatsApp en ventana aparte y mostrar comprobante en la web
-      window.open(waUrl, '_blank');
+      if (waUrl) window.open(waUrl, '_blank', 'noopener');
       showWebOrderReceipt(newOrder, waUrl);
       return;
     }
@@ -1437,8 +1436,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (notes !== '') msg += `\n💬 *Notas:* ${notes}\n`;
     msg += `\n¡Muchas gracias! 🙏`;
 
-    const waPhone = "5493813023185";
-    const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
+    const waUrl = window.AppConfig.getWhatsappUrl(msg);
 
     // La reserva de stock ya fue realizada atómicamente por create_public_order_v2.
     newOrder.stock_deducted = true;
@@ -1451,7 +1449,7 @@ document.addEventListener('DOMContentLoaded', () => {
     closeCheckout();
 
     // Abrir WhatsApp en ventana aparte y mostrar comprobante interactivo
-    window.open(waUrl, '_blank');
+    if (waUrl) window.open(waUrl, '_blank', 'noopener');
     showWebOrderReceipt(newOrder, waUrl);
   });
 
@@ -1511,7 +1509,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     if (totalEl) totalEl.textContent = `$${formatPrice(order.total || order.total_amount)}`;
-    if (waLinkEl) waLinkEl.href = waUrl;
+    if (waLinkEl) {
+      waLinkEl.href = waUrl || '#';
+      waLinkEl.hidden = !waUrl;
+    }
 
     modal.style.display = 'flex';
   }
@@ -2371,7 +2372,6 @@ function showPaymentSuccessModal(data) {
   }
 
   // Armar mensaje directo de WhatsApp
-  const waPhone = "5493813023185";
   let waMsg = `✨ *Comprobante de Pago Acreditado - BO growclub* ✨\n\n`;
   waMsg += `📦 *Pedido:* ${data.orderId}\n`;
   waMsg += `💳 *Operación Mercado Pago:* #${data.collectionId}\n`;
@@ -2382,7 +2382,9 @@ function showPaymentSuccessModal(data) {
   waMsg += `¡Hola equipo BÔ Grow Club! Ya completé el pago de mi pedido por Mercado Pago. Les comparto el comprobante para coordinar la entrega. 🙏🌿`;
 
   if (waBtn) {
-    waBtn.href = `https://wa.me/${waPhone}?text=${encodeURIComponent(waMsg)}`;
+    const contactUrl = window.AppConfig.getWhatsappUrl(waMsg);
+    waBtn.href = contactUrl || '#';
+    waBtn.hidden = !contactUrl;
   }
 
   modal.classList.add('active');

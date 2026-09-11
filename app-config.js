@@ -17,6 +17,30 @@
   ]);
   const SECRET_KEY_PATTERN = /token|secret|password|passcode|private.?key|credential/i;
   const SECRET_VALUE_PATTERN = /^(?:bearer\s+[A-Za-z0-9._~-]{16,}|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/i;
+  const SITE_CONTENT_FIELDS = [
+    ['homeTitle', 'Portada', 'Título principal', 'Elegí hoy.', 100],
+    ['homeHighlight', 'Portada', 'Segunda línea destacada', 'Sabé cuándo llega.', 100],
+    ['homeDescription', 'Portada', 'Descripción principal', 'Un solo catálogo con productos disponibles en el local y opciones de proveedores. Vas a ver el plazo antes de agregar cada producto.', 500],
+    ['homeCta', 'Portada', 'Texto del botón del catálogo', 'Ver catálogo y plazos', 60],
+    ['service1Title', 'Servicios', 'Primer servicio: título', 'Disponible hoy', 80],
+    ['service1Text', 'Servicios', 'Primer servicio: descripción', 'Stock propio listo para retirar o coordinar.', 180],
+    ['service2Title', 'Servicios', 'Segundo servicio: título', 'Opciones de proveedores', 80],
+    ['service2Text', 'Servicios', 'Segundo servicio: descripción', 'Productos nacionales con espera informada.', 180],
+    ['service3Title', 'Servicios', 'Tercer servicio: título', 'Compra acompañada', 80],
+    ['service3Text', 'Servicios', 'Tercer servicio: descripción', 'Confirmamos cada pedido antes de avanzar.', 180],
+    ['contactEyebrow', 'Contacto', 'Etiqueta de la sección', 'Atención personalizada', 100],
+    ['contactTitle', 'Contacto', 'Título de contacto', 'Visitanos o escribinos', 140],
+    ['contactDescription', 'Contacto', 'Presentación de contacto', 'Te esperamos en el local o a través de nuestros canales directos.', 500],
+    ['locationTitle', 'Contacto', 'Título del local', 'Nuestro local', 100],
+    ['locationDescription', 'Contacto', 'Descripción del local', 'Coordiná tu visita para recibir asesoramiento personalizado.', 400],
+    ['whatsappTitle', 'Contacto', 'Título de WhatsApp', 'Asesoramiento por WhatsApp', 100],
+    ['whatsappDescription', 'Contacto', 'Descripción de WhatsApp', 'Escribinos para consultar productos, disponibilidad y entregas.', 400],
+    ['communityTitle', 'Contacto', 'Título de redes', 'Nuestra comunidad', 100],
+    ['communityDescription', 'Contacto', 'Descripción de redes', 'Seguinos para conocer novedades y propuestas de la tienda.', 400],
+    ['footerDescription', 'Pie de página', 'Descripción de la tienda', 'Productos seleccionados, atención personalizada y asesoramiento para tu compra.', 600],
+    ['footerNote', 'Pie de página', 'Frase final (opcional)', '', 240]
+  ].map(([key, group, label, defaultValue, maxLength]) => ({ key, group, label, defaultValue, maxLength }));
+  deepFreeze(SITE_CONTENT_FIELDS);
 
   function getRelativeLuminance(hexColor) {
     const rawHex = String(hexColor || '').trim().replace(/^#/, '');
@@ -128,11 +152,18 @@
         warehouseTerm: 'Depósito',
         whatsapp: '',
         instagram: '',
-        address: ''
+        address: '',
+        facebookUrl: '',
+        mapsUrl: ''
       },
       hero: {
         enabled: false,
         slides: []
+      },
+      content: {
+        ...Object.fromEntries(SITE_CONTENT_FIELDS.map(field => [field.key, field.defaultValue])),
+        homeEnabled: true,
+        contactEnabled: true
       }
     },
     catalog: {
@@ -268,6 +299,73 @@
     return fallback;
   }
 
+  function safeExternalUrl(value) {
+    try {
+      const url = new URL(String(value || '').trim());
+      return url.protocol === 'https:' && !url.username && !url.password ? url.href : '';
+    } catch (error) { return ''; }
+  }
+
+  function getContactLinks(config) {
+    const texts = config?.brand?.texts || {};
+    const digits = String(texts.whatsapp || '').replace(/\D/g, '');
+    const instagram = String(texts.instagram || '').trim();
+    let instagramUrl = /^@?[a-zA-Z0-9._]{1,30}$/.test(instagram)
+      ? `https://www.instagram.com/${instagram.replace(/^@/, '')}/`
+      : '';
+    if (!instagramUrl && instagram) {
+      try {
+        const profile = new URL(safeExternalUrl(instagram));
+        if (['instagram.com', 'www.instagram.com'].includes(profile.hostname)
+          && /^\/[a-zA-Z0-9._]{1,30}\/?$/.test(profile.pathname)) {
+          instagramUrl = `https://www.instagram.com/${profile.pathname.split('/')[1]}/`;
+        }
+      } catch (error) { /* Invalid profile URLs stay hidden until corrected in admin. */ }
+    }
+    return {
+      whatsapp: /^\d{8,15}$/.test(digits) ? `https://wa.me/${digits}` : '',
+      instagram: instagramUrl,
+      facebook: safeExternalUrl(texts.facebookUrl),
+      maps: safeExternalUrl(texts.mapsUrl)
+    };
+  }
+
+  function getWhatsappUrl(message = '', config = getPresentationConfig()) {
+    const base = getContactLinks(config).whatsapp;
+    return base ? `${base}${message ? `?text=${encodeURIComponent(message)}` : ''}` : '';
+  }
+
+  function getHeroMedia(slide) {
+    const src = cleanAssetUrl(slide?.mediaUrl ?? slide?.media_url, '');
+    if (slide?.type !== 'video') return { kind: src ? 'image' : 'invalid', src };
+    try {
+      const url = new URL(src);
+      const host = url.hostname.toLowerCase();
+      let id = '';
+      if (url.protocol === 'https:' && !url.username && !url.password) {
+        if (host === 'youtu.be') id = url.pathname.slice(1);
+        if (['youtube.com', 'www.youtube.com', 'm.youtube.com', 'www.youtube-nocookie.com'].includes(host)) {
+          id = url.pathname === '/watch' ? url.searchParams.get('v') : url.pathname.match(/^\/(?:embed|shorts|live)\/([^/]+)$/)?.[1];
+        }
+      }
+      if (/^[a-zA-Z0-9_-]{11}$/.test(id || '')) return {
+        kind: 'youtube', src: `https://www.youtube-nocookie.com/embed/${id}?playsinline=1&rel=0`,
+        watchUrl: `https://www.youtube.com/watch?v=${id}`
+      };
+    } catch (error) { /* A local media asset does not need an absolute URL. */ }
+    return { kind: src && /\.(mp4|webm)(?:[?#]|$)/i.test(src) ? 'video' : 'invalid', src };
+  }
+
+  function normalizeSiteContent(content = {}) {
+    if (!content || typeof content !== 'object' || Array.isArray(content)) content = {};
+    return {
+      ...Object.fromEntries(SITE_CONTENT_FIELDS.map(field => [field.key,
+        content[field.key] === undefined ? field.defaultValue : cleanOptionalText(content[field.key], field.maxLength)])),
+      homeEnabled: cleanBoolean(content.homeEnabled, true),
+      contactEnabled: cleanBoolean(content.contactEnabled, true)
+    };
+  }
+
   function normalizeHeroSlides(value) {
     if (!Array.isArray(value)) return [];
     return value.slice(0, 8).map((slide, index) => {
@@ -360,8 +458,11 @@
           warehouseTerm: cleanText(texts.warehouseTerm || sanitized.terminology?.warehouse, defaults.brand.texts.warehouseTerm, 60),
           whatsapp: cleanOptionalText(texts.whatsapp ?? sanitized.whatsapp_phone, 40),
           instagram: cleanOptionalText(texts.instagram ?? sanitized.instagram_url, 120),
-          address: cleanOptionalText(texts.address ?? sanitized.address, 240)
+          address: cleanOptionalText(texts.address ?? sanitized.address, 240),
+          facebookUrl: cleanOptionalText(texts.facebookUrl, 2048),
+          mapsUrl: cleanOptionalText(texts.mapsUrl, 2048)
         },
+        content: normalizeSiteContent(brand.content),
         hero: {
           enabled: cleanBoolean(hero.enabled ?? sanitized.hero_slider_active, defaults.brand.hero.enabled),
           slides: normalizeHeroSlides(hero.slides ?? sanitized.hero_slides)
@@ -456,7 +557,7 @@
       errors.push({ path: 'brand.hero.slides', code: 'invalid_slides', message: 'La portada admite hasta ocho piezas visuales.' });
     } else if (Array.isArray(heroSlides)) {
       heroSlides.forEach((slide, index) => {
-        if (!['image', 'video'].includes(slide?.type) || !cleanAssetUrl(slide?.mediaUrl, '')) {
+        if (!['image', 'video'].includes(slide?.type) || getHeroMedia(slide).kind === 'invalid') {
           errors.push({ path: `brand.hero.slides.${index}`, code: 'invalid_slide', message: 'Cada pieza necesita un tipo y recurso visual seguros.' });
         }
         if (slide?.targetUrl !== undefined && cleanActionUrl(slide.targetUrl, '') !== slide.targetUrl) {
@@ -464,6 +565,13 @@
         }
       });
     }
+
+    const contact = config.brand?.texts || {};
+    for (const key of ['mapsUrl', 'facebookUrl']) {
+      if (contact[key] && !safeExternalUrl(contact[key])) errors.push({ path: `brand.texts.${key}`, code: 'invalid_url', message: 'Los enlaces de mapa y Facebook deben empezar con https:// y no incluir credenciales.' });
+    }
+    if (contact.whatsapp && !getContactLinks(config).whatsapp) errors.push({ path: 'brand.texts.whatsapp', code: 'invalid_phone', message: 'Ingresá WhatsApp con código de país, entre 8 y 15 dígitos, o dejalo vacío.' });
+    if (contact.instagram && !getContactLinks(config).instagram) errors.push({ path: 'brand.texts.instagram', code: 'invalid_instagram', message: 'Instagram debe ser un @usuario o un enlace de perfil de instagram.com.' });
 
     if (config.catalog?.currency !== undefined && !/^[A-Z]{3}$/.test(String(config.catalog.currency))) {
       errors.push({ path: 'catalog.currency', code: 'invalid_currency', message: 'La moneda debe ser un código ISO de tres letras.' });
@@ -850,34 +958,31 @@
     documentRef.querySelectorAll('[data-app-brand-slogan]').forEach(element => {
       element.textContent = texts.slogan;
     });
-    const whatsappDigits = texts.whatsapp.replace(/\D/g, '');
+    const links = getContactLinks(normalized);
     documentRef.querySelectorAll('[data-app-brand-whatsapp], [data-app-brand-whatsapp-cta]').forEach(whatsappLink => {
       if (whatsappLink.hasAttribute('data-app-brand-whatsapp')) {
         whatsappLink.textContent = texts.whatsapp;
       }
-      whatsappLink.href = whatsappDigits ? `https://wa.me/${whatsappDigits}` : '#';
+      whatsappLink.href = getWhatsappUrl(whatsappLink.getAttribute('data-whatsapp-message') || '', normalized) || '#';
+      whatsappLink.hidden = !links.whatsapp;
     });
     documentRef.querySelectorAll('[data-app-contact-row="whatsapp"]').forEach(whatsappRow => {
-      whatsappRow.hidden = !whatsappDigits;
+      whatsappRow.hidden = !links.whatsapp;
     });
 
-    const instagramLink = documentRef.querySelector('[data-app-brand-instagram]');
-    const instagramRow = documentRef.querySelector('[data-app-contact-row="instagram"]');
-    const instagramValue = texts.instagram.trim();
-    const instagramHandle = instagramValue.replace(/^@/, '').replace(/[^a-zA-Z0-9._]/g, '');
-    const instagramUrl = /^https:\/\/(?:www\.)?instagram\.com\/[a-zA-Z0-9._/-]+$/i.test(instagramValue)
-      ? instagramValue
-      : (instagramHandle ? `https://www.instagram.com/${instagramHandle}/` : '#');
-    if (instagramLink) {
-      instagramLink.textContent = instagramValue;
-      instagramLink.href = instagramUrl;
+    for (const channel of ['instagram', 'facebook', 'maps']) {
+      documentRef.querySelectorAll(`[data-app-brand-${channel}], [data-app-brand-${channel}-cta]`).forEach(link => {
+        if (channel === 'instagram' && link.hasAttribute('data-app-brand-instagram')) link.textContent = texts.instagram;
+        link.href = links[channel] || '#';
+        link.hidden = !links[channel];
+      });
+      documentRef.querySelectorAll(`[data-app-contact-row="${channel}"]`).forEach(row => { row.hidden = !links[channel]; });
     }
-    if (instagramRow) instagramRow.hidden = !instagramValue || instagramUrl === '#';
+    documentRef.querySelectorAll('[data-app-contact-row="social"]').forEach(row => { row.hidden = !links.instagram && !links.facebook; });
 
-    const addressElement = documentRef.querySelector('[data-app-brand-address]');
-    const addressRow = documentRef.querySelector('[data-app-contact-row="address"]');
-    if (addressElement) addressElement.textContent = texts.address;
-    if (addressRow) addressRow.hidden = !texts.address;
+    documentRef.querySelectorAll('[data-app-brand-address]').forEach(element => { element.textContent = texts.address; });
+    documentRef.querySelectorAll('[data-app-contact-row="address"]').forEach(row => { row.hidden = !texts.address; });
+    applyStorefrontContent(normalized, documentRef);
     documentRef.querySelectorAll('[data-app-brand-copyright]').forEach(element => {
       element.textContent = `© ${new Date().getFullYear()} ${texts.name}. Todos los derechos reservados.`;
     });
@@ -887,6 +992,22 @@
     if (appleIcon) appleIcon.href = visuals.faviconUrl;
     if (documentRef.title) documentRef.title = texts.slogan ? `${texts.name} | ${texts.slogan}` : texts.name;
     return normalized;
+  }
+
+  function applyStorefrontContent(config, documentRef = globalScope.document) {
+    if (!documentRef?.querySelectorAll) return;
+    const content = config.brand.content;
+    documentRef.querySelectorAll('[data-site-text]').forEach(element => {
+      const key = element.getAttribute('data-site-text');
+      if (!SITE_CONTENT_FIELDS.some(field => field.key === key)) return;
+      element.textContent = content[key];
+      element.hidden = !content[key];
+    });
+    for (const section of ['home', 'contact']) {
+      documentRef.querySelectorAll(`[data-site-section="${section}"]`).forEach(element => {
+        element.hidden = !content[`${section}Enabled`];
+      });
+    }
   }
 
   function resolveTenantId() {
@@ -919,6 +1040,7 @@
 
   const api = {
     CONFIG_SCHEMA_VERSION,
+    SITE_CONTENT_FIELDS,
     DEFAULT_CONFIG,
     sanitizeClientConfig,
     normalizeConfig,
@@ -929,6 +1051,9 @@
     applyBrandContent,
     createThemeTokens,
     getReadableForeground,
+    getContactLinks,
+    getWhatsappUrl,
+    getHeroMedia,
     getPresentationConfig,
     resolveTenantId,
     getActiveTenantId: resolveTenantId,
