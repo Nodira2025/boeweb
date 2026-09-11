@@ -116,8 +116,8 @@ test('storefront consume la vista canónica y descarta carritos que ya no tienen
   const loadEnd = storefront.indexOf('// Expose loadCatalog globally', loadStart);
   const authoritativePath = storefront.slice(loadStart, loadEnd);
 
-  assert.match(authoritativePath, /\.from\('public_catalog_products_v2'\)/);
-  assert.match(authoritativePath, /\.eq\('tenant_id', tenantId\)/);
+  assert.match(authoritativePath, /StoreCatalog\.readAllRows\(supabaseClient,[\s\S]*?'public_catalog_products_v2'/);
+  assert.match(fs.readFileSync('store-catalog.js', 'utf8'), /\.eq\('tenant_id', tenantId\)/);
   assert.match(authoritativePath, /cart = cart\.filter/);
   assert.match(authoritativePath, /localStorage\.setItem\('boeweb_cart'/);
   assert.match(authoritativePath, /handleUrlProductDeepLink\(\);/);

@@ -26,7 +26,7 @@
 
   <!-- Stylesheet -->
   <link rel="stylesheet" href="index.css?v=white_label_v2">
-  <link rel="stylesheet" href="storefront.css?v=purchase_clarity_v1">
+  <link rel="stylesheet" href="storefront.css?v=purchase_clarity_v2_catalog_scope">
   <script src="app-config.js?v=canonical_theme_v1"></script>
   <script src="theme.js?v=canonical_theme_v1"></script>
 </head>
@@ -319,6 +319,7 @@
 
       <div class="catalog-content">
         <!-- Catalog Header (Filters trigger, sorting and active state) -->
+        <p id="external-catalog-notice" class="external-catalog-notice" role="status" hidden></p>
         <div class="catalog-header-controls">
           <!-- Mobile Filter Floating Trigger Icon Button -->
           <button class="mobile-filter-trigger-btn" id="mobile-filter-trigger-btn" onclick="openMobileFilterDrawer()" aria-label="Filtrar productos">
@@ -458,19 +459,6 @@
       <main class="academy-content-panel" id="academy-lesson-content">
         <!-- Filled dynamically by academy.js -->
       </main>
-    </div>
-  </section>
-
-  <!-- TEAM SHOWCASE SECTION (CONOCÉ A NUESTRO PERSONAL) -->
-  <section class="team-showcase-section" id="team-showcase-section" style="max-width: 1280px; margin: 40px auto; padding: 0 20px;">
-    <div style="text-align: center; margin-bottom: 30px;">
-      <span style="background: rgba(195,155,75,0.15); border: 1px solid var(--color-accent-gold); color: var(--color-accent-gold); padding: 4px 14px; border-radius: 12px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;">ASESORAMIENTO TÉCNICO & ATENCIÓN PERSONALIZADA</span>
-      <h2 style="font-family: var(--font-serif); font-size: 2.2rem; color: var(--color-text-main); margin: 10px 0 6px 0;">🧑‍🌾 Conocé a Nuestro Equipo de Asesores</h2>
-      <p style="font-size: 0.95rem; color: var(--color-text-muted); max-width: 650px; margin: 0 auto;">Elegí a tu asesor de confianza para recibir recomendaciones de cultivo, promociones de sustrato y atención directa por WhatsApp.</p>
-    </div>
-
-    <div id="team-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
-      <!-- Filled dynamically by index.js -->
     </div>
   </section>
 
@@ -905,6 +893,7 @@
                 <button class="qty-btn-detail" id="detail-qty-plus" type="button">&plus;</button>
               </div>
               <button class="btn btn-primary" id="detail-add-to-cart-btn" type="button">Agregar al Carrito</button>
+              <a id="detail-inquiry-link" class="btn btn-primary" target="_blank" rel="noopener" hidden>Consultar encargo con la tienda</a>
             </div>
             
             <div class="product-detail-description-container">
@@ -1077,6 +1066,10 @@
       </div>
       <a href="vendedor.html" class="footer-team-access">Acceso del equipo</a>
       <p data-app-brand-copyright>&copy; 2026 BÔ Grow Club. Todos los derechos reservados.</p>
+      <div class="developer-credit" aria-label="Desarrollado por PULSO">
+        <span>Desarrollado por</span>
+        <span class="developer-credit-pill"><img src="assets/pulso-developer-logo.png" alt="PULSO — Transformar procesos para crecer" width="240" height="80" loading="lazy"></span>
+      </div>
     </div>
   </footer>
 
@@ -1675,7 +1668,8 @@
   <script src="public-catalog-unification.js?v=cat_v2"></script>
   <script src="public-order-api.js?v=orders_v2"></script>
   <script src="mercadopago-checkout.js?v=1.0"></script>
-  <script src="index.js?v=3.0"></script>
+  <script src="store-catalog.js?v=catalog_scope_v1"></script>
+  <script src="index.js?v=security_v4_catalog_scope_v1"></script>
   <script src="hero-slider.js?v=white_label_v2"></script>
   <script src="memberPortal.js?v=2.4"></script>
   <script src="academy.js?v=2.4"></script>

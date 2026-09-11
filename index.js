@@ -269,47 +269,41 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error('El catálogo público está deshabilitado por la configuración de esta tienda.');
       }
       const tenantId = window.AppConfig.getActiveTenantId();
-      const { data: catalogRows, error: catalogError } = await supabaseClient
-        .from('public_catalog_products_v2')
-        .select('tenant_id,id,sku,barcode,name,description,category,brand,price,currency,image_url,track_stock,available_quantity')
-        .eq('tenant_id', tenantId)
-        .order('name', { ascending: true });
-      if (catalogError) throw catalogError;
-
-      products = (catalogRows || []).map(row => {
-        const availableQuantity = row.track_stock === false
-          ? null
-          : Math.max(0, Number(row.available_quantity) || 0);
-        const canBackorder = row.track_stock !== false && catalogConfig.allowBackorders === true;
-        const isAvailable = row.track_stock === false || availableQuantity > 0 || canBackorder;
-        return {
-          id: row.id,
-          product_id: row.id,
-          product_code: row.sku,
-          barcode: row.barcode || '',
-          name: row.name,
-          description: row.description || '',
-          category: row.category || 'Otros',
-          brand: row.brand || '',
-          price: Number(row.price) || 0,
-          currency: row.currency || 'ARS',
-          image: row.image_url || 'assets/logo.jpg',
-          image_url: row.image_url || 'assets/logo.jpg',
-          track_stock: row.track_stock !== false,
-          stock: availableQuantity,
-          own_stock: availableQuantity,
-          available_quantity: availableQuantity,
-          available: isAvailable,
-          availability: row.track_stock === false || availableQuantity > 0 ? 'EN_STOCK' : (canBackorder ? 'A_PEDIDO' : 'SIN_STOCK'),
-          allow_backorder: canBackorder,
-          supplier_code: 'own'
-        };
-      }).filter(product => catalogConfig.showOutOfStock || product.available);
+      const catalogRows = await window.StoreCatalog.readAllRows(supabaseClient,
+        'public_catalog_products_v2',
+        'tenant_id,id,sku,barcode,name,description,category,brand,price,currency,image_url,track_stock,available_quantity', tenantId);
+      products = catalogRows.filter(row => !window.StoreCatalog.isPrivateProduct(row))
+        .map(row => window.StoreCatalog.normalizeOwnProduct(row, catalogConfig))
+        .filter(product => catalogConfig.showOutOfStock || product.available);
+      const externalNotice = document.getElementById('external-catalog-notice');
+      if (externalNotice) externalNotice.hidden = true;
+      if (catalogConfig.source === 'unified') {
+        try {
+          const externalRows = await window.StoreCatalog.readAllRows(supabaseClient,
+            'public_external_catalog_v2',
+            'tenant_id,id,external_sku,name,category,price,currency,source_type,estimated_days,image_url,brand,description', tenantId);
+          products.push(...externalRows.filter(row => !window.StoreCatalog.isPrivateProduct(row))
+            .map(window.StoreCatalog.normalizeExternalProduct));
+          if (externalNotice && externalRows.length) {
+            externalNotice.textContent = 'Los productos de proveedores se encargan previa confirmación de disponibilidad, precio final y plazo. No son stock físico del local.';
+            externalNotice.hidden = false;
+          }
+        } catch (error) {
+          console.warn('No se pudo cargar el catálogo de proveedores:', error);
+          if (externalNotice) {
+            externalNotice.textContent = 'No se pudo cargar el catálogo de proveedores. Podés seguir viendo el stock del local y reintentar recargando la página.';
+            externalNotice.hidden = false;
+          }
+        }
+      }
+      products.sort((left, right) => Number(left.inquiry_only) - Number(right.inquiry_only)
+        || left.name.localeCompare(right.name, 'es'));
       renderCatalogTaxonomy();
       const availableById = new Map(products.map(product => [String(product.id), product]));
       cart = cart.filter(item => {
         const product = availableById.get(String(item.id || item.product_id || item.product_code));
         return product
+          && !product.inquiry_only
           && product.available
           && Number(item.quantity) > 0
           && (product.allow_backorder || product.available_quantity === null || Number(item.quantity) <= product.available_quantity);
@@ -572,7 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const inStockCount = products.filter(p => (p.has_own_stock || (p.stock > 0 && p.availability !== 'A_PEDIDO' && p.availability !== 'LOCAL_2_DAYS'))).length;
-    const nationalCount = products.filter(p => (p.availability === 'A_PEDIDO' || p.badge_text?.includes('5 días') || p.badge_text?.includes('PEDIDO'))).length;
+    const nationalCount = products.filter(p => p.source_type === 'B2B_SUPPLIER').length;
     const lowStockCount = products.filter(p => p.stock > 0 && p.stock <= 5).length;
 
     const countInStockEl = document.getElementById('count-stock-in');
@@ -649,7 +643,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (inStockActive && !nationalActive) {
       filteredProducts = filteredProducts.filter(p => p.available && (p.has_own_stock || (p.stock > 0 && p.availability !== 'A_PEDIDO' && p.availability !== 'LOCAL_2_DAYS')));
     } else if (nationalActive && !inStockActive) {
-      filteredProducts = filteredProducts.filter(p => p.availability === 'A_PEDIDO' || p.badge_text?.includes('5 días') || p.badge_text?.includes('PEDIDO'));
+      filteredProducts = filteredProducts.filter(p => p.source_type === 'B2B_SUPPLIER');
+    } else if (nationalActive && inStockActive) {
+      filteredProducts = filteredProducts.filter(p => p.source_type === 'B2B_SUPPLIER' || (p.available && p.stock > 0));
     }
 
     if (checkStockLow && checkStockLow.checked) {
@@ -716,15 +712,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const stockNum = Number(product.stock !== undefined ? product.stock : (product.own_stock !== undefined ? product.own_stock : 0)) || 0;
       const hasPhysicalStock = stockNum > 0;
       const isLocalOrB2b = product.availability === 'LOCAL_2_DAYS' || product.availability === 'A_PEDIDO';
-      const isAvailableToBuy = hasPhysicalStock || isLocalOrB2b;
+      const isAvailableToBuy = product.available && (hasPhysicalStock || isLocalOrB2b || product.track_stock === false);
 
       const card = document.createElement('article');
-      card.className = `product-card ${!isAvailableToBuy ? 'out-of-stock' : ''}`;
+      card.className = `product-card ${product.inquiry_only ? 'inquiry-product' : ''} ${!isAvailableToBuy ? 'out-of-stock' : ''}`;
       card.setAttribute('data-id', product.id);
       
       // Stock warning tags
       let stockTag = '';
-      if (hasPhysicalStock) {
+      if (product.inquiry_only) {
+        stockTag = `<span class="stock-tag tag-on-demand">📦 ${product.estimated_days} días hábiles estimados</span>`;
+      } else if (hasPhysicalStock) {
         if (stockNum <= 5) {
           stockTag = `<span class="stock-tag tag-in-stock">🟢 En Stock (${stockNum} en tienda)</span>`;
         } else {
@@ -733,13 +731,15 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (product.availability === 'LOCAL_2_DAYS' || product.badge_text?.includes('2 DÍAS')) {
         stockTag = '<span class="stock-tag tag-local-store">🚚 Tienda Cercana · Demora 2 días</span>';
       } else if (product.availability === 'A_PEDIDO' || product.badge_text?.includes('5 días') || product.badge_text?.includes('PEDIDO')) {
-        stockTag = '<span class="stock-tag tag-on-demand">📦 Demora 5 días hábiles</span>';
+        stockTag = '<span class="stock-tag tag-on-demand">📦 A pedido · Consultar plazo</span>';
+      } else if (product.track_stock === false) {
+        stockTag = '<span class="stock-tag tag-in-stock">Disponible</span>';
       } else {
         stockTag = '<span class="stock-tag tag-out">🔴 Sin Stock</span>';
       }
 
       // Fallback image if empty
-      const imageUrl = product.image && product.image !== '' ? product.image : 'assets/logo.jpg';
+      const imageUrl = escapeHtml(product.image && product.image !== '' ? product.image : 'assets/logo.jpg');
       const safeName = escapeHtml(product.name || 'Producto BÔ');
       const safeCategory = escapeHtml(product.category || 'Cultivo');
 
@@ -749,9 +749,9 @@ document.addEventListener('DOMContentLoaded', () => {
         weightTag = `<span class="product-card-weight-badge">${escapeHtml(product.weight)}</span>`;
       }
 
-      const btnLabel = hasPhysicalStock 
+      const btnLabel = product.inquiry_only ? 'Consultar y encargar' : hasPhysicalStock || product.track_stock === false
         ? 'Agregar' 
-        : (product.availability === 'LOCAL_2_DAYS' ? 'Pedir (2 días)' : (product.availability === 'A_PEDIDO' ? 'Pedir (5 días)' : 'Sin Stock'));
+        : (product.availability === 'LOCAL_2_DAYS' ? 'Pedir (2 días)' : (product.availability === 'A_PEDIDO' ? 'Pedir' : 'Sin Stock'));
 
       card.innerHTML = `
         ${stockTag}
@@ -771,7 +771,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="product-card-price">$${formatPrice(product.price)}</div>
             <button class="add-to-cart-btn ${!isAvailableToBuy ? 'disabled' : ''}" 
                     data-id="${product.id}" 
-                    aria-label="Agregar ${safeName} al carrito"
+                    aria-label="${product.inquiry_only ? 'Consultar' : 'Agregar'} ${safeName}${product.inquiry_only ? '' : ' al carrito'}"
                     ${!isAvailableToBuy ? 'disabled' : ''}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -947,6 +947,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function addToCart(productId) {
     const product = products.find(p => p.id === productId);
     if (!product) return;
+    if (product.inquiry_only) {
+      openProductDetail(productId);
+      return;
+    }
+    if (!product.available) return;
 
     const existingItem = cart.find(item => item.id === productId);
     if (existingItem) {
@@ -1820,7 +1825,21 @@ document.addEventListener('DOMContentLoaded', () => {
     detailProductPrice.textContent = `$${formatPrice(product.price)}`;
     
     // Stock and availability check
-    if (!product.available) {
+    const inquiryLink = document.getElementById('detail-inquiry-link');
+    const inquiryUrl = window.StoreCatalog.consultationUrl(product, window.AppConfig.get('brand.texts.whatsapp', ''));
+    if (inquiryLink) {
+      inquiryLink.hidden = !inquiryUrl;
+      if (inquiryUrl) inquiryLink.href = inquiryUrl;
+      else inquiryLink.removeAttribute('href');
+    }
+    detailQtyMinus.hidden = product.inquiry_only;
+    detailQtyPlus.hidden = product.inquiry_only;
+    detailQtyValue.hidden = product.inquiry_only;
+    detailAddToCartBtn.hidden = product.inquiry_only;
+    if (product.inquiry_only) {
+      detailProductStock.textContent = `${product.delivery_estimate}. No es stock del local. ${inquiryUrl ? 'Consultá con la tienda antes de pagar.' : 'Contactá a la tienda para confirmar el encargo.'}`;
+      detailProductStock.style.color = 'var(--color-text-main)';
+    } else if (!product.available) {
       detailProductStock.textContent = 'Sin Stock (No disponible)';
       detailProductStock.style.color = '#721c24';
       detailAddToCartBtn.disabled = true;
@@ -1830,7 +1849,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (product.stock) {
         detailProductStock.textContent = `Stock disponible: ${product.stock} unidades`;
       } else {
-        detailProductStock.textContent = 'Stock disponible';
+        detailProductStock.textContent = product.track_stock === false ? 'Disponible' : 'A pedido · Confirmar plazo con la tienda';
       }
       detailProductStock.style.color = 'var(--color-primary)';
       detailAddToCartBtn.disabled = false;
@@ -1842,7 +1861,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Description rendering
     if (product.description && product.description.trim() !== '') {
-      detailProductDescription.innerHTML = product.description;
+      detailProductDescription.textContent = product.description;
     } else {
       detailProductDescription.innerHTML = '<p>No hay descripción adicional disponible para este producto en este momento.</p>';
     }
@@ -1899,7 +1918,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   detailAddToCartBtn.addEventListener('click', () => {
-    if (!currentDetailProduct) return;
+    if (!currentDetailProduct || currentDetailProduct.inquiry_only || !currentDetailProduct.available) return;
     
     // Add to cart with custom quantity
     const existingItem = cart.find(item => item.id === currentDetailProduct.id);
@@ -2238,11 +2257,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize Zen 420 Floating Leaves
   initZenLeaves();
   checkReferralURL();
-  renderTeamShowcaseUI();
   checkPaymentReturnStatus();
 });
 
-// --- TEAM SHOWCASE & REFERRAL LISTENER ---
+// --- REFERRAL LISTENER ---
 function checkReferralURL() {
   const params = new URLSearchParams(window.location.search);
   const ref = params.get('ref') || params.get('vendedor') || params.get('asesor');
@@ -2251,40 +2269,6 @@ function checkReferralURL() {
     if (window.showToast) window.showToast(`🌿 Asesor asignado por link: ${ref}`);
   }
 }
-
-function renderTeamShowcaseUI() {
-  const container = document.getElementById('team-cards-grid');
-  if (!container) return;
-
-  const sellers = window.AUTHORIZED_VENDEDORES || [
-    { name: 'Raul', role: 'Especialista en Sustratos & Nutrición Orgánica', phone: '5493510001111', refCode: 'raul123' },
-    { name: 'Nacho Mina', role: 'Asesor Técnico en Cultivo Indoor & Iluminación LED', phone: '5493510002222', refCode: 'nachomina123' },
-    { name: 'Alexis', role: 'Especialista en Riego Automático & Hidroponía', phone: '5493510003333', refCode: 'alexis123' },
-    { name: 'Gino', role: 'Asesor en Extracciones & Parafernalia Premium', phone: '5493510004444', refCode: 'gino123' },
-    { name: 'Rodrigo', role: 'Especialista en Control de Plagas & Fitopatología', phone: '5493510005555', refCode: 'rodrigo123' },
-    { name: 'Felipe', role: 'Asesor de Membresías & Trámites REPROCANN', phone: '5493510006666', refCode: 'felipe123' },
-    { name: 'Mariano', role: 'Especialista en Semillas & Genética Cannabis', phone: '5493510007777', refCode: 'mariano123' }
-  ];
-
-  container.innerHTML = sellers.map(v => `
-    <div style="background: var(--color-card-bg); border: 1.5px solid var(--color-border-accent); border-radius: 18px; padding: 20px 16px; text-align: center; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 12px; transition: transform 0.2s ease;">
-      <div style="width: 72px; height: 72px; border-radius: 50%; border: 2px solid var(--color-accent-gold); padding: 3px; background: rgba(195,155,75,0.15);">
-        <img src="assets/logo.jpg" alt="${v.name}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
-      </div>
-      <div>
-        <h4 style="margin: 0; font-family: var(--font-serif); font-size: 1.15rem; color: var(--color-text-main); font-weight: 700;">${v.name}</h4>
-        <span style="display: block; font-size: 0.78rem; color: var(--color-accent-gold); font-weight: 700; margin-top: 4px;">${v.role}</span>
-      </div>
-      <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
-        <a href="https://wa.me/${v.phone}?text=${encodeURIComponent('Hola ' + v.name + '! Quisiera hacerte una consulta de cultivo.')}" target="_blank" class="btn btn-secondary" style="width: 100%; border-color: #25d366; color: #25d366; font-size: 0.82rem; font-weight: 700; padding: 8px 12px; border-radius: 10px;">
-          💬 Asesorarme por WhatsApp
-        </a>
-      </div>
-    </div>
-  `).join('');
-}
-
-window.renderTeamShowcaseUI = renderTeamShowcaseUI;
 
 // --- ZEN 420 FLOATING LEAVES EFFECT ---
 function initZenLeaves() {

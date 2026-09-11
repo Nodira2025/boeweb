@@ -42,8 +42,10 @@ test('el resumen de caja restringe a cada vendedor por opened_by', () => {
 
 test('Caja carga los registros en orden y no ofrece turnos ajenos a vendedores', () => {
   const workspaceSource = extractFunctionSource('refreshCashWorkspace');
-  assert.match(workspaceSource, /await\s+loadPosRegisters\(\)\s*;/);
   assert.match(workspaceSource, /return\s+await\s+refreshCanonicalCashSection\(\)\s*;/);
+  const summarySource = extractFunctionSource('refreshCanonicalCashSection');
+  assert.match(summarySource, /await\s+loadPosRegisters\(\)\s*;/);
+  assert.ok(summarySource.indexOf('await loadPosRegisters()') < summarySource.indexOf(".from('cash_sessions_v2')"));
 
   const switchSource = extractFunctionSource('switchVendorTab');
   assert.match(switchSource, /tab\s*===\s*['"]cash['"][\s\S]*?refreshCashWorkspace\(\)/);

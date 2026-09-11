@@ -63,6 +63,7 @@ let activeNearbyStoreFilter = 'all';
 let currentSelectedCcId = null;
 let canonicalCurrentAccounts = [];
 let canonicalCashView = null;
+let localCashRegisters = [];
 let canonicalAdminAuditLogs = [];
 let canonicalAdminAuditLoadedAt = 0;
 
@@ -7735,7 +7736,6 @@ function canInspectTeamCashSessions(context) {
 }
 
 async function refreshCashWorkspace() {
-  await loadPosRegisters();
   return await refreshCanonicalCashSection();
 }
 
@@ -7750,10 +7750,17 @@ async function loadCanonicalCashClosureHistory() {
     return [];
   }
   try {
+    const registerIds = localCashRegisters.filter(register => register.tenant_id === context.tenantId).map(register => register.id);
+    if (!registerIds.length) {
+      list.innerHTML = '<div class="cash-empty-state"><p>Seleccioná una caja del local para consultar sus cierres.</p></div>';
+      if (count) count.textContent = '0 cierres';
+      return [];
+    }
     const { data, error } = await supabaseClient
       .from('cash_closures')
-      .select('id,session_id,document_number,expected_amount,counted_amount,difference,review_status,closed_by,closed_at,reviewed_by,reviewed_at,notes')
+      .select('id,session_id,document_number,expected_amount,counted_amount,difference,review_status,closed_by,closed_at,reviewed_by,reviewed_at,notes,cash_sessions_v2!inner(register_id)')
       .eq('tenant_id', context.tenantId)
+      .in('cash_sessions_v2.register_id', registerIds)
       .order('closed_at', { ascending: false })
       .limit(50);
     if (error) throw error;
@@ -7824,10 +7831,17 @@ async function refreshCanonicalCashSection() {
   }
 
   try {
+    const registers = await loadPosRegisters();
     loadCanonicalCashClosureHistory().catch(error => {
       console.error('No se pudo abrir el historial de cierres:', error);
     });
     const selectedRegisterId = document.getElementById('pos-register-select')?.value || null;
+    if (!selectedRegisterId || !registers.some(register => register.id === selectedRegisterId)) {
+      // Never fall back to an arbitrary tenant session, which could belong to Reprocam.
+      canonicalCashView = { ...getEmptyCashData(), authority: 'server', noSession: true, closed: true };
+      renderCashSectionUI();
+      return canonicalCashView;
+    }
     let sessionQuery = supabaseClient
       .from('cash_sessions_v2')
       .select('id,register_id,status,opened_by,opened_at,opening_amount,closed_by,closed_at,version')
@@ -7956,7 +7970,7 @@ async function fetchCanonicalInternalCatalog() {
     }
   });
 
-  return (productsResult.data || []).map(product => {
+  return (productsResult.data || []).filter(product => !window.StoreCatalog.isPrivateProduct(product)).map(product => {
     const balance = bestBalanceByProduct.get(product.id);
     const inventoryOptions = (inventoryOptionsByProduct.get(product.id) || [])
       .sort((left, right) => Number(right.is_default) - Number(left.is_default) || right.available - left.available);
@@ -10721,6 +10735,7 @@ async function loadPosRegisters() {
   const context = await ensureVendorOperationalSession();
   if (!select) return [];
   if (!supabaseClient || !context) {
+    localCashRegisters = [];
     select.innerHTML = '<option value="">Sesión operativa requerida</option>';
     select.disabled = true;
     if (status) status.innerHTML = 'La sesión no está verificada. <button type="button" onclick="reconnectVendorSession()" style="min-height: 44px; margin-top: 6px; padding: 8px 12px; border: 1px solid #C2A246; border-radius: 10px; background: #F6F3E8; color: #152D24; font-weight: 800; cursor: pointer;">Reconectar sesión</button>';
@@ -10731,7 +10746,7 @@ async function loadPosRegisters() {
     const [registersResult, sessionsResult] = await Promise.all([
       supabaseClient
         .from('cash_registers')
-        .select('id,code,name,currency,active')
+        .select('id,tenant_id,code,name,currency,active,metadata')
         .eq('tenant_id', context.tenantId)
         .eq('active', true)
         .order('name', { ascending: true }),
@@ -10745,10 +10760,11 @@ async function loadPosRegisters() {
     if (sessionsResult.error) throw sessionsResult.error;
 
     const openByRegister = new Map((sessionsResult.data || []).map(session => [session.register_id, session]));
-    const registers = (registersResult.data || []).map(register => ({
+    const registers = (registersResult.data || []).filter(window.StoreCatalog.isLocalRegister).map(register => ({
       ...register,
       session: openByRegister.get(register.id) || null
     }));
+    localCashRegisters = registers;
     const previousRegisterId = select.value;
     const canInspectTeamCash = canInspectTeamCashSessions(context);
     const isOwnSession = register => register.session?.opened_by === context.userId;
@@ -10770,7 +10786,7 @@ async function loadPosRegisters() {
         ? `Turno abierto desde ${new Date(preferred.session.opened_at).toLocaleString('es-AR')}.`
         : (preferred
           ? 'La caja seleccionada no tiene un turno abierto; abrilo desde Caja & Arqueo antes de cobrar efectivo.'
-          : 'Todas las cajas disponibles tienen un turno abierto por otro usuario.');
+          : (registers.length ? 'Todas las cajas del local tienen un turno abierto por otro usuario.' : 'No hay cajas del local disponibles. Reprocam se administra por separado.'));
     }
     select.onchange = async () => {
       const selected = registers.find(register => register.id === select.value);
@@ -10785,6 +10801,7 @@ async function loadPosRegisters() {
     };
     return registers;
   } catch (error) {
+    localCashRegisters = [];
     console.error('No se pudieron cargar las cajas operativas:', error);
     select.innerHTML = '<option value="">Cajas no disponibles</option>';
     select.disabled = true;
