@@ -59,6 +59,10 @@
     for (const balance of data.balances) {
       const product = products.get(balance.product_id), origin = locations.get(balance.location_id);
       if (!product || isPrivate(product) || Number(balance.on_hand) <= 0) continue;
+      if (product.active === false || product.track_stock === false) {
+        review.push({ name: product.name, reason: 'Producto desactivado o sin control de stock', id: product.id });
+        continue;
+      }
       const floor = inferSector(product);
       if (!floor) { review.push({ name: product.name, reason: 'Nombre ambiguo', id: product.id }); continue; }
       if (floorOf(origin) === floor) continue;

@@ -117,3 +117,15 @@ test('A changed session stops relocation before the first write', async () => {
   });
   assert.equal(writes, 0); assert.equal(report.failed.length, 1);
 });
+
+
+test('Inactive historical stock is listed for review without attempted transfers', () => {
+  const plan = placement.buildPlan({ drafts: [], products: [
+    { id: 'inactive', name: 'Sedas RAW', active: false, track_stock: true },
+    { id: 'untracked', name: 'Tijeras', active: true, track_stock: false }
+  ], locations: [{ id: 'origin', code: 'S2-GENERAL', active: true, is_sellable: true, location_type: 'SHELF' }],
+  balances: ['inactive', 'untracked'].map(product_id => ({ product_id, location_id: 'origin', on_hand: 7, reserved: 0 })) });
+  assert.equal(plan.actions.length, 0);
+  assert.equal(plan.review.length, 2);
+  assert.ok(plan.review.every(item => item.reason === 'Producto desactivado o sin control de stock'));
+});
