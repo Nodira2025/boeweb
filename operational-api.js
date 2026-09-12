@@ -532,7 +532,10 @@
     return invokeOperationalRpc(supabaseClient, 'locate_catalog_product_draft_v2', {
       p_tenant_id: tenantId,
       p_draft_id: safeDraftId,
-      p_location: location,
+      // Sector-only is a presentation detail; WMS persists a supported location type.
+      p_location: String(location.location_type || '').trim().toUpperCase() === 'SECTOR'
+        ? { ...location, location_type: 'SHELF', metadata: { ...location.metadata, is_sector_only: true } }
+        : location,
       p_idempotency_key: requireIdempotencyKey(idempotencyKey, 'INVALID_DRAFT_LOCATION')
     });
   }

@@ -2524,6 +2524,12 @@
           </div>
         </div>
 
+        <section aria-label="Ordenar productos por sector" style="padding: 14px; margin-bottom: 16px; background: #f7f4ea; color: #152D24; border: 1px solid #C2A246; border-radius: 12px;">
+          <button type="button" onclick="prepareSectorPlacement()" class="stock-entry-secondary-btn" style="min-height: 44px;">Ordenar sectores por nombre</button>
+          <button type="button" id="sector-placement-apply" onclick="applySectorPlacement()" class="stock-entry-secondary-btn" style="min-height: 44px;" hidden>Aplicar ubicaciones propuestas</button>
+          <p id="sector-placement-status" role="status" aria-live="polite" style="white-space: pre-line; overflow-wrap: anywhere;"></p>
+        </section>
+        <p id="draft-approval-status" role="status" aria-live="polite" style="white-space: pre-line; overflow-wrap: anywhere; color: #152D24;"></p>
         <!-- Buscador y filtro de borradores -->
         <div style="margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
           <input type="search" id="drafts-search-input" placeholder="🔍 Filtrar por nombre, SKU, marca o vendedor..." class="b2b-search-input" style="flex: 1; min-width: 240px; padding: 10px 14px; border-radius: 12px; border: 1.5px solid #d4c5a9; font-size: 0.9rem; background: #fff;" oninput="filterPendingProductDrafts(this.value)">
@@ -4942,6 +4948,7 @@
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="wms-sectors.js?v=sector_publication_v1"></script>
+  <script src="wms-product-placement.js?v=name_placement_v1"></script>
   <script src="wms-sector-editor.js?v=sector_publication_v1"></script>
   <script src="mapa-local.js?v=sector_publication_v1"></script>
   <script src="saas-auth.js?v=session_recovery_v4"></script>
@@ -4952,7 +4959,7 @@
   <script src="migration-center.js?v=migration_v1"></script>
   <script src="tenant-onboarding.js?v=onboarding_v1"></script>
   <script src="pos-cart-engine.js?v=cart_v3"></script>
-  <script src="operational-api.js?v=session_recovery_v3_draft_edit_v3_sector_publication_v1"></script>
+  <script src="operational-api.js?v=session_recovery_v3_draft_edit_v3_sector_publication_v1_approval_sector_fix_v1"></script>
   <script src="pos-desk-utils.js?v=pos_utils_v1"></script>
   <script src="public-catalog-unification.js?v=cat_v1"></script>
   <script src="pos-inventory-sync.js?v=pos_sync_v1"></script>
@@ -4961,6 +4968,6 @@
   <script src="assets/vendor/sheetjs/xlsx-0.20.3.min.js"></script>
   <script src="inventory-export.js?v=2"></script>
   <script src="wms-location-assignment.js?v=central_batch_v1"></script>
-  <script src="vendedor.js?v=central_batch_location_v1"></script>
+  <script src="vendedor.js?v=central_batch_location_v1_approval_sector_fix_v1"></script>
 </body>
 </html>

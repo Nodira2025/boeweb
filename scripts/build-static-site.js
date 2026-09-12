@@ -61,6 +61,7 @@ const PUBLIC_ROOT_FILES = [
   'wms-map.css',
   'wms-location-assignment.js',
   'wms-sectors.js',
+  'wms-product-placement.js',
   'wms-sector-editor.js'
 ];
 

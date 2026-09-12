@@ -6814,7 +6814,7 @@ function renderPendingDraftsList(drafts) {
 
             <div>
               <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #5c3b1e; margin-bottom: 2px;">Costo de Compra ($)</label>
-              <input type="number" step="0.01" id="draft-cost-${draft.id}" placeholder="Ej: 15000" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.85rem; border-radius: 8px; color: #3e2723; background: #fffdfa; border: 1.5px solid #d4c5a9;">
+              <input type="number" step="0.01" id="draft-cost-${draft.id}" value="${Number(draft.cost_price) || 0}" placeholder="Ej: 15000" class="b2b-form-input" style="width: 100%; padding: 8px; font-size: 0.85rem; border-radius: 8px; color: #3e2723; background: #fffdfa; border: 1.5px solid #d4c5a9;">
             </div>
           </div>
 
@@ -6913,7 +6913,88 @@ function filterPendingProductDrafts(query) {
 }
 window.filterPendingProductDrafts = filterPendingProductDrafts;
 
+let draftApprovalBatchRunning = false;
+let sectorPlacementRunning = false;
+let sectorPlacementPreview = null;
+const draftApprovalsInFlight = new Set();
+
+async function prepareSectorPlacement() {
+  if (sectorPlacementRunning || draftApprovalBatchRunning || draftApprovalsInFlight.size) return;
+  sectorPlacementRunning = true;
+  const status = document.getElementById('sector-placement-status');
+  const applyButton = document.getElementById('sector-placement-apply');
+  if (applyButton) applyButton.hidden = true;
+  try {
+    const context = await ensureVendorOperationalSession({ showLogin: true });
+    if (!context?.isVerified || !['ADMIN', 'SUPERVISOR'].includes(context.role)) throw new Error('Se requiere administración o supervisión.');
+    status.textContent = 'Consultando los productos y sus ubicaciones…';
+    const data = await window.WmsProductPlacement.readData(supabaseClient, context.tenantId);
+    const plan = window.WmsProductPlacement.buildPlan(data);
+    plan.actions.forEach(action => { action.key = `name-placement:${crypto.randomUUID()}`; });
+    sectorPlacementPreview = { plan, context };
+    const drafts = plan.actions.filter(action => action.kind === 'draft').length;
+    const transfers = plan.actions.length - drafts;
+    const counts = Object.entries(window.WmsProductPlacement.SECTORS).map(([floor, name]) =>
+      `${name}: ${plan.actions.filter(action => action.floor === Number(floor)).length}`);
+    status.textContent = `${drafts} borradores para ubicar o reparar y ${transfers} posiciones de stock para trasladar.\n${counts.join(' · ')}\nSe conservan cantidades y precios. La góndola o balda queda pendiente.\n`
+      + (plan.review.length ? `Para revisar (${plan.review.length}):\n${plan.review.map(item => `${item.name}: ${item.reason}`).join('\n')}` : 'Todos los nombres fueron identificados.');
+    if (applyButton) applyButton.hidden = !plan.actions.length;
+  } catch (error) { status.textContent = `No se pudo preparar: ${error.message}`; }
+  finally { sectorPlacementRunning = false; }
+}
+window.prepareSectorPlacement = prepareSectorPlacement;
+
+async function applySectorPlacement() {
+  if (sectorPlacementRunning || draftApprovalBatchRunning || draftApprovalsInFlight.size || !sectorPlacementPreview) return;
+  sectorPlacementRunning = true;
+  const status = document.getElementById('sector-placement-status');
+  const button = document.getElementById('sector-placement-apply');
+  if (button) button.disabled = true;
+  try {
+    const report = await window.WmsProductPlacement.applyPlan({
+      plan: sectorPlacementPreview.plan, client: supabaseClient, authContext: sectorPlacementPreview.context,
+      api: window.OperationalApi, getContext: () => SaasAuth.getTenantContext(),
+      onProgress: (done, total, failed) => { status.textContent = `${done}/${total} ubicaciones guardadas · ${failed} errores`; }
+    });
+    window.lastSectorPlacementReport = report;
+    const done = new Set(report.completed.map(action => action.key));
+    sectorPlacementPreview.plan.actions = sectorPlacementPreview.plan.actions.filter(action => !done.has(action.key));
+    const remaining = sectorPlacementPreview.plan.actions.length;
+    status.textContent = `${report.completed.length} ubicaciones guardadas. ${remaining} pendientes.\n`
+      + report.failed.map(item => `${item.name}: ${item.error}`).join('\n')
+      + (report.review.length ? `\nPara revisar (${report.review.length}):\n${report.review.map(item => `${item.name}: ${item.reason}`).join('\n')}` : '');
+    if (button) { button.hidden = !remaining; button.textContent = 'Reintentar pendientes'; }
+    await refreshAfterDraftApprovals();
+  } catch (error) { status.textContent += `\nNo se pudo completar: ${error.message}`; }
+  finally { sectorPlacementRunning = false; if (button) button.disabled = false; }
+}
+window.applySectorPlacement = applySectorPlacement;
+
+function readDraftApprovalValues(draft) {
+  const value = (field, fallback) => document.getElementById(`draft-${field}-${draft.id}`)?.value ?? fallback;
+  const requiredNumber = (field, fallback) => {
+    const raw = value(field, fallback);
+    return String(raw).trim() === '' ? NaN : Number(raw);
+  };
+  return {
+    name: String(value('name', draft.name || '')).trim(),
+    category: value('cat', draft.category || 'Otros'),
+    cost: Number(value('cost', draft.cost_price ?? 0) || 0),
+    price: requiredNumber('price', draft.sale_price ?? draft.price ?? 0),
+    stock: requiredNumber('stock', draft.stock_quantity ?? draft.stock ?? 0)
+  };
+}
+
+async function refreshAfterDraftApprovals() {
+  storeMapDataLoaded = false;
+  await Promise.all([loadPendingProductDrafts(), refreshPendingLocationBadge(), refreshPendingDraftsBadge(), loadInternalCatalog()]);
+  await loadStoreMapData(true);
+  if (typeof rerenderStoreMap === 'function') rerenderStoreMap();
+  if (window.fetchB2BProducts) await window.fetchB2BProducts(true);
+}
+
 async function approveAllPendingProductDrafts() {
+  if (draftApprovalBatchRunning || draftApprovalsInFlight.size || sectorPlacementRunning) return;
   const drafts = Array.from(pendingDraftCache.values());
   if (!drafts.length) {
     showToast('No hay borradores pendientes para aprobar.');
@@ -6922,18 +7003,36 @@ async function approveAllPendingProductDrafts() {
   if (!confirm(`¿Aprobar y publicar todos los ${drafts.length} productos pendientes de la cola?`)) {
     return;
   }
-  showToast(`⏳ Aprobando ${drafts.length} productos en lote...`);
+  // Snapshot every edited field before any asynchronous operation or list refresh.
+  const entries = drafts.map(draft => ({ draft, values: readDraftApprovalValues(draft) }));
+  draftApprovalBatchRunning = true;
+  const button = document.getElementById('btn-approve-all-drafts');
+  const grid = document.getElementById('pending-drafts-grid');
+  if (button) button.disabled = true;
+  if (grid) grid.inert = true;
   let approvedCount = 0;
-  for (const draft of drafts) {
-    try {
-      await approveProductDraft(draft.id);
-      approvedCount++;
-    } catch (e) {
-      console.warn('Error aprobando draft', draft.id, e);
+  const failures = [];
+  try {
+    for (const entry of entries) {
+      const result = await approveProductDraft(entry.draft.id, { batch: true, values: entry.values });
+      if (result?.ok) approvedCount++;
+      else failures.push(`${entry.values.name}: ${result?.error || 'No aprobado'}`);
+      const message = `Procesados ${approvedCount + failures.length}/${entries.length} · ${approvedCount} aprobados · ${failures.length} pendientes`;
+      const status = document.getElementById('draft-approval-status');
+      if (status) status.textContent = message;
     }
+    await refreshAfterDraftApprovals();
+  } catch (error) {
+    failures.push(`No se pudo actualizar la vista: ${error.message}`);
+  } finally {
+    draftApprovalBatchRunning = false;
+    if (button) button.disabled = false;
+    if (grid) grid.inert = false;
   }
-  showToast(`✅ ${approvedCount} productos aprobados y publicados con éxito.`);
-  loadPendingProductDrafts();
+  const summary = `${approvedCount} productos aprobados. ${entries.length - approvedCount} pendientes.`;
+  const status = document.getElementById('draft-approval-status');
+  if (status) status.textContent = [summary, ...failures].join('\n');
+  showToast(summary);
 }
 window.approveAllPendingProductDrafts = approveAllPendingProductDrafts;
 
@@ -7170,7 +7269,11 @@ async function saveProductDraftChanges(draftId) {
 window.saveProductDraftChanges = saveProductDraftChanges;
 
 // Aprobar el borrador, publicar y vincularlo a su ubicación física.
-async function approveProductDraft(draftId) {
+async function approveProductDraft(draftId, options = {}) {
+  if ((draftApprovalBatchRunning && !options.batch) || draftApprovalsInFlight.has(draftId) || sectorPlacementRunning) {
+    return { ok: false, error: 'Ya hay una operación en curso.' };
+  }
+  draftApprovalsInFlight.add(draftId);
   try {
     const draft = pendingDraftCache.get(draftId);
     if (!draft) throw new Error('El borrador ya no está disponible. Actualizá la lista.');
@@ -7180,33 +7283,38 @@ async function approveProductDraft(draftId) {
     const priceInput = document.getElementById(`draft-price-${draftId}`);
     const stockInput = document.getElementById(`draft-stock-${draftId}`);
 
-    const nameVal = nameInput ? nameInput.value.trim() : (draft.name || 'Producto BÔ');
-    const catVal = catInput ? catInput.value : (draft.category || 'Otros');
-    const costVal = costInput ? parseFloat(costInput.value) || 0 : 0;
-    const priceVal = priceInput ? parseFloat(priceInput.value) || 0 : (Number(draft.sale_price) || Number(draft.price) || 0);
-    const stockVal = stockInput ? parseInt(stockInput.value, 10) : Number(draft.stock || 0);
+    const values = options.values || readDraftApprovalValues(draft);
+    const { name: nameVal, category: catVal, cost: costVal, price: priceVal, stock: stockVal } = values;
 
     if (!nameVal) {
       showToast('⚠️ Por favor ingresá un nombre para el producto.');
       if (nameInput) nameInput.focus();
-      return;
+      throw new Error('Ingresá un nombre para el producto.');
     }
 
-    if (isNaN(priceVal) || priceVal <= 0) {
+    if (!Number.isFinite(priceVal) || priceVal <= 0) {
       showToast('⚠️ Por favor ingresá un precio final válido mayor a 0.');
       if (priceInput) priceInput.focus();
-      return;
+      throw new Error('Ingresá un precio mayor a cero.');
     }
 
-    if (isNaN(stockVal) || stockVal < 0) {
+    if (!Number.isInteger(stockVal) || stockVal < 0) {
       showToast('⚠️ Por favor ingresá una cantidad de stock válida mayor o igual a 0.');
       if (stockInput) stockInput.focus();
-      return;
+      throw new Error('Ingresá una cantidad entera mayor o igual a cero.');
     }
+    if (!Number.isFinite(costVal) || costVal < 0) throw new Error('El costo no puede ser negativo.');
 
     const authContext = await ensureVendorOperationalSession({ showLogin: true });
     if (!window.OperationalApi || !authContext) {
       throw new Error('Iniciá sesión para aprobar el producto en el catálogo central.');
+    }
+    // Repair legacy sector-only drafts through the operational command, keeping their sector.
+    if (String(draft.location_data?.location_type || '').trim().toUpperCase() === 'SECTOR') {
+      const location = window.WmsProductPlacement.normalizeLocation(draft.location_data);
+      await window.OperationalApi.locateCatalogProductDraft({ supabaseClient, authContext, draftId, location,
+        idempotencyKey: `repair-sector:${draftId}:${draft.updated_at || 'legacy'}` });
+      draft.location_data = location;
     }
     const approval = await window.OperationalApi.approveCatalogProductDraft({
       supabaseClient,
@@ -7226,23 +7334,22 @@ async function approveProductDraft(draftId) {
       },
       idempotencyKey: `approve-draft:${draftId}`
     });
+    if (approval?.status !== 'APPROVED') throw new Error('El servidor no confirmó la aprobación.');
     pendingDraftCache.delete(draftId);
     storeMapDataLoaded = false;
-    showToast(`Producto "${nameVal}" aprobado con ${stockVal} u. y ubicación vinculadas.`);
-    await Promise.all([
-      loadPendingProductDrafts(),
-      refreshPendingLocationBadge(),
-      refreshPendingDraftsBadge(),
-      loadInternalCatalog()
-    ]);
-    if (typeof loadStoreMapData === 'function') await loadStoreMapData(true);
-    if (typeof rerenderStoreMap === 'function') rerenderStoreMap();
-    if (window.fetchB2BProducts) window.fetchB2BProducts(true);
-    return approval;
+    if (!options.batch) {
+      showToast(`Producto "${nameVal}" aprobado con ${stockVal} u. y ubicación vinculadas.`);
+      try { await refreshAfterDraftApprovals(); }
+      catch (error) { showToast(`Producto aprobado. Actualizá la vista: ${error.message}`); }
+    }
+    return { ok: true, approval };
 
   } catch (err) {
     console.error('Error al aprobar borrador:', err);
-    showToast(`❌ Error al aprobar: ${err.message}`);
+    if (!options.batch) showToast(`❌ Error al aprobar: ${err.message}`);
+    return { ok: false, error: err.message };
+  } finally {
+    draftApprovalsInFlight.delete(draftId);
   }
 }
 
