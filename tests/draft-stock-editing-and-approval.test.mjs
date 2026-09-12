@@ -90,12 +90,15 @@ test('Inferencia de categorías en lookup-product.mjs mapea extractores y ventil
   assert.match(lookupProductMjs, /\['Ventilación',\s*\/ventilaci\[oó\]n\|extractor\|ventilador\|turbina/);
 });
 
-test('vendedor.js contiene soporte para guardar cambios en borrador y editar stock en cola y asistente', () => {
+test('vendedor.js permite editar stock en borradores pero ubicar conserva las cantidades', () => {
   assert.match(vendedorJs, /function saveProductDraftChanges\(draftId\)/);
   assert.match(vendedorJs, /window\.saveProductDraftChanges = saveProductDraftChanges/);
   assert.match(vendedorJs, /id="draft-stock-\$\{draft\.id\}"/);
-  assert.match(vendedorJs, /id="location-assistant-stock-input"/);
-  assert.match(vendedorJs, /updateLocationAssistantStock/);
+  assert.doesNotMatch(vendedorJs, /id="location-assistant-stock-input"/);
+  assert.match(vendedorJs, /Ubicar conserva la cantidad/);
+  const placement = vendedorJs.slice(vendedorJs.indexOf('function setLocationAssignmentBusy'), vendedorJs.indexOf('function startBatchSectorRefinement'));
+  assert.doesNotMatch(placement, /updateCatalogProductDraft|stock_quantity:/);
+  assert.match(placement, /WmsLocationAssignment\.runJob/);
   assert.match(vendedorJs, /overrides:\s*\{[\s\S]*?stock_quantity:\s*stockVal/);
 });
 

@@ -1359,6 +1359,7 @@ async function vendorLogout() {
 }
 
 function switchVendorTab(tab) {
+  if (locationAssignmentBusy) { showToast('Esperá a que termine el guardado de ubicaciones.'); return; }
   const dashboardHome = document.getElementById('vendor-dashboard-home');
   const mainLayout = document.querySelector('.b2b-main-layout');
   const mapSection = document.getElementById('store-map-section');
@@ -3988,6 +3989,7 @@ let mobileProductEntryMethod = '';
 let pendingLocationProducts = [];
 let locationAssistantSelectedDraftIds = new Set();
 let locationAssistantState = createEmptyLocationAssistantState();
+let locationAssignmentBusy = false;
 
 function createEmptyLocationAssistantState() {
   return {
@@ -5674,7 +5676,7 @@ function updatePendingLocationIndicators(count) {
 async function fetchPendingLocationProducts() {
   if (!supabaseClient) return [];
   const context = await ensureVendorOperationalSession();
-  if (!context) return [];
+  if (!context) throw new Error('La sesión no está verificada para consultar las ubicaciones.');
   const { data, error } = await supabaseClient
     .from('catalog_product_drafts_v2')
     .select('*')
@@ -5928,7 +5930,7 @@ function renderLocationAssistantProductHeader() {
         <div style="display: flex; gap: 6px; flex-wrap: wrap; max-height: 80px; overflow-y: auto;">
           ${state.products.map(p => `
             <span style="background: #fff; border: 1px solid #a5d6a7; border-radius: 6px; padding: 2px 8px; font-size: 0.78rem; font-weight: 700; color: #152d24;">
-              ${escapeStockHtml(p.name || p.product_code || 'Producto')} (${Number(p.stock) || 0}u)
+              ${escapeStockHtml(p.name || p.product_code || 'Producto')} (${Number(p.stock_quantity ?? p.stock) || 0}u)
             </span>
           `).join('')}
         </div>
@@ -5952,11 +5954,11 @@ function renderLocationAssistantProductHeader() {
         </div>
         <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap;">
           <span style="font-size: 0.78rem; color: var(--vendor-muted);">${escapeStockHtml(product.product_code || '')}</span>
-          <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; font-weight: 800; color: #1b5e20; background: #f1f8e9; border: 1px solid #81c784; padding: 2px 8px; border-radius: 6px;">
+          <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; font-weight: 800; color: #1b5e20; background: #f1f8e9; border: 1px solid #81c784; padding: 2px 8px; border-radius: 6px;">
             <span>Stock:</span>
-            <input type="number" min="0" step="1" id="location-assistant-stock-input" value="${Number(product.stock) >= 0 ? Number(product.stock) : 0}" style="width: 60px; padding: 2px 4px; font-size: 0.85rem; font-weight: 800; text-align: center; border: 1px solid #2e7d32; border-radius: 4px; background: #fff;" oninput="updateLocationAssistantStock(this.value)">
+            <strong title="Ubicar conserva la cantidad; para modificarla usá ingreso o ajuste de inventario.">${Math.max(0, Number(product.stock_quantity ?? product.stock) || 0)}</strong>
             <span>u.</span>
-          </label>
+          </span>
         </div>
       </div>
     </div>`;
@@ -6013,6 +6015,10 @@ function openEditProductLocation(productIdentifier, isMultiSlot = false) {
     showToast(`No se encontró el producto ${productIdentifier} para reubicar.`);
     return;
   }
+
+  // This entry point selects a product, not an explicit stock position. The central
+  // read must reject multiple origins rather than move the first cached position.
+  targetProduct = { ...targetProduct, location_id: null };
 
   const decoded = decodeHumanWmsLocation(targetProduct.wms_code || targetProduct.shelf_code || targetProduct.location || '', targetProduct);
   const zoneObj = LOCATION_ZONE_OPTIONS.find(z => z.id === decoded.zoneCode || z.prefix === decoded.zoneCode) || LOCATION_ZONE_OPTIONS.find(z => Number(z.floor_level || z.floor) === Number(decoded.floorLevel)) || LOCATION_ZONE_OPTIONS[0];
@@ -6212,7 +6218,7 @@ function renderLocationReviewStep() {
 
       ${isEditing && !isBulk ? `
         <button type="button" onclick="persistLocationAssistant(true)" style="width: 100%; padding: 12px; font-size: 0.92rem; font-weight: 800; border-radius: 12px; background: rgba(194,162,70,0.18); border: 1.5px solid var(--vendor-gold); color: #5c3b1e; cursor: pointer;">
-          ➕ Guardar como Ubicación Adicional (Multi-Slot WMS)
+          ¿Cómo repartir stock en otra ubicación?
         </button>
       ` : ''}
 
@@ -6486,291 +6492,128 @@ async function upsertProductLocationWithFallback(location) {
     }
   });
   const cachedLocation = { ...location, location_id: result.location_id, wms_code: result.code };
-  saveLocalProductLocation(cachedLocation);
   return cachedLocation;
 }
 
-async function persistLocationAssistant(saveAsMultiSlot = false) {
-  const state = locationAssistantState;
-  const productsToPersist = (state.isBulk && Array.isArray(state.products) && state.products.length > 0)
-    ? state.products
-    : (state.product ? [state.product] : []);
-
-  const status = document.getElementById('location-assistant-status');
-  if (!productsToPersist.length || !state.zone || !state.compass || !state.wall || !state.level || !state.sector) {
-    showToast('Completá todos los pasos antes de guardar.');
-    return;
-  }
-  try {
-    const authContext = await ensureVendorOperationalSession({ showLogin: true });
-    if (!window.OperationalApi || !authContext) {
-      throw new Error('Iniciá sesión para ubicar productos en la base central.');
-    }
-    if (status) {
-      status.hidden = false;
-      status.dataset.state = 'loading';
-      status.textContent = `Guardando ubicación para ${productsToPersist.length} producto${productsToPersist.length === 1 ? '' : 's'}…`;
-    }
-
-    const zone = state.zone;
-    const wall = state.wall;
-    const level = state.level;
-    const sector = state.sector;
-    const levelNum = Number(level.id) || 1;
-    const floorLevel = zone.floor_level || (zone.id === 'DP' ? 2 : 1);
-    const zonePrefix = zone.prefix || 'TI';
-    const compassCode = state.compass.id || 'D';
-    const wallCode = wall.id || 'P1';
-    const sectorCode = sector.id || 'C';
-    const isChico = sectorCode === 'U' || (sector.label && (sector.label.toLowerCase().includes('chico') || sector.label.toLowerCase().includes('no hace falta')));
-
-    // Código estándar oficial: TI-D-P1-N3-C (o TI-D-P1-N3-U)
-    const wmsCode = `${zonePrefix}-${compassCode}-${wallCode}-N${levelNum}-${sectorCode}`;
-    const locationLabel = isChico
-      ? `📍 ${zone.label} · ${state.compass.compass} de la PC · ${wall.label} · Nivel ${levelNum}`
-      : `📍 ${zone.label} · ${state.compass.compass} de la PC · ${wall.label} · Nivel ${levelNum} · Sector ${sector.label}`;
-
-    // Subir foto una sola vez si aplica
-    const leadCode = productsToPersist[0].product_code || productsToPersist[0].id;
-    const photo = await uploadLocationAssistantPhoto(leadCode);
-
-    // Asegurar existencia del módulo en el mapa si aplica
-    if (window.ensureShelfExistsForLocation) {
-      window.ensureShelfExistsForLocation(wallCode, floorLevel, locationLabel);
-    }
-
-    for (const draft of productsToPersist) {
-      const productCode = draft.product_code || draft.id;
-      const overrides = {
-        floor_level: floorLevel,
-        shelf_code: wallCode,
-        shelf_level: levelNum,
-        location_area: zone.label,
-        location_wall: wall.label,
-        shelf_position: sector.label,
-        placement_photo_url: photo.url,
-        placement_photo_path: photo.path,
-        location_label: locationLabel,
-        location_status: 'LOCATED'
-      };
-      const metadata = buildLocationAssistantMetadata(draft, overrides);
-      const productLocation = {
-        product_id: productCode,
-        product_code: productCode,
-        name: draft.name || productCode,
-        image_url: draft.image_url || photo.url,
-        barcode: draft.barcode || null,
-        floor_level: floorLevel,
-        shelf_code: wallCode,
-        shelf_level: levelNum,
-        stock: Math.max(0, Number(draft.stock) || 0),
-        qr_payload: draft.qr_payload || buildProductQrPayload(productCode),
-        area_name: zone.label,
-        wall_side: wall.label,
-        shelf_position: sector.label,
-        placement_photo_url: photo.url,
-        placement_photo_path: photo.path,
-        location_label: locationLabel,
-        wms_code: wmsCode,
-        updated_at: new Date().toISOString()
-      };
-
-      if (draft.id && (draft.status === 'PENDING_LOCATION' || draft.status === 'PENDING_REVIEW')) {
-        const inputStockEl = document.getElementById('location-assistant-stock-input');
-        const currentStockVal = inputStockEl ? Math.max(0, parseInt(inputStockEl.value, 10) || 0) : (Number(draft.stock) || 0);
-        if (Number.isFinite(currentStockVal) && currentStockVal !== Number(draft.stock_quantity ?? draft.stock)) {
-          try {
-            await window.OperationalApi.updateCatalogProductDraft({
-              supabaseClient,
-              authContext,
-              draftId: draft.id,
-              updates: { stock_quantity: currentStockVal }
-            });
-            draft.stock = currentStockVal;
-            draft.stock_quantity = currentStockVal;
-          } catch (updateErr) {
-            console.warn('Aviso actualizando stock en asistente de ubicación:', updateErr);
-          }
-        }
-        await window.OperationalApi.locateCatalogProductDraft({
-          supabaseClient,
-          authContext,
-          draftId: draft.id,
-          location: {
-            code: wmsCode,
-            name: locationLabel,
-            location_type: 'SHELF',
-            is_sellable: true,
-            is_default: false,
-            metadata: {
-              ...metadata,
-              placement_photo_url: photo.url,
-              placement_photo_path: photo.path
-            }
-          },
-          idempotencyKey: `locate-draft:${draft.id}:${globalThis.crypto?.randomUUID?.() || Date.now()}`
-        });
-      } else {
-        // Producto ya aprobado o existente en inventario: registrar ubicación central
-        await window.OperationalApi.upsertInventoryLocation({
-          supabaseClient,
-          authContext,
-          location: {
-            code: wmsCode,
-            name: locationLabel,
-            location_type: 'SHELF',
-            is_sellable: true,
-            is_default: false,
-            metadata: {
-              ...metadata,
-              product_code: productCode,
-              placement_photo_url: photo.url,
-              placement_photo_path: photo.path
-            }
-          }
-        });
-      }
-
-      saveLocalProductLocation(productLocation);
-
-      if (window.logMapHistoryAction) {
-        window.logMapHistoryAction(
-          state.isEditing ? 'REUBICACION_PRODUCTO' : 'ASISTENTE_UBICACION',
-          state.isEditing ? 'Producto reubicado' : 'Ubicación asignada',
-          `Producto "${draft.name || productCode}" -> ${wmsCode}${saveAsMultiSlot ? ' (Multi-Slot)' : ''}`,
-          wallCode,
-          floorLevel
-        );
-      }
-    }
-
-    storeMapDataLoaded = false;
-    if (typeof loadStoreMapData === 'function') {
-      loadStoreMapData(true).catch(e => console.warn('Recarga de mapa en segundo plano:', e));
-    }
-    if (typeof loadInternalCatalog === 'function') {
-      loadInternalCatalog().catch(e => console.warn('Recarga de catálogo en segundo plano:', e));
-    }
-
-    const successMsg = productsToPersist.length > 1
-      ? `✅ ${productsToPersist.length} productos ubicados en ${wmsCode}`
-      : `✅ Ubicación guardada: ${wmsCode}`;
-
-    showToast(successMsg);
-    if (status) {
-      status.hidden = false;
-      status.dataset.state = 'success';
-      status.textContent = `${successMsg}. Actualizando lista…`;
-    }
-
-    locationAssistantSelectedDraftIds.clear();
-    await loadPendingLocationProducts();
-  } catch (error) {
-    console.error('Error al guardar ubicación asistida:', error);
-    if (status) {
-      status.hidden = false;
-      status.dataset.state = 'error';
-      status.textContent = error.message;
-    }
+function setLocationAssignmentBusy(busy) {
+  locationAssignmentBusy = busy;
+  for (const id of ['location-assistant-content', 'location-assistant-toolbar', 'location-assistant-nav']) {
+    const element = document.getElementById(id);
+    if (element) { element.inert = busy; element.setAttribute('aria-busy', String(busy)); }
   }
 }
 
-async function saveSectorOnlyLocation() {
-  const state = locationAssistantState;
-  const productsToPersist = (state.isBulk && Array.isArray(state.products) && state.products.length > 0)
-    ? state.products
-    : (state.product ? [state.product] : []);
+function showLocationAssignmentStatus(message, state = 'loading') {
+  const status = document.getElementById('location-assistant-status');
+  if (status) { status.hidden = false; status.dataset.state = state; status.textContent = message; }
+}
 
-  if (!productsToPersist.length) {
-    showToast('Seleccioná al menos un producto para guardar en este sector.');
+function buildAssistantDestination(state, sectorOnly, photo = {}) {
+  const zone = state.zone;
+  const floor = Number(zone.floor_level) || Number(String(zone.id).replace(/\D/g, '')) || 1;
+  const prefix = zone.prefix || zone.id || 'S1';
+  const level = sectorOnly ? null : Number(state.level.id);
+  const code = sectorOnly ? `${prefix}-GENERAL`
+    : `${prefix}-${state.compass.id}-${state.wall.id}-N${level}-${state.sector.id}`;
+  const name = sectorOnly ? `📍 ${zone.label} · Pendiente de góndola o balda`
+    : `📍 ${zone.label} · ${state.compass.compass} de la PC · ${state.wall.label} · Nivel ${level}${state.sector.id === 'U' ? '' : ' · Sector ' + state.sector.label}`;
+  return {
+    code, name, location_type: sectorOnly ? 'STORE' : 'SHELF', is_sellable: true, is_default: false,
+    metadata: {
+      floor_level: floor, shelf_code: sectorOnly ? 'GENERAL' : state.wall.id,
+      shelf_level: level, area_name: zone.label, wall_side: sectorOnly ? null : state.wall.label,
+      shelf_position: sectorOnly ? null : state.sector.label, is_sector_only: sectorOnly,
+      placement_photo_url: photo.url || null, placement_photo_path: photo.path || null
+    }
+  };
+}
+
+async function refreshAfterLocationAssignment(complete) {
+  const warnings = [];
+  storeMapDataLoaded = false;
+  try {
+    await loadStoreMapData(true);
+    if (!storeMapDataLoaded) warnings.push('mapa');
+  } catch (error) { warnings.push('mapa'); }
+  try { await loadInternalCatalog(); } catch (error) { warnings.push('catálogo'); }
+  try {
+    pendingLocationProducts = await fetchPendingLocationProducts();
+    updatePendingLocationIndicators(pendingLocationProducts.length);
+    if (complete) {
+      locationAssistantSelectedDraftIds.clear();
+      locationAssistantState = createEmptyLocationAssistantState();
+      renderLocationAssistant();
+    }
+  } catch (error) { warnings.push('lista de pendientes'); }
+  return warnings.length ? ` Falta actualizar: ${warnings.join(', ')}. Usá Refrescar para consultar el estado central.` : '';
+}
+
+async function runAssistantLocationSave(sectorOnly = false) {
+  if (locationAssignmentBusy) return;
+  const state = locationAssistantState;
+  const products = state.isBulk && state.products?.length ? state.products : (state.product ? [state.product] : []);
+  if (state.isMultiSlot) {
+    showLocationAssignmentStatus('Para repartir unidades entre ubicaciones usá Traslados WMS e indicá la cantidad.', 'error');
     return;
   }
-  const zone = state.zone || LOCATION_ZONE_OPTIONS[0];
-  const floorLevel = zone.floor_level || (zone.id === 'DP' ? 2 : (Number(zone.id.replace(/\D/g, '')) || 1));
-  const zonePrefix = zone.prefix || zone.id || 'S1';
-  const wmsCode = `${zonePrefix}-GENERAL`;
-  const locationLabel = `📍 ${zone.label} · Pendiente de góndola o balda`;
-
-  const status = document.getElementById('location-assistant-status');
-  if (status) {
-    status.hidden = false;
-    status.dataset.state = 'loading';
-    status.textContent = `Guardando ${productsToPersist.length} producto(s) en ${zone.label}…`;
+  if (!products.length || !state.zone || (!sectorOnly && (!state.compass || !state.wall || !state.level || !state.sector))) {
+    showToast('Completá los datos de ubicación antes de guardar.');
+    return;
   }
-
+  setLocationAssignmentBusy(true);
   try {
     const authContext = await ensureVendorOperationalSession({ showLogin: true });
-    for (const draft of productsToPersist) {
-      const productCode = draft.product_code || draft.id;
-      const productLocation = {
-        product_id: productCode,
-        product_code: productCode,
-        name: draft.name || productCode,
-        image_url: draft.image_url || '',
-        barcode: draft.barcode || null,
-        floor_level: floorLevel,
-        shelf_code: 'GENERAL',
-        shelf_level: null,
-        stock: Math.max(0, Number(draft.stock) || 0),
-        qr_payload: draft.qr_payload || buildProductQrPayload(productCode),
-        area_name: zone.label,
-        wall_side: null,
-        shelf_position: null,
-        placement_photo_url: null,
-        placement_photo_path: null,
-        location_label: locationLabel,
-        wms_code: wmsCode,
-        updated_at: new Date().toISOString()
-      };
-
-      if (authContext && window.OperationalApi && draft.id && (draft.status === 'PENDING_LOCATION' || draft.status === 'PENDING_REVIEW')) {
-        await window.OperationalApi.locateCatalogProductDraft({
-          supabaseClient,
-          authContext,
-          draftId: draft.id,
-          location: {
-            code: wmsCode,
-            name: locationLabel,
-            location_type: 'SECTOR',
-            is_sellable: true,
-            is_default: false,
-            metadata: {
-              floor_level: floorLevel,
-              shelf_code: 'GENERAL',
-              is_sector_only: true
-            }
-          },
-          idempotencyKey: `locate-draft:${draft.id}:${globalThis.crypto?.randomUUID?.() || Date.now()}`
-        }).catch(e => console.warn('Locate draft error:', e));
-      }
-
-      saveLocalProductLocation(productLocation);
-
-      if (window.logMapHistoryAction) {
-        window.logMapHistoryAction(
-          'ASIGNACION_SECTOR_RAPIDA',
-          'Asignado a Sector general',
-          `Producto "${draft.name || productCode}" -> ${zone.label} (Detalle de balda pendiente)`,
-          'GENERAL',
-          floorLevel
-        );
-      }
+    if (!authContext || !window.OperationalApi || !window.WmsLocationAssignment) {
+      throw new Error('Se requiere una sesión verificada y conexión al servicio de ubicaciones.');
     }
+    showLocationAssignmentStatus('Verificando productos y guardando en la base central…');
+    if (state.assignmentJob && (state.photoBlob !== state.assignmentPhotoSource?.blob
+      || state.photoPreviewUrl !== state.assignmentPhotoSource?.url)) {
+      throw new Error('Quedó un guardado por verificar. Reintentá con la misma foto antes de cambiarla.');
+    }
+    if (!sectorOnly && !state.assignmentPhoto) {
+      state.assignmentPhoto = await uploadLocationAssistantPhoto(products[0].product_code || products[0].id);
+    }
+    const destination = buildAssistantDestination(state, sectorOnly, state.assignmentPhoto);
+    if (state.assignmentJob && JSON.stringify(state.assignmentJob.location) !== JSON.stringify(destination)) {
+      throw new Error('Quedó un guardado por verificar. Reintentá con el mismo destino antes de cambiarlo.');
+    }
+    if (!state.assignmentJob) {
+      state.assignmentJob = window.WmsLocationAssignment.createJob({
+        products, location: destination, tenantId: authContext.tenantId, userId: authContext.userId
+      });
+      state.assignmentPhotoSource = { blob: state.photoBlob, url: state.photoPreviewUrl };
+    }
+    const result = await window.WmsLocationAssignment.runJob(state.assignmentJob, {
+      supabaseClient, api: window.OperationalApi, authContext,
+      onProgress: (done, total) => showLocationAssignmentStatus(`${done} de ${total} productos confirmados en la base central…`)
+    });
+    result.confirmed.forEach(entry => locationAssistantSelectedDraftIds.delete(String(entry.product.id || entry.target.id)));
+    const total = state.assignmentJob.entries.length;
+    const message = result.complete
+      ? `✅ ${total} producto(s) confirmado(s) en ${destination.code}. Se conservaron sus cantidades.`
+      : `${result.confirmed.length} de ${total} confirmados. Quedan ${result.pending.length} pendientes. ${result.failure.entry.product.name || result.failure.entry.target.id}: ${result.failure.message} Reintentá para continuar; los confirmados no se repiten.`;
+    const refreshWarning = await refreshAfterLocationAssignment(result.complete);
+    showLocationAssignmentStatus(message + refreshWarning, result.complete ? 'success' : 'error');
+    showToast(result.complete ? message : `Guardado incompleto: ${result.confirmed.length}/${total}. Revisá el detalle en el asistente.`);
+    return result;
+  } catch (error) {
+    console.error('No se pudo completar la ubicación central:', error);
+    showLocationAssignmentStatus(error.message, 'error');
+    showToast(`No se pudo guardar: ${error.message}`);
+  } finally { setLocationAssignmentBusy(false); }
+}
 
-    storeMapDataLoaded = false;
-    if (typeof loadStoreMapData === 'function') loadStoreMapData(true).catch(() => {});
-    if (typeof loadInternalCatalog === 'function') loadInternalCatalog().catch(() => {});
-
-    showToast(`💾 ${productsToPersist.length} producto(s) asignado(s) a ${zone.label}.`);
-    locationAssistantSelectedDraftIds.clear();
-    await loadPendingLocationProducts();
-    renderStoreMapUI();
-    switchVendorTab('store-map');
-    if (window.openWmsSectorView) window.openWmsSectorView(floorLevel);
-  } catch (err) {
-    console.error('Error al guardar en sector general:', err);
-    showToast(`Error al guardar: ${err.message}`);
+async function persistLocationAssistant(saveAsMultiSlot = false) {
+  if (saveAsMultiSlot || locationAssistantState.isMultiSlot) {
+    showLocationAssignmentStatus('Para dividir stock entre ubicaciones usá Traslados WMS e indicá la cantidad. No se duplicaron unidades.', 'error');
+    return;
   }
+  return runAssistantLocationSave(false);
+}
+
+async function saveSectorOnlyLocation() {
+  return runAssistantLocationSave(true);
 }
 window.saveSectorOnlyLocation = saveSectorOnlyLocation;
 
@@ -6792,15 +6635,28 @@ function startBatchSectorRefinement(productIds, sectorFloor) {
     ...(typeof pendingDraftCache !== 'undefined' ? Array.from(pendingDraftCache.values()) : [])
   ];
 
-  const matchedProducts = productIds.map(id => {
-    const q = String(id).toUpperCase();
-    return allCandidates.find(p => 
-      String(p.id).toUpperCase() === q ||
-      String(p.product_id).toUpperCase() === q ||
-      String(p.product_code).toUpperCase() === q ||
-      String(p.sku).toUpperCase() === q
-    );
-  }).filter(Boolean);
+  const matchedProducts = [];
+  for (const id of productIds) {
+    const query = String(id).toUpperCase();
+    const matches = allCandidates.filter(product => {
+      if (!product) return false;
+      const code = String(product.wms_code || product.shelf_code || product.location || '').toUpperCase();
+      const floor = Number(window.WmsSectors?.resolveFloor(product) || product.floor_level);
+      const pending = product.is_draft || product.draft_id || ['PENDING_LOCATION', 'PENDING_REVIEW'].includes(product.status)
+        || product.is_sector_only || code === 'GENERAL' || code.endsWith('-GENERAL') || !code;
+      return floor === floorNum && pending && [product.id, product.product_id, product.product_code, product.sku]
+        .some(value => value != null && String(value).toUpperCase() === query);
+    });
+    // Cached projections may repeat a row, but different drafts/origins are not interchangeable.
+    const unique = new Map(matches.map(product => [
+      `${product.draft_id || product.product_id || product.id}:${product.location_id || ''}`, product
+    ]));
+    if (unique.size !== 1) {
+      showToast(`No se pudo identificar una única ubicación de ${id} en este sector. Refrescá el mapa o elegí el origen en Traslados WMS.`);
+      return;
+    }
+    matchedProducts.push(unique.values().next().value);
+  }
 
   if (!matchedProducts.length) {
     showToast('No se encontraron los productos seleccionados.');
@@ -6809,7 +6665,7 @@ function startBatchSectorRefinement(productIds, sectorFloor) {
 
   locationAssistantState = {
     ...createEmptyLocationAssistantState(),
-    step: 'wall',
+    step: 'type',
     product: matchedProducts[0],
     products: matchedProducts,
     zone: zoneObj,

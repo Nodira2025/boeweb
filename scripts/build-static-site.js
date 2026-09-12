@@ -59,6 +59,7 @@ const PUBLIC_ROOT_FILES = [
   'vendedor.html',
   'vendedor.js',
   'wms-map.css',
+  'wms-location-assignment.js',
   'wms-sectors.js',
   'wms-sector-editor.js'
 ];
