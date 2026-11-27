@@ -27,7 +27,7 @@ Los datos y logs permanecen locales. Con la PC apagada no habrá mediciones. La 
 
 ## n8n local
 
-El servidor responde en http://127.0.0.1:5678 y conserva el workflow `boewebSentryLocalTriage`. Falta el alta de propietario en `/setup`, guardar el token de lectura autorizado, ejecutar una consulta real y publicar el workflow. El flujo consulta sólo `boeweb-browser`, aunque el alcance de `event:read` del token abarca la organización `tucapacitacion`, autorizado por el titular.
+El servidor responde en http://127.0.0.1:5678 y tiene publicado el workflow `boewebSentryLocalTriage`, con credencial cifrada y consulta real verificada. Falta el alta de propietario en `/setup` para acceder al editor. El flujo consulta sólo `boeweb-browser`, aunque el alcance de `event:read` del token abarca la organización `tucapacitacion`, autorizado por el titular.
 
 ## Fuentes
 
