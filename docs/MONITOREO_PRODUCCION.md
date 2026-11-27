@@ -33,3 +33,13 @@ El servidor responde en http://127.0.0.1:5678 y conserva el workflow `boewebSent
 
 - https://docs.netlify.com/build/post-processing/snippet-injection/
 - https://github.com/louislam/uptime-kuma/releases/tag/2.5.12
+
+## Conexión Sentry–n8n verificada (27/11/2026)
+
+La credencial `Sentry boeweb lectura` ya está importada en el almacén cifrado local de n8n con alcance `event:read`, autorizado para la organización. El archivo temporal restringido se eliminó tras importarlo. La ejecución CLI terminó en `Resumir incidencias nuevas` con `success` y devolvió `BOEWEB-BROWSER-1`, nivel error, recuento 1. Evidencia sanitizada: `scratch/n8n-runtime/sentry-verified.json` en el checkout original.
+
+El workflow `boewebSentryLocalTriage` está publicado (`active=true`) y el servidor reiniciado carga un workflow publicado. Tiene inicio manual para diagnóstico y programación cada 15 minutos. La consulta no modifica Sentry ni envía mensajes. El alta de propietario local sigue pendiente para poder usar el editor. Una ejecución programada se inició; todavía falta confirmar un ciclo programado completo después del reinicio.
+
+Los archivos versionados de `automation/n8n/` generan e importan este flujo. `connect-sentry-local.cjs` usa la instalación existente en `scratch/n8n-runtime/`, verifica la consulta y publica el workflow; reimporta el ID fijo, por lo que sólo debe ejecutarse durante la instalación o una actualización controlada. Exportar antes cualquier edición propia del flujo.
+
+Argos ya tiene instalado su GitHub App únicamente en `Nodira2025/boeweb` y el proyecto muestra ese repositorio conectado. Renovate está instalado únicamente en boeweb; su panel Mend pide aceptar los términos antes de finalizar el alta, con autorización del titular pendiente.

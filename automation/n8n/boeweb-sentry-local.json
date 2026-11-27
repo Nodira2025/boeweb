@@ -1,0 +1,123 @@
+{
+  "id": "boewebSentryLocalTriage",
+  "name": "boeweb · Triage local de Sentry",
+  "active": false,
+  "nodes": [
+    {
+      "id": "sentry-manual",
+      "name": "Probar lectura manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "parameters": {},
+      "position": [
+        0,
+        180
+      ]
+    },
+    {
+      "id": "sentry-schedule",
+      "name": "Cada 15 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "sentry-get-issues",
+      "name": "Incidencias boeweb-browser",
+      "type": "n8n-nodes-base.sentryIo",
+      "typeVersion": 1,
+      "credentials": {
+        "sentryIoApi": {
+          "id": "boewebSentryRead",
+          "name": "Sentry boeweb lectura"
+        }
+      },
+      "parameters": {
+        "authentication": "accessToken",
+        "resource": "issue",
+        "operation": "getAll",
+        "organizationSlug": "tucapacitacion",
+        "projectSlug": "boeweb-browser",
+        "returnAll": false,
+        "limit": 50,
+        "additionalFields": {
+          "query": "is:unresolved",
+          "statsPeriod": "24h",
+          "shortIdLookUp": false
+        }
+      },
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "id": "sentry-summarize",
+      "name": "Resumir incidencias nuevas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const state = $getWorkflowStaticData('global');\nconst seen = state.seen ?? {};\nconst now = Date.now();\nconst issues = $input.all().map(item => item.json).filter(issue => issue && issue.id);\nconst next = [];\nfor (const issue of issues) {\n  const id = String(issue.id);\n  const lastSeen = String(issue.lastSeen ?? '');\n  if (seen[id] === lastSeen) continue;\n  seen[id] = lastSeen;\n  next.push({\n    json: {\n      project: 'boeweb-browser',\n      shortId: String(issue.shortId ?? '').slice(0, 50),\n      status: String(issue.status ?? '').slice(0, 50),\n      level: String(issue.level ?? '').slice(0, 30),\n      count: Number(issue.count ?? 0),\n      firstSeen: String(issue.firstSeen ?? ''),\n      lastSeen,\n      link: /^https:\\/\\/[^/]+\\.sentry\\.io\\/issues\\/\\d+\\/?$/.test(String(issue.permalink ?? '')) ? issue.permalink : '',\n      review: 'Revisar en Sentry; no cerrar ni asignar automáticamente.'\n    }\n  });\n}\n// Bound the deduplication state; n8n persists static data only for active workflows.\nstate.seen = Object.fromEntries(Object.entries(seen).slice(-500));\nstate.checkedAt = new Date(now).toISOString();\nreturn next;"
+      },
+      "position": [
+        480,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Probar lectura manual": {
+      "main": [
+        [
+          {
+            "node": "Incidencias boeweb-browser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cada 15 minutos": {
+      "main": [
+        [
+          {
+            "node": "Incidencias boeweb-browser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Incidencias boeweb-browser": {
+      "main": [
+        [
+          {
+            "node": "Resumir incidencias nuevas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Argentina/Buenos_Aires",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  }
+}
