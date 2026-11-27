@@ -20,6 +20,7 @@ const PUBLIC_ROOT_FILES = [
   'index.css',
   'index.html',
   'index.js',
+  'sentry-bootstrap.js',
   'inventory-export.js',
   'mapa-local.js',
   'memberPortal.js',
