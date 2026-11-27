@@ -39,7 +39,8 @@ async function main() {
     if (error.code !== 'ENOENT') throw error;
   }
   const workflow = path.join(__dirname, 'boeweb-sentry-local.json');
-  await cli(['import:workflow', `--input=${workflow}`], config);
+  const verifyOnly = process.argv[2] === 'verify';
+  if (!verifyOnly) await cli(['import:workflow', `--input=${workflow}`], config);
   const output = await cli(['execute', '--id=boewebSentryLocalTriage', '--rawOutput'], config);
   const start = output.indexOf('{\n');
   if (start < 0) throw new Error('n8n no devolvió evidencia de ejecución.');
@@ -50,8 +51,10 @@ async function main() {
   const evidence = { status: result.status, lastNode: data.lastNodeExecuted, checkedAt: new Date().toISOString(), issues: items.map(item => ({shortId:item.json.shortId,level:item.json.level,count:item.json.count})) };
   await fs.writeFile(path.join(runtime, 'sentry-verified.json'), `${JSON.stringify(evidence,null,2)}\n`);
   console.log(JSON.stringify(evidence));
-  await cli(['publish:workflow', '--id=boewebSentryLocalTriage'], config);
-  console.log('Workflow de lectura publicado con intervalo de 15 minutos.');
+  if (!verifyOnly) {
+    await cli(['publish:workflow', '--id=boewebSentryLocalTriage'], config);
+    console.log('Workflow de lectura publicado con intervalo de 15 minutos.');
+  }
 }
 
 main().catch(error => { console.error(error.message); process.exitCode = 1; });

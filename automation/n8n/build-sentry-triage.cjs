@@ -4,35 +4,6 @@ const path = require('node:path');
 const WORKFLOW_ID = 'boewebSentryLocalTriage';
 const output = path.join(__dirname, 'boeweb-sentry-local.json');
 
-const summarizeIssues = `const state = $getWorkflowStaticData('global');
-const seen = state.seen ?? {};
-const now = Date.now();
-const issues = $input.all().map(item => item.json).filter(issue => issue && issue.id);
-const next = [];
-for (const issue of issues) {
-  const id = String(issue.id);
-  const lastSeen = String(issue.lastSeen ?? '');
-  if (seen[id] === lastSeen) continue;
-  seen[id] = lastSeen;
-  next.push({
-    json: {
-      project: 'boeweb-browser',
-      shortId: String(issue.shortId ?? '').slice(0, 50),
-      status: String(issue.status ?? '').slice(0, 50),
-      level: String(issue.level ?? '').slice(0, 30),
-      count: Number(issue.count ?? 0),
-      firstSeen: String(issue.firstSeen ?? ''),
-      lastSeen,
-      link: /^https:\\/\\/[^/]+\\.sentry\\.io\\/issues\\/\\d+\\/?$/.test(String(issue.permalink ?? '')) ? issue.permalink : '',
-      review: 'Revisar en Sentry; no cerrar ni asignar automáticamente.'
-    }
-  });
-}
-// Bound the deduplication state; n8n persists static data only for active workflows.
-state.seen = Object.fromEntries(Object.entries(seen).slice(-500));
-state.checkedAt = new Date(now).toISOString();
-return next;`;
-
 const workflow = {
   id: WORKFLOW_ID,
   name: 'boeweb · Triage local de Sentry',
@@ -73,18 +44,38 @@ const workflow = {
       position: [240, 0],
     },
     {
+      id: 'sentry-dedupe',
+      name: 'Descartar incidencias ya vistas',
+      type: 'n8n-nodes-base.removeDuplicates',
+      typeVersion: 2,
+      parameters: { operation: 'removeItemsSeenInPreviousExecutions', logic: 'removeItemsWithAlreadySeenKeyValues', dedupeValue: '={{ $json.id + ":" + $json.lastSeen }}', options: { scope: 'node', historySize: 500 } },
+      position: [480, 0],
+    },
+    {
       id: 'sentry-summarize',
       name: 'Resumir incidencias nuevas',
-      type: 'n8n-nodes-base.code',
-      typeVersion: 2,
-      parameters: { jsCode: summarizeIssues },
+      type: 'n8n-nodes-base.set',
+      typeVersion: 3.4,
+      parameters: {
+        mode: 'manual',
+        includeOtherFields: false,
+        assignments: { assignments: [
+          { id: 'project', name: 'project', type: 'string', value: 'boeweb-browser' },
+          ...['shortId', 'status', 'level', 'firstSeen', 'lastSeen'].map(name => ({ id: name, name, type: 'string', value: '={{ String($json.' + name + ' ?? "").slice(0, 100) }}' })),
+          { id: 'count', name: 'count', type: 'number', value: '={{ Number($json.count ?? 0) }}' },
+          { id: 'link', name: 'link', type: 'string', value: '={{ "https://tucapacitacion.sentry.io/issues/" + String($json.id).replace(/[^0-9]/g, "") + "/" }}' },
+          { id: 'review', name: 'review', type: 'string', value: 'Revisar en Sentry; no cerrar ni asignar automáticamente.' },
+        ] },
+        options: {},
+      },
       position: [480, 0],
     },
   ],
   connections: {
     'Probar lectura manual': { main: [[{ node: 'Incidencias boeweb-browser', type: 'main', index: 0 }]] },
     'Cada 15 minutos': { main: [[{ node: 'Incidencias boeweb-browser', type: 'main', index: 0 }]] },
-    'Incidencias boeweb-browser': { main: [[{ node: 'Resumir incidencias nuevas', type: 'main', index: 0 }]] },
+    'Incidencias boeweb-browser': { main: [[{ node: 'Descartar incidencias ya vistas', type: 'main', index: 0 }]] },
+    'Descartar incidencias ya vistas': { main: [[{ node: 'Resumir incidencias nuevas', type: 'main', index: 0 }]] },
   },
   settings: {
     executionOrder: 'v1',

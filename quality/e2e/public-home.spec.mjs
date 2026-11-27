@@ -1,6 +1,18 @@
 import { test, expect } from '@playwright/test';
 import { argosScreenshot } from '@argos-ci/playwright';
 
+test.beforeEach(async ({ page }) => {
+  // The homepage decorates itself with random leaves. Use the same seed so their
+  // positions do not produce visual changes when the application code is unchanged.
+  await page.addInitScript(() => {
+    let seed = 18731;
+    Math.random = () => {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    };
+  });
+});
+
 test('portada y catálogo accesibles', async ({ page }) => {
   // Keep CI deterministic: do not read the live inventory or send telemetry.
   await page.route(/supabase\.co|sentry\.io|sentry-cdn\.com/, route => route.abort());

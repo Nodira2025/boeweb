@@ -65,12 +65,91 @@
       ]
     },
     {
-      "id": "sentry-summarize",
-      "name": "Resumir incidencias nuevas",
-      "type": "n8n-nodes-base.code",
+      "id": "sentry-dedupe",
+      "name": "Descartar incidencias ya vistas",
+      "type": "n8n-nodes-base.removeDuplicates",
       "typeVersion": 2,
       "parameters": {
-        "jsCode": "const state = $getWorkflowStaticData('global');\nconst seen = state.seen ?? {};\nconst now = Date.now();\nconst issues = $input.all().map(item => item.json).filter(issue => issue && issue.id);\nconst next = [];\nfor (const issue of issues) {\n  const id = String(issue.id);\n  const lastSeen = String(issue.lastSeen ?? '');\n  if (seen[id] === lastSeen) continue;\n  seen[id] = lastSeen;\n  next.push({\n    json: {\n      project: 'boeweb-browser',\n      shortId: String(issue.shortId ?? '').slice(0, 50),\n      status: String(issue.status ?? '').slice(0, 50),\n      level: String(issue.level ?? '').slice(0, 30),\n      count: Number(issue.count ?? 0),\n      firstSeen: String(issue.firstSeen ?? ''),\n      lastSeen,\n      link: /^https:\\/\\/[^/]+\\.sentry\\.io\\/issues\\/\\d+\\/?$/.test(String(issue.permalink ?? '')) ? issue.permalink : '',\n      review: 'Revisar en Sentry; no cerrar ni asignar automáticamente.'\n    }\n  });\n}\n// Bound the deduplication state; n8n persists static data only for active workflows.\nstate.seen = Object.fromEntries(Object.entries(seen).slice(-500));\nstate.checkedAt = new Date(now).toISOString();\nreturn next;"
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "logic": "removeItemsWithAlreadySeenKeyValues",
+        "dedupeValue": "={{ $json.id + \":\" + $json.lastSeen }}",
+        "options": {
+          "scope": "node",
+          "historySize": 500
+        }
+      },
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "id": "sentry-summarize",
+      "name": "Resumir incidencias nuevas",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "project",
+              "name": "project",
+              "type": "string",
+              "value": "boeweb-browser"
+            },
+            {
+              "id": "shortId",
+              "name": "shortId",
+              "type": "string",
+              "value": "={{ String($json.shortId ?? \"\").slice(0, 100) }}"
+            },
+            {
+              "id": "status",
+              "name": "status",
+              "type": "string",
+              "value": "={{ String($json.status ?? \"\").slice(0, 100) }}"
+            },
+            {
+              "id": "level",
+              "name": "level",
+              "type": "string",
+              "value": "={{ String($json.level ?? \"\").slice(0, 100) }}"
+            },
+            {
+              "id": "firstSeen",
+              "name": "firstSeen",
+              "type": "string",
+              "value": "={{ String($json.firstSeen ?? \"\").slice(0, 100) }}"
+            },
+            {
+              "id": "lastSeen",
+              "name": "lastSeen",
+              "type": "string",
+              "value": "={{ String($json.lastSeen ?? \"\").slice(0, 100) }}"
+            },
+            {
+              "id": "count",
+              "name": "count",
+              "type": "number",
+              "value": "={{ Number($json.count ?? 0) }}"
+            },
+            {
+              "id": "link",
+              "name": "link",
+              "type": "string",
+              "value": "={{ \"https://tucapacitacion.sentry.io/issues/\" + String($json.id).replace(/[^0-9]/g, \"\") + \"/\" }}"
+            },
+            {
+              "id": "review",
+              "name": "review",
+              "type": "string",
+              "value": "Revisar en Sentry; no cerrar ni asignar automáticamente."
+            }
+          ]
+        },
+        "options": {}
       },
       "position": [
         480,
@@ -102,6 +181,17 @@
       ]
     },
     "Incidencias boeweb-browser": {
+      "main": [
+        [
+          {
+            "node": "Descartar incidencias ya vistas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descartar incidencias ya vistas": {
       "main": [
         [
           {
