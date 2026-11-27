@@ -29,5 +29,9 @@ test('carrito abre y conserva su control de cierre', async ({ page }) => {
   await page.getByRole('button', { name: 'Ver carrito', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Tu Pedido' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Cerrar carrito' })).toBeVisible();
+  // Opening the inline cart starts smooth scrolling. Cancel that movement so
+  // fixed mobile navigation is captured at the same document position each time.
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   await argosScreenshot(page, 'BÔ carrito abierto', { root: './.argos' });
 });
