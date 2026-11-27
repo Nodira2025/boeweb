@@ -1,0 +1,31 @@
+name: Rendimiento local
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Iniciar sitio local
+        run: |
+          node local-server.js > /tmp/boeweb-server.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:4173/ > /dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/boeweb-server.log
+          exit 1
+      - name: Medir portada y validar umbrales
+        run: docker run --rm --network host -v "$PWD:/repo" -w /repo grafana/k6:2.4.0 run quality/load/public-smoke.js

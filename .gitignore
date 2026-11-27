@@ -19,3 +19,8 @@ assets/vendor/sheetjs/xlsx-0.20.3.min.js
 dist/
 scratch/dumps/
 scratch/temp_*.sql
+
+# Quality reports
+.argos/
+playwright-report/
+test-results/
